@@ -187,13 +187,14 @@ function spawn(G, e, y) {
     const M = G.mobs[G.mobs.length - 1]; M.size = 2.3; M.hurt = 6 + Math.round(L * .8); gg.giant = M;
     M.mb = MIDS[(G.L + (G.mids = (G.mids || 0) + 1)) % MIDS.length];
     // 양옆 지원: 대군보다 조금 앞에서 시작해 대군이 다 지나갈 때까지
-    const big = Math.random() < .5 ? 0 : 1, len = depth + 520, stepY = 72;
+    const big = Math.random() < .5 ? 0 : 1, len = depth + 520, stepY = 72, minusAt = [ri(6, 8), ri(6, 8)];
     [0, 1].forEach(sd => {
       const x0 = sd ? ROAD_R - LANE + 4 : ROAD_L, x1 = sd ? ROAD_R : ROAD_L + LANE - 4, cx = (x0 + x1) / 2;
       let k2 = 0;
       for (let yy = y + 120 + sd * 31; yy > y - len; yy -= stepY, k2++) {
         const roll = k2 % 5;
-        if (sd === big && k2 === 4) G.gates.push(laneGate(x0, x1, yy, L >= 4 ? 100 : 50));              // 큰 문 하나(+100)
+        if (k2 === 4) G.gates.push(laneGate(x0, x1, yy, (sd === big ? 1 : -1) * (L >= 4 ? 100 : 50)));   // 같은 높이에 한쪽 +100 · 반대쪽 -100 — 잘 골라야
+        else if (k2 === minusAt[sd] || k2 === minusAt[sd] + 6) G.gates.push(laneGate(x0, x1, yy, -10 * ri(1, 3)));   // 줄 중간중간 -10 · -20 · -30 (쏘면 줄어듦)
         else if (roll === 2 + sd) {                                               // 보급 상자: 무기 · 연사 · 유도탄
           const r = Math.random(), gift = G.tier < TIERS.length - 1 && r < .3 ? 'tier' : r < .55 ? 'missile' : r < .8 ? 'rate' : 'dmg';
           const bh = Math.round((4 + L * 1.2) * (1 + p * .3));
@@ -553,7 +554,7 @@ export function autoAim(G, skill, dt, mem) {
   if (G.missiles && skill >= .5 && (G.boss || G.mobs.some(m => m.size > 1 && m.y > -700))) fireMissile(G);
   const near = G.boxes.filter(x => x.y > -230 && Math.abs(x.x - G.px) < x.w / 2 + R && !G.boxes.some(o => o !== x && Math.abs(o.y - x.y) < 4));
   if (near.length && skill > .3) { const x = near[0].x, w = near[0].w / 2 + R + 10; return pick(x < MID ? Math.min(ROAD_R - 30, x + w) : Math.max(ROAD_L + 30, x - w)); }
-  const gt = G.gates.filter(x => !x.used && x.y > -520).sort((a, b) => b.y - a.y)[0];
+  const gt = G.gates.filter(x => !x.used && x.y > -520 && !(x.lane && partValue(G, x.parts[0]) < G.n)).sort((a, b) => b.y - a.y)[0];
   if (gt) {
     const val = p => partValue(G, p);
     let best = 0; gt.parts.forEach((p, i) => { if (val(p) > val(gt.parts[best])) best = i; });
