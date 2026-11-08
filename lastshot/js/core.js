@@ -192,7 +192,7 @@ function elite(M, Lv) { M.hp = M.max = Math.round(M.hp * 4 + Lv * .4); M.size = 
 
 function spawn(G, e, y) {
   const L = power(G.L), p = e.p, k = e.kind;
-  ARMY = Math.max(3, G.n); LVL = G.L; LVK = (STAGE_K[G.stage] || 1) * (G.twist === 'gust' || G.twist === 'elite' ? .8 : 1) * (1 - (G.help || 0) * .1);
+  ARMY = Math.max(3, G.n); LVL = G.L; LVK = (STAGE_K[G.stage] || 1) * (G.twist === 'gust' || G.twist === 'elite' ? .8 : 1) * (1 - (G.help || 0) * .1) * (G.L >= 7 ? 1.2 : 1);   // 7레벨부터 1.2배 (사용자 지시 2026-11-08)
   G.p = p;
   if (k === 'gate' || k === 'swap') {
     let A = gateVal(G, true, p), B = gateVal(G, false, p);
@@ -258,7 +258,7 @@ function spawn(G, e, y) {
     const tank = G.bossKind === 'tank';
     // 보스 체력 = 지금 우리 화력(초당 피해) × 버티는 시간(레벨 1 약 5초 → 20 약 10초) — 부대가 아무리 커도 만나자마자 녹지 않게
     const dps = G.rate * G.dmg * TIERS[G.tier].mul * Math.pow(Math.max(1, G.n), .72) * .85;
-    const hp = Math.round(Math.max(60 + L * 55 + L * L * 3, dps * (5 + Math.min(G.L, 20) * .25) * (1 - (G.help || 0) * .08)) * (tank ? .9 : 1));
+    const hp = Math.round(Math.max(60 + L * 55 + L * L * 3, dps * (5 + Math.min(G.L, 20) * .25) * (1 - (G.help || 0) * .08) * (G.L >= 7 ? 1.2 : 1)) * (tank ? .9 : 1));
     const look = bossLook(G.L);
     G.boss = { kind: G.bossKind, animal: look.animal, evo: look.evo, x: MID, y: y - 40, r: tank ? 70 : 62, hp, max: hp, vy: tank ? 16 + L : 100 + Math.min(L, 20) * 3, stop: tank ? -560 : -800,
       t: 0, flash: 0, pop: 0, acc: 0, accT: 0, summon: 2.5, bite: 0, fire: 1.2, aim: 0 };
