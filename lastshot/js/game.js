@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=22';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=24';
 import { SPRITES } from './sprites.js?v=17';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
@@ -769,7 +769,7 @@ function fxFloat(x, y, s, c, size, small, h) {
   if (small) { let n = 0; for (const t of texts) if (t.small) n++; if (n >= 14) return; }
   if (!small) { let n = 0; for (let i = texts.length - 1; i >= 0; i--) if (!texts[i].small && ++n >= 5) texts.splice(i, 1); }   // 큰 글자는 동시에 5개까지
   texts.push({ x: wx(x), z: wz(y), h: h || 3, s, c, size: size || 18, t: small ? .55 : 1.1, L: small ? .55 : 1.1, small, dy: 0 }); }
-let tint = null, shake = 0, banner = 0, hitstop = 0, flashW = 0;
+let tint = null, shake = 0, banner = 0, bannerL = 1.9, hitstop = 0, flashW = 0;
 // 콤보 · 외침 · 동전 · 꽃가루
 let comboPop = 0, shout = null;
 const SHOUTS = [[10, 'GOOD!', '#7dd3fc'], [25, 'GREAT!', '#86efac'], [50, 'AMAZING!', '#fde047'], [100, 'FANTASTIC!', '#fb923c'], [200, 'UNSTOPPABLE!', '#f472b6'], [400, 'LEGENDARY!', '#c4b5fd']];
@@ -900,12 +900,18 @@ function drawOverlay(dt) {
   ctx.globalAlpha = 1;
   // 시작 안내: 스테이지 이름 · 보스
   if (banner > 0 && state === 'play') {
-    banner -= dt; const st = STAGES[G.stage], a = Math.min(1, banner * 2, (1.9 - banner) * 4), y = Math.max(196, VH * .3), w = Math.min(310, VW - 32);
+    banner -= dt; const st = STAGES[G.stage], a = Math.min(1, banner * 2, (bannerL - banner) * 4), y = Math.max(196, VH * .3), w = Math.min(310, VW - 32);
     ctx.globalAlpha = a;
     const g = ctx.createLinearGradient(0, y - 30, 0, y + 30); g.addColorStop(0, 'rgba(30,58,138,.92)'); g.addColorStop(1, 'rgba(15,23,42,.92)');
     ctx.fillStyle = g; rr(VW / 2 - w / 2, y - 30, w, 60, 16); ctx.fill(); ctx.strokeStyle = 'rgba(253,224,71,.8)'; ctx.lineWidth = 2; ctx.stroke();
     text('레벨 ' + G.L + ' · ' + st.name, VW / 2, y - 9, 20 * k, '#fde047', true);
     ctx.font = `800 ${12 * k}px ${FONT}`; ctx.fillStyle = '#fca5a5'; ctx.textAlign = 'center'; ctx.fillText('보스: ' + bossName(G.L), VW / 2, y + 15);
+    const tw = G.twist && TWISTS[G.twist];
+    if (tw) {   // 오늘의 변수: 판 아래 띠
+      const ty = y + 50; ctx.fillStyle = 'rgba(8,47,73,.92)'; rr(VW / 2 - w / 2 + 14, ty - 17, w - 28, 34, 12); ctx.fill(); ctx.strokeStyle = 'rgba(125,211,252,.85)'; ctx.lineWidth = 1.5; ctx.stroke();
+      text('오늘의 변수 · ' + tw.name, VW / 2, ty - 5, 13 * k, '#7dd3fc', true);
+      ctx.font = `700 ${10.5 * k}px ${FONT}`; ctx.fillStyle = '#e0f2fe'; ctx.fillText(tw.sub, VW / 2, ty + 9);
+    }
     ctx.globalAlpha = 1;
   }
   // 보스 등장 경고
@@ -1095,7 +1101,7 @@ function start() {
   clearViews(); texts.length = 0; coins.length = 0; confetti.length = 0; bodies.length = 0; inFlight = 0; shout = null; bossWarn = 0; bossSeen = false;
   born.length = 0; lastN = 3; squadPop = 0; hitstop = 0; dragId = null; dragX = null; scoreAt = null; slow = 0; kick = 0; tint = null; flashW = 0; shake = 0; comboPop = 0;
   save('lastshot_live', 1);   // 판 도중 새로고침 = 쓰러진 것으로(누적 점수를 지키려는 새로고침 막기)
-  G = newGame(level, hooks); state = 'play'; setTheme((G.L - 1) % 5); banner = 1.9; dispScore = score(); syncHud(0);
+  G = newGame(level, hooks); state = 'play'; setTheme((G.L - 1) % 5); banner = bannerL = G.twist ? 2.6 : 1.9; dispScore = score(); syncHud(0);
   btnMsl.hidden = false;
 }
 function countUp(el, to, ms = 900) {

@@ -37,7 +37,27 @@ export const STAGES = {
 };
 // 레벨 순서: 2 돌격 · 3 뱀 · 4 미로 · 5 무기고 · 6 대군 · 7 매복 · 8 포위 · 9 총공격 → 10 부터 다시(더 세게)
 const ORDER = ['rush', 'serpent', 'maze', 'armory', 'assault', 'ambush', 'siege', 'legion'];
-export const stageOf = L => L <= 1 ? 'basic' : ORDER[(L - 2) % ORDER.length];
+const cycleOf = L => Math.floor((L - 2) / ORDER.length);
+function orderOf(c) {   // 바퀴 c 의 스테이지 순서: 0 은 그대로, 1 부터는 c 로 정해지는 섞기(앞 바퀴 마지막과 같은 스테이지로 시작하지 않게)
+  if (c <= 0) return ORDER;
+  const a = ORDER.slice(); let s = c * 9301 + 49297;
+  for (let i = a.length - 1; i > 0; i--) { s = (s * 233 + 1013) % 65536; const j = s % (i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  if (a[0] === orderOf(c - 1)[ORDER.length - 1]) [a[0], a[1]] = [a[1], a[0]];
+  return a;
+}
+export const stageOf = L => L <= 1 ? 'basic' : orderOf(cycleOf(L))[(L - 2) % ORDER.length];
+// 오늘의 변수: 3레벨부터 판마다 무작위로 하나(같은 레벨도 할 때마다 다르게)
+export const TWISTS = {
+  gold:   { name: '황금 러시', sub: '점수 2배 · 보급 상자가 많아요' },
+  gust:   { name: '돌풍', sub: '적이 빨라요 · 대신 수가 적어요' },
+  giants: { name: '거인의 날', sub: '중간보스가 여럿 나와요' },
+  supply: { name: '보급의 날', sub: '문 숫자가 크고 문이 많아요' },
+  elite:  { name: '정예 부대', sub: '단단한 정예병이 많아요 · 대신 수는 적어요' },
+  storm:  { name: '천둥 폭풍', sub: '하늘에서 번개가 저절로 떨어져요' }
+};
+const TW_KEYS = Object.keys(TWISTS);
+// 두 번째 바퀴부터 섞어 넣는 손님 요소(다른 스테이지의 것)
+const GUESTS = ['runner', 'snake', 'ring', 'barrel', 'swarm', 'wall', 'flank', 'siege', 'wedge', 'giant'];
 export const bossOf = L => L % 2 ? 'brute' : 'tank';
 // 보스 겉모습: 레벨마다 악어 → 고릴라 → 코끼리 → 사자 → 호랑이, 5레벨마다 한 단계 진화(LV1~3)
 //   하는 짓은 그대로 번갈아: 홀수 레벨 = 걸어오며 졸병 부름(brute), 짝수 = 멈춰서 던짐(tank, 빨간 원 피하기)
@@ -76,24 +96,36 @@ export function makeLevel(L) {
   for (let i = 0; i < rows; i++) seq.push(st.pat[i % st.pat.length]);
   for (let i = 2; i < seq.length - 1; i++) if (Math.random() < .3) [seq[i], seq[i + 1]] = [seq[i + 1], seq[i]];
   seq[0] = 'gate';
+  const cyc = cycleOf(L), ins = (k, n) => { for (let c = 0; c < n; c++) seq.splice(ri(2, seq.length - 1), 0, k); };
+  // 리믹스: 두 번째 바퀴부터 다른 스테이지의 요소 하나를 손님으로 두 번(대군은 14레벨부터 손님으로도)
+  if (cyc >= 1) {
+    const pool = GUESTS.concat(L >= 14 ? ['horde'] : []).filter(k => !st.pat.includes(k)), gk = pool[ri(0, pool.length - 1)];
+    let c = 0; for (let i = 2; i < seq.length && c < 2; i += 3) if (!['gate', 'gate3', 'swap', 'horde', 'flood', 'box'].includes(seq[i])) { seq[i] = gk; c++; }
+    if (!c) ins(gk, 1);
+  }
+  const twist = L >= 3 && Math.random() < .7 ? TW_KEYS[ri(0, TW_KEYS.length - 1)] : null;
+  if (twist === 'gold') ins('box', 2);
+  if (twist === 'supply') ins('gate', 2);
+  if (twist === 'giants') ins('giant', 2);
   // 중간보스: 3레벨부터 일반 무리가 있는 스테이지면 한 판 가운데쯤 한 번
   if (L >= 3 && !seq.includes('giant')) { const m = seq.indexOf('mob', Math.floor(seq.length / 3)); if (m > 0) seq[m] = 'giant'; }
   let d = 0;
-  for (let i = 0; i < rows; i++) {
+  const rowsN = seq.length; let streams = 0;
+  for (let i = 0; i < rowsN; i++) {
     let k = seq[i];
     if (k === 'giant' && L < 3) k = 'mob';
-    if ((k === 'horde' || k === 'flood') && L < 6) k = 'mob';   // 대군은 6레벨부터
-    ev.push({ d, kind: k, p: rows > 1 ? i / (rows - 1) : 1 });
+    if ((k === 'horde' || k === 'flood') && (L < 6 || ++streams > 2)) k = 'mob';   // 대군은 6레벨부터, 한 판에 두 번까지
+    ev.push({ d, kind: k, p: rowsN > 1 ? i / (rowsN - 1) : 1 });
     d += k === 'runner' ? space * .75 : k === 'horde' || k === 'flood' ? space + streamDur(L, k === 'flood') * speedOf(L) : space;
   }
   ev.push({ d: d + 220, kind: 'boss', p: 1 });
-  return { ev, length: d + 220 + 1150 - START + 600, stage: stageOf(L), boss: bossOf(L) };
+  return { ev, length: d + 220 + 1150 - START + 600, stage: stageOf(L), boss: bossOf(L), twist };
 }
 
 export function newGame(L, hooks) {
   const lv = makeLevel(L);
   return {
-    L, ev: lv.ev, length: lv.length, stage: lv.stage, bossKind: lv.boss, dist: START, next: 0, t: 0,
+    L, ev: lv.ev, length: lv.length, stage: lv.stage, bossKind: lv.boss, twist: lv.twist, stormT: 4, dist: START, next: 0, t: 0,
     speed: Math.min(176, 142 + L * 3),
     px: MID, tx: MID, n: 3, shown: 3, tier: 0, missiles: 1, rockets: [],
     rate: 5, dmg: 1, cd: 0, pow: 0, flash: 0,
@@ -111,7 +143,7 @@ function gateVal(G, good, p) {
   const L = power(G.L), n = Math.max(1, G.n);
   if (good) {
     if (L >= 6 && Math.random() < .22 && n < 60) return { t: 'x', v: 2 };
-    return { t: '+', v: ri(3, 6) + Math.round(L * .8 + n * .22 + p * 3) };
+    return { t: '+', v: Math.round((ri(3, 6) + L * .8 + n * .22 + p * 3) * (G.twist === 'supply' ? 1.35 : 1)) };
   }
   if (L >= 8 && Math.random() < .2) return { t: '/', v: 2 };
   return { t: '+', v: -(ri(3, 6) + Math.round(L + n * .4 + p * 5)) };
@@ -135,31 +167,31 @@ function mobGroup(G, y, c, hp, cx, opt = {}) {
     const col = i % cols, row = Math.floor(i / cols), ox = -w / 2 + col * sp + rnd(-4, 4);
     G.mobs.push({
       ox, x: clamp(cx + ox, ROAD_L + 8, ROAD_R - 8), y: y - row * 16 + rnd(-4, 4), hp, max: hp,
-      vy: opt.vy != null ? opt.vy : 14 + Math.min(L, 30) * 1.3, side,
+      vy: (opt.vy != null ? opt.vy : 14 + Math.min(L, 30) * 1.3) * (G.twist === 'gust' ? 1.45 : 1), side,
       step: Math.random() * 6, g: grp, flash: 0, kb: 0, size: 1, hurt: 1, lv, bn: lv === 2 && c > 8 && i % 9 === 4
     });
-    if (c > 4 && Math.random() < elitePct(G.L) * Math.min(1, .25 + (G.p || 0))) elite(G.mobs[G.mobs.length - 1], G.L);
+    if (c > 4 && Math.random() < elitePctG(G) * Math.min(1, .25 + (G.p || 0))) elite(G.mobs[G.mobs.length - 1], G.L);
   }
   return grp;
 }
-// 적 수 · 체력: 레벨(L = power)이 오를수록 확실히 많고 단단하게 — 용 · 천둥번개 · 진급으로 강해진 우리 편에 맞춰
-// PRESS: 우리 부대가 클수록 적도 많아진다(화력은 병사 수의 0.72제곱으로 커지므로 그 절반쯤 따라감) — 부대가 불어나도 쉬워지지 않게
-let PRESS = 1;
+// 적 수 = 레벨 기본 + 지금 우리 부대 크기에 비례(ARMY^0.85 × 레벨 계수) — 부대가 작으면 적도 작게, 커지면 커져서 어느 레벨이든 늘 팽팽하게.
+//   레벨이 오를수록 비례 계수가 커져 확실히 어려워진다. LVK = 스테이지 보정 × 오늘의 변수 보정
 const MAXMOBS = 480;
-const pressure = G => clamp(Math.pow(Math.max(1, G.n) / 60, .45), 1, Math.min(2, 1 + (G.L - 1) * .12));
-let LVK = 1;
-const levelK = Lv => clamp(.45 + Lv * .035, .5, 1);   // 레벨 1 은 절반쯤, 16 부터 그대로(그 뒤 세기는 power 가 올림)
+let ARMY = 10, LVL = 1, LVK = 1;
 // 스테이지마다 세기 보정(구성이 달라 같은 수라도 어려움이 다르다 — 균형 시험으로 맞춤)
-const STAGE_K = { basic: 1, rush: 1, serpent: .9, maze: 1.1, armory: 1, assault: .85, ambush: .35, siege: .7, legion: .45 };
-const mobCount = (L, p, k = 1) => Math.min(Math.round((6 + L * 3.4) * (.72 + p * 1.5) * rnd(.85, 1.15) * k * PRESS * LVK), 420);   // 판 처음은 가볍게, 뒤로 갈수록 확 많아짐
-const mobHp = (L, p) => 1 + Math.floor(L / 4 + p * (L / 5.5));
+const STAGE_K = { basic: 1, rush: 1, serpent: 1, maze: 1, armory: .65, assault: 1.45, ambush: .75, siege: .75, legion: .9 };
+const mobCount = (L, p, k = 1) => Math.min(Math.round((4 + L * 1.4 + Math.pow(ARMY, .85) * (.45 + Math.min(LVL, 25) * .022)) * (.75 + p * .6) * rnd(.85, 1.15) * k * LVK), 420);
+// 대군 물결: 초당 나오는 수도 같은 방식
+const streamFlux = (G, full) => (5 + Math.pow(Math.max(1, G.n), .85) * (.22 + Math.min(G.L, 25) * .012)) * (full ? 1.25 : 1) * LVK;
+const mobHp = (L, p) => 1 + Math.floor(L / 4 * (.35 + .65 * Math.min(1, p * 1.6)) + p * (L / 5.5));   // 판 앞쪽은 가볍게 시작해 뒤로 갈수록 단단하게
 // 정예병(큰 몸집 · 은 투구 · 방패): 3레벨부터 무리 속에 섞인다 — 체력 4배, 닿으면 3명
 const elitePct = Lv => Lv < 3 ? 0 : Math.min(.24, .03 * (Lv - 2));
+const elitePctG = G => G.twist === 'elite' ? Math.min(.45, elitePct(Math.max(G.L, 4)) * 2 + .08) : elitePct(G.L);
 function elite(M, Lv) { M.hp = M.max = Math.round(M.hp * 4 + Lv * .4); M.size = 1.25; M.lv = 2; M.hurt = 3; M.elite = true; }
 
 function spawn(G, e, y) {
   const L = power(G.L), p = e.p, k = e.kind;
-  PRESS = pressure(G); LVK = levelK(G.L) * (STAGE_K[G.stage] || 1);
+  ARMY = Math.max(3, G.n); LVL = G.L; LVK = (STAGE_K[G.stage] || 1) * (G.twist === 'gust' || G.twist === 'elite' ? .8 : 1);
   G.p = p;
   if (k === 'gate' || k === 'swap') {
     let A = gateVal(G, true, p), B = gateVal(G, false, p);
@@ -182,11 +214,12 @@ function spawn(G, e, y) {
   } else if (k === 'mob') {
     mobGroup(G, y, mobCount(L, p, G.stage === 'rush' ? .65 : 1), mobHp(L, p), rnd(ROAD_L + 60, ROAD_R - 60));
   } else if (k === 'runner') {   // 돌격대: 길을 가로지르는 한두 줄, 아주 빠르게 달려옴
-    const c = Math.min(Math.round((3 + L * 1.1) * (1 + p * .7) * LVK), 60);
+    const c = Math.min(mobCount(L, p, .55), 60);
     mobGroup(G, y, c, 1, MID, { cols: Math.min(c, 15), sp: 19, vy: 90 + L * 3, side: 18, lv: 0 });
   } else if (k === 'giant') {    // 거인 하나 + 호위
     const grp = mobGroup(G, y, 1, Math.round((16 + L * 9) * (1 + p * .5) * LVK), rnd(ROAD_L + 80, ROAD_R - 80), { vy: 8 + L, side: 34, lv: 2 });
     const M = G.mobs[G.mobs.length - 1]; M.size = 2.3; M.hurt = 6 + Math.round(L * .8); grp.giant = M;
+    if (G.twist === 'giants') { M.hp = M.max = Math.round(M.hp * .7); M.hurt = Math.round(M.hurt * .7); }
     M.mb = MIDS[(G.L + (G.mids = (G.mids || 0) + 1)) % MIDS.length];   // 중간보스 겉모습(번갈아)
     mobGroup(G, y + 40, Math.round(mobCount(L, p) * .25), mobHp(L, p), M.x);
   } else if (FORMS.includes(k)) {
@@ -194,7 +227,7 @@ function spawn(G, e, y) {
   } else if (k === 'horde' || k === 'flood') {
     // 대군(horde): 길 가운데로 빨간 군대가 정해진 시간 동안 끝없이 줄줄이 밀려온다 + 중간보스, 양옆 옆길엔 문 · 보급 상자가 계속.
     // 총공격(flood): 길 전체를 꽉 메우고 밀려온다(옆길 없음) — 화력 싸움, 앞에 문 · 보급 상자가 미리 나온다.
-    const full = k === 'flood', dur = streamDur(G.L, full), vy = 12 + Math.min(L, 30) * .8;
+    const full = k === 'flood', dur = streamDur(G.L, full), vy = (12 + Math.min(L, 30) * .8) * (G.twist === 'gust' ? 1.45 : 1);
     const hx0 = full ? ROAD_L + 10 : ROAD_L + LANE + 2, hx1 = full ? ROAD_R - 10 : ROAD_R - LANE - 2, sp = 15;
     const grp = { alive: 0, pop: 0, cx: MID, hw: (hx1 - hx0) / 2, side: 0, horde: true };
     G.groups.push(grp);
@@ -202,8 +235,7 @@ function spawn(G, e, y) {
       hp: Math.max(1, Math.round(mobHp(L, p) * (full ? .45 : .55))), fill: 0, lanes: !full, laneAcc: 0, k2: 0, big: ri(0, 1), minusAt: ri(5, 7),
       mids: full ? [.3, .7] : [.4, .8] };
     // 초당 나오는 수(flux): 레벨이 오를수록 많이. 줄은 촘촘히(15 간격) 두고 줄마다 채우는 비율로 맞춘다 → 끝없이 이어진 사람 물결
-    S.fill = clamp((14 + G.L * 2.2) * (full ? 1.3 : 1) * PRESS * LVK * S.rowDt / S.cols, .1, .95);
-    S.hp = Math.max(S.hp, Math.round(S.hp * Math.sqrt(PRESS)));
+    S.fill = clamp(streamFlux(G, full) * S.rowDt / S.cols, .08, .95);
     for (let r = 0; r < 10; r++) { const f = S.fill; S.fill = Math.min(.95, f * 2.2); streamRow(G, S, y - r * 15); S.fill = f; }   // 앞머리는 두툼하게
     G.h.horde && G.h.horde(full);
   } else if (k === 'siege') {    // 양쪽 끝에서 두 무리, 가운데로 모여듦
@@ -223,9 +255,9 @@ function spawn(G, e, y) {
     xs.forEach((x, i) => G.boxes.push({ x, y, w: 92, h: 46, hp: i ? Math.round(hp * 1.15) : hp, max: hp, gift: i ? (gift === 'thunder' ? 'missile' : G.L >= 2 && Math.random() < .35 ? 'thunder' : gift === 'missile' ? 'rate' : 'missile') : gift, flash: 0, pop: 0 }));
   } else if (k === 'boss') {
     const tank = G.bossKind === 'tank';
-    // 보스 체력 = 지금 우리 화력(초당 피해) × 버티는 시간(레벨 1 약 5.5초 → 20 약 14초) — 부대가 아무리 커도 만나자마자 녹지 않게
+    // 보스 체력 = 지금 우리 화력(초당 피해) × 버티는 시간(레벨 1 약 5초 → 20 약 10초) — 부대가 아무리 커도 만나자마자 녹지 않게
     const dps = G.rate * G.dmg * TIERS[G.tier].mul * Math.pow(Math.max(1, G.n), .72) * .85;
-    const hp = Math.round(Math.max(60 + L * 55 + L * L * 3, dps * (5 + Math.min(G.L, 20) * .45)) * (tank ? .9 : 1));
+    const hp = Math.round(Math.max(60 + L * 55 + L * L * 3, dps * (5 + Math.min(G.L, 20) * .25)) * (tank ? .9 : 1));
     const look = bossLook(G.L);
     G.boss = { kind: G.bossKind, animal: look.animal, evo: look.evo, x: MID, y: y - 40, r: tank ? 70 : 62, hp, max: hp, vy: tank ? 16 + L : 100 + Math.min(L, 20) * 3, stop: tank ? -560 : -800,
       t: 0, flash: 0, pop: 0, acc: 0, accT: 0, summon: 2.5, bite: 0, fire: 1.2, aim: 0 };
@@ -278,7 +310,7 @@ function streamRow(G, S, y) {
     if (Math.random() > S.fill) continue;
     const x = S.x0 + c * S.sp + rnd(-3, 3);
     const M = { ox: x - MID, x, y: y + rnd(-4, 4), hp: S.hp, max: S.hp, vy: S.vy, side: 0, step: Math.random() * 6, g: grp, flash: 0, kb: 0, size: 1, hurt: 1, lv };
-    if (Math.random() < elitePct(G.L) * .5) elite(M, G.L);
+    if (Math.random() < elitePctG(G) * .5) elite(M, G.L);
     G.mobs.push(M); grp.alive++;
   }
 }
@@ -346,7 +378,7 @@ function lose(G, k, x, y, src) {
 }
 function killMob(g, i, M) {
   g.combo = g.comboT > 0 ? g.combo + 1 : 1; g.comboT = 1.1; g.bestCombo = Math.max(g.bestCombo, g.combo);
-  const pts = Math.round((M.mb ? 60 : M.leader ? 40 : M.elite ? 25 : 10) * g.L * (1 + Math.min(g.combo, 100) * .02));   // 콤보 100 이면 3배
+  const pts = Math.round((M.mb ? 60 : M.leader ? 40 : M.elite ? 25 : 10) * g.L * (1 + Math.min(g.combo, 100) * .02) * (g.twist === 'gold' ? 2 : 1));   // 콤보 100 이면 3배
   g.score += pts; g.mobs.splice(i, 1); M.g.alive--; M.g.pop = 1; M.dead = true;
   g.h.burst(M.x, M.y, 'red', M.size > 1 ? 24 : 3); g.h.smoke(M.x, M.y, M.size > 1 ? 4 : 1);
   g.h.die(M, pts); g.h.combo(g.combo, M.x, M.y);
@@ -427,6 +459,7 @@ export function step(G, dt) {
   g.px += (g.tx - g.px) * Math.min(1, dt * 14);
 
   if (g.stream) streamStep(g, dt);
+  if (g.twist === 'storm' && !g.boss) { g.stormT -= dt; if (g.stormT <= 0) { g.stormT = rnd(4.5, 7.5); strike(g); } }   // 천둥 폭풍: 저절로 번개
   if (g.bolts > 0) { g.boltCd -= dt; if (g.boltCd <= 0) { g.boltCd = .3; if (strike(g)) g.bolts--; else g.boltCd = .2; } }
   setTier(g, countTier(g));   // 병사 수가 30 · 80 을 넘으면 진급(모습 · 무기 · 총알이 함께 바뀜)
   // 사격: 총알 수는 병사 수만큼(최대 18), 위력은 병사 수에 따라 커짐
