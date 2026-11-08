@@ -14,7 +14,7 @@
       var main = $('#heroMain'), sub = $('#heroSub');
       main.href = '/app'; main.innerHTML = '이어 읽기 · ' + at.replace(/[<>&]/g, '') + ' <span aria-hidden="true">→</span>';
       sub.href = '/app#plan'; sub.textContent = '통독표 열기';
-      $('#topBtn').href = '/app'; $('#topBtn').textContent = '이어 읽기';
+      $('#topBtn').href = '/app';   // 이름은 그대로 '성경 읽기', 읽던 곳으로 바로
     }
   } catch (e) {}
 
