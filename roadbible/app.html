@@ -2723,7 +2723,9 @@ function toast(msg){
 applySettings();
 syncTabs();
 render(Math.max(0,+(store.get("lastPage")||0)||0));   // 마지막으로 읽던 책·장·쪽 그대로 복원
-setTimeout(showVod,400);   // 실행할 때마다 모아둔 형광펜 한 구절 다시 만나기
+/* 소개 페이지의 "통독표 열기"(/app#plan) — 다시 만나는 형광펜 대신 성경통독표를 바로 연다 */
+if(location.hash==="#plan"){history.replaceState(null,"",location.pathname);setTimeout(openPlanFull,80);}
+else setTimeout(showVod,400);   // 실행할 때마다 모아둔 형광펜 한 구절 다시 만나기
 
 /* ── 오프라인(PWA): 서비스워커가 본문·앱을 통째로 캐시 ── */
 if("serviceWorker"in navigator&&location.protocol.startsWith("http")){
