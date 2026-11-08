@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=24';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=25';
 import { SPRITES } from './sprites.js?v=17';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
@@ -473,7 +473,8 @@ function updateBodies(dt) {
 
 /* ── 문: 꽉 찬 색 판 + 큰 숫자, 둥근 기둥. 진급 문 · 유도탄 문은 금색 ── */
 const views = new Map();   // core 물건 → 3D 물건
-function gateLabel(p) { return p.t === 'x' ? '×' + p.v : p.t === '/' ? '÷' + p.v : p.t === 'M' ? 'M' + p.v : (p.v > 0 ? '+' : '') + p.v; }
+const dec = v => Number.isInteger(v) ? String(v) : v.toFixed(1);
+function gateLabel(p) { return p.t === 'x' ? '×' + dec(p.v) : p.t === '/' ? '÷' + dec(p.v) : p.t === 'M' ? 'M' + p.v : (p.v > 0 ? '+' : '') + p.v; }
 function gateKind(p) { return p.t === 'M' ? 'trade' : (p.t === 'x' || (p.t === '+' && p.v >= 0)) ? 'good' : 'bad'; }
 const GATEC = {
   good: { top: '#62b3ff', bot: '#1f63e6', edge: '#0d3a9e', post: '#2a6cf0', glow: 'rgba(160,215,255,.9)' },
@@ -948,6 +949,11 @@ const hooks = {
   gateHit: (gt, p, x) => {
     SFX.gateTick(p.gain);
     for (let i = 0; i < 3; i++) addSpark(wx(x) + rnd(-.4, .4), rnd(1.5, 4), wz(gt.y) + .3, i ? '#bfefff' : '#ffffff', rnd(.7, 1.3), .14, rnd(-5, 5), rnd(1, 6), rnd(2, 6));
+    if (p.t !== '+') {   // × · ÷ 문: 바뀐 값(×2.3 · ÷1.8)이 톡
+      if (p.ftx && p.ftx.t > 0 && texts.includes(p.ftx)) { p.ftx.s = gateLabel(p); p.ftx.t = p.ftx.L = .6; p.ftx.pop = 1; p.ftx.z = wz(gt.y); }
+      else { p.ftx = { x: wx((p.x0 + p.x1) / 2), z: wz(gt.y), h: 5.4, s: gateLabel(p), c: p.t === 'x' ? '#e0f7ff' : '#ffe4e6', size: 18, t: .6, L: .6, small: true, dy: 0, pop: 1 }; texts.push(p.ftx); }
+      return;
+    }
     // 칸마다 숫자 하나가 '+1 → +2 → +3' 으로 누적되며 톡 튄다(새 글자를 계속 만들지 않음)
     if (p.ftx && p.ftx.t > 0 && texts.includes(p.ftx)) { p.ftx.n++; p.ftx.s = '+' + p.ftx.n; p.ftx.t = p.ftx.L = .6; p.ftx.pop = 1; p.ftx.z = wz(gt.y); }
     else { p.ftx = { x: wx((p.x0 + p.x1) / 2), z: wz(gt.y), h: 5.4, s: '+1', n: 1, c: '#e0f7ff', size: 18, t: .6, L: .6, small: true, dy: 0, pop: 1 }; texts.push(p.ftx); }
@@ -1101,8 +1107,10 @@ function start() {
   clearViews(); texts.length = 0; coins.length = 0; confetti.length = 0; bodies.length = 0; inFlight = 0; shout = null; bossWarn = 0; bossSeen = false;
   born.length = 0; lastN = 3; squadPop = 0; hitstop = 0; dragId = null; dragX = null; scoreAt = null; slow = 0; kick = 0; tint = null; flashW = 0; shake = 0; comboPop = 0;
   save('lastshot_live', 1);   // 판 도중 새로고침 = 쓰러진 것으로(누적 점수를 지키려는 새로고침 막기)
-  G = newGame(level, hooks); state = 'play'; setTheme((G.L - 1) % 5); banner = bannerL = G.twist ? 2.6 : 1.9; dispScore = score(); syncHud(0);
+  const fails = load('lastshot_fail_lv', 0) === level ? load('lastshot_fails', 0) : 0;
+  G = newGame(level, hooks, { help: fails }); state = 'play'; setTheme((G.L - 1) % 5); banner = bannerL = G.twist ? 2.6 : 1.9; dispScore = score(); syncHud(0);
   btnMsl.hidden = false;
+  if (G.help) setTimeout(() => { if (G && state === 'play') { shout = { s: '지원군 도착!', c: '#86efac', t: 1.6, L: 1.6, sub: '유도탄 ' + G.missiles + '발 · 병사 +' + G.help * 8 + ' · 적이 줄었어요' }; SFX.power(); } }, 2700);
 }
 function countUp(el, to, ms = 900) {
   const from = 0, t0 = performance.now();
@@ -1111,6 +1119,8 @@ function countUp(el, to, ms = 900) {
   requestAnimationFrame(tick);
 }
 function end(win) {
+  if (win) save('lastshot_fails', 0);
+  else { const f = load('lastshot_fail_lv', 0) === G.L ? load('lastshot_fails', 0) : 0; save('lastshot_fail_lv', G.L); save('lastshot_fails', f + 1); }   // 같은 레벨에서 연속으로 진 횟수
   state = 'end'; btnMsl.hidden = true; endAt = performance.now(); save('lastshot_live', 0);
   inFlight = 0; coins.length = 0;
   const btn = $('#btnNext');

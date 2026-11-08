@@ -122,12 +122,13 @@ export function makeLevel(L) {
   return { ev, length: d + 220 + 1150 - START + 600, stage: stageOf(L), boss: bossOf(L), twist };
 }
 
-export function newGame(L, hooks) {
+export function newGame(L, hooks, opts = {}) {
+  const help = Math.min(4, opts.help || 0);   // 막힌 레벨 지원: 같은 레벨에서 연속으로 진 횟수(최대 4) — 1번마다 유도탄 +3 · 시작 병사 +8 · 적 -10% · 보스 체력 -8%
   const lv = makeLevel(L);
   return {
     L, ev: lv.ev, length: lv.length, stage: lv.stage, bossKind: lv.boss, twist: lv.twist, stormT: 4, dist: START, next: 0, t: 0,
     speed: Math.min(176, 142 + L * 3),
-    px: MID, tx: MID, n: 3, shown: 3, tier: 0, missiles: 1, rockets: [],
+    px: MID, tx: MID, n: 3 + help * 8, shown: 3 + help * 8, tier: 0, missiles: 1 + Math.floor((L - 1) / 5) + help * 3, help, rockets: [],
     rate: 5, dmg: 1, cd: 0, pow: 0, flash: 0,
     bullets: [], gates: [], mobs: [], groups: [], boxes: [], barrels: [], shells: [], boss: null,
     h: Object.assign({ burst: NOOP, spark: NOOP, float: NOOP, sfx: NOOP, buzz: NOOP, shake: NOOP, tint: NOOP, ring: NOOP, gateHit: NOOP, smoke: NOOP, blast: NOOP, die: NOOP, pts: NOOP, combo: NOOP, stop: NOOP }, hooks || {}),
@@ -191,7 +192,7 @@ function elite(M, Lv) { M.hp = M.max = Math.round(M.hp * 4 + Lv * .4); M.size = 
 
 function spawn(G, e, y) {
   const L = power(G.L), p = e.p, k = e.kind;
-  ARMY = Math.max(3, G.n); LVL = G.L; LVK = (STAGE_K[G.stage] || 1) * (G.twist === 'gust' || G.twist === 'elite' ? .8 : 1);
+  ARMY = Math.max(3, G.n); LVL = G.L; LVK = (STAGE_K[G.stage] || 1) * (G.twist === 'gust' || G.twist === 'elite' ? .8 : 1) * (1 - (G.help || 0) * .1);
   G.p = p;
   if (k === 'gate' || k === 'swap') {
     let A = gateVal(G, true, p), B = gateVal(G, false, p);
@@ -257,7 +258,7 @@ function spawn(G, e, y) {
     const tank = G.bossKind === 'tank';
     // 보스 체력 = 지금 우리 화력(초당 피해) × 버티는 시간(레벨 1 약 5초 → 20 약 10초) — 부대가 아무리 커도 만나자마자 녹지 않게
     const dps = G.rate * G.dmg * TIERS[G.tier].mul * Math.pow(Math.max(1, G.n), .72) * .85;
-    const hp = Math.round(Math.max(60 + L * 55 + L * L * 3, dps * (5 + Math.min(G.L, 20) * .25)) * (tank ? .9 : 1));
+    const hp = Math.round(Math.max(60 + L * 55 + L * L * 3, dps * (5 + Math.min(G.L, 20) * .25) * (1 - (G.help || 0) * .08)) * (tank ? .9 : 1));
     const look = bossLook(G.L);
     G.boss = { kind: G.bossKind, animal: look.animal, evo: look.evo, x: MID, y: y - 40, r: tank ? 70 : 62, hp, max: hp, vy: tank ? 16 + L : 100 + Math.min(L, 20) * 3, stop: tank ? -560 : -800,
       t: 0, flash: 0, pop: 0, acc: 0, accT: 0, summon: 2.5, bite: 0, fire: 1.2, aim: 0 };
@@ -691,6 +692,10 @@ function hitAny(g, B) {
       if (B.x >= p.x0 && B.x <= p.x1) {
         // 처음엔 한 발에 +1, 많이 올릴수록 조금씩 더 맞혀야 오른다(무한정 커지지 않게)
         if (p.t === '+' && gt.y > -820 && !(p.cap != null && p.v >= p.cap)) { p.acc += 1; const need = 1 + Math.floor((p.gain || 0) / 3); if (p.acc >= need) { p.acc = 0; p.v++; p.gain = (p.gain || 0) + 1; p.hit = 1; h.gateHit(gt, p, B.x); } }
+        else if ((p.t === 'x' && p.v < 3) || (p.t === '/' && p.v > 1)) {
+          p.acc += 1; const need = 4 + Math.floor((p.gain || 0) / 2);
+          if (p.acc >= need && gt.y > -820) { p.acc = 0; p.v = Math.round((p.v + (p.t === 'x' ? .1 : -.1)) * 10) / 10; p.gain = (p.gain || 0) + 1; p.hit = 1; h.gateHit(gt, p, B.x); }
+        }
         h.spark(B.x, gt.y + gt.h / 2, 'cool', 1);
         return true;
       }
