@@ -76,6 +76,18 @@ function zap(f0, f1, dur, vol, wob, lfoHz, type = 'sawtooth', cut = 4000, delay 
   g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .004); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
   o.connect(f); f.connect(g); g.connect(master); o.start(t); l.start(t); o.stop(t + dur + .02); l.stop(t + dur + .02);
 }
+// 종소리(링 먹는 소리처럼 맑고 경쾌하게): 부드럽게 시작하는 사인파 + 맑은 배음, 짧게 울리다 사라짐
+function chime(f, dur, vol, delay = 0) {
+  if (muted || !AC) return;
+  const t = AC.currentTime + delay;
+  [[1, 1], [2, .32], [3.01, .12]].forEach(([m, a]) => {
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sine'; o.frequency.value = f * m;
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol * a, t + .006); g.gain.exponentialRampToValueAtTime(.0001, t + dur / m);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + .02);
+  });
+}
+const PENTA = [0, 2, 4, 7, 9];   // 5음계: 어느 음끼리 겹쳐도 어울린다
 const SFX = {
   // 총소리: LV1 '탕'(터지는 잡음 + 낮은 쿵) · LV2 '퓨웅'(내려가는 전자음 + 지글) · LV3 '지이잉'(떨리는 레이저 + 낮은 울림)
   shot(tier) {
@@ -99,9 +111,9 @@ const SFX = {
   hit() { if (gap('hit', 45)) return; noiseHit(.035, .035, 'bandpass', 2200 + Math.random() * 600, 1200, 1.4); },
   kill(c) { if (gap('kill', 32)) return; const f = 520 * Math.pow(2, Math.min(c, 36) / 14); noiseHit(.06, .05, 'lowpass', 1800, 300, .6); tone(f, f * 1.5, .07, 'triangle', .035); },   // 퍽 + 콤보마다 오르는 음
   coin() { if (gap('coin', 55)) return; tone(1760, 1760, .04, 'square', .018); tone(2640, 2640, .09, 'square', .016, false, .04); },
-  gateUp() { [660, 880, 1320].forEach((f, i) => tone(f, f * 1.02, .12, 'triangle', .07, false, i * .05)); },
+  gateUp() { [1047, 1319, 1568, 2093].forEach((f, i) => chime(f, .35, .07, i * .05)); },
   gateDown() { tone(260, 80, .32, 'sawtooth', .07); },
-  gateTick(k) { if (gap('tick', 35)) return; const f = 700 + Math.min(1600, k * 22); tone(f, f * 1.25, .045, 'square', .025); tone(f * 2, f * 2.4, .03, 'sine', .02); },
+  gateTick(k) { if (gap('tick', 60)) return; const i = Math.min(9, k), f = 784 * Math.pow(2, (PENTA[i % 5] + 12 * Math.floor(i / 5)) / 12); chime(f, .22, .05); chime(f * 1.335, .3, .045, .055); },   // '띠링' — 두 음이 위로, 숫자가 오를수록 한 칸씩 높아짐
   boom() { if (gap('boom', 60)) return; tone(700, 40, .55, 'square', .16, true); tone(120, 40, .4, 'sine', .14); },
   cannon() { tone(200, 40, .35, 'square', .12, true); tone(90, 40, .3, 'sawtooth', .06); },
   hurt() { if (gap('hurt', 70)) return; tone(160, 70, .14, 'sawtooth', .05); },
