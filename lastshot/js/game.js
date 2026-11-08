@@ -89,23 +89,21 @@ function chime(f, dur, vol, delay = 0) {
 }
 const PENTA = [0, 2, 4, 7, 9];   // 5음계: 어느 음끼리 겹쳐도 어울린다
 const SFX = {
-  // 총소리: LV1 '탕'(터지는 잡음 + 낮은 쿵) · LV2 '퓨웅'(내려가는 전자음 + 지글) · LV3 '지이잉'(떨리는 레이저 + 낮은 울림)
+  // 총소리: 낮은 '쿵' 없이 짧고 맑게. LV1 '츅'(가벼운 바람 소리 + 짧게 내려가는 음) · LV2 '퓽'(둥근 전자음) · LV3 '쮸잉'(살짝 떨리는 맑은 레이저 + 반짝임)
   shot(tier) {
-    if (gap('shot', 75)) return;
-    const j = 1 + (Math.random() - .5) * .12;   // 매번 조금씩 다르게(기계음처럼 똑같지 않게)
+    if (gap('shot', 85)) return;
+    const j = 1 + (Math.random() - .5) * .08;   // 매번 아주 조금씩 다르게
     if (tier === 0) {
-      noiseHit(.05, .11, 'bandpass', 2600 * j, 900, .7);
-      noiseHit(.13, .07, 'lowpass', 1400 * j, 180, .5);
-      tone(150 * j, 45, .1, 'sine', .09);
+      noiseHit(.035, .028, 'bandpass', 4200 * j, 2600, 1.1);
+      zap(1700 * j, 620, .055, .022, 0, 1, 'triangle', 6000);
     } else if (tier === 1) {
-      zap(1500 * j, 190, .14, .045, 40, 30, 'sawtooth', 3200);
-      tone(620 * j, 90, .12, 'sine', .06);
-      noiseHit(.07, .03, 'highpass', 5000, 2500, .6);
+      zap(1500 * j, 480, .075, .03, 0, 1, 'sine', 8000);
+      zap(3000 * j, 980, .06, .009, 0, 1, 'triangle', 9000);
+      noiseHit(.03, .012, 'highpass', 6500, 4500, .7);
     } else {
-      zap(2300 * j, 160, .2, .04, 160, 55, 'sawtooth', 5200);
-      zap(2320 * j, 170, .2, .018, 120, 61, 'square', 3000);
-      tone(240 * j, 55, .18, 'sine', .07);
-      noiseHit(.12, .02, 'highpass', 7000, 3500, .5);
+      zap(2400 * j, 820, .11, .028, 22, 38, 'sine', 9000);
+      zap(4800 * j, 1700, .08, .008, 30, 38, 'sine', 9000);
+      zap(1200 * j, 520, .09, .012, 0, 1, 'triangle', 5000);
     }
   },
   hit() { if (gap('hit', 45)) return; noiseHit(.035, .035, 'bandpass', 2200 + Math.random() * 600, 1200, 1.4); },
