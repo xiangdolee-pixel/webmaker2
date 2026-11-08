@@ -33,11 +33,15 @@ const fmt = n => Math.round(n).toLocaleString('ko-KR');
 const touchy = () => matchMedia('(hover: none)').matches;
 
 /* ── 소리: 짧은 합성음(파일 없음) ── */
-let AC = null, master = null;
+let AC = null, master = null, echo = null;
 const thr = {};   // 같은 소리가 너무 촘촘히 겹치지 않게
 const gap = (k, ms) => { const n = performance.now(); if (n - (thr[k] || 0) < ms) return true; thr[k] = n; return false; };
 function audio() {
-  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createDynamicsCompressor(); master.connect(AC.destination); } catch (e) {} }
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createDynamicsCompressor(); master.connect(AC.destination);
+    // 짧은 울림(에코): 총소리 끝에 살짝 공간감 — 맑은 소리가 '탁' 끊기지 않고 세련되게 사라진다
+    const d = AC.createDelay(), fb = AC.createGain(), lp = AC.createBiquadFilter(), wet = AC.createGain();
+    d.delayTime.value = .075; fb.gain.value = .3; lp.type = 'lowpass'; lp.frequency.value = 3800; wet.gain.value = .32;
+    echo = AC.createGain(); echo.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); lp.connect(wet); wet.connect(master); } catch (e) {} }
   if (AC && AC.state === 'suspended') AC.resume();
 }
 function tone(f0, f1, dur, type, vol, noise, delay = 0) {
@@ -67,14 +71,16 @@ function noiseHit(dur, vol, type, f0, f1, q = .8, delay = 0) {
   src.connect(f); f.connect(g); g.connect(master); src.start(t, Math.random() * .8); src.stop(t + dur + .02);
 }
 // 떨리는 소리(레이저): 주파수를 빠르게 흔든다(lfo), 필터로 거칠기 조절
-function zap(f0, f1, dur, vol, wob, lfoHz, type = 'sawtooth', cut = 4000, delay = 0) {
+function zap(f0, f1, dur, vol, wob, lfoHz, type = 'sawtooth', cut = 4000, delay = 0, send = 0, pan = 0) {
   if (muted || !AC) return;
   const t = AC.currentTime + delay, o = AC.createOscillator(), l = AC.createOscillator(), lg = AC.createGain(), f = AC.createBiquadFilter(), g = AC.createGain();
   o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
   l.frequency.value = lfoHz; lg.gain.value = wob; l.connect(lg); lg.connect(o.frequency);
   f.type = 'lowpass'; f.frequency.setValueAtTime(cut, t); f.frequency.exponentialRampToValueAtTime(Math.max(200, cut * .2), t + dur);
   g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .004); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-  o.connect(f); f.connect(g); g.connect(master); o.start(t); l.start(t); o.stop(t + dur + .02); l.stop(t + dur + .02);
+  let out = g; if (pan && AC.createStereoPanner) { const pn = AC.createStereoPanner(); pn.pan.value = pan; g.connect(pn); out = pn; }
+  o.connect(f); f.connect(g); out.connect(master); if (send && echo) { const sg = AC.createGain(); sg.gain.value = send; out.connect(sg); sg.connect(echo); }
+  o.start(t); l.start(t); o.stop(t + dur + .02); l.stop(t + dur + .02);
 }
 // 종소리(링 먹는 소리처럼 맑고 경쾌하게): 부드럽게 시작하는 사인파 + 맑은 배음, 짧게 울리다 사라짐
 function chime(f, dur, vol, delay = 0) {
@@ -89,25 +95,26 @@ function chime(f, dur, vol, delay = 0) {
 }
 const PENTA = [0, 2, 4, 7, 9];   // 5음계: 어느 음끼리 겹쳐도 어울린다
 const SFX = {
-  // 총소리: 낮은 '쿵' 없이 짧고 맑게. LV1 '츅'(가벼운 바람 소리 + 짧게 내려가는 음) · LV2 '퓽'(둥근 전자음) · LV3 '쮸잉'(살짝 떨리는 맑은 레이저 + 반짝임)
+  // 총소리: 잡음(북 · 스네어처럼 들리는 '퍽')을 전혀 쓰지 않고 맑은 음만 — 높은 음이 빠르게 미끄러져 내려가는 '퓻' + 짧은 에코.
+  // 음높이는 5음계 안에서 조금씩 바꿔(같은 소리 반복 = 북 장단처럼 들림) 노래하듯 이어지게, 좌우로도 살짝 흩뿌린다.
   shot(tier) {
     if (gap('shot', 85)) return;
-    const j = 1 + (Math.random() - .5) * .08;   // 매번 아주 조금씩 다르게
-    if (tier === 0) {
-      noiseHit(.035, .028, 'bandpass', 4200 * j, 2600, 1.1);
-      zap(1700 * j, 620, .055, .022, 0, 1, 'triangle', 6000);
-    } else if (tier === 1) {
-      zap(1500 * j, 480, .075, .03, 0, 1, 'sine', 8000);
-      zap(3000 * j, 980, .06, .009, 0, 1, 'triangle', 9000);
-      noiseHit(.03, .012, 'highpass', 6500, 4500, .7);
-    } else {
-      zap(2400 * j, 820, .11, .028, 22, 38, 'sine', 9000);
-      zap(4800 * j, 1700, .08, .008, 30, 38, 'sine', 9000);
-      zap(1200 * j, 520, .09, .012, 0, 1, 'triangle', 5000);
+    const k = Math.pow(2, PENTA[Math.floor(Math.random() * 3)] / 12), pan = (Math.random() - .5) * .5;
+    if (tier === 0) {          // LV1 '퓻' — 가볍고 깨끗한 사인 블립
+      zap(2100 * k, 760 * k, .06, .03, 0, 1, 'sine', 9000, 0, .25, pan);
+      zap(4200 * k, 1500 * k, .035, .006, 0, 1, 'sine', 9000, 0, 0, pan);
+    } else if (tier === 1) {   // LV2 '퓨잉' — 조금 더 굵고 둥근 전자음
+      zap(1800 * k, 560 * k, .085, .03, 0, 1, 'sine', 9000, 0, .3, pan);
+      zap(1800 * k, 560 * k, .07, .008, 0, 1, 'square', 2600, 0, 0, pan);
+      zap(3600 * k, 1200 * k, .05, .006, 0, 1, 'sine', 9000, 0, 0, pan);
+    } else {                   // LV3 '쮸잉' — 반짝이며 떨리는 맑은 레이저
+      zap(2600 * k, 780 * k, .12, .026, 16, 42, 'sine', 9000, 0, .38, pan);
+      zap(5200 * k, 1560 * k, .08, .007, 24, 42, 'sine', 9000, 0, .2, pan);
+      zap(1300 * k, 620 * k, .09, .01, 0, 1, 'triangle', 4000, 0, 0, pan);
     }
   },
-  hit() { if (gap('hit', 45)) return; noiseHit(.035, .035, 'bandpass', 2200 + Math.random() * 600, 1200, 1.4); },
-  kill(c) { if (gap('kill', 32)) return; const f = 520 * Math.pow(2, Math.min(c, 36) / 14); noiseHit(.06, .05, 'lowpass', 1800, 300, .6); tone(f, f * 1.5, .07, 'triangle', .035); },   // 퍽 + 콤보마다 오르는 음
+  hit() { if (gap('hit', 45)) return; const f = 2600 + Math.random() * 500; zap(f, f * .7, .03, .016, 0, 1, 'sine', 9000); },   // 맞는 소리: 작고 맑은 '틱'(잡음 없음)
+  kill(c) { if (gap('kill', 32)) return; const f = 520 * Math.pow(2, Math.min(c, 36) / 14); zap(f * .6, f * 1.4, .07, .03, 0, 1, 'sine', 9000, 0, .2); tone(f, f * 1.5, .07, 'triangle', .022); },   // 쓰러뜨림: 퐁 터지는 방울 소리 + 콤보마다 오르는 음
   coin() { if (gap('coin', 55)) return; tone(1760, 1760, .04, 'square', .018); tone(2640, 2640, .09, 'square', .016, false, .04); },
   gateUp() { [1047, 1319, 1568, 2093].forEach((f, i) => chime(f, .35, .07, i * .05)); },
   gateDown() { tone(260, 80, .32, 'sawtooth', .07); },
