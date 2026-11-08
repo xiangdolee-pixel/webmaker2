@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=15';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=16';
 import { SPRITES } from './sprites.js?v=15';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
@@ -82,18 +82,29 @@ function zap(f0, f1, dur, vol, wob, lfoHz, type = 'sawtooth', cut = 4000, delay 
   o.connect(f); f.connect(g); out.connect(master); if (send && echo) { const sg = AC.createGain(); sg.gain.value = send; out.connect(sg); sg.connect(echo); }
   o.start(t); l.start(t); o.stop(t + dur + .02); l.stop(t + dur + .02);
 }
-// 종소리(링 먹는 소리처럼 맑고 경쾌하게): 부드럽게 시작하는 사인파 + 맑은 배음, 짧게 울리다 사라짐
-function chime(f, dur, vol, delay = 0) {
+const PENTA = [0, 2, 4, 7, 9];   // 5음계: 어느 음끼리 겹쳐도 어울린다
+// 마림바 같은 음: 따뜻한 사인 기본음 + 나무 두드리는 듯 금방 사라지는 4배음, 높은 쪽은 깎아 귀가 편하게(짧은 에코)
+const NOTE = s => 261.63 * Math.pow(2, s / 12);   // 도(C4)에서 반음 s 칸
+function mallet(s, dur, vol, delay = 0, send = .22) {
   if (muted || !AC) return;
-  const t = AC.currentTime + delay;
-  [[1, 1], [2, .32], [3.01, .12]].forEach(([m, a]) => {
+  const f = NOTE(s), t = AC.currentTime + delay, lp = AC.createBiquadFilter(), out = AC.createGain();
+  lp.type = 'lowpass'; lp.frequency.value = 2600; out.gain.value = 1; lp.connect(out); out.connect(master);
+  if (echo && send) { const sg = AC.createGain(); sg.gain.value = send; out.connect(sg); sg.connect(echo); }
+  [[1, 1, dur], [4, .22, dur * .18], [2, .1, dur * .5]].forEach(([m, a, d], i) => {
     const o = AC.createOscillator(), g = AC.createGain();
-    o.type = 'sine'; o.frequency.value = f * m;
-    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol * a, t + .006); g.gain.exponentialRampToValueAtTime(.0001, t + dur / m);
-    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + .02);
+    o.type = i === 2 ? 'triangle' : 'sine'; o.frequency.value = f * m;
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol * a, t + .008); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+    o.connect(g); g.connect(lp); o.start(t); o.stop(t + d + .03);
   });
 }
-const PENTA = [0, 2, 4, 7, 9];   // 5음계: 어느 음끼리 겹쳐도 어울린다
+// +문 맞히는 소리: 맞힐 때마다 아래 노래가 한 음씩 이어진다(잠깐 쉬면 처음부터). 네 음마다 낮은 화음 음이 받쳐 준다.
+const TUNE = [0, 4, 7, 12, 11, 7, 9, 12, 14, 12, 9, 7, 5, 9, 12, 16, 14, 12, 11, 14, 19, 16, 12, 24];
+const BASS = [-24, -15, -19, -17, -24, -20, -19, -17];   // 도 · 라 · 파 · 솔 · 도 · 미 · 파 · 솔
+let tuneI = 0, tuneAt = 0;
+function tuneNext() {
+  const n = performance.now(); if (n - tuneAt > 1300) tuneI = 0; tuneAt = n;
+  const i = tuneI++; return { s: TUNE[i % TUNE.length], bar: Math.floor(i / 4) % BASS.length, down: i % 4 === 0 };
+}
 const SFX = {
   // 총소리: 잡음(북 · 스네어처럼 들리는 '퍽')을 전혀 쓰지 않고 맑은 음만 — 높은 음이 빠르게 미끄러져 내려가는 '퓻' + 짧은 에코.
   // 음높이는 5음계 안에서 조금씩 바꿔(같은 소리 반복 = 북 장단처럼 들림) 노래하듯 이어지게, 좌우로도 살짝 흩뿌린다.
@@ -115,19 +126,21 @@ const SFX = {
   },
   hit() { if (gap('hit', 45)) return; const f = 2600 + Math.random() * 500; zap(f, f * .7, .03, .016, 0, 1, 'sine', 9000); },   // 맞는 소리: 작고 맑은 '틱'(잡음 없음)
   kill(c) { if (gap('kill', 32)) return; const f = 520 * Math.pow(2, Math.min(c, 36) / 14); zap(f * .6, f * 1.4, .07, .03, 0, 1, 'sine', 9000, 0, .2); tone(f, f * 1.5, .07, 'triangle', .022); },   // 쓰러뜨림: 퐁 터지는 방울 소리 + 콤보마다 오르는 음
-  coin() { if (gap('coin', 55)) return; tone(1760, 1760, .04, 'square', .018); tone(2640, 2640, .09, 'square', .016, false, .04); },
-  gateUp() { [1047, 1319, 1568, 2093].forEach((f, i) => chime(f, .35, .07, i * .05)); },
+  coin() { if (gap('coin', 55)) return; const s = 12 + PENTA[Math.floor(Math.random() * 5)]; mallet(s, .18, .035, 0, .15); mallet(s + 7, .22, .025, .045, .15); },   // 동전: 맑은 두 음 '똥-딩'
+  gateUp() { [0, 4, 7, 12].forEach((s, i) => mallet(s + 7, .5, .07, i * .06)); mallet(-5, .7, .06); mallet(-17, .8, .05); },   // 관문 통과: 솔 화음 아르페지오 + 낮은 받침
   gateDown() { tone(260, 80, .32, 'sawtooth', .07); },
-  gateTick(k) { if (gap('tick', 60)) return; const i = Math.min(9, k), f = 784 * Math.pow(2, (PENTA[i % 5] + 12 * Math.floor(i / 5)) / 12); chime(f, .22, .05); chime(f * 1.335, .3, .045, .055); },   // '띠링' — 두 음이 위로, 숫자가 오를수록 한 칸씩 높아짐
+  gateTick() { if (gap('tick', 70)) return; const m = tuneNext(); mallet(m.s, .42, .06); mallet(m.s - 12, .3, .018, 0, 0); if (m.down) mallet(BASS[m.bar], .7, .045, 0, .1); },   // 맞힐 때마다 멜로디 한 음 + 마디 첫 음엔 낮은 화음
   boom() { if (gap('boom', 60)) return; tone(700, 40, .55, 'square', .16, true); tone(120, 40, .4, 'sine', .14); },
   cannon() { tone(200, 40, .35, 'square', .12, true); tone(90, 40, .3, 'sawtooth', .06); },
   hurt() { if (gap('hurt', 70)) return; tone(160, 70, .14, 'sawtooth', .05); },
-  power() { [523, 784, 1047, 1568].forEach((f, i) => tone(f, f * 1.01, .16, 'triangle', .08, false, i * .06)); },
+  power() { [0, 4, 7, 12, 16].forEach((s, i) => mallet(s, .45, .07, i * .055)); mallet(-12, .9, .06); mallet(-24, 1, .05); },
+  promote() { [7, 12, 16, 19, 24].forEach((s, i) => mallet(s, .5, .07, i * .07)); [-5, -12].forEach(s => mallet(s, 1.1, .055, .35)); zap(900, 2400, .35, .012, 6, 18, 'sine', 9000, 0, .4); },   // 진급: 올라가는 팡파르 + 반짝 솟는 소리
+  demote() { [7, 4, 0].forEach((s, i) => mallet(s, .35, .05, i * .1)); },
   missile() { tone(300, 1400, .25, 'sawtooth', .03); tone(3000, 400, .45, 'square', .05, true); },
-  cheer() { [784, 988, 1175, 1568, 1976].forEach((f, i) => tone(f, f, .14, 'square', .045, false, i * .055)); },
+  cheer() { [7, 11, 14, 19, 23].forEach((s, i) => mallet(s, .32, .06, i * .055)); mallet(-17, .7, .05); },
   alarm() { [0, .32, .64].forEach(d => { tone(520, 420, .26, 'sawtooth', .06, false, d); tone(260, 210, .26, 'square', .04, false, d); }); },
-  win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f, .22, 'triangle', .09, false, i * .1)); },
-  lose() { [392, 330, 262].forEach((f, i) => tone(f, f * .9, .25, 'sawtooth', .06, false, i * .16)); }
+  win() { [0, 4, 7, 12, 9, 12, 16, 24].forEach((s, i) => mallet(s, i === 7 ? 1.2 : .4, .075, i * .11)); [-24, -17, -12].forEach((s, i) => mallet(s, 1.2, .05, i * .33)); },
+  lose() { [7, 3, 0, -5].forEach((s, i) => mallet(s, .5, .06, i * .17)); mallet(-24, 1.1, .05, .5); }
 };
 const buzz = ms => { if (!muted && navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) try { navigator.vibrate(ms); } catch (e) {} };
 
@@ -834,6 +847,8 @@ let G = null, state = 'menu', last = 0, T = 0, slow = 0, endTimer = 0, walkT = 0
 const born = [];
 const ME_SC = 1, EN_SC = 1;   // 꼬마 병사 크기(판정과 상관없이 보이는 크기만)   // 새로 늘어난 병사가 톡 튀어나오게(자리별 생긴 때)
 const hooks = {
+  // 진급: 큰 외침 + 꽃가루 + 병사들이 톡 튀어 오르며 새 모습 · 새 무기로 바뀐다
+  promote: t => { shout = { s: 'LV' + (t + 1) + ' ' + TIERS[t].name + '!', c: t === 2 ? '#93c5fd' : '#fde047', t: 1.5, L: 1.5, sub: t === 2 ? '망토 · 금 갑옷 · 레이저 총' : '은 투구 · 방패 · 플라스마 총', big: true }; addConfetti(t === 2 ? 70 : 40, VW / 2, VH * .5); squadPop = 1; for (let i = 0; i < Math.min(G.n, 60); i++) born[i] = T + i * .008; },
   gateHit: (gt, p, x) => {
     SFX.gateTick(p.gain);
     for (let i = 0; i < 3; i++) addSpark(wx(x) + rnd(-.4, .4), rnd(1.5, 4), wz(gt.y) + .3, i ? '#bfefff' : '#ffffff', rnd(.7, 1.3), .14, rnd(-5, 5), rnd(1, 6), rnd(2, 6));
@@ -1118,18 +1133,18 @@ $('#btnRankClose').addEventListener('click', home);
 $('#btnMute').addEventListener('click', () => { muted = !muted; save('lastshot_mute', muted ? 1 : 0); paintMute(); if (!muted) audio(); });
 addEventListener('resize', fit);
 document.addEventListener('visibilitychange', () => { last = performance.now(); for (const k in keys) keys[k] = false; if (!document.hidden && AC && AC.state !== 'running' && state === 'play') try { AC.resume(); } catch (e) {} });
-if (dbg) window.__ls = { auto: false, start, end, get G() { return G; }, setLevel(l) { level = l; }, get state() { return state; }, fireMissile: shootMissile, sfx(n, t) { audio(); muted = false; SFX[n](t); }, setTier(t) { G.tier = t; }, get timers() { return { endTimer, slow, hitstop, over: G && G.over }; } };
+if (dbg) window.__ls = { auto: false, start, end, get G() { return G; }, setLevel(l) { level = l; }, get state() { return state; }, fireMissile: shootMissile, sfx(n, t) { audio(); muted = false; SFX[n](t); }, setTier(t) { G.tier = G.rank = t; }, get timers() { return { endTimer, slow, hitstop, over: G && G.over }; } };
 fit(); G = preview(); syncHud(0); paintMute();
 try { renderer.compile(scene, camera); } catch (e) {}   // 셰이더를 미리 만들어 첫 진급 · 첫 폭발 때 멈칫하지 않게
 requestAnimationFrame(t => { last = t; loop(t); });
 // 확인용: ?debug&play=레벨 → 자동 조종으로 바로 시작
 if (dbg) { const m = location.search.match(/play=(\d+)/); if (m) { level = +m[1]; window.__ls.auto = !/manual/.test(location.search); muted = true; setTimeout(start, 50); } }
 if (dbg) { const w = location.search.match(/[?&]w=(\d+)&h=(\d+)/); if (w) { Object.assign($('#game').style, { width: w[1] + 'px', height: w[2] + 'px', margin: 0 }); fit(); } }
-if (dbg) { const t = location.search.match(/tier=(\d)/); if (t) setTimeout(() => { if (G) G.tier = +t[1]; }, 80); }
+if (dbg) { const t = location.search.match(/tier=(\d)/); if (t) setTimeout(() => { if (G) G.tier = G.rank = +t[1]; }, 80); }
 // 확인용: &gal=croc2 · gal=golem · gal=army1 → 보스 · 중간보스 · 병사를 가까이 세워 놓고 보기(게임은 멈춤)
 function gallery(k, n) {
   $('#ovStart').hidden = true; clearViews(); state = 'menu'; bossSeen = true;
-  G = newGame(level, {}); G.n = 30; G.tier = Math.min(2, n); G.gates = []; G.mobs = []; G.groups = []; G.boxes = []; lastN = 30;
+  G = newGame(level, {}); G.n = 30; G.tier = G.rank = Math.min(2, n); G.gates = []; G.mobs = []; G.groups = []; G.boxes = []; lastN = 30;
   const anim = ['croc', 'gorilla', 'elephant', 'lion', 'tiger'], mids = ['boar', 'golem', 'lich', 'siege', 'drake'];
   if (anim.includes(k)) G.boss = { kind: 'brute', animal: k, evo: Math.min(2, n), x: MID, y: -300, r: 62, hp: 100, max: 100, t: 0, flash: 0, pop: 0, stop: -800, bite: 0, fire: 2, summon: 99 };
   else if (mids.includes(k)) G.mobs.push({ mb: k, x: MID, y: -230, size: 2.3, step: 0, flash: 0, hp: 100, max: 100, g: {}, lv: 2, ox: 0 });

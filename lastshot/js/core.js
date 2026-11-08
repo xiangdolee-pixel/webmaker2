@@ -4,11 +4,29 @@
    레벨마다 스테이지 종류(구성 · 색)가 바뀌고, 보스도 번갈아 바뀐다. 레벨이 오를수록 + 한 판 뒤로 갈수록 세짐. */
 export const ROAD_L = 34, ROAD_R = 326, MID = 180, SPAWN = -1150, RANGE = 1000, START = 680;
 const GAP = 22, BV = 1150;           // BV: 총알 속도                       // 병사 사이 간격
-export const TIERS = [                // 부대 등급: 타이어에서 '진급'을 얻으면 오른다
+export const TIERS = [                // 부대 등급: 병사 수가 늘면 저절로 오르고(RANKUP), 타이어 · 진급 문으로도 오른다
   { name: '견습병', bullet: 0, mul: 1 },
   { name: '정예병', bullet: 1, mul: 1.6 },
   { name: '근위대장', bullet: 2, mul: 2.5 }
 ];
+// 병사 수로 오르는 등급: 30명이면 정예병, 80명이면 근위대장. 내려갈 때는 조금 더 줄어야(20 · 60 아래) — 경계에서 깜빡이지 않게.
+// 타이어 · 진급 문으로 얻은 등급(rank)은 병사 수가 줄어도 그 아래로 내려가지 않는다.
+export const RANKUP = [30, 80], RANKDOWN = [20, 60];
+function countTier(g) {
+  let t = g.tier;
+  while (t < RANKUP.length && g.n >= RANKUP[t]) t++;
+  while (t > 0 && g.n < RANKDOWN[t - 1]) t--;
+  return Math.max(t, g.rank);
+}
+function promote(g, x, y) {   // 상자 · 진급 문으로 한 등급 올리기
+  g.rank = Math.min(TIERS.length - 1, g.tier + 1); setTier(g, g.rank, x, y);
+}
+function setTier(g, t, x = g.px, y = -60) {
+  if (t === g.tier) return;
+  const up = t > g.tier, h = g.h; g.tier = t;
+  if (up) { if (h.promote) h.promote(t); else h.float(x, y, 'LV' + (t + 1) + ' ' + TIERS[t].name + ' 진급!', '#facc15', 40); h.sfx('promote'); h.tint('gold'); h.ring(g.px, 0, 'gold'); h.buzz(40); }
+  else { h.float(g.px, -60, 'LV' + (t + 1) + ' ' + TIERS[t].name, '#cbd5e1', 30); h.sfx('demote'); }
+}
 // 스테이지 종류: 구성(pat) · 화면 색(theme)
 export const STAGES = {
   basic:  { name: '기본 훈련', sub: '문을 골라 부대를 키우세요', theme: 0, pat: ['gate', 'mob', 'gate', 'box', 'mob', 'gate', 'mob', 'box'] },
@@ -71,7 +89,7 @@ export function newGame(L, hooks) {
   return {
     L, ev: lv.ev, length: lv.length, stage: lv.stage, bossKind: lv.boss, dist: START, next: 0, t: 0,
     speed: Math.min(176, 142 + L * 3),
-    px: MID, tx: MID, n: 3, shown: 3, tier: 0, missiles: 1, rockets: [],
+    px: MID, tx: MID, n: 3, shown: 3, tier: 0, rank: 0, missiles: 1, rockets: [],
     rate: 5, dmg: 1, cd: 0, pow: 0, flash: 0,
     bullets: [], gates: [], mobs: [], groups: [], boxes: [], barrels: [], shells: [], boss: null,
     h: Object.assign({ burst: NOOP, spark: NOOP, float: NOOP, sfx: NOOP, buzz: NOOP, shake: NOOP, tint: NOOP, ring: NOOP, gateHit: NOOP, smoke: NOOP, blast: NOOP, die: NOOP, pts: NOOP, combo: NOOP, stop: NOOP }, hooks || {}),
@@ -263,6 +281,7 @@ export function step(G, dt) {
   g.tx = clamp(g.tx, ROAD_L + R * .7, ROAD_R - R * .7);
   g.px += (g.tx - g.px) * Math.min(1, dt * 14);
 
+  setTier(g, countTier(g));   // 병사 수가 30 · 80 을 넘으면 진급(모습 · 무기 · 총알이 함께 바뀜)
   // 사격: 총알 수는 병사 수만큼(최대 18), 위력은 병사 수에 따라 커짐
   const T = TIERS[g.tier];
   g.cd -= dt; g.flash = Math.max(0, g.flash - dt);
@@ -301,7 +320,7 @@ export function step(G, dt) {
         if (g.n <= p.v) { h.float(g.px, -40, '병사가 모자라요', '#fca5a5', 30); h.sfx('gateDown'); p.taken = true; continue; }
         const pay = p.v, maxed = p.t === 'T' && g.tier >= TIERS.length - 1;   // 이미 최고 등급이면 진급 대신 유도탄
         lose(g, pay, g.px, 0, 'trade');
-        if (p.t === 'T' && !maxed) { g.tier++; h.float(g.px, -60, TIERS[g.tier].name + ' 진급!', '#facc15', 40); }
+        if (p.t === 'T' && !maxed) promote(g, g.px, -60);
         else { g.missiles += 3; h.float(g.px, -60, '유도탄 +3', '#facc15', 40); }
         h.float(g.px, -10, '-' + pay, '#f87171', 30);
         h.sfx('power'); h.tint('gold'); h.ring(g.px, 0, 'gold'); h.stop(.08); h.buzz(40);
@@ -426,7 +445,7 @@ function breakBox(g, X) {
   h.burst(X.x, X.y, 'tire', 26); h.burst(X.x, X.y, 'gold', 16); h.ring(X.x, X.y, 'gold'); h.smoke(X.x, X.y, 3);
   // 나란한 짝은 함께 사라진다(하나만 얻음)
   g.boxes = g.boxes.filter(o => { if (Math.abs(o.y - X.y) < 4) { h.burst(o.x, o.y, 'tire', 10); return false; } return true; });
-  if (X.gift === 'tier' && g.tier < TIERS.length - 1) { g.tier++; h.float(X.x, X.y - 10, TIERS[g.tier].name + ' 진급!', '#facc15', 30); }
+  if (X.gift === 'tier' && g.tier < TIERS.length - 1) promote(g, X.x, X.y - 10);
   else if (X.gift === 'missile') { g.missiles += 3; h.float(X.x, X.y - 10, '유도탄 +3!', '#facc15', 28); }
   else if (X.gift === 'rate') { g.rate = Math.min(14, g.rate * 1.25); h.float(X.x, X.y - 10, '연사 UP!', '#facc15', 28); }
   else { g.dmg = +(g.dmg * 1.3).toFixed(2); h.float(X.x, X.y - 10, '위력 UP!', '#facc15', 28); }
