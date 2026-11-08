@@ -3,8 +3,8 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=20';
-import { SPRITES } from './sprites.js?v=16';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=21';
+import { SPRITES } from './sprites.js?v=17';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
 const SHELL = { croc: '#9be04f', gorilla: '#8a6a4a', elephant: '#5ab8ff', lion: '#ffb02e', tiger: '#ff5a1f' };
@@ -135,8 +135,6 @@ const SFX = {
   hurt() { if (gap('hurt', 70)) return; tone(160, 70, .14, 'sawtooth', .05); },
   power() { [0, 4, 7, 12, 16].forEach((s, i) => mallet(s, .45, .07, i * .055)); mallet(-12, .9, .06); mallet(-24, 1, .05); },
   promote() { [7, 12, 16, 19, 24].forEach((s, i) => mallet(s, .5, .07, i * .07)); [-5, -12].forEach(s => mallet(s, 1.1, .055, .35)); zap(900, 2400, .35, .012, 6, 18, 'sine', 9000, 0, .4); },   // 진급: 올라가는 팡파르 + 반짝 솟는 소리
-  // 용의 불: 부드러운 '화르륵'(높은 쪽만 남긴 바람 소리 + 낮게 내려가는 따뜻한 음) — 북처럼 둔하지 않게
-  fire() { if (gap('fire', 120)) return; noiseHit(.38, .03, 'bandpass', 1800, 700, .9); zap(520, 260, .3, .018, 8, 14, 'triangle', 2400, 0, .2); },
   // 천둥: 번쩍 '쩌정' 갈라지는 소리 + 멀리 굴러가는 우르릉
   thunder() {
     if (gap('thunder', 90)) return;
@@ -403,41 +401,6 @@ function fxBlast(x, y, kind) {
   for (let i = 0; i < 16; i++) addSpark(wx(x), rnd(.5, 3), wz(y), a[i % 2], rnd(2, 3.5), rnd(.2, .35), rnd(-10, 10), rnd(2, 9), rnd(-10, 10));
   kick = Math.max(kick, .6);
 }
-// 용 불: 입 앞 불덩이 몇 개 + 부채꼴 불기둥(아래). 알갱이는 적게 — 더하기 빛이 겹치면 폰이 무거워진다
-function fxFire(x, y, range, spread, lv) {
-  const mouthH = 9.5 + lv * .6; fxFlame(x, y, range, spread, lv, mouthH);
-  if (reduce) return;
-  const c = lv === 2 ? ['#ffffff', '#7fd0ff', '#ffb030'] : ['#fff3b0', '#ffb030', '#ff5a1f'];
-  for (let i = 0; i < 8 + lv * 3; i++) {
-    const life = rnd(.3, .45), d = rnd(.3, 1) * range * S, w = rnd(-1, 1) * spread * d;
-    addSpark(wx(x) + rnd(-.3, .3), mouthH, wz(y) - 1.5, c[i % 3], rnd(2.4, 3.6) * (1 + lv * .2), life, w / life, -mouthH / life * rnd(.75, 1), -d / life);
-  }
-}
-// 불기둥: 입(꼭짓점)에서 앞쪽 땅으로 퍼지는 삼각 부채(주황 → 붉게 사라짐). 메시 6개를 돌려 쓴다
-const flameTex = canvasTex(64, 128, x => {
-  const gr = x.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,236,170,.95)'); gr.addColorStop(.25, 'rgba(255,170,60,.85)'); gr.addColorStop(.6, 'rgba(235,80,20,.55)'); gr.addColorStop(1, 'rgba(200,30,10,0)');
-  x.fillStyle = gr; x.fillRect(0, 0, 64, 128);
-  x.globalCompositeOperation = 'destination-in'; const sg = x.createLinearGradient(0, 0, 64, 0); sg.addColorStop(0, 'rgba(0,0,0,0)'); sg.addColorStop(.3, '#000'); sg.addColorStop(.7, '#000'); sg.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = sg; x.fillRect(0, 0, 64, 128);
-});
-const flames = Array.from({ length: 6 }, () => {
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(12), 3));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute([.35, 0, .65, 0, 0, 1, 1, 1], 2)); geo.setIndex([0, 2, 1, 1, 2, 3]);
-  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: flameTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-  m.visible = false; m.frustumCulled = false; scene.add(m); return { m, t: 0 };
-});
-function fxFlame(x, y, range, spread, lv, mouthH) {
-  const f = flames.find(o => o.t <= 0) || flames[0], len = range * S, w = Math.max(1.6, (18 + range * spread) * S), pos = f.m.geometry.attributes.position;
-  pos.array.set([-.5, mouthH, -1.5, .5, mouthH, -1.5, -w, .4, -len, w, .4, -len]); pos.needsUpdate = true;
-  f.m.material.color.set(lv === 2 ? '#cfe8ff' : '#ffffff'); f.m.position.set(wx(x), 0, wz(y)); f.m.visible = true; f.t = .28;
-}
-function updateFlames(dt) {
-  for (const f of flames) {
-    if (f.t <= 0) continue;
-    f.t -= dt; f.m.material.opacity = Math.max(0, f.t / .28) * (.55 + Math.random() * .2); f.m.scale.x = 1 + Math.random() * .1;
-    if (f.t <= 0) f.m.visible = false;
-  }
-}
 // 번개: 하늘에서 내리꽂는 파란 번개 — 갈라진 모양 그림 6장을 번갈아 보여 '치지지직' 떨리게, 맞은 자리에서 옆 적에게 작은 전기가 튄다
 const boltTexs = Array.from({ length: 6 }, () => canvasTex(128, 512, x => {
   const path = (x0, y0, y1, amp, step) => { const p = [[x0, y0]]; let cx = x0; for (let y = y0 + step; y <= y1; y += step) { cx += (Math.random() - .5) * amp; cx = Math.max(10, Math.min(118, cx)); p.push([cx, y]); } return p; };
@@ -597,9 +560,6 @@ function makeBox(X) {
     const rim = new THREE.Mesh(new THREE.TorusGeometry(.98, .12, 8, 24).rotateX(Math.PI / 2), ph('#f5b52e')); rim.position.y = -.15; prize.add(rim);
     const pl = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), ph('#1f5bff')); pl.scale.set(.25, .5, 1.05); pl.position.y = 1; prize.add(pl);
     prize.position.y = .2;
-  } else if (X.gift === 'dragon') {   // 작은 용 그림
-    const card = new THREE.Mesh(sprGeo, new THREE.MeshBasicMaterial({ map: sprTexture('dragon0'), alphaTest: .4, side: THREE.DoubleSide }));
-    card.scale.set(3.2, 3.2 / sprAspect('dragon0'), 1); card.position.y = -1; card.userData.face = true; prize.add(card);
   } else if (X.gift === 'thunder') {   // 노란 번개 모양
     const sh = new THREE.Shape(); [[.15, 1.4], [-.55, -.05], [-.05, -.05], [-.35, -1.4], [.6, .25], [.05, .25], [.4, 1.4]].forEach(([x, y], i) => i ? sh.lineTo(x, y) : sh.moveTo(x, y));
     const bolt = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: .3, bevelEnabled: true, bevelSize: .06, bevelThickness: .06 }), new THREE.MeshPhongMaterial({ color: '#ffd23f', emissive: '#a86b00', shininess: 90 }));
@@ -687,7 +647,7 @@ function syncViews(dt) {
     if (!v) { v = makeBox(X); views.set(X, v); }
     const j = X.flash > 0 ? rnd(-.12, .12) : 0;
     v.grp.position.set(wx(X.x) + j, 0, wz(X.y));
-    v.prize.rotation.y = X.gift === 'dragon' ? Math.sin(T * 2) * .3 : v.prize.rotation.y + dt * 1.6; v.prize.position.y = 3 + Math.sin(T * 3) * .2;
+    v.prize.rotation.y += dt * 1.6; v.prize.position.y = 3 + Math.sin(T * 3) * .2;
     v.halo.quaternion.copy(camera.quaternion); v.halo.material.opacity = .4 + Math.sin(T * 5) * .15;
     v.tireMat.emissive.setScalar(X.flash > 0 ? .5 : 0);
     v.tires.forEach((t, i) => { t.scale.setScalar(1 + X.pop * .06); t.rotation.x = Math.sin(T * 2 + i) * .03; });
@@ -729,18 +689,6 @@ function syncViews(dt) {
     animCard(v, T, M.step, M.flash, 0, false);
     if (M.y > SPAWN + 150 && Math.random() < .5) auraFx(wx(M.x), wz(M.y), MID_AURA[M.mb], 2.2, 1);
     if (M.mb === 'drake' && Math.random() < .6) addSpark(wx(M.x) + rnd(-.3, .3), 4.4, wz(M.y) + 4.2, Math.random() < .5 ? '#ffb030' : '#ff5a1f', rnd(1, 2), .3, rnd(-1, 1), rnd(-1, 1), rnd(4, 9));
-  }
-  // 용
-  for (const d of G.dragons) {
-    live.add(d); let v = views.get(d);
-    if (!v || v.lv !== d.lv) { if (v) dropView(v); v = makeBillboard('dragon' + d.lv, [10, 13, 17][d.lv]); v.lv = d.lv; v.shadow = v.grp.children[1]; views.set(d, v); }
-    const flap = Math.sin(T * 9 + d.slot * 2);
-    v.grp.position.set(wx(d.x), 0, wz(d.y));
-    v.card.quaternion.copy(camera.quaternion);
-    v.card.position.y = 6.5 + flap * .4 + d.lv * .6;
-    v.card.scale.set(v.w * (1 + flap * .06), v.h * (1 - flap * .03), 1);
-    v.shadow.material.opacity = .5;
-    if (Math.random() < .35) addSpark(wx(d.x) + rnd(-1.5, 1.5), 4 + rnd(0, 2), wz(d.y) + 1, d.lv === 2 ? '#7fd0ff' : '#bfe3ff', rnd(.8, 1.4), .3, 0, rnd(-2, 0), rnd(2, 5));
   }
   if (G.boss) {
     const K = G.boss; live.add(K); let v = views.get(K);
@@ -819,7 +767,7 @@ function pill(x, y, s, fs, c1, c2) {
   ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 2.5; ctx.stroke();
   text(s, x, y + fs * .04, fs, '#fff', true, 'rgba(0,0,0,.35)');
 }
-const GIFT = { tier: '진급', missile: '유도탄 +3', rate: '연사 UP', dmg: '위력 UP', dragon: '용 소환', thunder: '천둥번개' };
+const GIFT = { tier: '진급', missile: '유도탄 +3', rate: '연사 UP', dmg: '위력 UP', thunder: '천둥번개' };
 const elastic = a => 1 + .7 * Math.exp(-a * 9) * Math.cos(a * 22);   // 톡 튀었다가 제자리로
 const texts = [];
 function fxFloat(x, y, s, c, size, small, h) {
@@ -992,9 +940,7 @@ const hooks = {
   // 새 대형이 나올 때: 작은 알림(큰 외침을 가리지 않게 — 이미 외침이 떠 있으면 생략)
   formation: name => { if (!shout || shout.t <= 0) shout = { s: name + '!', c: '#fecaca', t: 1.1, L: 1.1, sub: '' }; },
   // 대군 돌격 시작: 경고 외침 + 경보음
-  horde: full => { shout = full ? { s: '총공격!', c: '#fca5a5', t: 2, L: 2, sub: '끝없이 밀려와요 · 용 · 천둥번개로 쓸어버려요!', big: true } : { s: '대군 돌격!', c: '#fca5a5', t: 2, L: 2, sub: '끝없이 밀려와요 · 양옆 문으로 버티세요!', big: true }; SFX.alarm(); buzz([40, 60, 40]); },
-  dragon: (n, lv) => { shout = { s: n === 1 ? '용 소환!' : '용 ' + n + '마리 · LV' + (lv + 1) + '!', c: '#93c5fd', t: 1.5, L: 1.5, sub: '함께 날며 불을 뿜어요', big: true }; SFX.promote(); addConfetti(30, VW / 2, VH * .5); },
-  fire: (x, y, range, spread, lv) => fxFire(x, y, range, spread, lv),
+  horde: full => { shout = full ? { s: '총공격!', c: '#fca5a5', t: 2, L: 2, sub: '끝없이 밀려와요 · 천둥번개로 쓸어버려요!', big: true } : { s: '대군 돌격!', c: '#fca5a5', t: 2, L: 2, sub: '끝없이 밀려와요 · 양옆 문으로 버티세요!', big: true }; SFX.alarm(); buzz([40, 60, 40]); },
   bolt: (x, y) => fxBolt(x, y),
   // 진급: 큰 외침 + 꽃가루 + 병사들이 톡 튀어 오르며 새 모습 · 새 무기로 바뀐다
   promote: t => { shout = { s: 'LV' + (t + 1) + ' ' + TIERS[t].name + '!', c: t === 2 ? '#93c5fd' : '#fde047', t: 1.5, L: 1.5, sub: t === 2 ? '망토 · 금 갑옷 · 레이저 총' : '은 투구 · 방패 · 플라스마 총', big: true }; addConfetti(t === 2 ? 70 : 40, VW / 2, VH * .5); squadPop = 1; for (let i = 0; i < Math.min(G.n, 60); i++) born[i] = T + i * .008; },
@@ -1071,7 +1017,7 @@ function render(dt) {
     if (G.boss && !bossSeen) { bossSeen = true; bossWarn = 2; SFX.alarm(); buzz([40, 60, 40]); }
   } else bullets.count = heads.count = 0;
   flushSoldiers();
-  updateFx(dt); updateRings(dt); updateBlasts(dt); updateBolts(dt); updateFlames(dt);
+  updateFx(dt); updateRings(dt); updateBlasts(dt); updateBolts(dt);
   shake = Math.max(0, shake - dt);
   placeCamera(shake * 1.6, dt);
   renderer.render(scene, camera);
