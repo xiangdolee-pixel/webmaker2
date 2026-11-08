@@ -92,10 +92,11 @@ body.lock {
 .ptr.ready { opacity: 1; color: var(--olive); }
 .ptr.spin { animation: ptrspin .7s linear infinite; }
 @keyframes ptrspin { to { transform: translate(-50%, 70px) rotate(360deg); } }
-/* 올리브 바구니 그림(leaf.png, 배경 투명) 을 원색 그대로 */
+/* 올리브바스켓 로고(라임 네모, assets/img/logo.webp) */
 .branch, .leaf-mark {
-  background: url(leaf.png) center / contain no-repeat;
-  filter: drop-shadow(0 4px 6px rgba(0,0,0,.12));
+  background: url(assets/img/logo.webp) center / contain no-repeat;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.12);
 }
 .quote-card {
   max-width: 560px;
@@ -315,7 +316,7 @@ a, button { -webkit-touch-callout: none; }
   transition: color 1.6s ease;   /* 배경 장면이 바뀌면 글자색도 따라 */
   white-space: nowrap;
 }
-.ob-logo .leaf-mark { width: 34px; height: 25px; flex: none; }
+.ob-logo .leaf-mark { width: 28px; height: 28px; flex: none; }
 .ob-top .ob-acc { margin-left: auto; }
 .ob-top .ob-acc .xa-login {
   border: 1px solid var(--line); border-radius: 99px; padding: 0 14px; line-height: 32px;

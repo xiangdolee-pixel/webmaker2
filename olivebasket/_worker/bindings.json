@@ -7,7 +7,7 @@
       "!/app.js",
       "!/admin.js",
       "!/sw.js",
-      "!/leaf.png",
+      "!/assets/img/*",
       "!/icons/*",
       "!/manifest.webmanifest"
     ]
