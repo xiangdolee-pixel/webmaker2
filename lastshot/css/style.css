@@ -59,4 +59,31 @@ button:focus-visible { outline: 2px solid var(--yellow); outline-offset: 3px; }
 .btn.red:active { box-shadow: 0 2px 0 #b91c1c; }
 .link { margin-top: 12px; padding: 6px 10px; font-size: .88rem; font-weight: 600; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 
+/* 점수 · 랭킹 */
+.chip.score { background: rgba(15, 23, 42, .72); color: #fff; }
+.chip.score b { color: #fde047; font-variant-numeric: tabular-nums; }
+.card { max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; }
+.links { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.rank { margin-top: 12px; }
+.rank[hidden], .rank-form[hidden] { display: none; }
+.rank-score { font-size: 1rem; font-weight: 700; color: var(--muted); }
+.rank-score b { display: block; font-size: 2.1rem; font-weight: 900; color: var(--ink); letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.rank-msg { min-height: 1.4em; margin-top: 4px; font-size: .92rem; font-weight: 700; color: var(--blue); }
+.rank-form { display: flex; gap: 6px; margin-top: 8px; }
+.rank-form input { flex: 1; min-width: 0; height: 44px; padding: 0 12px; border: 2px solid #cbd5e1; border-radius: 12px; background: #fff; color: var(--ink); font: inherit; font-size: 1rem; font-weight: 700; }
+.rank-form input:focus { outline: none; border-color: var(--blue); }
+.rank-form button { flex: none; height: 44px; padding: 0 16px; border-radius: 12px; background: var(--ink); color: #fff; font-size: 1rem; font-weight: 800; }
+.rank-form button:disabled { opacity: .5; }
+.rank-list { margin: 10px 0 0; padding: 0; list-style: none; text-align: left; }
+.rank-list li { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: 8px; font-size: .92rem; }
+.rank-list li:nth-child(odd) { background: rgba(15, 23, 42, .05); }
+.rank-list li b { width: 22px; flex: none; font-weight: 900; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rank-list li:nth-child(-n+3) b { color: #d97706; }
+.rank-list .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.rank-list .lv { flex: none; font-size: .78rem; color: var(--muted); }
+.rank-list .sc { flex: none; min-width: 64px; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rank-list li.me { background: var(--blue); color: #fff; }
+.rank-list li.me b, .rank-list li.me .lv { color: rgba(255, 255, 255, .85); }
+.rank-list li.none { justify-content: center; height: auto; padding: 14px 8px; background: none; color: var(--muted); }
+
 @media (prefers-reduced-motion: reduce) { .card { animation: none; } .prog i { transition: none; } }

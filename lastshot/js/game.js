@@ -2,7 +2,7 @@
    3D(three.js r160, MIT — js/vendor 에 함께 올림): 바다 위 다리, 병사 · 적은 InstancedMesh 로 수백 명,
    빛나는 총알 줄기 · 불꽃 · 연기 · 파편. 숫자(문 제외) · 떠오르는 글자 · 보스 체력은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, BOSSES, stageOf, bossOf, squadPos, squadR, newGame, step, autoAim } from './core.js?v=10';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, BOSSES, stageOf, bossOf, squadPos, squadR, newGame, step, autoAim } from './core.js?v=11';
 
 const $ = s => document.querySelector(s);
 const glc = $('#gl'), cv = $('#cv'), ctx = cv.getContext('2d');
@@ -15,6 +15,10 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const load = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : +v || d; } catch (e) { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 let level = load('lastshot_level', 1), best = load('lastshot_best', 1), muted = load('lastshot_mute', 0) === 1;
+// 점수: 쓰러질 때까지 이어서 깬 레벨들의 점수를 모은다(run). 쓰러지면 그 점수로 랭킹(1~10등)에 이름을 넣고 0 부터
+let run = load('lastshot_run', 0);
+const score = () => run + (G && state !== 'menu' ? G.score : 0);
+const fmt = n => Math.round(n).toLocaleString('ko-KR');
 
 /* ── 소리: 짧은 합성음(파일 없음) ── */
 let AC = null, lastShot = 0, hitT = 0, tickT = 0;
@@ -674,6 +678,7 @@ cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
 const keys = {};
 addEventListener('keydown', e => {
   if (['ArrowLeft', 'ArrowRight', 'a', 'd'].includes(e.key)) { keys[e.key] = true; e.preventDefault(); }
+  if (e.target && /^(INPUT|BUTTON)$/.test(e.target.tagName)) return; // 이름 넣는 중 · 버튼 위에서는 그 요소가 받는다
   if ((e.key === 'Enter' || e.key === ' ') && (state === 'menu' || state === 'end')) { e.preventDefault(); start(); }
 });
 addEventListener('keyup', e => { keys[e.key] = false; });
@@ -701,35 +706,100 @@ function loop(t) {
 }
 function start() {
   audio();
-  $('#ovStart').hidden = true; $('#ovEnd').hidden = true;
+  $('#ovStart').hidden = true; $('#ovEnd').hidden = true; $('#ovRank').hidden = true;
   clearViews(); texts.length = 0;
   G = newGame(level, hooks); state = 'play'; setTheme(STAGES[G.stage].theme); banner = 2.6; syncHud();
 }
 function end(win) {
   state = 'end';
   const btn = $('#btnNext');
+  $('#rankBox').hidden = true;
   if (win) {
+    const bonus = 500 * G.L + G.n * 5;   // 레벨 클리어 보너스 + 남은 부대
+    run += G.score + bonus; save('lastshot_run', run);
     level++; save('lastshot_level', level);
     if (level > best) { best = level; save('lastshot_best', best); }
     $('#endKicker').textContent = 'CLEAR'; $('#endTitle').textContent = `레벨 ${level - 1} 클리어!`;
-    $('#endSub').textContent = `남은 부대 ${G.n}명 · 다음은 더 어려워요.`;
+    $('#endSub').textContent = `남은 부대 ${G.n}명 · 클리어 보너스 +${fmt(bonus)} · 점수 ${fmt(run)}`;
     btn.textContent = `레벨 ${level} 시작`; btn.classList.remove('red'); SFX.win();
   } else {
     $('#endKicker').textContent = 'GAME OVER'; $('#endTitle').textContent = '부대가 쓰러졌어요';
     const pct = Math.min(100, Math.round(prog() * 100));
-    $('#endSub').textContent = `레벨 ${level} · ${pct}%까지 왔어요. 문을 쏴서 숫자를 키우고, 타이어는 부숴서 무기를 챙기세요.`;
+    $('#endSub').textContent = `레벨 ${level} · ${pct}%까지 왔어요.`;
     btn.textContent = '다시 도전'; btn.classList.add('red'); SFX.lose(); buzz(200);
+    const final = run + G.score;
+    run = 0; save('lastshot_run', 0);
+    showRank(final, level);
   }
   $('#ovEnd').hidden = false; syncHud();
   setTimeout(() => { try { btn.focus({ preventScroll: true }); } catch (e) {} }, 50);
 }
+/* ── 랭킹 1~10등 (서버: /api/rank) ── */
+let rankMine = 0;
+const escH = s => String(s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
+function rankRows(list, box) {
+  box.innerHTML = list.length
+    ? list.map((r, i) => `<li${r.id === rankMine ? ' class="me"' : ''}><b>${i + 1}</b><span class="nm">${escH(r.name)}</span><span class="lv">LV ${r.level}</span><span class="sc">${fmt(r.score)}</span></li>`).join('')
+    : '<li class="none">아직 기록이 없어요. 첫 주인공이 되어 보세요!</li>';
+}
+async function getRank() {
+  const r = await fetch('/api/rank', { cache: 'no-store' });
+  if (!r.ok) throw new Error();
+  return (await r.json()).top || [];
+}
+// 쓰러졌을 때: 점수 보여 주고, 10등 안이면 이름 넣기
+async function showRank(final, lv) {
+  const box = $('#rankBox'), form = $('#rankForm'), list = $('#rankList'), msg = $('#rankMsg');
+  box.hidden = false; form.hidden = true; msg.textContent = '랭킹 불러오는 중…';
+  $('#rankScore').textContent = fmt(final); list.innerHTML = '';
+  form.dataset.score = final; form.dataset.level = lv;
+  let top;
+  try { top = await getRank(); } catch (e) { msg.textContent = '랭킹을 불러오지 못했어요.'; return; }
+  if (state !== 'end') return;
+  rankRows(top, list);
+  const ok = final > 0 && (top.length < 10 || final > top[top.length - 1].score);
+  if (ok) {
+    const place = top.filter(r => r.score >= final).length + 1;
+    msg.textContent = `${place}등 기록! 이름을 남겨 주세요.`;
+    form.hidden = false;
+    const inp = form.querySelector('input');
+    try { inp.value = localStorage.getItem('lastshot_name') || ''; } catch (e) {}
+    setTimeout(() => { try { inp.focus({ preventScroll: true }); inp.select(); } catch (e) {} }, 80);
+  } else msg.textContent = final > 0 ? '10등 안에 들려면 조금 더! 다시 도전해 보세요.' : '';
+}
+$('#rankForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const form = e.currentTarget, inp = form.querySelector('input'), btn = form.querySelector('button'), msg = $('#rankMsg');
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/rank', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, score: +form.dataset.score, level: +form.dataset.level }) });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) { msg.textContent = out.error || '등록하지 못했어요.'; if (out.top) rankRows(out.top, $('#rankList')); return; }
+    try { localStorage.setItem('lastshot_name', name); } catch (e2) {}
+    rankMine = out.id; rankRows(out.top, $('#rankList'));
+    form.hidden = true; msg.textContent = `${out.rank}등에 이름을 올렸어요!`; SFX.win();
+    setTimeout(() => { try { $('#btnNext').focus({ preventScroll: true }); } catch (e3) {} }, 50);
+  } catch (err) { msg.textContent = '등록하지 못했어요. 잠시 뒤에 다시 해 주세요.'; }
+  finally { btn.disabled = false; }
+});
+// 처음 화면의 '랭킹 보기'
+async function openRank() {
+  $('#ovStart').hidden = true; $('#ovRank').hidden = false;
+  const list = $('#rankAll'); list.innerHTML = '<li class="none">불러오는 중…</li>';
+  try { rankRows(await getRank(), list); } catch (e) { list.innerHTML = '<li class="none">랭킹을 불러오지 못했어요.</li>'; }
+  setTimeout(() => { try { $('#btnRankClose').focus({ preventScroll: true }); } catch (e) {} }, 50);
+}
+
 function preview() { setTheme(STAGES[stageOf(level)].theme); const g = newGame(level, {}); step(g, 0); g.mobs.forEach(m => { m.flash = 0; }); return g; }
-function home() { state = 'menu'; clearViews(); G = preview(); $('#ovEnd').hidden = true; $('#ovStart').hidden = false; syncHud(); }
+function home() { state = 'menu'; clearViews(); G = preview(); $('#ovEnd').hidden = true; $('#ovRank').hidden = true; $('#ovStart').hidden = false; syncHud(); }
 const prog = () => G ? Math.max(0, Math.min(1, (G.dist - G.ev[0].d - 680) / (G.length - 680))) : 0;
 function syncHud() {
   const playing = G && state !== 'menu';
   $('#hudLv').textContent = playing ? G.L : level;
   $('#hudBest').textContent = best;
+  $('#hudScore').textContent = fmt(score());
   $('#startLv').textContent = level;
   const st = STAGES[stageOf(level)]; $('#startStage').textContent = st.name; $('#startSub').textContent = st.sub + ' · 보스: ' + BOSSES[bossOf(level)];
   $('#btnReset').hidden = level <= 1;
@@ -742,11 +812,13 @@ function paintMute() { const b = $('#btnMute'); b.setAttribute('aria-pressed', m
 $('#btnStart').addEventListener('click', start);
 $('#btnNext').addEventListener('click', start);
 $('#btnHome').addEventListener('click', home);
-$('#btnReset').addEventListener('click', () => { level = 1; save('lastshot_level', 1); home(); });
+$('#btnReset').addEventListener('click', () => { level = 1; save('lastshot_level', 1); run = 0; save('lastshot_run', 0); home(); });
+$('#btnRank').addEventListener('click', openRank);
+$('#btnRankClose').addEventListener('click', home);
 $('#btnMute').addEventListener('click', () => { muted = !muted; save('lastshot_mute', muted ? 1 : 0); paintMute(); if (!muted) audio(); });
 addEventListener('resize', fit);
 document.addEventListener('visibilitychange', () => { last = performance.now(); });
-if (dbg) window.__ls = { auto: false, start, get G() { return G; }, setLevel(l) { level = l; }, get state() { return state; } };
+if (dbg) window.__ls = { auto: false, start, end, get G() { return G; }, setLevel(l) { level = l; }, get state() { return state; } };
 fit(); G = preview(); syncHud(); paintMute();
 requestAnimationFrame(t => { last = t; loop(t); });
 // 확인용: ?debug&play=레벨 → 자동 조종으로 바로 시작

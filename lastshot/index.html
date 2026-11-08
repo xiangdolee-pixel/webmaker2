@@ -8,8 +8,8 @@
 <meta name="theme-color" content="#0f172a">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="css/style.css?v=5">
-<script type="module" src="js/game.js?v=10"></script>
+<link rel="stylesheet" href="css/style.css?v=6">
+<script type="module" src="js/game.js?v=11"></script>
 </head>
 <body>
 <!-- 계정(로그인) 버튼 자리 — 게임 화면을 가리지 않게 숨김 (자리가 없으면 오른쪽 위에 떠서 나오므로 일부러 둔다) -->
@@ -27,6 +27,7 @@
       <button type="button" class="pill mute" id="btnMute" aria-pressed="false">소리 켬</button>
     </div>
     <div class="hud-row sub">
+      <span class="chip score">점수 <b id="hudScore">0</b></span>
       <span class="chip" id="hudPow" hidden></span>
     </div>
   </div>
@@ -45,7 +46,17 @@
         <li><b>보스</b> 근육 대장은 걸어오고, 탱크는 포탄을 쏴요(빨간 원 피하기)</li>
       </ul>
       <button type="button" class="btn" id="btnStart">시작</button>
-      <button type="button" class="link" id="btnReset" hidden>레벨 1부터 다시</button>
+      <div class="links"><button type="button" class="link" id="btnRank">랭킹 보기</button><button type="button" class="link" id="btnReset" hidden>레벨 1부터 다시</button></div>
+    </div>
+  </section>
+
+  <section class="ov" id="ovRank" hidden>
+    <div class="card">
+      <p class="kicker">RANKING</p>
+      <h2>랭킹 TOP 10</h2>
+      <p class="end-sub">쓰러질 때까지 이어서 깬 레벨들의 점수예요.</p>
+      <ol class="rank-list" id="rankAll"></ol>
+      <button type="button" class="btn" id="btnRankClose">처음 화면</button>
     </div>
   </section>
 
@@ -54,6 +65,15 @@
       <p class="kicker" id="endKicker">CLEAR</p>
       <h2 id="endTitle">레벨 클리어!</h2>
       <p class="end-sub" id="endSub"></p>
+      <div class="rank" id="rankBox" hidden>
+        <p class="rank-score">점수 <b id="rankScore">0</b></p>
+        <p class="rank-msg" id="rankMsg" role="status"></p>
+        <form class="rank-form" id="rankForm" hidden>
+          <input type="text" name="name" maxlength="10" placeholder="이름 (10자까지)" aria-label="랭킹에 남길 이름" autocomplete="nickname" enterkeyhint="done" required>
+          <button type="submit">등록</button>
+        </form>
+        <ol class="rank-list" id="rankList"></ol>
+      </div>
       <button type="button" class="btn" id="btnNext">다음 레벨</button>
       <button type="button" class="link" id="btnHome">처음 화면</button>
     </div>

@@ -65,6 +65,7 @@ export function newGame(L, hooks) {
     rate: 5, dmg: 1, cd: 0, pow: 0, flash: 0,
     bullets: [], gates: [], mobs: [], groups: [], boxes: [], barrels: [], shells: [], boss: null,
     h: Object.assign({ burst: NOOP, spark: NOOP, float: NOOP, sfx: NOOP, buzz: NOOP, shake: NOOP, tint: NOOP, ring: NOOP, gateHit: NOOP, smoke: NOOP, blast: NOOP }, hooks || {}),
+    score: 0,        // 이 판 점수: 적 · 거인 · 타이어 · 보스 (레벨이 높을수록 크게)
     over: 0          // 0 진행 · 1 이김 · -1 짐
   };
 }
@@ -154,7 +155,7 @@ function lose(G, k, x, y, src) {
   if (G.lost) G.lost[src] = (G.lost[src] || 0) + k;
   G.n -= k; G.h.burst(x, y, 'blue', Math.min(k, 14));
 }
-function killMob(g, i, M) { g.mobs.splice(i, 1); M.g.alive--; M.g.pop = 1; g.h.burst(M.x, M.y, 'red', M.size > 1 ? 24 : 6); g.h.smoke(M.x, M.y, M.size > 1 ? 4 : 1); }
+function killMob(g, i, M) { g.score += (M.size > 1 ? 60 : 10) * g.L; g.mobs.splice(i, 1); M.g.alive--; M.g.pop = 1; g.h.burst(M.x, M.y, 'red', M.size > 1 ? 24 : 6); g.h.smoke(M.x, M.y, M.size > 1 ? 4 : 1); }
 function explode(g, x, y) {   // 드럼통 폭발: 둘레 적을 쓸어버리고 타이어도 깎는다
   const h = g.h, R2 = 80 * 80;
   h.blast(x, y); h.burst(x, y, 'gold', 30); h.smoke(x, y, 6); h.ring(x, y, 'gold'); h.shake(.35); h.sfx('boom'); h.buzz(50);
@@ -307,6 +308,7 @@ export function step(G, dt) {
   if (g.n <= 0) { g.n = 0; g.over = -1; return; }
   if (K && K.hp <= 0) {
     h.burst(K.x, K.y, 'red', 50); h.burst(K.x, K.y, 'gold', 40); h.ring(K.x, K.y, 'gold'); h.blast(K.x, K.y);
+    g.score += 1000 * g.L;
     g.boss = null; g.shells = []; h.shake(.6); h.buzz([60, 40, 120]); h.sfx('boom'); g.over = 1;
     for (const M of g.mobs) h.burst(M.x, M.y, 'red', 1);
     g.mobs = []; g.groups = [];
@@ -316,6 +318,7 @@ const PLx = g => power(g.L);
 
 function breakBox(g, X) {
   const h = g.h;
+  g.score += 30 * g.L;
   g.boxes = g.boxes.filter(o => o !== X);
   h.burst(X.x, X.y, 'tire', 26); h.burst(X.x, X.y, 'gold', 16); h.ring(X.x, X.y, 'gold'); h.smoke(X.x, X.y, 3);
   // 나란한 짝은 함께 사라진다(하나만 얻음)
