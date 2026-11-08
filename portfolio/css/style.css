@@ -88,6 +88,21 @@ a { color: inherit; text-decoration: none; }
 .lock-err { min-height: 22px; margin: 12px 0 0; color: #dc2626; font-size: 14px; }
 @media (prefers-color-scheme: dark) { .lock-err { color: #f87171; } }
 
+/* 분류 탭 — 고른 칸 배경 하나(.tab-ind)가 미끄러져 옮겨 간다 */
+.cats-box { margin: -8px 0 22px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.cats-box::-webkit-scrollbar { display: none; }
+.cats { position: relative; display: inline-flex; gap: 2px; padding: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow); }
+.cats[hidden] { display: none; }
+.cat { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 16px; border: 0; border-radius: 999px; background: none; color: var(--sub); font: inherit; font-size: 15px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: color .35s var(--ease); }
+.cat:hover { color: var(--fg); }
+.cat i { font-style: normal; font-size: 12px; font-weight: 700; padding: 0 7px; line-height: 19px; border-radius: 999px; background: var(--thumb); color: var(--sub); transition: background-color .35s var(--ease), color .35s var(--ease); }
+.cat.on, .cat.on:hover { color: var(--brand-fg); }
+.cat.on i { background: rgba(255, 255, 255, .22); color: var(--brand-fg); }
+.tab-ind { position: absolute; z-index: 0; top: 4px; left: 0; height: 38px; border-radius: 999px; background: var(--brand); transition: transform .35s var(--ease), width .35s var(--ease); }
+.cats.no-ind .tab-ind { display: none; }
+.cats.no-ind .cat.on { background: var(--brand); }
+.grid > li[hidden] { display: none; }
+
 /* 화면이 좁아지면 한 줄 칸 수를 줄인다: 5 → 3 → 2 → 1 */
 @media (max-width: 1200px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 900px) {
@@ -96,12 +111,14 @@ a { color: inherit; text-decoration: none; }
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 }
 @media (max-width: 560px) {
+  .cat { height: 36px; padding: 0 13px; font-size: 14.5px; }
+  .tab-ind { height: 36px; }
   .wrap { padding: 36px 16px 28px; }
   .grid { grid-template-columns: 1fr; gap: 12px; }
   .name { font-size: 17px; }
   .desc { font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .card, .thumb img, .tag, .go, .go::after, .toast { transition: none; }
+  .card, .thumb img, .tag, .go, .go::after, .toast, .cat, .cat i, .tab-ind { transition: none; }
   .card:hover, .card:hover .thumb img, .card:hover .go::after { transform: none; }
 }

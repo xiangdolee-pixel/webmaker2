@@ -3,12 +3,13 @@
 //   기본 export (xim.….workers.dev)   운영자 관리 화면(/) + 운영자 API(/api/*)
 //   Engine (서비스 바인딩 전용)          각 고객 사이트 Worker 가 부른다. 공개 주소로는 닿지 않는다.
 //     status(slug)                      사이트 상태(active | suspended | unknown)
-//     portfolio()                       포트폴리오에 켜 둔 사이트 [{ slug, name, url }] (portfolio 폴더가 쓴다)
+//     portfolio()                       포트폴리오에 켜 둔 사이트 [{ slug, name, url }] + 포트폴리오2 [{ slug:'', name, url, extra }] (portfolio 폴더가 쓴다)
 //     fetch(request)                    /__suspended (정지 화면). 업체 관리 화면 · 회원 · 게시판은 xms 가 맡는다.
 //
 //   바인딩: DB(D1 xim), XMS_DB(D1 xms: 업체 관리자 계정 · 입장권), ASSETS(정적 파일)   비밀값: XIM_ADMIN_PASSWORD (wrangler secret, 리포에 없음)
 import { ensureMailDomain, ensureTurnstile } from './mail-domain.js';
 import { deleteRequest } from './request-files.js';
+import { linkUrl as cleanUrl, scrapeMeta } from './scrape.js';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 // 관리자 계정 추가도 그 사이트 홈페이지 회원가입과 같은 항목 · 같은 검사로 (xms 와 같은 코드)
 import { siteSettings, memberValues, uniqueProblem } from '../../xms/_worker/lib.js';
@@ -390,11 +391,93 @@ async function ximApi(request, env, url) {
   // 포트폴리오(portfolio.plators.com)에 보이기 켜기 · 끄기
   m = path.match(/^\/api\/sites\/(\d+)\/portfolio$/);
   if (m && method === 'POST') {
-    const on = (await body(request)).on ? 1 : 0;
-    await db.prepare('UPDATE sites SET portfolio = ? WHERE id = ?').bind(on, +m[1]).run();
+    const v = await body(request);
     const s = await db.prepare('SELECT slug, name FROM sites WHERE id = ?').bind(+m[1]).first();
+    // { tag } = 포트폴리오 분류(홈페이지 · 웹서비스 · 웹앱 · 웹게임 …)만 바꾸기
+    if (v.tag !== undefined) {
+      const tag = str(v.tag, 20);
+      await db.prepare('UPDATE sites SET portfolio_tag = ? WHERE id = ?').bind(tag, +m[1]).run();
+      await audit(db, request, 'SITE_UPDATE', s ? `${s.name} (${s.slug})` : `#${m[1]}`, `포트폴리오 분류: ${tag || '(없음)'}`);
+      return json({ ok: true });
+    }
+    const on = v.on ? 1 : 0;
+    await db.prepare('UPDATE sites SET portfolio = ? WHERE id = ?').bind(on, +m[1]).run();
     await audit(db, request, on ? 'SITE_PORTFOLIO_ON' : 'SITE_PORTFOLIO_OFF', s ? `${s.name} (${s.slug})` : `#${m[1]}`);
     return json({ ok: true });
+  }
+
+  // 포트폴리오2: xim 에서 만들지 않은 사이트를 주소로 넣어 포트폴리오에 함께 보이기
+  //   넣을 때 한 번만 그 페이지의 카톡 미리보기(og:title · og:description · og:image)를 읽어 저장한다.
+  //   그림도 그때 받아 R2(FILES, pf2/…)에 넣어 두고 포트폴리오는 그 저장본을 보여 준다 → 그 뒤로는 그 사이트 서버에 묻지 않는다.
+  //   image 칸 = R2 이름(pf2/…). 운영자는 그림을 새로 올리거나 뺄 수 있다.
+  if (path === '/api/portfolio2' && method === 'GET') {
+    const { results } = await db.prepare('SELECT * FROM portfolio_links ORDER BY sort, id').all();
+    return json(results);
+  }
+  if (path === '/api/portfolio2' && method === 'POST') {
+    const url = pf2Url((await body(request)).url);
+    const meta = await scrapeMeta(url);
+    const image = meta.image ? await pf2SaveRemote(env, meta.image) : '';
+    const top = await db.prepare('SELECT COALESCE(MAX(sort), 0) AS n FROM portfolio_links').first();
+    const row = await db.prepare('INSERT INTO portfolio_links (url, name, description, image, tag, shown, sort, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?) RETURNING *')
+      .bind(meta.url || url, meta.name || new URL(url).hostname, meta.desc || '', image, '홈페이지', top.n + 1, now()).first();
+    await audit(db, request, 'PF2_CREATE', row.name, row.url);
+    return json({ row, warn: meta.error || (!image || !meta.desc ? '미리보기 정보 중 비어 있는 것이 있습니다. 직접 채워 주세요.' : '') });
+  }
+  // 저장해 둔 그림 (운영자 화면 미리보기용 — 포트폴리오는 Engine 으로 받는다)
+  m = path.match(/^\/api\/portfolio2\/img\/(pf2\/[a-f0-9]{32})$/);
+  if (m && method === 'GET') return pf2Image(env, m[1]);
+  m = path.match(/^\/api\/portfolio2\/(\d+)(\/refetch|\/image)?$/);
+  if (m) {
+    const id = +m[1];
+    const old = await db.prepare('SELECT * FROM portfolio_links WHERE id = ?').bind(id).first();
+    if (!old) throw notFound();
+    const setImage = async (image) => {
+      const row = await db.prepare('UPDATE portfolio_links SET image = ? WHERE id = ? RETURNING *').bind(image, id).first();
+      if (old.image && old.image !== image) await pf2DropImage(env, old.image);
+      return row;
+    };
+    if (m[2] === '/refetch' && method === 'POST') {
+      // 다시 가져오기(운영자가 누를 때만): 그 사이트 미리보기를 다시 읽는다 (못 읽은 칸은 원래 값 그대로)
+      const meta = await scrapeMeta(old.url);
+      if (meta.error) throw bad(meta.error);
+      const image = meta.image ? await pf2SaveRemote(env, meta.image) : '';
+      await db.prepare('UPDATE portfolio_links SET name = ?, description = ? WHERE id = ?').bind(meta.name || old.name, meta.desc || old.description, id).run();
+      const row = image ? await setImage(image) : await db.prepare('SELECT * FROM portfolio_links WHERE id = ?').bind(id).first();
+      await audit(db, request, 'PF2_UPDATE', row.name, '다시 가져오기');
+      return json({ row });
+    }
+    if (m[2] === '/image' && method === 'POST') {
+      // 그림 새로 올리기 (본문 = 그림 파일 그대로)
+      const mime = (request.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+      if (!PF2_IMG.test(mime)) throw bad('그림 파일(jpg · png · webp · gif)만 올릴 수 있습니다.');
+      const buf = await request.arrayBuffer();
+      if (!buf.byteLength) throw bad('빈 파일입니다.');
+      if (buf.byteLength > PF2_MAX) throw bad('그림이 너무 큽니다 (5MB 까지).');
+      const row = await setImage(await pf2Put(env, buf, mime));
+      await audit(db, request, 'PF2_UPDATE', row.name, '그림 올림');
+      return json({ row });
+    }
+    if (m[2] === '/image' && method === 'DELETE') {
+      const row = await setImage('');
+      await audit(db, request, 'PF2_UPDATE', row.name, '그림 뺌');
+      return json({ row });
+    }
+    if (!m[2] && method === 'PUT') {
+      const v = await body(request);
+      const shown = v.shown === undefined ? old.shown : (v.shown ? 1 : 0);
+      const row = await db.prepare('UPDATE portfolio_links SET url = ?, name = ?, description = ?, tag = ?, shown = ? WHERE id = ? RETURNING *')
+        .bind(v.url === undefined ? old.url : pf2Url(v.url), v.name === undefined ? old.name : str(v.name, 120) || old.name,
+          v.description === undefined ? old.description : str(v.description, 300), v.tag === undefined ? old.tag : str(v.tag, 20), shown, id).first();
+      await audit(db, request, 'PF2_UPDATE', row.name, v.shown !== undefined && Object.keys(v).length === 1 ? (shown ? '보이기' : '숨기기') : '수정');
+      return json({ row });
+    }
+    if (!m[2] && method === 'DELETE') {
+      await db.prepare('DELETE FROM portfolio_links WHERE id = ?').bind(id).run();
+      if (old.image) await pf2DropImage(env, old.image);
+      await audit(db, request, 'PF2_DELETE', old.name, old.url);
+      return json({ ok: true });
+    }
   }
 
   // 업체 관리자 계정 = xms 회원 중 등급 1 (사이트주소/xms/ 로 로그인)
@@ -771,6 +854,39 @@ function siteFields(raw) {
 // 업체 사이트 주소: 도메인이 있으면 그 주소, 없으면 workers.dev
 const WORKERS_SUB = 'xiangdolee';
 const ACCOUNT_ID = 'f225d506d8cf6ddf97704a36c69f5ce7'; // xiangdolee 계정
+// ── 포트폴리오2 그림: R2(FILES) 의 pf2/<무작위> 에 둔다 ──
+const PF2_IMG = /^image\/(png|jpeg|webp|gif)$/;
+const PF2_MAX = 5 * 1024 * 1024;
+async function pf2Put(env, buf, mime) {
+  if (!env.FILES) throw bad('파일 저장소(R2)가 연결돼 있지 않습니다.');
+  const key = `pf2/${randomHex(16)}`;
+  await env.FILES.put(key, buf, { httpMetadata: { contentType: mime } });
+  return key;
+}
+// 미리보기 그림을 한 번 받아 저장 (못 받으면 '' → 이름 첫 글자로 보임)
+async function pf2SaveRemote(env, src) {
+  try {
+    const r = await fetch(src, { redirect: 'follow', signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; xim-portfolio/1.0)', Accept: 'image/*' } });
+    const mime = (r.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+    if (!r.ok || !PF2_IMG.test(mime)) return '';
+    const buf = await r.arrayBuffer();
+    if (!buf.byteLength || buf.byteLength > PF2_MAX) return '';
+    return await pf2Put(env, buf, mime);
+  } catch { return ''; }
+}
+async function pf2DropImage(env, key) {
+  if (/^pf2\/[a-f0-9]{32}$/.test(key || '')) await env.FILES?.delete(key).catch(() => {});
+}
+async function pf2Image(env, key) {
+  const obj = /^pf2\/[a-f0-9]{32}$/.test(key || '') ? await env.FILES?.get(key) : null;
+  if (!obj) return new Response('Not found', { status: 404 });
+  // 이름이 그림마다 새로 생기므로(바꾸면 새 이름) 오래 캐시해도 된다
+  return new Response(obj.body, { headers: { 'Content-Type': obj.httpMetadata?.contentType || 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable' } });
+}
+
+// 포트폴리오2 주소 다듬기 (잘못되면 400)
+function pf2Url(v) { const u = cleanUrl(v); if (!u.ok) throw bad(u.error); return u.url; }
+
 function siteUrl(site) {
   const d = String(site.domain || '').trim().replace(/^https?:[/][/]/, '').replace(/[/].*$/, '');
   return d ? `https://${d}` : `https://${site.slug}.${WORKERS_SUB}.workers.dev`;
@@ -800,8 +916,11 @@ export class Engine extends WorkerEntrypoint {
 
   // 포트폴리오 사이트가 묻는다: 포트폴리오에 켜 둔 운영 중 사이트 [{ slug, name, url }] (만든 차례)
   async portfolio() {
-    const { results } = await this.env.DB.prepare("SELECT slug, name, domain FROM sites WHERE portfolio = 1 AND status = 'active' ORDER BY id").all();
-    return results.map((s) => ({ slug: s.slug, name: s.name, url: `${siteUrl(s)}/` }));
+    const { results } = await this.env.DB.prepare("SELECT slug, name, domain, portfolio_tag FROM sites WHERE portfolio = 1 AND status = 'active' ORDER BY id").all();
+    const list = results.map((s) => ({ slug: s.slug, name: s.name, url: `${siteUrl(s)}/`, tag: s.portfolio_tag || '' }));
+    // 포트폴리오2(xim 밖의 사이트)는 그 뒤에: 글 · 그림을 그대로 넘긴다
+    const { results: links } = await this.env.DB.prepare('SELECT * FROM portfolio_links WHERE shown = 1 ORDER BY sort, id').all().catch(() => ({ results: [] }));
+    return list.concat(links.map((l) => ({ slug: '', name: l.name, url: l.url, tag: l.tag || '', extra: { name: l.name, desc: l.description, image: l.image ? `/pf2-img/${l.image.slice(4)}` : '', tag: l.tag } })));
   }
 
   // 보안 감시: 이 IP 가 지금 막혀 있나 (사이트 Worker 가 IP 마다 60초 캐시)
@@ -845,6 +964,9 @@ export class Engine extends WorkerEntrypoint {
 
   async fetch(request) {
     const url = new URL(request.url);
+    // 포트폴리오2 그림 (portfolio 사이트가 /pf2-img/<이름> 을 이리로 넘긴다)
+    const pi = url.pathname.match(/^\/__pf2img\/([a-f0-9]{32})$/);
+    if (pi) return pf2Image(this.env, `pf2/${pi[1]}`);
     const site = await getSite(this.env, request.headers.get('X-Xim-Site'));
     if (url.pathname === '/__suspended') return suspendedPage(site);
     if (!site) return new Response('xim 에 등록되지 않은 사이트입니다.', { status: 404 });

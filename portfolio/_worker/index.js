@@ -8,6 +8,7 @@
 //     이미지 · 그 밖의 파일은 짧은 표(pf_ok, 10분)로 통과. 표는 비밀번호로 서명 → 비밀번호를 바꾸면 무효.
 //   카드의 사이트명 · 설명 · 이미지는 각 사이트 xms 설정을 열 때마다 읽어 채운다:
 //     사이트명 = 검색엔진 제목, 설명 = 카톡 미리보기 설명, 이미지 = 카톡 미리보기 그림. 비어 있으면 index.html 에 적힌 그대로.
+//   포트폴리오2(xim 에서 만들지 않은 사이트)는 xim 의 '포트폴리오2' 탭에서 넣은 값(카톡 미리보기)으로 xim 사이트 다음에 붙인다.
 //   그 밖(페이지 · /xms 관리 · /member)은 xim 공통 사이트 Worker 가 맡는다.
 import site from '../../xim/_worker/site-worker.js';
 
@@ -52,7 +53,7 @@ function lockPage(error, next) {
 <title>포트폴리오</title>
 <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="/css/style.css?v=7">
+<link rel="stylesheet" href="/css/style.css?v=8">
 </head>
 <body>
 <main class="lock">
@@ -105,7 +106,7 @@ function cardHtml(site, d, st) {
   const thumb = img
     ? `<span class="thumb is-og"><img src="${escHtml(img)}" alt="${name} 공유 이미지" width="1200" height="630" loading="lazy"></span>`
     : `<span class="thumb is-empty"><b>${escHtml([...plain][0] || '')}</b></span>`;
-  return `<li><a class="card" href="${escHtml(site.url)}" data-xim="${escHtml(site.slug)}" target="_blank" rel="noopener">${thumb}
+  return `<li${st.tag ? ` data-tag="${st.tag}"` : ''}><a class="card" href="${escHtml(site.url)}"${site.slug ? ` data-xim="${escHtml(site.slug)}"` : ''} target="_blank" rel="noopener">${thumb}
 <span class="body">${st.tag ? `<span class="tag">${st.tag}</span>` : ''}<strong class="name">${name}</strong><span class="desc">${desc}</span><span class="go">바로가기</span></span></a></li>`;
 }
 async function fillCards(res, env, ctx) {
@@ -114,8 +115,13 @@ async function fillCards(res, env, ctx) {
   try { if (env.XIM) sites = await env.XIM.portfolio(); } catch { sites = null; }
   if (!sites || !env.XMS) return new Response(html, res);
   const st = staticCards(html);
-  const info = await Promise.all(sites.map((s) => readSite(env, s.slug, new URL(s.url).origin)));
-  const list = sites.map((s, i) => cardHtml(s, info[i] || {}, st[s.slug] || {})).join('\n');
+  // 포트폴리오2(xim 밖의 사이트, slug 없음)는 xim 이 저장해 둔 카톡 미리보기 값 그대로
+  const info = await Promise.all(sites.map((s) => (s.extra ? s.extra : readSite(env, s.slug, new URL(s.url).origin))));
+  //   분류(tag) = xim 에 적은 값, 비어 있으면 index.html 카드 값
+  const list = sites.map((s, i) => {
+    const base = s.extra ? {} : st[s.slug] || {};
+    return cardHtml(s, info[i] || {}, { ...base, tag: s.tag ? escHtml(s.tag) : base.tag || '' });
+  }).join('\n');
   return new HTMLRewriter()
     .on('ul.grid', { element(e) { e.setInnerContent(list || '<li class="none">아직 올린 사이트가 없습니다.</li>', { html: true }); } })
     .transform(new Response(html, res));
@@ -166,6 +172,14 @@ export default {
       // 페이지는 늘 비밀번호 화면(맞게 넣으면 /__unlock 응답에 바로 담김), 파일은 짧은 표로
       if (request.method === 'GET' && (request.headers.get('Accept') || '').includes('text/html')) return lockPage(false, url.pathname + url.search);
       if (!(await valid(secret, 'files', cookieOf(request, FILES)))) return new Response('Unauthorized', { status: 401, headers: { 'Cache-Control': 'no-store' } });
+      // 포트폴리오2 그림: xim 이 처음 한 번 받아 저장해 둔 것 (그 사이트 서버에는 다시 묻지 않는다)
+      const pi = url.pathname.match(/^\/pf2-img\/([a-f0-9]{32})$/);
+      if (pi && env.XIM) {
+        const r = await env.XIM.fetch(new Request(`https://xim/__pf2img/${pi[1]}`));
+        const out = new Response(r.body, r);
+        out.headers.set('Cache-Control', 'private, max-age=86400');
+        return out;
+      }
       return page(request, env, ctx, url);
     }
     return env.XMS ? site.fetch(request, env, ctx) : env.ASSETS.fetch(request);

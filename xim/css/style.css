@@ -384,3 +384,21 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
   .price-tbl td { display: block; border: 0; padding: 0; white-space: normal !important; }
   .price-tbl td[data-l]:not(:first-child)::before { content: attr(data-l) ' · '; color: var(--mute); font-size: 12px; }
 }
+
+/* 포트폴리오2 */
+.pf2-add { display: flex; gap: 8px; flex: 1 1 320px; max-width: 520px; margin-left: auto; }
+.pf2-add .input { flex: 1; min-width: 0; min-height: 40px; }
+.srow.pf2-row { grid-template-columns: 128px minmax(0, 1fr) auto; }
+.pf2-thumb { position: relative; display: grid; place-items: center; width: 128px; aspect-ratio: 1200 / 630; border-radius: 8px; overflow: hidden; background: #eef0f6; }
+.pf2-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pf2-thumb b { color: var(--mute); font-size: 22px; }
+.pf2-thumb:not(.none) b { visibility: hidden; }
+.pf2-row .pf2-txt b { color: var(--ink); font-size: 15px; }
+.pf2-desc { flex-basis: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.pf2-prev { margin-bottom: 12px; }
+.pf2-prev .pf2-thumb { width: 100%; max-width: 320px; }
+.pf2-row.off .pf2-thumb { opacity: .55; }
+@media (max-width: 1100px) { .srow.pf2-row { grid-template-columns: 128px minmax(0, 1fr); } .srow.pf2-row .sr-act { grid-column: 1 / -1; justify-content: flex-start; } }
+@media (max-width: 767px) { .pf2-add { max-width: none; margin-left: 0; flex-basis: 100%; } .srow.pf2-row { grid-template-columns: 96px minmax(0, 1fr); } .pf2-thumb { width: 96px; } }
+.pf2-img-act { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 2px; }
+.pf2-img-act label.btn { cursor: pointer; }

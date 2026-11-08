@@ -56,6 +56,7 @@ const NAV_ICON = {
   requests: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>',
   monitor: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M8.5 12h2l1-2.5 2 5 1-2.5h1"/></svg>',
   audit: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>',
+  portfolio2: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M12 11v5M9.5 13.5h5"/></svg>',
   pricing: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>',
   security: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
 };
@@ -65,7 +66,7 @@ function showApp() {
   $('#app').hidden = false;
   if (!navReady) {
     navReady = true;
-    pillTabs($('#nav'), [['sites', '사이트'], ['customers', '고객'], ['requests', '수정요청'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제']], tab, (v) => {
+    pillTabs($('#nav'), [['sites', '사이트'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제']], tab, (v) => {
       tab = v;
       if (reqOpen && !(v === 'requests' && /^#req-\d+$/.test(location.hash))) { reqOpen = 0; if (location.hash) history.replaceState(null, '', location.pathname); }
       render();
@@ -149,6 +150,7 @@ function render() {
     const tasks = [renderTiles()];
     if (tab === 'sites') tasks.push(renderSites());
     if (tab === 'customers') tasks.push(renderCustomers());
+    if (tab === 'portfolio2') tasks.push(renderPortfolio2());
     if (tab === 'requests') tasks.push(renderRequests());
     if (tab === 'security') tasks.push(renderSecurity());
     if (tab === 'monitor') tasks.push(renderMonitor());
@@ -193,6 +195,126 @@ async function renderSites() {
         .catch((e) => { pf.checked = !on; toast(e.message); })
         .finally(() => { pf.disabled = false; });
     };
+  });
+}
+
+// ───────── 포트폴리오2: xim 밖에서 만든 사이트를 주소로 넣기 ─────────
+//   넣으면 xim 이 그 페이지의 카톡 미리보기(썸네일 · 사이트명 · 설명)를 읽어 온다. 포트폴리오에서 xim 사이트 다음 차례로 나온다.
+let pf2 = [];
+const PF_TAGS = '<datalist id="pf-tags"><option value="홈페이지"><option value="웹서비스"><option value="웹앱"><option value="웹게임"></datalist>';
+const pf2Host = (u) => { try { return new URL(u).hostname; } catch { return u; } };
+// 그림은 xim 이 저장해 둔 것(R2 pf2/…)
+const pf2Src = (img) => (/^pf2\/[a-f0-9]{32}$/.test(img || '') ? `/api/portfolio2/img/${img}` : '');
+function pf2Thumb(l) {
+  const first = esc([...(l.name || '?')][0]);
+  return pf2Src(l.image)
+    ? `<span class="pf2-thumb"><img src="${esc(pf2Src(l.image))}" alt="" loading="lazy" onerror="this.parentNode.classList.add('none');this.remove()"><b>${first}</b></span>`
+    : `<span class="pf2-thumb none"><b>${first}</b></span>`;
+}
+async function renderPortfolio2() {
+  pf2 = await api('/portfolio2');
+  if (tab !== 'portfolio2') return;
+  view.innerHTML = `
+    <div class="bar"><h2>포트폴리오2 ${pf2.length}</h2>
+      <form class="pf2-add" data-add><input class="input" name="url" required placeholder="https://example.kr/ 또는 한글주소.kr" autocomplete="off" aria-label="사이트 주소"><button class="btn primary" type="submit">가져오기</button></form></div>
+    <p class="meta mon-rule">xim 에서 만들지 않은 사이트도 포트폴리오에 올립니다. 주소를 넣으면 카톡 미리보기(썸네일 · 사이트명 · 설명)를 한 번만 읽어 xim 에 저장하고(그림 포함), 그 뒤로는 그 사이트 서버에 다시 묻지 않습니다. 포트폴리오에는 xim 사이트 다음에 같은 모양으로 나옵니다.</p>
+    <div class="rows">${pf2.map((l) => `
+      <article class="card srow pf2-row${l.shown ? '' : ' off'}" data-id="${l.id}">
+        ${pf2Thumb(l)}
+        <div class="pf2-txt"><b>${esc(l.name)}</b><span class="badge doing">${esc(l.tag || '분류 없음')}</span><span class="pf2-desc">${l.description ? esc(l.description) : '<span class="dim">설명 없음</span>'}</span>
+          <a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(pf2Host(l.url))}</a></div>
+        <div class="sr-act">
+          <label class="pf-sw" title="켜면 포트폴리오에 나옵니다"><input type="checkbox" data-pf${l.shown ? ' checked' : ''}><i aria-hidden="true"></i>보이기</label>
+          <button class="btn sm" type="button" data-act="refetch">다시 가져오기</button>
+          <button class="btn sm" type="button" data-act="edit">수정</button>
+          <button class="btn sm danger" type="button" data-act="del">삭제</button>
+        </div>
+      </article>`).join('') || '<div class="card empty">아직 넣은 사이트가 없습니다. 위에 주소를 넣어 보세요.</div>'}</div>`;
+  const form = view.querySelector('[data-add]');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    busy(form.querySelector('button'), null, async () => {
+      const r = await api('/portfolio2', { method: 'POST', data: { url: form.url.value } });
+      toast(`"${r.row.name}" 을(를) 포트폴리오에 올렸습니다.`);
+      await renderPortfolio2();
+      if (r.warn) { toast(r.warn); pf2Dialog(r.row); }
+    });
+  });
+  view.querySelectorAll('[data-id]').forEach((el) => {
+    const l = pf2.find((x) => x.id === +el.dataset.id);
+    el.querySelector('[data-act="edit"]').onclick = () => pf2Dialog(l);
+    el.querySelector('[data-act="refetch"]').onclick = (e) => busy(e.currentTarget, null, async () => {
+      await api(`/portfolio2/${l.id}/refetch`, { method: 'POST', data: {} });
+      toast('미리보기 정보를 다시 가져왔습니다.');
+      renderPortfolio2();
+    });
+    const del = el.querySelector('[data-act="del"]');
+    del.onclick = () => busy(del, null, async () => {
+      if (del.dataset.sure !== '1') { del.dataset.sure = '1'; del.textContent = '정말 삭제'; return; }
+      await api(`/portfolio2/${l.id}`, { method: 'DELETE' });
+      toast('삭제했습니다.');
+      renderPortfolio2();
+    });
+    const pf = el.querySelector('[data-pf]');
+    pf.onchange = () => {
+      const on = pf.checked;
+      pf.disabled = true;
+      api(`/portfolio2/${l.id}`, { method: 'PUT', data: { shown: on } })
+        .then(() => { l.shown = on ? 1 : 0; el.classList.toggle('off', !on); toast(on ? `"${l.name}" 을(를) 포트폴리오에 보입니다.` : `"${l.name}" 을(를) 포트폴리오에서 숨깁니다.`); })
+        .catch((e) => { pf.checked = !on; toast(e.message); })
+        .finally(() => { pf.disabled = false; });
+    };
+  });
+}
+function pf2Dialog(l) {
+  openDialog(`
+    <h2>포트폴리오2 수정</h2>
+    <form>
+      <div class="pf2-prev" data-prev>${pf2Thumb(l)}</div>
+      <label class="field"><span>주소</span><input class="input" name="url" value="${esc(l.url)}" required></label>
+      <div class="row2">
+        <label class="field"><span>사이트명</span><input class="input" name="name" value="${esc(l.name)}" required maxlength="120"></label>
+        <label class="field"><span>분류</span><input class="input" name="tag" value="${esc(l.tag)}" maxlength="20" placeholder="홈페이지" list="pf-tags">${PF_TAGS}</label>
+      </div>
+      <label class="field"><span>설명</span><textarea class="input" name="description" maxlength="300">${esc(l.description)}</textarea></label>
+      <div class="field"><span>썸네일 그림</span>
+        <div class="pf2-img-act"><label class="btn sm">새로 올리기<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-img hidden></label>
+          <button class="btn sm" type="button" data-img-del${l.image ? '' : ' hidden'}>그림 빼기</button></div>
+        <small>jpg · png · webp · gif, 5MB 까지. 가로 1200 × 세로 630 비율이 가장 잘 맞습니다. 그림이 없으면 사이트명 첫 글자로 보입니다.</small></div>
+      <p class="err" role="alert"></p>
+      <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">저장</button></div>
+    </form>`, (dlg) => {
+    const form = dlg.querySelector('form');
+    // 그림은 고르는 즉시 올려 저장한다 (저장 버튼과 따로)
+    const prev = dlg.querySelector('[data-prev]');
+    const del = dlg.querySelector('[data-img-del]');
+    const showImg = (row) => { l.image = row.image; prev.innerHTML = pf2Thumb(row); del.hidden = !row.image; renderPortfolio2(); };
+    dlg.querySelector('[data-img]').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      busy(e.target.closest('label'), form.querySelector('.err'), async () => {
+        const res = await fetch(`/api/portfolio2/${l.id}/image`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(out.error || `올리지 못했습니다 (${res.status})`);
+        showImg(out.row);
+        toast('그림을 올렸습니다.');
+      });
+    });
+    del.onclick = () => busy(del, form.querySelector('.err'), async () => {
+      const r = await api(`/portfolio2/${l.id}/image`, { method: 'DELETE' });
+      showImg(r.row);
+      toast('그림을 뺐습니다.');
+    });
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      busy(form.querySelector('[type=submit]'), form.querySelector('.err'), async () => {
+        await api(`/portfolio2/${l.id}`, { method: 'PUT', data: formData(form) });
+        dlg.close();
+        toast('저장했습니다.');
+        renderPortfolio2();
+      });
+    });
   });
 }
 
@@ -333,6 +455,7 @@ function siteDialog(site) {
         <label class="field"><span>저장 용량 (MB)</span><input class="input" name="quota_mb" type="number" min="0" value="${esc(s.quota_mb)}" required></label>
       </div>
       <label class="field"><span>메모</span><textarea class="input" name="memo">${esc(s.memo)}</textarea></label>
+      ${site ? `<label class="field"><span>포트폴리오 분류</span><input class="input" name="portfolio_tag" value="${esc(s.portfolio_tag)}" maxlength="20" placeholder="홈페이지" list="pf-tags">${PF_TAGS}<small>포트폴리오에서 이 분류 탭으로 묶여 보입니다</small></label>` : ''}
       <p class="err" role="alert"></p>
       <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">저장</button></div>
     </form>`, (dlg) => {
@@ -340,8 +463,10 @@ function siteDialog(site) {
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       busy(form.querySelector('[type=submit]'), form.querySelector('.err'), async () => {
-        const data = { ...formData(form), status: s.status };
+        const { portfolio_tag: pfTag, ...rest } = formData(form);
+        const data = { ...rest, status: s.status };
         const r = site ? await api(`/sites/${site.id}`, { method: 'PUT', data }) : await api('/sites', { method: 'POST', data });
+        if (site && pfTag !== undefined && pfTag.trim() !== (s.portfolio_tag || '')) await api(`/sites/${site.id}/portfolio`, { method: 'POST', data: { tag: pfTag } });
         dlg.close();
         const mail = r?.mail ? ` 메일: ${r.mail.message}` : '';
         toast(site ? `저장했습니다.${mail}` : `사이트를 만들었습니다.${mail}`);
@@ -738,6 +863,7 @@ const AUDIT_ACTIONS = {
   ADMIN_CREATE: '관리자 계정 추가', ADMIN_DELETE: '관리자 계정 삭제', STAFF_ENTER: 'xms 들어가기',
   SEC_BLOCK: 'IP 차단', SEC_UNBLOCK: 'IP 차단 풀기', SEC_ALLOW: '막지 않을 IP 추가', SEC_UNALLOW: '막지 않을 IP 빼기',
   REQUEST_REPLY: '수정요청 답변', REQUEST_STATUS: '수정요청 상태', REQUEST_DELETE: '수정요청 삭제', CONNECT: 'GitHub에서 연결',
+  SITE_PORTFOLIO_ON: '포트폴리오 올림', SITE_PORTFOLIO_OFF: '포트폴리오 내림', PF2_CREATE: '포트폴리오2 추가', PF2_UPDATE: '포트폴리오2 수정', PF2_DELETE: '포트폴리오2 삭제',
 };
 let auditPage = 1;
 // ───────── Cloudflare 요금제 (사용자 지시 2026-11-04) ─────────

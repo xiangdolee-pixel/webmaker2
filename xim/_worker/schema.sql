@@ -153,3 +153,18 @@ CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(created_at);
 
 -- 2026-11-04 사이트가 원래 쓰는 파비콘 주소(배포할 때 index.html 에서 읽음, xim 카드에 표시 — xms 에서 올린 파비콘이 먼저). 한 번만:
 --   ALTER TABLE sites ADD COLUMN site_favicon TEXT NOT NULL DEFAULT '';
+
+-- 2026-11-08 포트폴리오2: xim 에서 만들지 않은 사이트를 주소로 넣어 포트폴리오에 함께 보이기
+--   넣을 때 그 페이지의 카톡 미리보기(og:title · og:description · og:image)를 읽어 채운다. xim 사이트 다음 차례로 나온다.
+CREATE TABLE IF NOT EXISTS portfolio_links (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  url         TEXT NOT NULL,
+  name        TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  image       TEXT NOT NULL DEFAULT '',
+  tag         TEXT NOT NULL DEFAULT '홈페이지',
+  shown       INTEGER NOT NULL DEFAULT 1,
+  sort        INTEGER NOT NULL DEFAULT 0,
+  created_at  INTEGER NOT NULL
+);
+--   ALTER TABLE sites ADD COLUMN portfolio_tag TEXT NOT NULL DEFAULT '';  -- 포트폴리오 분류(홈페이지 · 웹서비스 · 웹앱 · 웹게임), 사이트 수정 창에서
