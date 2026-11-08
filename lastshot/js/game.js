@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=19';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=20';
 import { SPRITES } from './sprites.js?v=16';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
@@ -138,7 +138,12 @@ const SFX = {
   // 용의 불: 부드러운 '화르륵'(높은 쪽만 남긴 바람 소리 + 낮게 내려가는 따뜻한 음) — 북처럼 둔하지 않게
   fire() { if (gap('fire', 120)) return; noiseHit(.38, .03, 'bandpass', 1800, 700, .9); zap(520, 260, .3, .018, 8, 14, 'triangle', 2400, 0, .2); },
   // 천둥: 번쩍 '쩌정' 갈라지는 소리 + 멀리 굴러가는 우르릉
-  thunder() { if (gap('thunder', 90)) return; noiseHit(.12, .07, 'highpass', 5200, 2600, .7); zap(3200, 600, .08, .02, 40, 60, 'sawtooth', 7000); noiseHit(.9, .05, 'lowpass', 900, 90, .5, .05); },
+  thunder() {
+    if (gap('thunder', 90)) return;
+    noiseHit(.1, .06, 'highpass', 5600, 3000, .7); zap(3400, 700, .09, .02, 60, 70, 'sawtooth', 8000);
+    for (let i = 1; i < 8; i++) noiseHit(.025, .035 * (1 - i / 9), 'highpass', 7000, 4500, .8, i * .045 + Math.random() * .02);   // 치지지직
+    noiseHit(.8, .04, 'lowpass', 700, 80, .5, .06);
+  },
   demote() { [7, 4, 0].forEach((s, i) => mallet(s, .35, .05, i * .1)); },
   missile() { tone(300, 1400, .25, 'sawtooth', .03); tone(3000, 400, .45, 'square', .05, true); },
   cheer() { [7, 11, 14, 19, 23].forEach((s, i) => mallet(s, .32, .06, i * .055)); mallet(-17, .7, .05); },
@@ -151,7 +156,7 @@ const buzz = ms => { if (!muted && navigator.vibrate && (!navigator.userActivati
 /* ── 3D 기본 ── */
 const renderer = new THREE.WebGLRenderer({ canvas: glc, antialias: true, powerPreference: 'high-performance' });
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 const scene = new THREE.Scene();
 const SKY = new THREE.Color('#9fd8f5');
 scene.background = SKY.clone();
@@ -314,10 +319,13 @@ const debris = pool(500, new THREE.InstancedMesh(new THREE.BoxGeometry(.3, .3, .
 const FXC = {
   red: ['#e3343a', '#f6c9a0', '#b5262b', '#c9cfd8'], blue: ['#2f6bf0', '#f6c9a0', '#2a4fae'], tire: ['#26282c', '#3a3d42', '#55585e'],
   gold: ['#ffd23f', '#ffb020', '#fff1a8'], hot: ['#ffe27a', '#ffb347'], cool: ['#bfefff', '#7fd6ff'], missile: ['#bfe6ff', '#4fa8ff', '#ffffff'],
+  gateB: ['#62b3ff', '#1f63e6', '#ffffff', '#bfe3ff'], gateR: ['#ff7a7a', '#e0242c', '#ffffff', '#ffd0d0'], gateY: ['#ffd76a', '#f08a12', '#ffffff'],
   confetti: ['#ff4d6d', '#ffd23f', '#3ddc84', '#4fa8ff', '#b47bff', '#ffffff']
 };
-const tmpC = new THREE.Color();
-function addSpark(x, h, z, c, size, life, vx, vh, vz) { if (sparks.list.length < sparks.cap) sparks.list.push({ x, h, z, vx: vx || 0, vh: vh || 0, vz: vz || 0, s: size, t: life, L: life, c: c instanceof THREE.Color ? c : new THREE.Color(c) }); }
+const tmpC = new THREE.Color(), colCache = new Map();
+const colr = c => { if (c instanceof THREE.Color) return c; let v = colCache.get(c); if (!v) colCache.set(c, v = new THREE.Color(c)); return v; };
+const shrink = (list, dt) => { let j = 0; for (const p of list) if ((p.t -= dt) > 0) list[j++] = p; list.length = j; };
+function addSpark(x, h, z, c, size, life, vx, vh, vz) { if (sparks.list.length < sparks.cap) sparks.list.push({ x, h, z, vx: vx || 0, vh: vh || 0, vz: vz || 0, s: size, t: life, L: life, c: colr(c) }); }
 function fxSpark(x, y, kind, n) {
   const cols = FXC[kind] || FXC.hot;
   for (let i = 0; i < n; i++) addSpark(wx(x) + rnd(-.3, .3), rnd(.8, 1.8), wz(y), cols[i % cols.length], rnd(.6, 1.2), rnd(.08, .2), rnd(-6, 6), rnd(-1, 5), rnd(-2, 6));
@@ -326,10 +334,10 @@ function fxBurst(x, y, kind, n) {
   if (reduce) n = Math.ceil(n / 3);
   const cols = FXC[kind] || FXC.red;
   for (let i = 0; i < n; i++) {
-    if (debris.list.length < debris.cap) debris.list.push({ x: wx(x) + rnd(-.5, .5), h: rnd(.6, 1.8), z: wz(y) + rnd(-.5, .5), vx: rnd(-7, 7), vh: rnd(4, 12), vz: rnd(-5, 7), r: rnd(0, 6), vr: rnd(-12, 12), s: kind === 'tire' ? rnd(1, 2.2) : kind === 'confetti' ? rnd(.5, .8) : rnd(.6, 1.3), t: rnd(.5, 1), c: new THREE.Color(cols[i % cols.length]), flat: kind === 'confetti' });
+    if (debris.list.length < debris.cap) debris.list.push({ x: wx(x) + rnd(-.5, .5), h: rnd(.6, 1.8), z: wz(y) + rnd(-.5, .5), vx: rnd(-7, 7), vh: rnd(4, 12), vz: rnd(-5, 7), r: rnd(0, 6), vr: rnd(-12, 12), s: kind === 'tire' ? rnd(1, 2.2) : kind === 'confetti' ? rnd(.5, .8) : rnd(.6, 1.3), t: rnd(.5, 1), c: colr(cols[i % cols.length]), flat: kind === 'confetti' });
   }
   for (let i = 0; i < Math.min(8, n); i++) addSpark(wx(x) + rnd(-.6, .6), rnd(.5, 2), wz(y) + rnd(-.6, .6), kind === 'gold' ? '#ffe07a' : kind === 'missile' ? '#9fd8ff' : '#ffb35a', rnd(1.2, 2.4), rnd(.12, .25), rnd(-3, 3), rnd(0, 4), rnd(-3, 3));
-  if (kind === 'blue') for (let i = 0; i < Math.min(5, n); i++) fall(x + rnd(-14, 14), y + rnd(-8, 8), 0, G ? G.tier : 0);
+  if (kind === 'blue' && G) for (let i = 0; i < Math.min(5, n); i++) fall(x + rnd(-14, 14), y + rnd(-8, 8), 0, G ? G.tier : 0);
 }
 function fxSmoke(x, y, n = 1) {
   for (let i = 0; i < n; i++) if (smokes.list.length < smokes.cap) smokes.list.push({ x: wx(x) + rnd(-.8, .8), h: rnd(.6, 1.6), z: wz(y) + rnd(-.6, .6), vx: rnd(-1, 1), vh: rnd(1, 2.4), vz: rnd(0, 2), s: rnd(1.4, 2.4), t: rnd(.5, .8), L: .8, g: rnd(.82, .96) });
@@ -338,7 +346,7 @@ function flushPool(pl) { pl.mesh.instanceMatrix.needsUpdate = true; if (pl.mesh.
 function updateFx(dt) {
   const cq = camera.quaternion;
   let i = 0;
-  sparks.list = sparks.list.filter(p => (p.t -= dt) > 0);
+  shrink(sparks.list, dt);
   for (const p of sparks.list) {
     p.x += p.vx * dt; p.h += p.vh * dt; p.z += p.vz * dt;
     const k = p.t / p.L; M4.compose(V.set(p.x, p.h, p.z), cq, SC.setScalar(p.s * (.6 + k * .6)));
@@ -346,7 +354,7 @@ function updateFx(dt) {
   }
   sparks.mesh.count = i; flushPool(sparks);
   i = 0;
-  smokes.list = smokes.list.filter(p => (p.t -= dt) > 0);
+  shrink(smokes.list, dt);
   for (const p of smokes.list) {
     p.x += p.vx * dt; p.h += p.vh * dt; p.z += p.vz * dt;
     const k = p.t / p.L; M4.compose(V.set(p.x, p.h, p.z), cq, SC.setScalar(p.s * (1.6 - k) * Math.min(1, k * 4)));
@@ -354,7 +362,7 @@ function updateFx(dt) {
   }
   smokes.mesh.count = i; flushPool(smokes);
   i = 0;
-  debris.list = debris.list.filter(p => (p.t -= dt) > 0);
+  shrink(debris.list, dt);
   for (const p of debris.list) {
     p.vh -= (p.flat ? 9 : 30) * dt; p.x += p.vx * dt; p.h += p.vh * dt; p.z += p.vz * dt; p.r += p.vr * dt;
     if (p.flat) { p.vx *= .97; p.vz *= .97; }
@@ -395,60 +403,83 @@ function fxBlast(x, y, kind) {
   for (let i = 0; i < 16; i++) addSpark(wx(x), rnd(.5, 3), wz(y), a[i % 2], rnd(2, 3.5), rnd(.2, .35), rnd(-10, 10), rnd(2, 9), rnd(-10, 10));
   kick = Math.max(kick, .6);
 }
-// 용 불: 입에서 앞쪽 부채꼴로 쏟아지는 불꽃(빛 알갱이) — LV 가 오를수록 길고 넓고 파란 불이 섞임
+// 용 불: 입 앞 불덩이 몇 개 + 부채꼴 불기둥(아래). 알갱이는 적게 — 더하기 빛이 겹치면 폰이 무거워진다
 function fxFire(x, y, range, spread, lv) {
-  const mouthH0 = 9.5 + lv * .6; fxFlame(x, y, range, spread, lv, mouthH0);
-  const n = reduce ? 8 : 20 + lv * 8, mouthH = mouthH0, c = lv === 2 ? ['#ffffff', '#7fd0ff', '#ffb030'] : ['#fff3b0', '#ffb030', '#ff5a1f'];
-  for (let i = 0; i < n; i++) {
-    const life = rnd(.32, .5), d = rnd(.4, 1) * range * S, w = (rnd(-1, 1) * spread * d);
-    addSpark(wx(x) + rnd(-.3, .3), mouthH, wz(y) - 1.5, c[i % 3], rnd(2.6, 4.4) * (1 + lv * .3), life, w / life, -mouthH / life * rnd(.75, 1), -d / life);
-  }
-  for (let i = 0; i < (reduce ? 0 : 6); i++) {   // 입 앞 불덩이(밝은 심지)
-    addSpark(wx(x), mouthH - .3, wz(y) - 2, i % 2 ? '#ffffff' : c[1], rnd(3.5, 5), .18, rnd(-2, 2), rnd(-6, -2), rnd(-30, -18));
+  const mouthH = 9.5 + lv * .6; fxFlame(x, y, range, spread, lv, mouthH);
+  if (reduce) return;
+  const c = lv === 2 ? ['#ffffff', '#7fd0ff', '#ffb030'] : ['#fff3b0', '#ffb030', '#ff5a1f'];
+  for (let i = 0; i < 8 + lv * 3; i++) {
+    const life = rnd(.3, .45), d = rnd(.3, 1) * range * S, w = rnd(-1, 1) * spread * d;
+    addSpark(wx(x) + rnd(-.3, .3), mouthH, wz(y) - 1.5, c[i % 3], rnd(2.4, 3.6) * (1 + lv * .2), life, w / life, -mouthH / life * rnd(.75, 1), -d / life);
   }
 }
-// 불기둥: 입(꼭짓점)에서 앞쪽 땅으로 퍼지는 삼각 부채 — 캔버스 불꽃 그림, 0.3초 동안 일렁이다 사라짐
-const flameTex = (() => {
-  const c = document.createElement('canvas'); c.width = 128; c.height = 256; const x = c.getContext('2d');
-  const gr = x.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, 'rgba(255,255,230,1)'); gr.addColorStop(.25, 'rgba(255,214,90,.95)'); gr.addColorStop(.6, 'rgba(255,120,30,.75)'); gr.addColorStop(1, 'rgba(220,40,10,0)');
-  x.fillStyle = gr; x.fillRect(0, 0, 128, 256);
-  x.globalCompositeOperation = 'destination-in'; const sg = x.createLinearGradient(0, 0, 128, 0); sg.addColorStop(0, 'rgba(0,0,0,0)'); sg.addColorStop(.3, '#000'); sg.addColorStop(.7, '#000'); sg.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = sg; x.fillRect(0, 0, 128, 256);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.userData.keep = true; return t;
-})();
-const flames = [];
-function fxFlame(x, y, range, spread, lv, mouthH) {
-  const len = range * S, w = Math.max(1.6, (18 + range * spread) * S), geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute([-.5, mouthH, -1.5, .5, mouthH, -1.5, -w, .4, -len, w, .4, -len], 3));
+// 불기둥: 입(꼭짓점)에서 앞쪽 땅으로 퍼지는 삼각 부채(주황 → 붉게 사라짐). 메시 6개를 돌려 쓴다
+const flameTex = canvasTex(64, 128, x => {
+  const gr = x.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,236,170,.95)'); gr.addColorStop(.25, 'rgba(255,170,60,.85)'); gr.addColorStop(.6, 'rgba(235,80,20,.55)'); gr.addColorStop(1, 'rgba(200,30,10,0)');
+  x.fillStyle = gr; x.fillRect(0, 0, 64, 128);
+  x.globalCompositeOperation = 'destination-in'; const sg = x.createLinearGradient(0, 0, 64, 0); sg.addColorStop(0, 'rgba(0,0,0,0)'); sg.addColorStop(.3, '#000'); sg.addColorStop(.7, '#000'); sg.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = sg; x.fillRect(0, 0, 64, 128);
+});
+const flames = Array.from({ length: 6 }, () => {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(12), 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute([.35, 0, .65, 0, 0, 1, 1, 1], 2)); geo.setIndex([0, 2, 1, 1, 2, 3]);
-  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: flameTex, color: lv === 2 ? '#bfe6ff' : '#ffffff', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-  m.position.set(wx(x), 0, wz(y)); scene.add(m); flames.push({ m, t: .3 });
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: flameTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  m.visible = false; m.frustumCulled = false; scene.add(m); return { m, t: 0 };
+});
+function fxFlame(x, y, range, spread, lv, mouthH) {
+  const f = flames.find(o => o.t <= 0) || flames[0], len = range * S, w = Math.max(1.6, (18 + range * spread) * S), pos = f.m.geometry.attributes.position;
+  pos.array.set([-.5, mouthH, -1.5, .5, mouthH, -1.5, -w, .4, -len, w, .4, -len]); pos.needsUpdate = true;
+  f.m.material.color.set(lv === 2 ? '#cfe8ff' : '#ffffff'); f.m.position.set(wx(x), 0, wz(y)); f.m.visible = true; f.t = .28;
 }
 function updateFlames(dt) {
-  for (let i = flames.length - 1; i >= 0; i--) {
-    const f = flames[i]; f.t -= dt; f.m.material.opacity = Math.max(0, f.t / .3) * (.75 + Math.random() * .25); f.m.scale.x = 1 + Math.random() * .12;
-    if (f.t <= 0) { scene.remove(f.m); f.m.geometry.dispose(); f.m.material.dispose(); flames.splice(i, 1); }
+  for (const f of flames) {
+    if (f.t <= 0) continue;
+    f.t -= dt; f.m.material.opacity = Math.max(0, f.t / .28) * (.55 + Math.random() * .2); f.m.scale.x = 1 + Math.random() * .1;
+    if (f.t <= 0) f.m.visible = false;
   }
 }
-// 번개: 하늘에서 땅까지 갈라진 빛줄기(캔버스로 한 번 그린 그림) + 하얀 번쩍임
-const boltTex = (() => {
-  const c = document.createElement('canvas'); c.width = 96; c.height = 512; const x = c.getContext('2d');
-  const pts = [[48, 0]]; for (let y = 32; y <= 512; y += 32) pts.push([48 + (Math.random() - .5) * 52, y]);
-  const line = (w, col, blur) => { x.shadowColor = '#7fd0ff'; x.shadowBlur = blur; x.strokeStyle = col; x.lineWidth = w; x.lineJoin = 'round'; x.beginPath(); pts.forEach(([a, b], i) => i ? x.lineTo(a, b) : x.moveTo(a, b)); x.stroke(); };
-  line(14, 'rgba(120,200,255,.55)', 24); line(6, '#dff3ff', 12); line(2.5, '#ffffff', 0);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.userData.keep = true; return t;
-})();
-const boltGeo = new THREE.PlaneGeometry(7, 60).translate(0, 30, 0); boltGeo.userData.keep = true;
-const bolts = [];
+// 번개: 하늘에서 내리꽂는 파란 번개 — 갈라진 모양 그림 6장을 번갈아 보여 '치지지직' 떨리게, 맞은 자리에서 옆 적에게 작은 전기가 튄다
+const boltTexs = Array.from({ length: 6 }, () => canvasTex(128, 512, x => {
+  const path = (x0, y0, y1, amp, step) => { const p = [[x0, y0]]; let cx = x0; for (let y = y0 + step; y <= y1; y += step) { cx += (Math.random() - .5) * amp; cx = Math.max(10, Math.min(118, cx)); p.push([cx, y]); } return p; };
+  const draw = (p, w, col, blur) => { x.shadowColor = '#3b82f6'; x.shadowBlur = blur; x.strokeStyle = col; x.lineWidth = w; x.lineJoin = 'round'; x.lineCap = 'round'; x.beginPath(); p.forEach(([a, b], i) => i ? x.lineTo(a, b) : x.moveTo(a, b)); x.stroke(); };
+  const main = path(64, 0, 512, 46, 24);
+  const kids = [1, 2, 3].map(() => { const s = main[4 + Math.floor(Math.random() * 12)]; return path(s[0], s[1], s[1] + 80 + Math.random() * 120, 40, 16); });   // 가지
+  for (const k of kids) { draw(k, 7, 'rgba(96,165,250,.6)', 14); draw(k, 2, '#dbeafe', 4); }
+  draw(main, 18, 'rgba(59,130,246,.55)', 28); draw(main, 8, '#93c5fd', 14); draw(main, 3, '#ffffff', 0);
+}));
+const boltGeo = new THREE.PlaneGeometry(9, 62).translate(0, 31, 0);
+const bolts = Array.from({ length: 4 }, () => {
+  const m = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({ map: boltTexs[0], transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  m.visible = false; m.frustumCulled = false; scene.add(m); return { m, t: 0, x: 0, y: 0, sw: 0 };
+});
+const BOLT_T = .5;
 function fxBolt(x, y) {
-  const m = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({ map: boltTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-  m.position.set(wx(x), 0, wz(y)); m.scale.x = Math.random() < .5 ? 1 : -1; scene.add(m); bolts.push({ m, t: .32 });
-  fxRing(x, y, 'missile'); fxRing(x, y, 'blue'); flashW = Math.max(flashW, .16); kick = 1;
-  for (let i = 0; i < 14; i++) addSpark(wx(x), rnd(.3, 2), wz(y), i % 2 ? '#ffffff' : '#7fd0ff', rnd(1.5, 3), rnd(.2, .4), rnd(-12, 12), rnd(4, 12), rnd(-12, 12));
+  const b = bolts.find(o => o.t <= 0) || bolts[0];
+  b.t = BOLT_T; b.x = x; b.y = y; b.sw = 0; b.m.position.set(wx(x), 0, wz(y)); b.m.visible = true;
+  fxRing(x, y, 'missile'); fxRing(x, y, 'blue'); flashW = Math.max(flashW, .1); tint = { c: '96,165,250', t: .3 }; kick = 1;
+  for (let i = 0; i < 16; i++) addSpark(wx(x), rnd(.3, 2), wz(y), i % 2 ? '#ffffff' : '#60a5fa', rnd(1.4, 2.6), rnd(.2, .4), rnd(-12, 12), rnd(4, 12), rnd(-12, 12));
+  // 옆 적에게 튀는 전기: 가까운 적 셋까지 지그재그 빛 알갱이로 잇는다
+  if (G) {
+    const near = G.mobs.filter(M => Math.abs(M.x - x) < 110 && Math.abs(M.y - y) < 110).slice(0, 3);
+    for (const M of near) arc(x, y, M.x, M.y);
+  }
+}
+function arc(x0, y0, x1, y1) {
+  const n = 9;
+  for (let i = 0; i <= n; i++) {
+    const a = i / n, jx = i && i < n ? rnd(-6, 6) : 0, jy = i && i < n ? rnd(-6, 6) : 0;
+    addSpark(wx(x0 + (x1 - x0) * a + jx), 1.2 + Math.sin(a * Math.PI) * 1.4, wz(y0 + (y1 - y0) * a + jy), i % 3 ? '#93c5fd' : '#ffffff', rnd(.9, 1.4), rnd(.12, .22), 0, 0, 0);
+  }
 }
 function updateBolts(dt) {
-  for (let i = bolts.length - 1; i >= 0; i--) {
-    const b = bolts[i]; b.t -= dt; b.m.quaternion.copy(camera.quaternion); b.m.material.opacity = Math.max(0, b.t / .32) * (Math.random() < .3 ? .5 : 1);
-    if (b.t <= 0) { scene.remove(b.m); b.m.material.dispose(); bolts.splice(i, 1); }
+  for (const b of bolts) {
+    if (b.t <= 0) continue;
+    b.t -= dt; b.sw -= dt;
+    if (b.sw <= 0) { b.sw = .045; b.m.material.map = boltTexs[Math.floor(Math.random() * boltTexs.length)]; b.m.scale.x = Math.random() < .5 ? 1 : -1; }   // 모양이 계속 바뀌며 지지직
+    b.m.quaternion.copy(camera.quaternion);
+    b.m.material.opacity = Math.min(1, b.t / BOLT_T * 2.2) * (Math.random() < .35 ? .45 : 1);
+    if (Math.random() < .5) addSpark(wx(b.x) + rnd(-1, 1), rnd(.2, 1.5), wz(b.y) + rnd(-1, 1), '#93c5fd', rnd(1, 1.8), .15, rnd(-6, 6), rnd(2, 8), rnd(-6, 6));
+    if (b.t <= 0) b.m.visible = false;
   }
 }
 function updateBlasts(dt) {
@@ -526,7 +557,7 @@ function makeGate(gt) {
     const posts = [];
     [p.x0, p.x1].forEach((xx, k) => {
       const m = postMat.good;
-      const post = new THREE.Mesh(postGeo, m); post.position.set(wx(xx) + (k ? -.38 : .38), 2.6, 0); post.castShadow = true; grp.add(post); posts.push(post);
+      const post = new THREE.Mesh(postGeo, m); post.position.set(wx(xx) + (k ? -.38 : .38), 2.6, 0); grp.add(post); posts.push(post);
       const cap = new THREE.Mesh(capGeo, m); cap.position.set(0, 2.7, 0); post.add(cap);   // 기둥 머리는 기둥에 붙여 색을 함께 바꾼다
     });
     const pv = { panel, tex, cv: c, posts, label: '', swap: gt.swap };
@@ -620,17 +651,35 @@ function disposeObj(o) {
   });
   scene.remove(o);
 }
+function gateBurst(gt) {
+  const p = gt.parts[gt.pick]; if (!p) return;
+  const kind = gateKind(p), cx = (p.x0 + p.x1) / 2, fk = kind === 'bad' ? 'gateR' : kind === 'trade' ? 'gateY' : 'gateB';
+  const cols = FXC[fk], n = reduce ? 10 : 34, w = (p.x1 - p.x0) * S;
+  for (let i = 0; i < n; i++) if (debris.list.length < debris.cap) debris.list.push({ x: wx(cx) + rnd(-w / 2, w / 2), h: rnd(1, 4.4), z: wz(gt.y) + rnd(-.3, .3), vx: rnd(-9, 9), vh: rnd(3, 11), vz: rnd(-8, 4), r: rnd(0, 6), vr: rnd(-14, 14), s: rnd(.9, 1.7), t: rnd(.6, 1), c: colr(cols[i % cols.length]), flat: true });
+  for (let i = 0; i < (reduce ? 3 : 10); i++) addSpark(wx(cx) + rnd(-w / 2, w / 2), rnd(1.2, 4), wz(gt.y), i % 2 ? '#ffffff' : cols[0], rnd(1.4, 2.4), rnd(.15, .3), rnd(-5, 5), rnd(0, 5), rnd(-4, 2));
+  fxRing(cx, gt.y, kind === 'bad' ? 'red' : kind === 'trade' ? 'gold' : 'blue');
+}
 function syncViews(dt) {
   const live = new Set();
   for (const gt of G.gates) {
     live.add(gt); let v = views.get(gt);
     if (!v) { v = makeGate(gt); views.set(gt, v); }
     v.grp.position.z = wz(gt.y);
+    if (gt.used && v.ut == null) { v.ut = 0; gateBurst(gt); }
+    if (v.ut != null) {   // 지나간 문: 고른 칸은 커지며 하얗게 터지고, 나머지는 작아지며 꺼짐
+      v.ut += dt; const k = Math.min(1, v.ut / .26);
+      v.parts.forEach((pv, i) => {
+        const mine = i === gt.pick, sc = mine ? 1 + k * .7 : 1 - k * .4;
+        pv.panel.scale.set(sc, sc, 1); pv.panel.material.color.setScalar(mine ? 1 + (1 - k) * 1.5 : 1); pv.panel.material.opacity = (1 - k) * (mine ? 1 : .5);
+        for (const po of pv.posts) po.scale.set(1, Math.max(.01, 1 - k), 1);
+      });
+      if (k >= 1) v.grp.visible = false;
+      continue;
+    }
     gt.parts.forEach((p, k) => {
       const pv = v.parts[k];
-      if (pv.label !== gateLabel(p)) paintGate(pv, p);
+      if (pv.label !== gateLabel(p) && T - (pv.pt || -9) > .09) { paintGate(pv, p); pv.pt = T; }
       const sc = 1 + p.hit * .16; pv.panel.scale.set(sc, sc, 1); pv.panel.material.color.setScalar(1 + p.hit * .9);
-      pv.panel.material.opacity = p.taken ? .25 : gt.used ? .55 : 1;
     });
   }
   for (const X of G.boxes) {
@@ -708,11 +757,22 @@ function clearViews() { for (const [, v] of views) dropView(v); views.clear(); }
 
 /* ── 화면 크기 · 카메라 ── */
 let VW = 360, VH = 640, DPR = 1, camDist = 40, camX = 0, lookR = .63, kick = 0;
+let prMax = 1.5, prNow = 0, slowT = 0, fastT = 0;
+function adaptRes(real) {
+  if (!prNow || state !== 'play') return;
+  if (real > 1 / 40) { slowT += real; fastT = 0; } else { slowT = Math.max(0, slowT - real * .5); if (real < 1 / 57) fastT += real; }
+  if (slowT > 1.2) {
+    slowT = 0;
+    if (prNow > 1) { prNow = Math.max(1, prNow - .25); renderer.setPixelRatio(prNow); renderer.setSize(VW, VH, false); }
+    else if (sun.castShadow) sun.castShadow = false;   // 가장 낮은 해상도에서도 느리면 그림자를 끈다
+  } else if (fastT > 8 && prNow < prMax) { fastT = 0; prNow = Math.min(prMax, prNow + .25); renderer.setPixelRatio(prNow); renderer.setSize(VW, VH, false); }
+}
 const LOOK = new THREE.Vector3();
 function fit() {
   const r = glc.getBoundingClientRect();
   VW = r.width || 360; VH = r.height || 640; DPR = Math.min(window.devicePixelRatio || 1, 2);
-  renderer.setPixelRatio(Math.min(DPR, 1.75)); renderer.setSize(VW, VH, false);
+  prMax = Math.min(DPR, 1.5); if (!prNow) prNow = prMax; prNow = Math.min(prNow, prMax);
+  renderer.setPixelRatio(prNow); renderer.setSize(VW, VH, false);
   cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
   camera.aspect = VW / VH; camera.fov = FOV;
   camera.updateProjectionMatrix();
@@ -768,7 +828,7 @@ function fxFloat(x, y, s, c, size, small, h) {
   texts.push({ x: wx(x), z: wz(y), h: h || 3, s, c, size: size || 18, t: small ? .55 : 1.1, L: small ? .55 : 1.1, small, dy: 0 }); }
 let tint = null, shake = 0, banner = 0, hitstop = 0, flashW = 0;
 // 콤보 · 외침 · 동전 · 꽃가루
-let comboShow = 0, comboPop = 0, shout = null, shoutAt = 0;
+let comboPop = 0, shout = null;
 const SHOUTS = [[10, 'GOOD!', '#7dd3fc'], [25, 'GREAT!', '#86efac'], [50, 'AMAZING!', '#fde047'], [100, 'FANTASTIC!', '#fb923c'], [200, 'UNSTOPPABLE!', '#f472b6'], [400, 'LEGENDARY!', '#c4b5fd']];
 const coins = [], confetti = [];
 let inFlight = 0, dispScore = 0, scoreAt = null, bumpT = 0;
@@ -789,11 +849,14 @@ function bumpScore() {
   const n = performance.now(); if (reduce || n - bumpT < 90) return; bumpT = n;
   try { $('#hudScore').parentElement.animate([{ transform: 'scale(1.28)', filter: 'brightness(1.6)' }, { transform: 'scale(1)', filter: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,.8,.24,1)' }); } catch (e) {}
 }
+const grpStat = new Map();
 function drawOverlay(dt) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, VW, VH);
   if (!G) return;
   const k = Math.min(1.25, VW / 360);
   // 적 무리 숫자 · 중간보스 체력 · 이름
+  grpStat.clear();
+  for (const M of G.mobs) { let s = grpStat.get(M.g); if (!s) grpStat.set(M.g, s = { sx: 0, n: 0, top: M }); s.sx += M.x; s.n++; if (M.y < s.top.y) s.top = M; }
   for (const q of G.groups) {
     if (q.giant) {
       const M = q.giant; if (M.y < SPAWN + 250 || M.dead) continue;
@@ -802,10 +865,9 @@ function drawOverlay(dt) {
       text(MID_NAME[M.mb] || '', p.x, p.y - 22 * k, 12 * k, '#fde68a', true);
       continue;
     }
-    let top = null, sx = 0, n = 0;
-    for (const M of G.mobs) if (M.g === q) { sx += M.x; n++; if (!top || M.y < top.y) top = M; }
-    if (!top || top.y < SPAWN + 250) continue;
-    const p = scr(wx(sx / n), 3.6, wz(top.y));
+    const st = grpStat.get(q);
+    if (!st || st.top.y < SPAWN + 250) continue;
+    const p = scr(wx(st.sx / st.n), 3.6, wz(st.top.y));
     pill(p.x, p.y, String(q.alive), 15 * k * (1 + q.pop * .3), '#f87171', '#b91c1c');
   }
   // 타이어 숫자
@@ -1051,7 +1113,7 @@ btnMsl.addEventListener('click', e => { if (e.detail === 0) shootMissile(); }); 
 const dbg = /[?&]debug/.test(location.search), botMem = {};
 function loop(t) {
   const real = Math.min(.25, (t - last) / 1000 || 0);
-  let dt = Math.min(.033, real); last = t;   // 끝 카드까지 기다리는 시간은 느린 화면과 상관없이 실제 시간으로
+  let dt = Math.min(.033, real); last = t; adaptRes(real);   // 끝 카드까지 기다리는 시간은 느린 화면과 상관없이 실제 시간으로
   if (slow > 0) { slow -= dt; dt *= .3; }
   let sdt = dt;
   if (hitstop > 0) { hitstop -= dt; sdt = dt * .06; }

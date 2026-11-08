@@ -3,7 +3,7 @@
    물건은 SPAWN 에서 생겨 +y 로 다가온다. 화면은 이 평면을 3D 로 세워 그린다.
    레벨마다 스테이지 종류(구성 · 색)가 바뀌고, 보스도 번갈아 바뀐다. 레벨이 오를수록 + 한 판 뒤로 갈수록 세짐. */
 export const ROAD_L = 34, ROAD_R = 326, MID = 180, SPAWN = -1150, RANGE = 1000, START = 680;
-const GAP = 22, BV = 1150;           // BV: 총알 속도                       // 병사 사이 간격
+const GAP = 22, BV = 1150, BIN = 32;           // BV: 총알 속도                       // 병사 사이 간격
 export const TIERS = [                // 부대 등급: 병사 수가 늘면 저절로 오르고(RANKUP), 타이어 · 진급 문으로도 오른다
   { name: '견습병', bullet: 0, mul: 1 },
   { name: '정예병', bullet: 1, mul: 1.6 },
@@ -64,11 +64,10 @@ const ri = (a, b) => Math.floor(rnd(a, b + 1));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const NOOP = () => {};
 
-export function squadPos(n) {
-  const p = [], m = Math.min(n, 60);
-  for (let i = 0; i < m; i++) { const a = i * 2.39996, r = GAP * .52 * Math.sqrt(i); p.push([Math.cos(a) * r, Math.sin(a) * r * .8]); }
-  return p;
-}
+const POS = [];   // 부대 자리표(해바라기 씨 배열) — 한 번 만들어 두고 앞에서부터 잘라 쓴다
+for (let i = 0; i < 60; i++) { const a = i * 2.39996, r = GAP * .52 * Math.sqrt(i); POS.push([Math.cos(a) * r, Math.sin(a) * r * .8]); }
+const POS_N = Array.from({ length: 61 }, (_, n) => POS.slice(0, n));
+export const squadPos = n => POS_N[Math.max(0, Math.min(60, n | 0))];
 export function squadR(n) { return GAP * .52 * Math.sqrt(Math.min(n, 60)) + 13; }
 
 /* ── 레벨 설계 ── */
@@ -258,7 +257,7 @@ function formation(G, k, y, L, p) {
       const sp = 16, cols = Math.floor((ROAD_R - ROAD_L - 16) / sp) + 1, gap = ri(1, cols - 4), yy = y - w * 170;
       const grp = mobGroup(G, yy, cols, Math.round(hp * 3 + L * .6), MID, { cols, sp, side: 0, lv: 2, vy: 10 + L * .6 });
       const row = G.mobs.slice(G.mobs.length - cols);
-      row.forEach((M, i) => { M.wall = true; M.y = yy; if (i >= gap && i < gap + 3) { M.dead = true; grp.alive--; } });
+      row.forEach((M, i) => { M.y = yy; if (i >= gap && i < gap + 3) { M.dead = true; grp.alive--; } });
       G.mobs = G.mobs.filter(M => !M.dead);
       mobGroup(G, yy - 50, Math.round(mobCount(L, p) * .3), hp, MID, { side: 0 });
     }
@@ -354,7 +353,9 @@ function breathe(g, d) {   // 불 뿜기: 용 앞쪽 부채꼴 안의 적 · 보
 }
 // 천둥번개: 적이 가장 몰린 곳에 차례로 내리꽂힌다
 function strike(g) {
-  const top = -RANGE + 60, cand = g.mobs.filter(M => M.y < -60 && M.y > top);
+  const top = -RANGE + 60;
+  let cand = g.mobs.filter(M => M.y < -140 && M.y > -720);   // 화면에서 잘 보이는 거리 먼저
+  if (!cand.length) cand = g.mobs.filter(M => M.y < -60 && M.y > top);
   let best = null, bc = -1;
   for (let i = 0; i < Math.min(50, cand.length); i++) {
     const M = cand[Math.floor(Math.random() * cand.length)]; let c = 0;
@@ -482,9 +483,11 @@ export function step(G, dt) {
     h.sfx('shot');
   }
   stepRockets(g, dt);
+  const bk = g.bk || (g.bk = new Map()); bk.clear();
+  for (const M of g.mobs) { const k = Math.floor(M.y / BIN); let a = bk.get(k); if (!a) bk.set(k, a = []); a.push(M); }
   for (let b = g.bullets.length - 1; b >= 0; b--) {
     const B = g.bullets[b]; B.y -= BV * dt; B.x += B.vx * dt;
-    if (B.y < B.y0 - RANGE || hitAny(g, B)) g.bullets.splice(b, 1);
+    if (B.y < B.y0 - RANGE || hitAny(g, B)) { g.bullets[b] = g.bullets[g.bullets.length - 1]; g.bullets.pop(); }   // 순서는 상관없어 끝 것과 바꿔 지움
   }
   // 문
   for (const gt of g.gates) {
@@ -503,6 +506,7 @@ export function step(G, dt) {
       const p = gt.parts.find(q => g.px >= q.x0 - 3 && g.px <= q.x1 + 3) || (gt.lane ? gt.parts[0] : null) || gt.parts[0], before = g.n;
       if (p.t === 'T' || p.t === 'M') {   // 내주고 얻는 문: 병사가 모자라면 아무 일도 없다
         if (g.n <= p.v) { h.float(g.px, -40, '병사가 모자라요', '#fca5a5', 30); h.sfx('gateDown'); p.taken = true; continue; }
+        gt.pick = gt.parts.indexOf(p);
         const pay = p.v, maxed = p.t === 'T' && g.tier >= TIERS.length - 1;   // 이미 최고 등급이면 진급 대신 유도탄
         lose(g, pay, g.px, 0, 'trade');
         if (p.t === 'T' && !maxed) promote(g, g.px, -60);
@@ -511,6 +515,7 @@ export function step(G, dt) {
         h.sfx('power'); h.tint('gold'); h.ring(g.px, 0, 'gold'); h.stop(.08); h.buzz(40);
         p.taken = true; continue;
       }
+      gt.pick = gt.parts.indexOf(p);
       const after = Math.max(0, Math.round(p.t === 'x' ? g.n * p.v : p.t === '/' ? g.n / p.v : g.n + p.v));
       if (after < before) { lose(g, before - after, g.px, 0, 'gate'); h.sfx('gateDown'); h.buzz(60); h.shake(.3); h.tint('red'); }
       else { g.n = after; h.sfx('gateUp'); h.tint('blue'); h.ring(g.px, 0, 'blue'); }
@@ -665,13 +670,18 @@ function hitAny(g, B) {
   for (const b of g.barrels) {
     if (b.hp > 0 && Math.abs(B.x - b.x) < 14 && Math.abs(B.y - b.y) < 14) { b.hp -= 1; b.flash = .06; h.spark(B.x, b.y + 6, 'hot', 2); return true; }
   }
-  for (let i = 0; i < g.mobs.length; i++) {
-    const M = g.mobs[i], hw = 13 * M.size, hh = 15 * M.size;
-    if (Math.abs(B.x - M.x) < hw && Math.abs(B.y - M.y) < hh) {
-      const left = B.d - M.hp; M.hp -= B.d; M.flash = .08; M.kb = M.size > 1 ? 1 : 6; h.spark(B.x, M.y + 4, 'hot', 2);
-      if (M.hp <= 0) { B.d = left; killMob(g, i, M); return B.d < .3; }
-      h.sfx('hit');
-      return true;
+  const b0 = Math.floor((B.y - 36) / BIN);
+  for (let j = b0; j <= b0 + 2; j++) {
+    const arr = g.bk.get(j); if (!arr) continue;
+    for (const M of arr) {
+      if (M.dead) continue;
+      const hw = 13 * M.size, hh = 15 * M.size;
+      if (Math.abs(B.x - M.x) < hw && Math.abs(B.y - M.y) < hh) {
+        const left = B.d - M.hp; M.hp -= B.d; M.flash = .08; M.kb = M.size > 1 ? 1 : 6; h.spark(B.x, M.y + 4, 'hot', 2);
+        if (M.hp <= 0) { B.d = left; killMob(g, g.mobs.indexOf(M), M); return B.d < .3; }
+        h.sfx('hit');
+        return true;
+      }
     }
   }
   for (const X of g.boxes) {
