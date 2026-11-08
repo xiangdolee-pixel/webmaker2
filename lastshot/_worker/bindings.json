@@ -1,7 +1,21 @@
 {
   "xim": true,
-  "assets": { "run_worker_first": ["/*"] },
+  "assets": {
+    "run_worker_first": [
+      "/*"
+    ]
+  },
   "d1_databases": [
-    { "binding": "DB", "database_name": "lastshot", "database_id": "1bff19f5-25b9-4981-bc39-9550e9961787" }
+    {
+      "binding": "DB",
+      "database_name": "lastshot",
+      "database_id": "1bff19f5-25b9-4981-bc39-9550e9961787"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "lastshot.plators.com",
+      "custom_domain": true
+    }
   ]
 }

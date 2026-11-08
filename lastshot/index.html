@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>라스트샷 LAST SHOT</title>
-<meta name="description" content="손가락으로 좌우로 움직여 문을 고르고, 쏘아서 숫자를 키우고, 부대를 불려 보스를 쓰러뜨리는 세로 화면 슈팅 게임. 결제 없이 실력만으로 레벨이 올라갑니다.">
+<meta name="description" content="손가락으로 좌우로 움직여 문을 고르고, 쏘아서 숫자를 키우고, 부대를 불려 동물 보스를 쓰러뜨리는 세로 화면 슈팅 게임. 결제 없이 실력만으로 레벨이 올라갑니다.">
 <meta name="theme-color" content="#0f172a">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="css/style.css?v=6">
-<script type="module" src="js/game.js?v=11"></script>
+<link rel="stylesheet" href="css/style.css?v=9">
+<script type="module" src="js/game.js?v=14"></script>
 </head>
 <body>
 <!-- 계정(로그인) 버튼 자리 — 게임 화면을 가리지 않게 숨김 (자리가 없으면 오른쪽 위에 떠서 나오므로 일부러 둔다) -->
@@ -21,16 +21,21 @@
 
   <div class="hud" aria-live="polite">
     <div class="hud-row">
-      <span class="pill lv">LV <b id="hudLv">1</b></span>
-      <div class="prog" aria-hidden="true"><i id="hudProg"></i></div>
-      <span class="pill best">최고 <b id="hudBest">1</b></span>
-      <button type="button" class="pill mute" id="btnMute" aria-pressed="false">소리 켬</button>
+      <span class="pill lv"><small>LV</small><b id="hudLv">1</b></span>
+      <div class="prog" aria-hidden="true"><i id="hudProg"></i><span class="prog-boss"></span></div>
+      <span class="pill best"><small>BEST LV</small><b id="hudBest">1</b></span>
+      <button type="button" class="pill mute" id="btnMute" aria-pressed="false" aria-label="소리 켜짐 — 눌러서 끄기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="on" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="off" d="M16 9l6 6M22 9l-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
     </div>
     <div class="hud-row sub">
-      <span class="chip score">점수 <b id="hudScore">0</b></span>
-      <span class="chip" id="hudPow" hidden></span>
+      <span class="chip score"><i class="coin" aria-hidden="true"></i><b id="hudScore">0</b></span>
+      <span class="chip pow" id="hudPow" hidden></span>
     </div>
   </div>
+
+  <button type="button" class="msl" id="btnMsl" hidden aria-label="유도탄 쏘기">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M31 5c6 0 12 6 12 12L26 34 14 22z" fill="#eef3fa"/><path d="M31 5c6 0 12 6 12 12l-5 5L26 10z" fill="#2f6bff"/><path d="M14 22l-7 2-2 6 9-1zM26 34l-1 9-6 2 2-7z" fill="#f5b52e"/><path d="M15 33c-5 0-8 5-9 10 5-1 10-4 9-10z" fill="#ff9a3a"/><circle cx="29" cy="19" r="3.4" fill="#2f6bff"/></svg>
+    <span class="msl-t">유도탄</span><b id="mslN">0</b>
+  </button>
 
   <section class="ov" id="ovStart">
     <div class="card">
@@ -38,12 +43,13 @@
       <h1>라스트샷</h1>
       <p class="lv-big">레벨 <b id="startLv">1</b> · <span id="startStage"></span></p>
       <p class="stage-sub" id="startSub"></p>
+      <p class="boss-tag"><small>BOSS</small><b id="startBoss"></b></p>
       <ul class="how">
         <li><b>←→ 끌기</b> 손가락으로 좌우로 움직여요</li>
-        <li><b>문</b> 쏘면 숫자가 올라가요(빨간 문도). 지나가면 부대가 늘거나 줄어요</li>
-        <li><b>타이어</b> 부수면 진급 · 연사 · 위력 UP. 부딪히면 크게 잃어요</li>
-        <li><b>드럼통</b> 쏘면 터져서 둘레 적을 한 번에</li>
-        <li><b>보스</b> 근육 대장은 걸어오고, 탱크는 포탄을 쏴요(빨간 원 피하기)</li>
+        <li><b>문 셈</b> ×2 와 +18, 어느 쪽이 클까? 지금 부대 수로 계산! + 숫자는 쏘면 올라가요</li>
+        <li><b>금색 문</b> 병사를 내주고 진급(총이 세짐) 하거나 유도탄 3발</li>
+        <li><b>유도탄</b> 오른쪽 아래 버튼<span class="kb"> · 스페이스</span>. 보스와 중간보스를 쫓아가 펑!</li>
+        <li><b>콤보</b> 쉬지 않고 쓰러뜨리면 점수가 최대 3배</li>
       </ul>
       <button type="button" class="btn" id="btnStart">시작</button>
       <div class="links"><button type="button" class="link" id="btnRank">랭킹 보기</button><button type="button" class="link" id="btnReset" hidden>레벨 1부터 다시</button></div>
@@ -65,6 +71,7 @@
       <p class="kicker" id="endKicker">CLEAR</p>
       <h2 id="endTitle">레벨 클리어!</h2>
       <p class="end-sub" id="endSub"></p>
+      <p class="rank-score" id="endScoreBox" hidden>누적 점수 <b id="endScore">0</b></p>
       <div class="rank" id="rankBox" hidden>
         <p class="rank-score">점수 <b id="rankScore">0</b></p>
         <p class="rank-msg" id="rankMsg" role="status"></p>
