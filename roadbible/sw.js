@@ -6,9 +6,9 @@
      별도 캐시(roadbible-cdn)에 담아 앱 버전이 올라가도 지워지지 않음 — 배포 직후 오프라인 사고 방지
    - 필수 CDN(기본 폰트 CSS)은 설치 때 미리 받아 둠(실패해도 설치는 계속)
    - /qt(오늘의 묵상)·회원 로그인·동기화(/api/sync) 등 실시간 요청엔 개입하지 않음 */
-const APP_CACHE="roadbible-v144";
+const APP_CACHE="roadbible-v145";
 const CDN_CACHE="roadbible-cdn";   // 배포마다 지우지 않는다 (폰트·SDK 보존)
-const ASSETS=["./","index.html","bible-data.js","icon.png","icon-32.png","icon-180.png","icon-192.png","manifest.json","privacy.html"];
+const ASSETS=["/app","bible-data.js","icon.png","icon-32.png","icon-180.png","icon-192.png","manifest.json","privacy.html"];
 const CDN_HOSTS=["cdn.jsdelivr.net"];
 const CDN_PRECACHE=[
   "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
@@ -57,7 +57,8 @@ self.addEventListener("fetch",e=>{
         });
         const first=await Promise.race([net.catch(()=>null),new Promise(r=>setTimeout(()=>r("slow"),2500))]);
         if(first&&first!=="slow")return first;
-        const hit=(await caches.match(e.request,{ignoreSearch:true}))||(await caches.match("index.html"));
+        /* 첫 화면(/)은 소개 페이지 — 오프라인이면 성경 앱(/app)을 대신 연다 */
+        const hit=(url.pathname==="/"&&await caches.match("/app"))||(await caches.match(e.request,{ignoreSearch:true}))||(await caches.match("/app"));
         return hit||net;
       })());
       return;

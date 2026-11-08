@@ -4,6 +4,7 @@
                  클라이언트에는 즉시 응답한다(느린 업스트림은 백그라운드에서만 갱신).
    - /api/sync : 회원별 형광펜 · 가름끈 · 읽음 · 별표 · 설정 (xms 로그인 — 같은 xms_sess 쿠키, 2026-11-04 구글 로그인 · Firestore 에서 옮겨 연결 끊음)
                  저장은 Durable Object(Sync, 회원 하나에 하나). 합치기는 화면(mergeCloud)이 하고, 서버는 버전 번호로 앞뒤만 가린다.
+   - /         : 소개 페이지(index.html). 로그인한 회원은 /app 으로 · /app = 성경 앱(app.html)
    - 그 밖     : xim 공통 사이트 Worker (회원 로그인 · 가입 · 계정 버튼 · 정적 파일) */
 import { DurableObject } from 'cloudflare:workers';
 import site from '../../xim/_worker/site-worker.js';
@@ -191,6 +192,10 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === '/qt') return handleQt(ctx);
     if (url.pathname === '/api/sync' && env.SYNC) return syncApi(request, env);
+    // 첫 화면(/) = 소개 페이지. 로그인한 회원이면 바로 성경 앱(/app)으로 (사용자 지시 2026-11-08 — 올리브바스켓과 같은 흐름)
+    if ((url.pathname === '/' || url.pathname === '/index.html') && request.method === 'GET' && (await memberId(request, env))) {
+      return new Response(null, { status: 302, headers: { Location: '/app', 'Cache-Control': 'no-store' } });
+    }
     return env.XMS ? site.fetch(request, env, ctx) : env.ASSETS.fetch(request);
   },
 };

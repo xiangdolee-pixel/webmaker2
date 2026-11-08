@@ -6,7 +6,8 @@
       "!/bible-data.js",
       "!/icon*.png",
       "!/manifest.json",
-      "!/sw.js"
+      "!/sw.js",
+      "!/assets/*"
     ]
   },
   "durable_objects": {

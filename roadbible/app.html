@@ -2875,7 +2875,7 @@ window.addEventListener("online",()=>{updateNet();toast("인터넷 연결됨 —
     requestAnimationFrame(()=>pop.classList.add("open"));
   }
   acctBtn.onclick=()=>{
-    if(!user){location.href="/member/login";return;}
+    if(!user){location.href="/member/login?next=/app";return;}
     pop&&pop.classList.contains("open")?closePop():openPop();
   };
   /* 로그아웃하면 이 기기의 내 기록을 비운다(서버에는 그대로 → 다시 로그인하면 돌아옴).
@@ -2950,7 +2950,7 @@ window.addEventListener("online",()=>{updateNet();toast("인터넷 연결됨 —
     }
   }
 
-  btn.onclick=()=>{ if(!user){location.href="/member/login";return;} logout(); };
+  btn.onclick=()=>{ if(!user){location.href="/member/login?next=/app";return;} logout(); };
   async function logout(){
     if(!await askConfirm("로그아웃할까요?\n이 기기에서는 형광펜·가름끈·별표·읽은 기록이 지워지고,\n다시 로그인하면 그대로 돌아옵니다."))return;
     clearTimeout(timer);
