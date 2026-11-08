@@ -17,7 +17,7 @@
 <link rel="preload" as="image" href="assets/img/photo/hero.webp">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/noto-serif-kr@5.2.5/index.css">
-<link rel="stylesheet" href="assets/css/landing.css?v=2">
+<link rel="stylesheet" href="assets/css/landing.css?v=3">
 <script>
   document.documentElement.className += ' js';
   // 홈 화면에 설치해 둔 앱으로 열었으면 소개 페이지 없이 바로 성경으로
@@ -139,17 +139,44 @@
       <p class="eyebrow">읽는 화면</p>
       <h2 class="sec-title">책처럼 넘기고,<br>내 눈에 맞추고.</h2>
     </div>
-    <ul class="chips">
-      <li><b>한 쪽씩 넘김</b>화면 좌우 끝을 톡. 장이 끝나면 다음 장으로.</li>
-      <li><b>얼마나 읽었는지 한눈에</b>화면 위 제목 밑줄이 차오르면 이 장을, 아래 메뉴 바탕이 차오르면 지금 읽는 성경책을 얼마나 읽었는지예요. 옆 숫자는 구약 · 신약, 성경 전체에서 몇 % 지점인지.</li>
-      <li><b>가름끈</b>장에 걸어 두고 모아 보며 바로 돌아가기.</li>
-      <li><b>성경 전체 검색</b>낱말 하나로 66권을. 띄어 쓰면 여러 낱말.</li>
-      <li><b>오늘의 잠언</b>‘잠’ 버튼 — 8일엔 8장. 한 달이면 잠언 한 권.</li>
-      <li><b>글꼴 다섯 가지</b>프리텐다드 · 본명조 · 바탕 · 나눔명조 · 마루부리, 크기 · 굵기 · 간격까지.</li>
-    </ul>
-    <div class="kit-shots">
-      <figure class="shot"><img class="rv" src="assets/img/app/c-search.webp" alt="성경 본문에서 ‘사랑’을 찾은 화면" width="640" height="886" loading="lazy"><figcaption>성경 전체 검색</figcaption></figure>
-      <figure class="shot"><img class="rv" src="assets/img/app/c-settings.webp" alt="보기 설정 — 글꼴 · 글자 크기 · 굵기 · 줄 간격" width="640" height="689" loading="lazy"><figcaption>보기 설정</figcaption></figure>
+    <div class="kits">
+      <article class="kit-card">
+        <figure class="kshot turn"><img class="rv" src="assets/img/app/k-turn.webp" alt="본문 화면 — 왼쪽 끝은 이전 쪽, 오른쪽 끝은 다음 쪽" width="640" height="919" loading="lazy">
+          <span class="zone l" aria-hidden="true"><i>‹ 이전 쪽</i></span><span class="zone r" aria-hidden="true"><i>다음 쪽 ›</i></span></figure>
+        <h3>한 쪽씩 넘김</h3>
+        <p>스크롤 없이 책처럼. 화면 오른쪽 끝을 톡 누르면 다음 쪽, 왼쪽 끝은 이전 쪽. 장이 끝나면 다음 장으로 이어져요. 가운데를 누르면 형광펜.</p>
+      </article>
+      <article class="kit-card">
+        <div class="bars">
+          <figure class="kshot bar"><img class="rv" src="assets/img/app/k-top.webp" alt="화면 맨 위 회색 띠가 4분의 3까지 찬 모습 — 15장 3/4쪽" width="640" height="107" loading="lazy"><figcaption><b>맨 위 회색 띠</b> = 이 장을 얼마나 <span>(3/4쪽 → 75%)</span></figcaption></figure>
+          <figure class="kshot bar"><img class="rv" src="assets/img/app/k-bottom.webp" alt="화면 맨 아래 메뉴 바탕이 70%쯤 찬 모습과 신약 31.8% · 전체 85.1%" width="640" height="105" loading="lazy"><figcaption><b>맨 아래 메뉴 바탕</b> = 지금 읽는 성경책을 얼마나 <span>(요한복음 70%)</span></figcaption></figure>
+        </div>
+        <h3>얼마나 읽었는지 한눈에</h3>
+        <p>화면 맨 위 회색 띠가 차오르면 이 장을, 맨 아래 메뉴의 회색 바탕이 차오르면 지금 읽는 성경책을 얼마나 읽었는지예요. 옆 숫자는 구약 · 신약, 그리고 성경 전체에서 몇 % 지점인지.</p>
+      </article>
+      <article class="kit-card">
+        <div class="bars">
+          <figure class="kshot bar"><img class="rv" src="assets/img/app/k-ribbon.webp" alt="왼쪽 위 가름끈이 채워진 모양으로 바뀐 화면" width="640" height="107" loading="lazy"><figcaption><b>왼쪽 위 가름끈</b>을 누르면 채워져요</figcaption></figure>
+          <figure class="kshot bar"><img class="rv" src="assets/img/app/k-marks.webp" alt="가름끈 모아보기 — 요한복음 15장" width="640" height="174" loading="lazy"><figcaption>아래 메뉴에서 <b>모아 보고</b> 바로 돌아가기</figcaption></figure>
+        </div>
+        <h3>가름끈</h3>
+        <p>책갈피처럼 장에 걸어 두세요. 걸어 둔 곳은 한곳에 모여, 누르면 그 쪽으로 바로 돌아가요.</p>
+      </article>
+      <article class="kit-card">
+        <figure class="kshot"><img class="rv" src="assets/img/app/c-search.webp" alt="성경 본문에서 ‘사랑’을 찾은 화면" width="640" height="886" loading="lazy"></figure>
+        <h3>성경 전체 검색</h3>
+        <p>낱말 하나로 66권 전체를. 띄어 쓰면 여러 낱말을 한꺼번에 찾고, 찾은 곳을 누르면 그 절로 가요.</p>
+      </article>
+      <article class="kit-card">
+        <figure class="kshot"><img class="rv" src="assets/img/app/k-proverb.webp" alt="오늘의 잠언 9장 화면" width="640" height="673" loading="lazy"></figure>
+        <h3>오늘의 잠언</h3>
+        <p>아래 ‘잠’ 버튼을 누르면 오늘 날짜의 잠언 장이 열려요. 9일엔 9장, 31일엔 31장 — 한 달이면 잠언 한 권.</p>
+      </article>
+      <article class="kit-card">
+        <figure class="kshot"><img class="rv" src="assets/img/app/c-settings.webp" alt="보기 설정 — 글꼴 · 글자 크기 · 굵기 · 줄 간격" width="640" height="689" loading="lazy"></figure>
+        <h3>내 눈에 맞는 글자</h3>
+        <p>글꼴 다섯 가지(프리텐다드 · 본명조 · 바탕 · 나눔명조 · 마루부리)에 글자 크기 · 굵기 · 줄 간격 · 글자 간격 · 여백까지 마음대로.</p>
+      </article>
     </div>
   </div>
 </section>

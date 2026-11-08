@@ -154,12 +154,23 @@ ul, ol { list-style: none; }
 .band { position: relative; margin: 0; }
 .band img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
 
-/* 읽는 화면: 칩 6개 + 화면 2장 */
-.chips { display: grid; margin-top: 30px; border-top: 1px solid var(--line); }
-.chips li { padding: 16px 0; border-bottom: 1px solid var(--line); font-size: 17px; color: var(--ink-2); }
-.chips b { display: block; font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
-.kit-shots { display: grid; gap: 28px; width: min(100%, 360px); margin: 36px auto 0; }
-.kit-shots .shot img { border-radius: 16px; }
+/* 읽는 화면: 그림 카드 6장 — 실제 화면을 그 부분만 잘라, 설명은 그림 위에 웹 글자로 */
+.kits { display: grid; gap: 20px; margin-top: 34px; }
+.kit-card { padding: 20px 18px 24px; border-radius: 22px; background: var(--paper-2); }
+.kit-card h3 { margin-top: 18px; font-size: 22px; font-weight: 800; letter-spacing: -.03em; }
+.kit-card p { margin-top: 8px; font-size: 17px; color: var(--ink-2); }
+.kshot { position: relative; margin: 0; }
+.kshot img { width: 100%; border-radius: 14px; box-shadow: 0 0 0 1px var(--line); }
+.kshot.turn img { -webkit-mask-image: linear-gradient(#000 82%, transparent); mask-image: linear-gradient(#000 82%, transparent); }
+/* 쪽 넘김: 누르는 자리 표시 */
+.zone { position: absolute; top: 8%; bottom: 18%; width: 18%; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: rgba(168, 48, 31, .14); border: 2px dashed rgba(168, 48, 31, .55); }
+.zone.l { left: 2%; } .zone.r { right: 2%; }
+.zone i { padding: 6px 8px; border-radius: 999px; background: var(--red); color: #fff; font-style: normal; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.zone.l i { transform: translateX(28%); } .zone.r i { transform: translateX(-28%); }
+.bars { display: grid; gap: 14px; }
+.bar figcaption { margin-top: 8px; font-size: 16px; color: var(--ink-2); }
+.bar figcaption b { color: var(--ink); }
+.bar figcaption span { color: var(--red); font-weight: 700; }
 
 /* 가입 */
 .sync { background: var(--paper-2); }
@@ -214,12 +225,11 @@ ul, ol { list-style: none; }
   .facts-in { grid-template-columns: repeat(4, 1fr); }
   .facts li, .facts li:nth-child(n) { padding: 32px 20px 30px; border-top: 0; border-left: 1px solid var(--line); }
   .facts li:first-child { padding-left: 0; border-left: 0; }
-  .chips { grid-template-columns: repeat(3, 1fr); column-gap: 28px; }
+  .kits { grid-template-columns: repeat(2, 1fr); gap: 24px; }
   .trio { grid-template-columns: repeat(3, 1fr); column-gap: 28px; }
   .band img { aspect-ratio: 21 / 9; }
   .olive-in { grid-template-columns: auto 1fr auto; align-items: center; gap: 28px; }
   .olive .btn { justify-self: end; }
-  .kit-shots { grid-template-columns: 1fr 1fr; width: min(100%, 760px); gap: 24px; }
 }
 @media (min-width: 1000px) {
   :root { --pad: 140px; }
@@ -232,6 +242,7 @@ ul, ol { list-style: none; }
   .feat.rev { grid-template-areas: "media head" "media points"; }
   .f-media { align-self: center; }
   .shot { width: min(100%, 440px); }
+  .kits { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 340px) {
   :root { --gut: 16px; }
