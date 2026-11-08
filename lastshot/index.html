@@ -8,8 +8,8 @@
 <meta name="theme-color" content="#0f172a">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="css/style.css?v=9">
-<script type="module" src="js/game.js?v=29"></script>
+<link rel="stylesheet" href="css/style.css?v=10">
+<script type="module" src="js/game.js?v=30"></script>
 </head>
 <body>
 <!-- 계정(로그인) 버튼 자리 — 게임 화면을 가리지 않게 숨김 (자리가 없으면 오른쪽 위에 떠서 나오므로 일부러 둔다) -->
@@ -72,6 +72,14 @@
       <h2 id="endTitle">레벨 클리어!</h2>
       <p class="end-sub" id="endSub"></p>
       <p class="rank-score" id="endScoreBox" hidden>누적 점수 <b id="endScore">0</b></p>
+      <div class="money" id="moneyBox" hidden>
+        <p class="money-q">Show me the money?</p>
+        <p class="money-sub">병사 <b>100명</b> · 유도탄 <b>10발</b>로 바로 다시 시작</p>
+        <div class="money-btns">
+          <button type="button" class="btn money-yes" id="btnMoneyYes">예</button>
+          <button type="button" class="btn money-no" id="btnMoneyNo">아니요</button>
+        </div>
+      </div>
       <div class="rank" id="rankBox" hidden>
         <p class="rank-score">점수 <b id="rankScore">0</b></p>
         <p class="rank-msg" id="rankMsg" role="status"></p>

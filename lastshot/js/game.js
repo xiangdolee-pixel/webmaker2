@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=25';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=26';
 import { SPRITES } from './sprites.js?v=17';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
@@ -1101,6 +1101,7 @@ function clearBurst() {   // 보스를 쓰러뜨렸을 때: 꽃가루 · CLEAR �
   tint = null; flashW = Math.min(flashW, .08);
   shout = { s: 'STAGE CLEAR!', c: '#fde047', t: 1.8, L: 1.8, sub: '레벨 ' + G.L, big: true }; addConfetti(140); SFX.cheer();
 }
+let moneyNext = false;   // 다음 판을 'Show me the money' 로 시작
 function start() {
   audio();
   $('#ovStart').hidden = true; $('#ovEnd').hidden = true; $('#ovRank').hidden = true;
@@ -1108,9 +1109,11 @@ function start() {
   born.length = 0; lastN = 3; squadPop = 0; hitstop = 0; dragId = null; dragX = null; scoreAt = null; slow = 0; kick = 0; tint = null; flashW = 0; shake = 0; comboPop = 0;
   save('lastshot_live', 1);   // 판 도중 새로고침 = 쓰러진 것으로(누적 점수를 지키려는 새로고침 막기)
   const fails = load('lastshot_fail_lv', 0) === level ? load('lastshot_fails', 0) : 0;
-  G = newGame(level, hooks, { help: fails }); state = 'play'; setTheme((G.L - 1) % 5); banner = bannerL = G.twist ? 2.6 : 1.9; dispScore = score(); syncHud(0);
+  const money = moneyNext; moneyNext = false;
+  G = newGame(level, hooks, { help: fails, money }); state = 'play'; setTheme((G.L - 1) % 5); banner = bannerL = G.twist ? 2.6 : 1.9; dispScore = score(); syncHud(0);
   btnMsl.hidden = false;
-  if (G.help) setTimeout(() => { if (G && state === 'play') { shout = { s: '지원군 도착!', c: '#86efac', t: 1.6, L: 1.6, sub: '유도탄 ' + G.missiles + '발 · 병사 +' + G.help * 8 + ' · 적이 줄었어요' }; SFX.power(); } }, 2700);
+  if (G.money) setTimeout(() => { if (G && state === 'play') { shout = { s: 'SHOW ME THE MONEY!', c: '#fde047', t: 1.8, L: 1.8, sub: '병사 ' + G.n + '명 · 유도탄 ' + G.missiles + '발', big: true }; SFX.promote(); addConfetti(60); } }, 2700);
+  else if (G.help) setTimeout(() => { if (G && state === 'play') { shout = { s: '지원군 도착!', c: '#86efac', t: 1.6, L: 1.6, sub: '유도탄 ' + G.missiles + '발 · 병사 +' + G.help * 8 + ' · 적이 줄었어요' }; SFX.power(); } }, 2700);
 }
 function countUp(el, to, ms = 900) {
   const from = 0, t0 = performance.now();
@@ -1124,7 +1127,7 @@ function end(win) {
   state = 'end'; btnMsl.hidden = true; endAt = performance.now(); save('lastshot_live', 0);
   inFlight = 0; coins.length = 0;
   const btn = $('#btnNext');
-  $('#rankBox').hidden = true;
+  $('#rankBox').hidden = true; $('#moneyBox').hidden = win;
   if (win) {
     const bonus = G.committed || 0;
     $('#endKicker').textContent = 'STAGE CLEAR'; $('#endTitle').textContent = `레벨 ${level - 1} 클리어!`;
@@ -1232,6 +1235,8 @@ function paintMute() { const b = $('#btnMute'); b.setAttribute('aria-pressed', m
 
 $('#btnStart').addEventListener('click', start);
 $('#btnNext').addEventListener('click', () => { if (performance.now() - endAt < 800) return; start(); });
+$('#btnMoneyYes').addEventListener('click', () => { if (performance.now() - endAt < 800) return; moneyNext = true; start(); });
+$('#btnMoneyNo').addEventListener('click', () => { $('#moneyBox').hidden = true; try { $('#btnNext').focus({ preventScroll: true }); } catch (e) {} });
 $('#btnHome').addEventListener('click', home);
 $('#btnReset').addEventListener('click', () => { level = 1; save('lastshot_level', 1); run = 0; save('lastshot_run', 0); home(); });
 $('#btnRank').addEventListener('click', openRank);

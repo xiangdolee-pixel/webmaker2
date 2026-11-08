@@ -123,12 +123,12 @@ export function makeLevel(L) {
 }
 
 export function newGame(L, hooks, opts = {}) {
-  const help = Math.min(4, opts.help || 0);   // 막힌 레벨 지원: 같은 레벨에서 연속으로 진 횟수(최대 4) — 1번마다 유도탄 +3 · 시작 병사 +8 · 적 -10% · 보스 체력 -8%
+  const help = Math.min(4, opts.help || 0), money = !!opts.money;   // money: 졌을 때 'Show me the money?' 에 예 → 병사 100 · 유도탄 10 으로 시작   // 막힌 레벨 지원: 같은 레벨에서 연속으로 진 횟수(최대 4) — 1번마다 유도탄 +3 · 시작 병사 +8 · 적 -10% · 보스 체력 -8%
   const lv = makeLevel(L);
   return {
     L, ev: lv.ev, length: lv.length, stage: lv.stage, bossKind: lv.boss, twist: lv.twist, stormT: 4, dist: START, next: 0, t: 0,
     speed: Math.min(176, 142 + L * 3),
-    px: MID, tx: MID, n: 3 + help * 8, shown: 3 + help * 8, tier: 0, missiles: 1 + Math.floor((L - 1) / 5) + help * 3, help, rockets: [],
+    px: MID, tx: MID, n: (money ? 100 : 3) + help * 8, shown: (money ? 100 : 3) + help * 8, tier: money ? 1 : 0, missiles: Math.max(money ? 10 : 0, 1 + Math.floor((L - 1) / 5)) + help * 3, help, money, rockets: [],
     rate: 5, dmg: 1, cd: 0, pow: 0, flash: 0,
     bullets: [], gates: [], mobs: [], groups: [], boxes: [], barrels: [], shells: [], boss: null,
     h: Object.assign({ burst: NOOP, spark: NOOP, float: NOOP, sfx: NOOP, buzz: NOOP, shake: NOOP, tint: NOOP, ring: NOOP, gateHit: NOOP, smoke: NOOP, blast: NOOP, die: NOOP, pts: NOOP, combo: NOOP, stop: NOOP }, hooks || {}),
