@@ -106,6 +106,8 @@ textarea.input { min-height: 120px; resize: vertical; }
 .tabs > button.on { color: var(--ink); background: var(--surface); box-shadow: var(--shadow); }
 .tabs.has-ind > button.on { background: none; box-shadow: none; }
 .tabs.has-ind > button { position: relative; }
+/* 사이트 분류 탭(전체 · 홈페이지 · 웹서비스 · 웹앱 · 웹게임 …) — 글자 폭만큼, 넘치면 옆으로 밀기 */
+.tabs.site-cats { width: fit-content; max-width: 100%; margin-bottom: 14px; }
 .tab-ind {
   position: absolute; left: 0; top: 0; border-radius: 99px; background: var(--surface); box-shadow: var(--shadow); pointer-events: none;
   transition: transform .36s var(--ease), width .36s var(--ease), height .36s var(--ease);

@@ -161,7 +161,10 @@ function render() {
 }
 
 // ───────── 사이트 ─────────
-let siteQ = '';
+let siteQ = '', siteCat = '';
+// 사이트 분류 = 포트폴리오 분류(sites.portfolio_tag, 사이트 수정 창). 포트폴리오와 같은 차례, 비어 있으면 '미분류'
+const CAT_ORDER = ['홈페이지', '웹서비스', '웹앱', '웹게임'];
+const catOf = (s) => (s.portfolio_tag || '').trim() || '미분류';
 async function renderSites() {
   const [sites, cs] = await Promise.all([api('/sites'), api('/customers')]);
   customers = cs;
@@ -169,9 +172,23 @@ async function renderSites() {
     <div class="bar"><h2>사이트 ${sites.length}</h2>
       <input class="input search-q" type="search" placeholder="사이트 · 고객 · 도메인 · 연락처 찾기" value="${esc(siteQ)}" data-q>
       <button class="btn primary" type="button" data-act="connect">GitHub에서 연결</button><button class="btn" type="button" data-act="new-site">+ 직접 만들기</button></div>
+    <div class="tabs site-cats" id="site-cats"></div>
     <div class="rows">${sites.map(siteRow).join('') || '<div class="card empty">아직 등록된 사이트가 없습니다.</div>'}</div>
     <div class="card empty" data-none hidden>찾는 사이트가 없습니다.</div>`;
-  liveSearch(view.querySelector('[data-q]'), (v) => { siteQ = v; });
+  // 분류 탭: 전체 · 홈페이지 · 웹서비스 · 웹앱 · 웹게임 … (사이트에 있는 분류만, 개수와 함께) — 찾기와 함께 걸러진다
+  const count = {};
+  sites.forEach((s) => { const c = catOf(s); count[c] = (count[c] || 0) + 1; });
+  const rank = (c) => (c === '미분류' ? 100 : CAT_ORDER.includes(c) ? CAT_ORDER.indexOf(c) : 50);
+  const cats = Object.keys(count).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'ko'));
+  if (siteCat && !count[siteCat]) siteCat = '';
+  const catBox = view.querySelector('#site-cats');
+  let refilter = null;
+  if (cats.length > 1) pillTabs(catBox, [['', `전체 ${sites.length}`], ...cats.map((c) => [c, `${c} ${count[c]}`])], siteCat, (v) => { siteCat = v; refilter?.(); showCat(); });
+  else catBox.remove();
+  // 좁은 화면에서 탭이 넘치면 고른 탭을 가운데로 밀어 보여 준다
+  function showCat() { const on = catBox.querySelector('button.on'); if (on && catBox.scrollWidth > catBox.clientWidth) catBox.scrollTo({ left: on.offsetLeft - (catBox.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' }); }
+  if (cats.length > 1 && siteCat) requestAnimationFrame(showCat);
+  refilter = liveSearch(view.querySelector('[data-q]'), (v) => { siteQ = v; }, (el) => !siteCat || el.dataset.cat === siteCat);
   view.querySelector('[data-act="new-site"]').onclick = () => siteDialog();
   view.querySelector('[data-act="connect"]').onclick = () => connectDialog();
   view.querySelectorAll('[data-site]').forEach((el) => {
@@ -319,12 +336,13 @@ function pf2Dialog(l) {
 }
 
 // 글자를 넣는 대로 아래 목록([data-find])을 걸러 보인다
-function liveSearch(input, remember) {
+// keep(el): 찾기 말고도 걸러 낼 조건(예: 사이트 분류 탭). 돌려준 run 을 부르면 다시 거른다
+function liveSearch(input, remember, keep) {
   const run = () => {
     const words = input.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
     let shown = 0;
     view.querySelectorAll('[data-find]').forEach((el) => {
-      const ok = words.every((w) => el.dataset.find.includes(w));
+      const ok = words.every((w) => el.dataset.find.includes(w)) && (!keep || keep(el));
       el.hidden = !ok;
       if (ok) shown++;
     });
@@ -334,6 +352,7 @@ function liveSearch(input, remember) {
   };
   input.addEventListener('input', run);
   run();
+  return run;
 }
 
 // ───────── GitHub에서 연결 ─────────
@@ -414,7 +433,7 @@ function siteRow(s) {
     + tagOf(s.bot_status, s.bot_note, '봇확인', '아직 만들기 전 — 가입할 때 봇 확인 없이 진행됩니다') : '';
   const find = [s.name, s.slug, s.domain, c?.name, c?.contact, c?.phone, c?.email, s.status === 'active' ? '운영' : '정지', fmtDate(s.created_at).slice(0, 10)].filter(Boolean).join(' ').toLowerCase();
   return `
-  <article class="card srow${s.status === 'active' ? '' : ' off'}" data-site="${s.id}" data-find="${esc(find)}">
+  <article class="card srow${s.status === 'active' ? '' : ' off'}" data-site="${s.id}" data-cat="${esc(catOf(s))}" data-find="${esc(find)}">
     <div class="sr-name">
       <a class="site-name" href="${esc(s.url)}" target="_blank" rel="noopener" title="${esc(s.name)} — 홈페이지 열기">${s.favicon ? `<img class="site-fav" src="${esc(s.favicon)}" alt="" width="20" height="20" onerror="this.remove()">` : ''}<b>${esc(s.name)}</b></a>
     </div>
