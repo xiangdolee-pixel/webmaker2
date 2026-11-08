@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=16';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=17';
 import { SPRITES } from './sprites.js?v=15';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
@@ -442,9 +442,10 @@ function paintGate(pv, p) {
     x.font = `900 ${big * .36}px Pretendard, sans-serif`; x.lineWidth = 8; x.strokeStyle = K.edge; x.strokeText(title, W / 2, H * .26); x.fillStyle = '#fff'; x.fillText(title, W / 2, H * .26);
     x.font = `900 ${big * .82}px Pretendard, sans-serif`; x.lineWidth = 16; x.strokeText('-' + p.v, W / 2, H * .66); x.fillStyle = '#fff'; x.fillText('-' + p.v, W / 2, H * .66);
   } else {
-    x.font = `900 ${big}px Pretendard, sans-serif`;
-    x.lineWidth = 18; x.strokeStyle = K.edge;
-    const s = gateLabel(p); x.strokeText(s, W / 2, H / 2 + 8); x.fillStyle = '#fff'; x.fillText(s, W / 2, H / 2 + 8);
+    const s = gateLabel(p);
+    let fs = big; x.font = `900 ${fs}px Pretendard, sans-serif`;
+    const tw = x.measureText(s).width; if (tw > W - 34) { fs = Math.floor(fs * (W - 34) / tw); x.font = `900 ${fs}px Pretendard, sans-serif`; }   // 좁은 옆길 문에서도 숫자가 칸 안에
+    x.lineWidth = Math.max(8, fs * .18); x.strokeStyle = K.edge; x.strokeText(s, W / 2, H / 2 + 8); x.fillStyle = '#fff'; x.fillText(s, W / 2, H / 2 + 8);
   }
   if (pv.swap) { x.font = '900 28px Pretendard, sans-serif'; x.fillStyle = 'rgba(255,255,255,.95)'; x.fillText('⇄ 바뀌는 문', W / 2, 26); }
   pv.label = gateLabel(p); pv.tex.needsUpdate = true;
@@ -847,6 +848,8 @@ let G = null, state = 'menu', last = 0, T = 0, slow = 0, endTimer = 0, walkT = 0
 const born = [];
 const ME_SC = 1, EN_SC = 1;   // 꼬마 병사 크기(판정과 상관없이 보이는 크기만)   // 새로 늘어난 병사가 톡 튀어나오게(자리별 생긴 때)
 const hooks = {
+  // 대군 돌격 시작: 경고 외침 + 경보음
+  horde: name => { shout = { s: '대군 돌격!', c: '#fca5a5', t: 2, L: 2, sub: name + ' 와 함께 몰려와요 · 양옆 문으로 버티세요!', big: true }; SFX.alarm(); buzz([40, 60, 40]); },
   // 진급: 큰 외침 + 꽃가루 + 병사들이 톡 튀어 오르며 새 모습 · 새 무기로 바뀐다
   promote: t => { shout = { s: 'LV' + (t + 1) + ' ' + TIERS[t].name + '!', c: t === 2 ? '#93c5fd' : '#fde047', t: 1.5, L: 1.5, sub: t === 2 ? '망토 · 금 갑옷 · 레이저 총' : '은 투구 · 방패 · 플라스마 총', big: true }; addConfetti(t === 2 ? 70 : 40, VW / 2, VH * .5); squadPop = 1; for (let i = 0; i < Math.min(G.n, 60); i++) born[i] = T + i * .008; },
   gateHit: (gt, p, x) => {

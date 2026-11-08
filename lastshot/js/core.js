@@ -73,12 +73,17 @@ export function makeLevel(L) {
   seq[0] = 'gate';
   // 중간보스: 3레벨부터는 어느 스테이지든 한 판 가운데쯤 한 번은 나온다
   if (L >= 3 && !seq.includes('giant')) { const m = seq.indexOf('mob', Math.floor(seq.length / 3)); if (m > 0) seq[m] = 'giant'; }
+  // 대군 돌격(horde): 2레벨부터 한 판에 한 번(7레벨부터 두 번) — 늘 같은 싸움이 되지 않게 판 흐름을 확 바꾼다
+  if (L >= 2) {
+    const at = [Math.round(seq.length * rnd(.35, .5))]; if (L >= 7) at.push(Math.round(seq.length * rnd(.75, .85)));
+    for (const a of at) { const i = clamp(a, 2, seq.length - 1); seq[i] = 'horde'; if (seq[i - 1] !== 'gate') seq[i - 1] = 'gate'; }
+  }
   let d = 0;
   for (let i = 0; i < rows; i++) {
     let k = seq[i];
     if (k === 'giant' && L < 3) k = 'mob';
     ev.push({ d, kind: k, p: rows > 1 ? i / (rows - 1) : 1 });
-    d += k === 'runner' ? space * .75 : space;
+    d += k === 'runner' ? space * .75 : k === 'horde' ? space * 2.4 : space;
   }
   ev.push({ d: d + 220, kind: 'boss', p: 1 });
   return { ev, length: d + 220 + 1150 - START + 600, stage: stageOf(L), boss: bossOf(L) };
@@ -170,6 +175,33 @@ function spawn(G, e, y) {
     const M = G.mobs[G.mobs.length - 1]; M.size = 2.3; M.hurt = 6 + Math.round(L * .8); grp.giant = M;
     M.mb = MIDS[(G.L + (G.mids = (G.mids || 0) + 1)) % MIDS.length];   // 중간보스 겉모습(번갈아)
     mobGroup(G, y + 40, Math.round(mobCount(L, p) * .25), mobHp(L, p), M.x);
+  } else if (k === 'horde') {
+    // 대군 돌격: 길 가운데를 빨간 군대가 빽빽이 메우고 곧장 밀려 내려온다(옆으로 따라오지 않음) + 한가운데 중간보스.
+    // 양옆 좁은 길(LANE)에는 +1 문이 줄지어 서고, +100 같은 큰 문 · 보급 상자(닿기만 해도 열림)가 이어져 버틸 힘을 준다.
+    const hx0 = ROAD_L + LANE, hx1 = ROAD_R - LANE, sp = 15, cols = Math.floor((hx1 - hx0) / sp);
+    const c = Math.min(Math.round(mobCount(L, p) * 2.1), 300), hp = Math.max(1, Math.round(mobHp(L, p) * .5));
+    const grp = mobGroup(G, y, c, hp, MID, { cols, sp, side: 0, vy: 34 + Math.min(L, 30) * 1.2 });
+    grp.horde = true;
+    const rowsN = Math.ceil(c / cols), depth = rowsN * 16;
+    const gg = mobGroup(G, y - depth * .45, 1, Math.round((16 + L * 9) * (1 + p * .5) * .8), MID, { vy: 34 + Math.min(L, 30) * 1.2, side: 0, lv: 2 });
+    const M = G.mobs[G.mobs.length - 1]; M.size = 2.3; M.hurt = 6 + Math.round(L * .8); gg.giant = M;
+    M.mb = MIDS[(G.L + (G.mids = (G.mids || 0) + 1)) % MIDS.length];
+    // 양옆 지원: 대군보다 조금 앞에서 시작해 대군이 다 지나갈 때까지
+    const big = Math.random() < .5 ? 0 : 1, len = depth + 520, stepY = 72;
+    [0, 1].forEach(sd => {
+      const x0 = sd ? ROAD_R - LANE + 4 : ROAD_L, x1 = sd ? ROAD_R : ROAD_L + LANE - 4, cx = (x0 + x1) / 2;
+      let k2 = 0;
+      for (let yy = y + 120 + sd * 31; yy > y - len; yy -= stepY, k2++) {
+        const roll = k2 % 5;
+        if (sd === big && k2 === 4) G.gates.push(laneGate(x0, x1, yy, L >= 4 ? 100 : 50));              // 큰 문 하나(+100)
+        else if (roll === 2 + sd) {                                               // 보급 상자: 무기 · 연사 · 유도탄
+          const r = Math.random(), gift = G.tier < TIERS.length - 1 && r < .3 ? 'tier' : r < .55 ? 'missile' : r < .8 ? 'rate' : 'dmg';
+          const bh = Math.round((4 + L * 1.2) * (1 + p * .3));
+          G.boxes.push({ x: cx, y: yy, w: 54, h: 40, hp: bh, max: bh, gift, flash: 0, pop: 0, lane: true });
+        } else G.gates.push(laneGate(x0, x1, yy, sd === big ? 1 : ri(1, 3)));                         // +1 +1 +1 …
+      }
+    });
+    G.h.horde && G.h.horde(MID_NAME[M.mb]);
   } else if (k === 'siege') {    // 양쪽 끝에서 두 무리, 가운데로 모여듦
     const c = mobCount(L, p, .44), hp = mobHp(L, p);
     mobGroup(G, y, c, hp, ROAD_L + 40, { side: 70 + L * 3 });
@@ -194,6 +226,9 @@ function spawn(G, e, y) {
   }
 }
 
+// 옆길 문: 한 칸짜리, 그 길로 지나갈 때만 받는다(다른 곳으로 지나가면 그냥 지나침)
+const LANE = 74;
+function laneGate(x0, x1, y, v) { return { y, h: 44, used: false, lane: true, parts: [{ x0, x1, t: '+', v, hit: 0, acc: 0 }], swap: 0, swapT: 0 }; }
 function lose(G, k, x, y, src) {
   if (k <= 0) return;
   if (G.lost) G.lost[src] = (G.lost[src] || 0) + k;
@@ -315,7 +350,11 @@ export function step(G, dt) {
     }
     if (!gt.used && gt.y >= -6) {
       gt.used = true;
-      const p = gt.parts.find(q => g.px >= q.x0 - 3 && g.px <= q.x1 + 3) || gt.parts[0], before = g.n;
+      if (gt.lane) {   // 옆길 문: 부대가 그 길에 걸쳐 있으면 받는다(큰 부대는 길 끝까지 못 가니 부대 반지름만큼 넉넉히)
+        const q = gt.parts[0], tol = 3 + R * .55;
+        if (g.px < q.x0 - tol || g.px > q.x1 + tol) { q.taken = true; continue; }
+      }
+      const p = gt.parts.find(q => g.px >= q.x0 - 3 && g.px <= q.x1 + 3) || (gt.lane ? gt.parts[0] : null) || gt.parts[0], before = g.n;
       if (p.t === 'T' || p.t === 'M') {   // 내주고 얻는 문: 병사가 모자라면 아무 일도 없다
         if (g.n <= p.v) { h.float(g.px, -40, '병사가 모자라요', '#fca5a5', 30); h.sfx('gateDown'); p.taken = true; continue; }
         const pay = p.v, maxed = p.t === 'T' && g.tier >= TIERS.length - 1;   // 이미 최고 등급이면 진급 대신 유도탄
@@ -366,6 +405,7 @@ export function step(G, dt) {
     const X = g.boxes[j]; if (!X) continue; X.y += g.speed * dt; X.flash = Math.max(0, X.flash - dt); X.pop = Math.max(0, X.pop - dt * 6);
     if (X.hp <= 0) { breakBox(g, X); continue; }
     if (X.y + X.h / 2 > -R * .6 && X.y - X.h / 2 < R * .6 && Math.abs(X.x - g.px) < X.w / 2 + R * .5) {
+      if (X.lane) { breakBox(g, X); continue; }   // 옆길 보급 상자는 닿기만 해도 열린다
       g.boxes.splice(j, 1); const loss = Math.min(Math.ceil(g.n * .45), Math.ceil(X.hp / 5)); lose(g, loss, g.px, 0, 'box'); h.shake(.4); h.buzz(80); h.sfx('boom');
       h.float(g.px, -40, '-' + loss, '#f87171', 34); h.burst(X.x, X.y, 'tire', 18); continue;
     }
@@ -444,7 +484,7 @@ function breakBox(g, X) {
   g.boxes = g.boxes.filter(o => o !== X);
   h.burst(X.x, X.y, 'tire', 26); h.burst(X.x, X.y, 'gold', 16); h.ring(X.x, X.y, 'gold'); h.smoke(X.x, X.y, 3);
   // 나란한 짝은 함께 사라진다(하나만 얻음)
-  g.boxes = g.boxes.filter(o => { if (Math.abs(o.y - X.y) < 4) { h.burst(o.x, o.y, 'tire', 10); return false; } return true; });
+  if (!X.lane) g.boxes = g.boxes.filter(o => { if (!o.lane && Math.abs(o.y - X.y) < 4) { h.burst(o.x, o.y, 'tire', 10); return false; } return true; });
   if (X.gift === 'tier' && g.tier < TIERS.length - 1) promote(g, X.x, X.y - 10);
   else if (X.gift === 'missile') { g.missiles += 3; h.float(X.x, X.y - 10, '유도탄 +3!', '#facc15', 28); }
   else if (X.gift === 'rate') { g.rate = Math.min(14, g.rate * 1.25); h.float(X.x, X.y - 10, '연사 UP!', '#facc15', 28); }
