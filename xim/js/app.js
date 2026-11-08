@@ -283,6 +283,20 @@ async function renderPortfolio2() {
     };
   });
 }
+// 그림을 브라우저에서 줄인다: 가로 1600px 이하 webp(못 하면 jpg) — 큰 사진도 수백 KB 로 빨리 올라가고 5MB 제한에 안 걸린다
+async function shrinkImage(file) {
+  let bmp;
+  try { bmp = await createImageBitmap(file); } catch { throw new Error('이 그림은 읽을 수 없어요. jpg · png · webp 로 바꿔 올려 주세요. (아이폰 HEIC 는 안 됩니다)'); }
+  const k = Math.min(1, 1600 / bmp.width);
+  if (k === 1 && file.size < 900 * 1024 && /^image\/(jpeg|png|webp|gif)$/.test(file.type)) { bmp.close?.(); return file; }   // 이미 작으면 그대로
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  bmp.close?.();
+  const blob = (await new Promise((r) => c.toBlob(r, 'image/webp', 0.86))) || (await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.86)));
+  if (!blob) throw new Error('그림을 줄이지 못했습니다. 다른 그림으로 해 주세요.');
+  return blob;
+}
 function pf2Dialog(l) {
   openDialog(`
     <h2>포트폴리오2 수정</h2>
@@ -295,9 +309,9 @@ function pf2Dialog(l) {
       </div>
       <label class="field"><span>설명</span><textarea class="input" name="description" maxlength="300">${esc(l.description)}</textarea></label>
       <div class="field"><span>썸네일 그림</span>
-        <div class="pf2-img-act"><label class="btn sm">새로 올리기<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-img hidden></label>
+        <div class="pf2-img-act"><label class="btn sm" data-up>새로 올리기<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-img hidden></label>
           <button class="btn sm" type="button" data-img-del${l.image ? '' : ' hidden'}>그림 빼기</button></div>
-        <small>jpg · png · webp · gif, 5MB 까지. 가로 1200 × 세로 630 비율이 가장 잘 맞습니다. 그림이 없으면 사이트명 첫 글자로 보입니다.</small></div>
+        <small>jpg · png · webp · gif. 큰 사진도 자동으로 줄여서 올립니다. 가로 1200 × 세로 630 비율이 가장 잘 맞습니다. 그림이 없으면 사이트명 첫 글자로 보입니다.</small></div>
       <p class="err" role="alert"></p>
       <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">저장</button></div>
     </form>`, (dlg) => {
@@ -306,17 +320,29 @@ function pf2Dialog(l) {
     const prev = dlg.querySelector('[data-prev]');
     const del = dlg.querySelector('[data-img-del]');
     const showImg = (row) => { l.image = row.image; prev.innerHTML = pf2Thumb(row); del.hidden = !row.image; renderPortfolio2(); };
-    dlg.querySelector('[data-img]').addEventListener('change', (e) => {
+    const up = dlg.querySelector('[data-up]'), err = form.querySelector('.err');
+    dlg.querySelector('[data-img]').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       e.target.value = '';
-      if (!file) return;
-      busy(e.target.closest('label'), form.querySelector('.err'), async () => {
-        const res = await fetch(`/api/portfolio2/${l.id}/image`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+      if (!file || up.classList.contains('busy')) return;
+      // 고르자마자 미리보기 + '올리는 중…' (예전엔 아무 변화가 없어 안 되는 것처럼 보였다)
+      const local = URL.createObjectURL(file);
+      prev.innerHTML = `<span class="pf2-thumb uploading"><img src="${local}" alt=""><i>올리는 중…</i></span>`;
+      up.classList.add('busy'); up.firstChild.textContent = '올리는 중…'; err.textContent = '';
+      try {
+        const blob = await shrinkImage(file);
+        const res = await fetch(`/api/portfolio2/${l.id}/image`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': blob.type || 'image/jpeg' }, body: blob });
         const out = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(out.error || `올리지 못했습니다 (${res.status})`);
         showImg(out.row);
         toast('그림을 올렸습니다.');
-      });
+      } catch (x) {
+        prev.innerHTML = pf2Thumb(l);   // 예전 그림으로 되돌림
+        err.textContent = x.message; toast(x.message);
+      } finally {
+        URL.revokeObjectURL(local);
+        up.classList.remove('busy'); up.firstChild.textContent = '새로 올리기';
+      }
     });
     del.onclick = () => busy(del, form.querySelector('.err'), async () => {
       const r = await api(`/portfolio2/${l.id}/image`, { method: 'DELETE' });

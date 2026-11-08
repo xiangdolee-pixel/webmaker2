@@ -184,7 +184,7 @@ const audit = (db, request, action, target = '', detail = '') =>
 
 const XIM_COOKIE = 'xim_sess';
 
-async function ximApi(request, env, url) {
+async function ximApi(request, env, url, ctx) {
   const db = env.DB;
   const path = url.pathname.replace(/\/+$/, '');
   const method = request.method;
@@ -326,24 +326,36 @@ async function ximApi(request, env, url) {
   if (path === '/api/sites' && method === 'GET') {
     // 배포할 때 도메인만 채워진 사이트(deploy.mjs) → 메일 · 봇 확인을 여기서 한 번 등록
     //   봇 확인이 '설정 전'(예전 토큰에 Turnstile 권한이 없던 때 등록)인 사이트도 다시 시도
-    const { results: pending } = await db.prepare("SELECT id, domain FROM sites WHERE domain != '' AND (mail_status = '' OR bot_status IN ('', 'skip'))").all();
-    for (const p of pending) {
-      const r = await mailRegister(env, p.id, p.domain).catch((e) => ({ message: e.message }));
-      await audit(db, request, 'SITE_MAIL', p.domain, `배포 때 채운 도메인 자동 등록 — ${r?.message || ''}`);
+    //   예전엔 목록을 열 때마다 여기서 Cloudflare 에 차례로 다시 등록하느라 목록이 4~5초씩 늦었다 →
+    //   응답은 바로 하고 등록은 뒤에서(ctx.waitUntil). 'skip'(권한 등으로 안 된 것)은 6시간에 한 번만 다시 시도
+    const retryKey = 'mail_retry_at';
+    const lastTry = +(await getSetting(db, retryKey)) || 0;
+    const { results: pending } = await db.prepare("SELECT id, domain, mail_status, bot_status FROM sites WHERE domain != '' AND (mail_status = '' OR bot_status IN ('', 'skip'))").all();
+    const due = pending.filter((p) => p.mail_status === '' || p.bot_status === '' || now() - lastTry > 6 * 3600 * 1000);
+    if (due.length && ctx) {
+      if (due.some((p) => p.bot_status === 'skip')) await setSetting(db, retryKey, String(now()));
+      ctx.waitUntil((async () => {
+        for (const p of due) {
+          const r = await mailRegister(env, p.id, p.domain).catch((e) => ({ message: e.message }));
+          await audit(db, request, 'SITE_MAIL', p.domain, `배포 때 채운 도메인 자동 등록 — ${r?.message || ''}`);
+        }
+      })());
     }
-    const { results } = await db.prepare(`
+    const [{ results }, { results: admins }, use, { results: favs }] = await Promise.all([db.prepare(`
       SELECT s.*, c.name AS customer_name,
         (SELECT COUNT(*) FROM requests r WHERE r.site_id = s.id AND r.status != 'done') AS open_requests
       FROM sites s LEFT JOIN customers c ON c.id = s.customer_id
-      ORDER BY s.id DESC`).all();
-    // 업체 관리자 = xms 의 등급 1 회원
-    const { results: admins } = await env.XMS_DB.prepare("SELECT site, COUNT(*) AS n FROM members WHERE level = 1 AND status != 'WITHDRAWN' GROUP BY site").all();
+      ORDER BY s.id DESC`).all(),
+      // 업체 관리자 = xms 의 등급 1 회원
+      env.XMS_DB.prepare("SELECT site, COUNT(*) AS n FROM members WHERE level = 1 AND status != 'WITHDRAWN' GROUP BY site").all(),
+      siteUsage(env),
+      // 파비콘 (xms 에 올린 것) — 카드 이름 옆에 보인다
+      env.XMS_DB.prepare("SELECT site, updated_at FROM site_files WHERE kind = 'favicon-32'").all(),
+    ]);
     const count = Object.fromEntries(admins.map((a) => [a.site, a.n]));
-    const use = await siteUsage(env);
-    // 파비콘 (xms 에 올린 것) — 카드 이름 옆에 보인다
-    const { results: favs } = await env.XMS_DB.prepare("SELECT site, updated_at FROM site_files WHERE kind = 'favicon-32'").all();
     const fav = Object.fromEntries(favs.map((f) => [f.site, f.updated_at]));
-    return json(results.map((s) => ({ ...s, admin_count: count[s.slug] || 0, url: siteUrl(s), favicon: fav[s.slug] ? `${siteUrl(s)}/xms/file/favicon-32.png?v=${fav[s.slug]}` : s.site_favicon ? `${siteUrl(s)}${s.site_favicon}` : '', usage: use[s.slug] || { db: 0, files: 0, file_count: 0, r2: 0, d1_files: 0 } })));
+    // 봇 확인 비밀 키(turnstile_secret)는 화면에 필요 없다 — 내려보내지 않는다
+    return json(results.map(({ turnstile_secret, ...s }) => ({ ...s, admin_count: count[s.slug] || 0, url: siteUrl(s), favicon: fav[s.slug] ? `${siteUrl(s)}/xms/file/favicon-32.png?v=${fav[s.slug]}` : s.site_favicon ? `${siteUrl(s)}${s.site_favicon}` : '', usage: use[s.slug] || { db: 0, files: 0, file_count: 0, r2: 0, d1_files: 0 } })));
   }
   if (path === '/api/sites' && method === 'POST') {
     const raw = await body(request);
@@ -978,10 +990,10 @@ export class Engine extends WorkerEntrypoint {
 // ───────────────────────── 기본 export: xim 운영자 화면 ─────────────────────────
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/')) {
-      try { return await ximApi(request, env, url); } catch (e) { return fail(e); }
+      try { return await ximApi(request, env, url, ctx); } catch (e) { return fail(e); }
     }
     return staticFile(request, env, url);
   },
