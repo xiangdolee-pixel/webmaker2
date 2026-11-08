@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=21';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=22';
 import { SPRITES } from './sprites.js?v=17';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
@@ -473,8 +473,8 @@ function updateBodies(dt) {
 
 /* ── 문: 꽉 찬 색 판 + 큰 숫자, 둥근 기둥. 진급 문 · 유도탄 문은 금색 ── */
 const views = new Map();   // core 물건 → 3D 물건
-function gateLabel(p) { return p.t === 'x' ? '×' + p.v : p.t === '/' ? '÷' + p.v : p.t === 'T' ? 'T' + p.v : p.t === 'M' ? 'M' + p.v : (p.v > 0 ? '+' : '') + p.v; }
-function gateKind(p) { return p.t === 'T' || p.t === 'M' ? 'trade' : (p.t === 'x' || (p.t === '+' && p.v >= 0)) ? 'good' : 'bad'; }
+function gateLabel(p) { return p.t === 'x' ? '×' + p.v : p.t === '/' ? '÷' + p.v : p.t === 'M' ? 'M' + p.v : (p.v > 0 ? '+' : '') + p.v; }
+function gateKind(p) { return p.t === 'M' ? 'trade' : (p.t === 'x' || (p.t === '+' && p.v >= 0)) ? 'good' : 'bad'; }
 const GATEC = {
   good: { top: '#62b3ff', bot: '#1f63e6', edge: '#0d3a9e', post: '#2a6cf0', glow: 'rgba(160,215,255,.9)' },
   bad: { top: '#ff7a7a', bot: '#e0242c', edge: '#8a0d14', post: '#e2353a', glow: 'rgba(255,180,180,.9)' },
@@ -492,7 +492,7 @@ function paintGate(pv, p) {
   x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
   const big = W < 400 ? 100 : 124;
   if (kind === 'trade') {
-    const title = p.t === 'T' ? '▲ 진급 · 총 ×1.6' : '유도탄 +3';
+    const title = '유도탄 +3';
     x.font = `900 ${big * .36}px Pretendard, sans-serif`; x.lineWidth = 8; x.strokeStyle = K.edge; x.strokeText(title, W / 2, H * .26); x.fillStyle = '#fff'; x.fillText(title, W / 2, H * .26);
     x.font = `900 ${big * .82}px Pretendard, sans-serif`; x.lineWidth = 16; x.strokeText('-' + p.v, W / 2, H * .66); x.fillStyle = '#fff'; x.fillText('-' + p.v, W / 2, H * .66);
   } else {
@@ -555,12 +555,7 @@ function makeBox(X) {
     t.add(new THREE.Mesh(hubGeo, hubMat)); grp.add(t); tires.push(t);
   }
   const prize = new THREE.Group(), ph = c => new THREE.MeshPhongMaterial({ color: c, shininess: 90, specular: '#ffffff' });
-  if (X.gift === 'tier') {   // 금 테 투구 + 파란 깃털
-    prize.add(new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.PI * .55), ph('#c9cfd8')));
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(.98, .12, 8, 24).rotateX(Math.PI / 2), ph('#f5b52e')); rim.position.y = -.15; prize.add(rim);
-    const pl = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), ph('#1f5bff')); pl.scale.set(.25, .5, 1.05); pl.position.y = 1; prize.add(pl);
-    prize.position.y = .2;
-  } else if (X.gift === 'thunder') {   // 노란 번개 모양
+  if (X.gift === 'thunder') {   // 노란 번개 모양
     const sh = new THREE.Shape(); [[.15, 1.4], [-.55, -.05], [-.05, -.05], [-.35, -1.4], [.6, .25], [.05, .25], [.4, 1.4]].forEach(([x, y], i) => i ? sh.lineTo(x, y) : sh.moveTo(x, y));
     const bolt = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: .3, bevelEnabled: true, bevelSize: .06, bevelThickness: .06 }), new THREE.MeshPhongMaterial({ color: '#ffd23f', emissive: '#a86b00', shininess: 90 }));
     bolt.position.z = -.15; prize.add(bolt);
@@ -767,7 +762,7 @@ function pill(x, y, s, fs, c1, c2) {
   ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 2.5; ctx.stroke();
   text(s, x, y + fs * .04, fs, '#fff', true, 'rgba(0,0,0,.35)');
 }
-const GIFT = { tier: '진급', missile: '유도탄 +3', rate: '연사 UP', dmg: '위력 UP', thunder: '천둥번개' };
+const GIFT = { missile: '유도탄 +3', rate: '연사 UP', dmg: '위력 UP', thunder: '천둥번개' };
 const elastic = a => 1 + .7 * Math.exp(-a * 9) * Math.cos(a * 22);   // 톡 튀었다가 제자리로
 const texts = [];
 function fxFloat(x, y, s, c, size, small, h) {
@@ -1228,18 +1223,18 @@ $('#btnRankClose').addEventListener('click', home);
 $('#btnMute').addEventListener('click', () => { muted = !muted; save('lastshot_mute', muted ? 1 : 0); paintMute(); if (!muted) audio(); });
 addEventListener('resize', fit);
 document.addEventListener('visibilitychange', () => { last = performance.now(); for (const k in keys) keys[k] = false; if (!document.hidden && AC && AC.state !== 'running' && state === 'play') try { AC.resume(); } catch (e) {} });
-if (dbg) window.__ls = { auto: false, start, end, get G() { return G; }, setLevel(l) { level = l; }, get state() { return state; }, fireMissile: shootMissile, sfx(n, t) { audio(); muted = false; SFX[n](t); }, setTier(t) { G.tier = G.rank = t; }, get timers() { return { endTimer, slow, hitstop, over: G && G.over }; } };
+if (dbg) window.__ls = { auto: false, start, end, get G() { return G; }, setLevel(l) { level = l; }, get state() { return state; }, fireMissile: shootMissile, sfx(n, t) { audio(); muted = false; SFX[n](t); }, setTier(t) { G.tier = t; }, get timers() { return { endTimer, slow, hitstop, over: G && G.over }; } };
 fit(); G = preview(); syncHud(0); paintMute();
 try { renderer.compile(scene, camera); } catch (e) {}   // 셰이더를 미리 만들어 첫 진급 · 첫 폭발 때 멈칫하지 않게
 requestAnimationFrame(t => { last = t; loop(t); });
 // 확인용: ?debug&play=레벨 → 자동 조종으로 바로 시작
 if (dbg) { const m = location.search.match(/play=(\d+)/); if (m) { level = +m[1]; window.__ls.auto = !/manual/.test(location.search); muted = true; setTimeout(start, 50); } }
 if (dbg) { const w = location.search.match(/[?&]w=(\d+)&h=(\d+)/); if (w) { Object.assign($('#game').style, { width: w[1] + 'px', height: w[2] + 'px', margin: 0 }); fit(); } }
-if (dbg) { const t = location.search.match(/tier=(\d)/); if (t) setTimeout(() => { if (G) G.tier = G.rank = +t[1]; }, 80); }
+if (dbg) { const t = location.search.match(/tier=(\d)/); if (t) setTimeout(() => { if (G) G.tier = +t[1]; }, 80); }
 // 확인용: &gal=croc2 · gal=golem · gal=army1 → 보스 · 중간보스 · 병사를 가까이 세워 놓고 보기(게임은 멈춤)
 function gallery(k, n) {
   $('#ovStart').hidden = true; clearViews(); state = 'menu'; bossSeen = true;
-  G = newGame(level, {}); G.n = 30; G.tier = G.rank = Math.min(2, n); G.gates = []; G.mobs = []; G.groups = []; G.boxes = []; lastN = 30;
+  G = newGame(level, {}); G.n = 30; G.tier = Math.min(2, n); G.gates = []; G.mobs = []; G.groups = []; G.boxes = []; lastN = 30;
   const anim = ['croc', 'gorilla', 'elephant', 'lion', 'tiger'], mids = ['boar', 'golem', 'lich', 'siege', 'drake'];
   if (anim.includes(k)) G.boss = { kind: 'brute', animal: k, evo: Math.min(2, n), x: MID, y: -300, r: 62, hp: 100, max: 100, t: 0, flash: 0, pop: 0, stop: -800, bite: 0, fire: 2, summon: 99 };
   else if (mids.includes(k)) G.mobs.push({ mb: k, x: MID, y: -230, size: 2.3, step: 0, flash: 0, hp: 100, max: 100, g: {}, lv: 2, ox: 0 });

@@ -4,27 +4,23 @@
    레벨마다 스테이지 종류(구성 · 색)가 바뀌고, 보스도 번갈아 바뀐다. 레벨이 오를수록 + 한 판 뒤로 갈수록 세짐. */
 export const ROAD_L = 34, ROAD_R = 326, MID = 180, SPAWN = -1150, RANGE = 1000, START = 680;
 const GAP = 22, BV = 1150, BIN = 32;           // BV: 총알 속도                       // 병사 사이 간격
-export const TIERS = [                // 부대 등급: 병사 수가 늘면 저절로 오르고(RANKUP), 타이어 · 진급 문으로도 오른다
+export const TIERS = [                // 부대 등급: 병사 수로만 정해진다(RANKUP) — 늘면 오르고 줄면 내려간다
   { name: '견습병', bullet: 0, mul: 1 },
   { name: '정예병', bullet: 1, mul: 1.6 },
   { name: '근위대장', bullet: 2, mul: 2.5 }
 ];
-// 병사 수로 오르는 등급: 100명이면 정예병, 200명이면 근위대장. 내려갈 때는 조금 더 줄어야(80 · 160 아래) — 경계에서 깜빡이지 않게.
-// 타이어 · 진급 문으로 얻은 등급(rank)은 병사 수가 줄어도 그 아래로 내려가지 않는다.
-export const RANKUP = [100, 200], RANKDOWN = [80, 160];
+// 등급은 병사 수로만: 100명이면 정예병, 200명이면 근위대장. 줄면 그만큼 내려간다(95 · 190 아래 — 경계에서 깜빡이지 않게 5% 여유만)
+export const RANKUP = [100, 200], RANKDOWN = [95, 190];
 function countTier(g) {
   let t = g.tier;
   while (t < RANKUP.length && g.n >= RANKUP[t]) t++;
   while (t > 0 && g.n < RANKDOWN[t - 1]) t--;
-  return Math.max(t, g.rank);
+  return t;
 }
-function promote(g, x, y) {   // 상자 · 진급 문으로 한 등급 올리기
-  g.rank = Math.min(TIERS.length - 1, g.tier + 1); setTier(g, g.rank, x, y);
-}
-function setTier(g, t, x = g.px, y = -60) {
+function setTier(g, t) {
   if (t === g.tier) return;
   const up = t > g.tier, h = g.h; g.tier = t;
-  if (up) { if (h.promote) h.promote(t); else h.float(x, y, 'LV' + (t + 1) + ' ' + TIERS[t].name + ' 진급!', '#facc15', 40); h.sfx('promote'); h.tint('gold'); h.ring(g.px, 0, 'gold'); h.buzz(40); }
+  if (up) { if (h.promote) h.promote(t); else h.float(g.px, -60, 'LV' + (t + 1) + ' ' + TIERS[t].name + ' 진급!', '#facc15', 40); h.sfx('promote'); h.tint('gold'); h.ring(g.px, 0, 'gold'); h.buzz(40); }
   else { h.float(g.px, -60, 'LV' + (t + 1) + ' ' + TIERS[t].name, '#cbd5e1', 30); h.sfx('demote'); }
 }
 // 스테이지 종류: 구성(pat) · 화면 색(theme)
@@ -99,7 +95,7 @@ export function newGame(L, hooks) {
   return {
     L, ev: lv.ev, length: lv.length, stage: lv.stage, bossKind: lv.boss, dist: START, next: 0, t: 0,
     speed: Math.min(176, 142 + L * 3),
-    px: MID, tx: MID, n: 3, shown: 3, tier: 0, rank: 0, missiles: 1, rockets: [],
+    px: MID, tx: MID, n: 3, shown: 3, tier: 0, missiles: 1, rockets: [],
     rate: 5, dmg: 1, cd: 0, pow: 0, flash: 0,
     bullets: [], gates: [], mobs: [], groups: [], boxes: [], barrels: [], shells: [], boss: null,
     h: Object.assign({ burst: NOOP, spark: NOOP, float: NOOP, sfx: NOOP, buzz: NOOP, shake: NOOP, tint: NOOP, ring: NOOP, gateHit: NOOP, smoke: NOOP, blast: NOOP, die: NOOP, pts: NOOP, combo: NOOP, stop: NOOP }, hooks || {}),
@@ -172,10 +168,7 @@ function spawn(G, e, y) {
     else if (k === 'gate' && G.L >= 2 && r < .28 && n < 70) {
       // 셈 문제: ×k 와 비슷한 크기의 +값 — 지금 부대 수로 계산해야 맞게 고른다(+쪽은 쏘면 더 오른다)
       const m = n < 14 ? 3 : 2; A = { t: 'x', v: m }; B = { t: '+', v: Math.max(3, Math.round(n * (m - 1) * rnd(.72, 1.25))) };
-    } else if (k === 'gate' && G.L >= 2 && r < .46 && G.tier < TIERS.length - 1 && n > 8) {
-      // 진급 문: 병사를 내주고 등급을 올린다(총 위력 ×1.6 · ×2.5) — 몇 명까지 내줘도 이득인지 따져 보기
-      A = { t: 'T', v: Math.max(5, Math.round(n * rnd(.3, .45))) }; B = gateVal(G, true, p);   // 다른 쪽은 파란 문 — 둘 다 좋은 선택지
-    } else if (k === 'gate' && G.L >= 2 && r < .58 && n > 6) {
+    } else if (k === 'gate' && G.L >= 2 && r < .42 && n > 6) {
       A = { t: 'M', v: Math.max(4, Math.round(n * rnd(.18, .3))) }; B = gateVal(G, true, p);   // 유도탄 문: 병사를 내주고 유도탄 3발
     }
     // 둘 다 마이너스(쏴서 올려야 함)
@@ -295,9 +288,9 @@ function midboss(G, y, x, L, p, vy) {
   M.mb = MIDS[(G.L + (G.mids = (G.mids || 0) + 1)) % MIDS.length];
   return M;
 }
-// 선물 고르기: 진급 · 유도탄 · 연사 · 위력 + 2레벨부터 천둥번개
+// 선물 고르기: 유도탄 · 연사 · 위력 + 2레벨부터 천둥번개
 function pickGift(G) {
-  const w = [['tier', G.tier < TIERS.length - 1 ? .2 : 0], ['missile', .17], ['rate', .14], ['dmg', .14], ['thunder', G.L >= 2 ? .17 : 0]];
+  const w = [['missile', .2], ['rate', .14], ['dmg', .14], ['thunder', G.L >= 2 ? .17 : 0]];
   let r = Math.random() * w.reduce((a, x) => a + x[1], 0);
   for (const [g, v] of w) { if ((r -= v) < 0) return g; }
   return 'rate';
@@ -476,13 +469,12 @@ export function step(G, dt) {
         if (g.px < q.x0 - tol || g.px > q.x1 + tol) { q.taken = true; continue; }
       }
       const p = gt.parts.find(q => g.px >= q.x0 - 3 && g.px <= q.x1 + 3) || (gt.lane ? gt.parts[0] : null) || gt.parts[0], before = g.n;
-      if (p.t === 'T' || p.t === 'M') {   // 내주고 얻는 문: 병사가 모자라면 아무 일도 없다
+      if (p.t === 'M') {   // 유도탄 문: 병사를 내주고 유도탄 3발(병사가 모자라면 아무 일도 없다)
         if (g.n <= p.v) { h.float(g.px, -40, '병사가 모자라요', '#fca5a5', 30); h.sfx('gateDown'); p.taken = true; continue; }
         gt.pick = gt.parts.indexOf(p);
-        const pay = p.v, maxed = p.t === 'T' && g.tier >= TIERS.length - 1;   // 이미 최고 등급이면 진급 대신 유도탄
+        const pay = p.v;
         lose(g, pay, g.px, 0, 'trade');
-        if (p.t === 'T' && !maxed) promote(g, g.px, -60);
-        else { g.missiles += 3; h.float(g.px, -60, '유도탄 +3', '#facc15', 40); }
+        g.missiles += 3; h.float(g.px, -60, '유도탄 +3', '#facc15', 40);
         h.float(g.px, -10, '-' + pay, '#f87171', 30);
         h.sfx('power'); h.tint('gold'); h.ring(g.px, 0, 'gold'); h.stop(.08); h.buzz(40);
         p.taken = true; continue;
@@ -603,7 +595,6 @@ const PLx = g => power(g.L);
 // 문 한 칸을 고르면 부대가 어떻게 되는지(자동 조종 어림값)
 export function partValue(G, p) {
   const n = G.n;
-  if (p.t === 'T') return G.tier < TIERS.length - 1 ? (n - p.v) * TIERS[G.tier + 1].mul / TIERS[G.tier].mul : n - p.v;
   if (p.t === 'M') return n - p.v + 9;
   return p.t === 'x' ? n * p.v : p.t === '/' ? n / p.v : n + p.v;
 }
@@ -615,8 +606,7 @@ function breakBox(g, X) {
   h.burst(X.x, X.y, 'tire', 26); h.burst(X.x, X.y, 'gold', 16); h.ring(X.x, X.y, 'gold'); h.smoke(X.x, X.y, 3);
   // 나란한 짝은 함께 사라진다(하나만 얻음)
   if (!X.lane) g.boxes = g.boxes.filter(o => { if (!o.lane && Math.abs(o.y - X.y) < 4) { h.burst(o.x, o.y, 'tire', 10); return false; } return true; });
-  if (X.gift === 'tier' && g.tier < TIERS.length - 1) promote(g, X.x, X.y - 10);
-  else if (X.gift === 'thunder') { g.bolts += g.L >= 8 ? 6 : 4; g.boltCd = .15; h.float(X.x, X.y - 10, '천둥번개!', '#fde047', 30); }
+  if (X.gift === 'thunder') { g.bolts += g.L >= 8 ? 6 : 4; g.boltCd = .15; h.float(X.x, X.y - 10, '천둥번개!', '#fde047', 30); }
   else if (X.gift === 'missile') { g.missiles += 3; h.float(X.x, X.y - 10, '유도탄 +3!', '#facc15', 28); }
   else if (X.gift === 'rate') { g.rate = Math.min(14, g.rate * 1.25); h.float(X.x, X.y - 10, '연사 UP!', '#facc15', 28); }
   else { g.dmg = +(g.dmg * 1.3).toFixed(2); h.float(X.x, X.y - 10, '위력 UP!', '#facc15', 28); }
@@ -701,7 +691,7 @@ export function autoAim(G, skill, dt, mem) {
   if (bar && skill > .5) return pick(bar.x);
   if (G.boss) return pick(G.boss.x);
   const bxs = G.boxes.filter(x => x.y < -60);
-  if (bxs.length) { const bx = bxs.sort((a, b) => (G.tier < TIERS.length - 1 && a.gift === 'tier' ? -1 : 0) - (G.tier < TIERS.length - 1 && b.gift === 'tier' ? -1 : 0) || a.hp - b.hp)[0]; return pick(bx.x); }
+  if (bxs.length) { const bx = bxs.sort((a, b) => a.hp - b.hp)[0]; return pick(bx.x); }
   const m = G.mobs.filter(x => x.y < 0).sort((a, b) => b.y - a.y)[0];
   if (m) return pick(m.x);
 }
