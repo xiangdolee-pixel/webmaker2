@@ -322,7 +322,15 @@ function setupThumbForm(root) {
 function readThumbForm(root) {
   const picked = $('[name=tp-title-pick]:checked', root);
   const title = (picked && picked.value) || $('[name=tp-title]', root).value.trim();
-  return { title, badgeName: $('[name=tp-badge-name]', root).value.trim(), badgeRole: $('[name=tp-badge-role]', root).value.trim(), emotion: $('[name=tp-emotion]', root).value, gesture: $('[name=tp-gesture]', root).value, face: $('[name=tp-face]', root).value };
+  const badgeName = $('[name=tp-badge-name]', root).value.trim();
+  let face = $('[name=tp-face]', root).value;
+  // 명찰이 있는데 내 사진이면 → 그 인물 사진으로 (내 사진에 남의 명찰을 붙이는 실수 금지, 사용자 지시 2026-11-09)
+  if (badgeName && !face.startsWith('person:') && !face.startsWith('asset:')) {
+    const o = $('[name=tp-badge-sel] option:checked', root);
+    face = `person:${(o && o.value !== '' && o.value !== 'custom' ? (o.dataset.en || o.dataset.name) : badgeName)}`;
+    toast('명찰 인물의 사진으로 바꿨습니다 (내 사진에 다른 사람 명찰은 붙이지 않습니다)');
+  }
+  return { title, badgeName, badgeRole: $('[name=tp-badge-role]', root).value.trim(), emotion: $('[name=tp-emotion]', root).value, gesture: $('[name=tp-gesture]', root).value, face };
 }
 
 // ───────── 작업 상세 ─────────

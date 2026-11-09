@@ -209,7 +209,13 @@ ${P.ARTICLE_FORMAT}
       await j.doc('factcheck', f);
       await j.doc('summary', sm);
       const p = o.thumb || {};
-      const pk = { title: p.title || sm.titles[0] || '', title_lines: p.title_lines || [], accent_words: p.accent_words || [], emotion: p.emotion || '자동', gesture: p.gesture || '자동', badgeName: p.badge_name || '', badgeRole: p.badge_role || '', face: /^\d{3}$/.test(p.face || '') ? `emoji:${p.face}` : 'emoji:auto' };
+      const pk = { title: p.title || sm.titles[0] || '', title_lines: p.title_lines || [], accent_words: p.accent_words || [], emotion: p.emotion || '자동', gesture: p.gesture || '자동', badgeName: p.badge_name || '', badgeRole: p.badge_role || '', face: /^\d{3}$/.test(p.face || '') ? `emoji:${p.face}` : /^person:/.test(p.face || '') ? p.face : 'emoji:auto' };
+      // 명찰이 있으면 사진도 그 인물 — 내 사진에 남의 명찰을 붙이는 실수 금지 (사용자 지시 2026-11-09)
+      if (pk.badgeName) {
+        const hit = (sm.people || []).map(String).find((x) => x.startsWith(pk.badgeName));
+        const en = hit ? (hit.match(/\(([^,)]+)/) || [])[1] : '';
+        pk.face = `person:${(en || pk.badgeName).trim()}`;
+      }
       if (o.thumb_job?.prompt) await j.doc('thumb_job', { prompt: o.thumb_job.prompt, pose_fix_prompt: o.thumb_job.pose_fix_prompt || '', for: pk.face, made_at: Date.now() });
       return { f, sm, pk, note: `${sm.titles[0] || ''} · 인물 ${f.people.length}명` };
     });
@@ -264,7 +270,7 @@ async function runSlidesEngine(j, work, nums, label = '슬라이드') {
 async function runThumb(j, job, work, pick, premade) {
   await stepRun(j, 'thumb-prompt', pick.title, async () => {
     let face = '';
-    const usePremade = premade?.prompt && !(pick.face || '').startsWith('person:') && !(pick.face || '').startsWith('asset:');
+    const usePremade = premade?.prompt && !pick.badgeName && !(pick.face || '').startsWith('person:') && !(pick.face || '').startsWith('asset:');   // 명찰이 있으면 그 인물 사진 경로로
     const outPng = path.join(work, '06_thumbnail.png');
     if (usePremade) {
       if ((pick.face || '').startsWith('emoji:') && pick.face !== 'emoji:auto') face = await download(`/api/studio/helper/face/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
@@ -276,7 +282,8 @@ async function runThumb(j, job, work, pick, premade) {
     if ((pick.face || '').startsWith('person:')) {
       const name = pick.face.slice(7).trim(); const dest = path.join(work, 'face.png');
       const r = await py(['tools\\img_search.py', name, dest], { cwd: DOCS, timeoutMin: 4, label: '인물 사진 검색' });
-      if (r.code === 0 && fs.existsSync(dest)) face = dest; else log(`  인물 사진 검색 실패(${name}) → 내 사진으로`);
+      if (r.code === 0 && fs.existsSync(dest)) face = dest;
+      else { log(`  인물 사진 검색 실패(${name}) → 명찰 없이 내 사진으로`); pick.badgeName = ''; pick.badgeRole = ''; pick.face = 'emoji:auto'; await j.doc('thumb_pick', pick); }   // 내 사진에 남의 명찰은 금지
     }
     if (!face && (pick.face || '').startsWith('emoji:') && pick.face !== 'emoji:auto') face = await download(`/api/studio/helper/face/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
     else if (!face && (pick.face || '').startsWith('asset:')) face = await download(`/studio/a/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
@@ -355,8 +362,13 @@ async function runImages(payload, work, early = null) {
   const onlyNums = redo?.what === 'slide' ? [+redo.idx] : [];
   const nums = onlyNums.length ? onlyNums : blocks.map((_, i) => i + 1);
   const pick = parse('thumb_pick'), premade = parse('thumb_job');
-  const withThumb = !onlyNums.length && !!pick;
+  // 이미 xim 에 올라간 그림은 건너뛴다(이어서 할 때 · 썸네일만 다시 만들 때 슬라이드 6장을 또 만들지 않게)
+  const have = payload.assets || [];
+  const haveSlide = new Set(have.filter((a) => a.kind === 'slide').map((a) => a.idx));
+  const haveThumb = have.some((a) => a.kind === 'thumb');
+  const withThumb = !onlyNums.length && !!pick && !haveThumb;
   await assertAlive(j);
+  let made = nums;
   if (early) {
     await early.promise;   // 글 단계와 겹쳐 돌린 슬라이드 (원고 초안 기준)
     const changed = nums.filter((n) => (early.blocks[n - 1] || '') !== blocks[n - 1]);
@@ -364,11 +376,13 @@ async function runImages(payload, work, early = null) {
     if (changed.length) { log(`  교차 팩트체크로 바뀐 블록 ${changed.join(',')} → 그 장만 다시`); await runSlidesEngine(j, work, changed, '슬라이드(수정분)'); }
   } else {
     write02(work, blocks);
-    await runSlidesEngine(j, work, nums);
+    const need = onlyNums.length ? nums : nums.filter((n) => !haveSlide.has(n) || !fs.existsSync(path.join(work, 'shot2', `${n}.png`)));
+    if (need.length) await runSlidesEngine(j, work, need); else log('  슬라이드는 이미 있음 — 건너뜀');
+    made = need;
   }
   if (withThumb) await runThumb(j, job, work, pick, premade);
-  await reviewSlides(j, work, nums, blocks);
-  await finishImages(j, work, docs, nums, pick, withThumb);
+  if (made.length) await reviewSlides(j, work, made, blocks);
+  await finishImages(j, work, docs, made, pick, withThumb);
 }
 
 // ───────── 모드 ─────────

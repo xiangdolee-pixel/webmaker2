@@ -488,7 +488,8 @@ export async function studioHelper(request, env, url, path, method) {
     const job = await getJob(db, row.id);
     const docs = (await db.prepare('SELECT kind, MAX(version) AS version, body FROM studio_docs WHERE job_id = ? GROUP BY kind').bind(job.id).all()).results;
     const caps = (await jobAssets(db, job.id)).filter((a) => a.kind === 'capture').map((a) => ({ idx: a.idx, url: `/studio/a/${a.id}`, mime: a.mime }));
-    return json({ job: { ...job, options: JSON.parse(job.options || '{}'), phase: row.status === 'images' ? 'images' : 'text' }, docs: Object.fromEntries(docs.map((d) => [d.kind, d.body])), captures: caps, settings: await getSettings(db), face_catalog: (await db.prepare("SELECT value FROM studio_settings WHERE key = 'face_catalog'").first())?.value || '' });
+    const have = (await jobAssets(db, job.id)).filter((a) => a.kind !== 'capture').map((a) => ({ kind: a.kind, idx: a.idx }));
+    return json({ job: { ...job, options: JSON.parse(job.options || '{}'), phase: row.status === 'images' ? 'images' : 'text' }, docs: Object.fromEntries(docs.map((d) => [d.kind, d.body])), captures: caps, assets: have, settings: await getSettings(db), face_catalog: (await db.prepare("SELECT value FROM studio_settings WHERE key = 'face_catalog'").first())?.value || '' });
   }
   if ((mm = path.match(/^\/api\/studio\/helper\/face\/(\d{3})$/))) {
     const o = await env.FILES.get(`studio/faces/${mm[1]}.webp`);
@@ -507,7 +508,8 @@ export async function studioHelper(request, env, url, path, method) {
       const docs = (await db.prepare('SELECT kind, MAX(version) AS version, body FROM studio_docs WHERE job_id = ? GROUP BY kind').bind(job.id).all()).results;
       const caps = (await jobAssets(db, job.id)).filter((a) => a.kind === 'capture').map((a) => ({ idx: a.idx, url: `/studio/a/${a.id}`, mime: a.mime }));
       const catalog = (await db.prepare("SELECT value FROM studio_settings WHERE key = 'face_catalog'").first())?.value || '';
-      return json({ job: { ...job, options: JSON.parse(job.options || '{}') }, docs: Object.fromEntries(docs.map((d) => [d.kind, d.body])), captures: caps, settings: await getSettings(db), face_catalog: catalog });
+      const have = (await jobAssets(db, job.id)).filter((a) => a.kind !== 'capture').map((a) => ({ kind: a.kind, idx: a.idx }));
+      return json({ job: { ...job, options: JSON.parse(job.options || '{}') }, docs: Object.fromEntries(docs.map((d) => [d.kind, d.body])), captures: caps, assets: have, settings: await getSettings(db), face_catalog: catalog });
     }
     if (sub === 'rss' && method === 'POST') {
       const c = await rssCandidates(NEWS_HOURS);
