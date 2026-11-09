@@ -103,6 +103,17 @@ function conditionsHtml(hs) {
     ${problems.length ? `<ul class="st-cond-problems">${problems.map((p) => `<li>${p}</li>`).join('')}</ul>` : ''}
   </section>`;
 }
+// 썸네일을 16:9(1280×720) PNG 로 내려받기 — 카드 버튼과 썸네일 탭이 같이 쓴다
+async function downloadThumb(url, id) {
+  try {
+    const img = new Image(); img.crossOrigin = 'anonymous'; img.src = url;
+    await img.decode();
+    const c = document.createElement('canvas'); c.width = 1280; c.height = 720;
+    const sh = img.width * 9 / 16, sy = (img.height - sh) / 2;
+    c.getContext('2d').drawImage(img, 0, sy, img.width, sh, 0, 0, 1280, 720);
+    const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `thumbnail-${String(id).slice(0, 6)}.png`; a.click();
+  } catch (e) { toast('내려받지 못했습니다: ' + e.message); }
+}
 function cardProgress(j) {
   if (!['queued', 'running', 'pick', 'thumb', 'images'].includes(j.status)) return '';
   const plan = planFor({ ...j, options: j.options || {} });
@@ -154,7 +165,12 @@ async function renderList() {
   $('#st-sched').addEventListener('click', scheduleDialog);
   $$('.st-card').forEach((c) => c.addEventListener('click', (e) => {
     const act = e.target.closest('[data-card-act]');
-    if (act) { e.stopPropagation(); if (act.dataset.cardAct === 'show') return; resTab = act.dataset.cardAct; }   // 썸네일 · 유튜브 버튼은 그 탭으로 바로
+    if (act) {
+      e.stopPropagation();
+      if (act.dataset.cardAct === 'show') return;
+      if (act.dataset.cardAct === 'dl') { const j = jobs.find((x) => x.id === c.dataset.id); if (j?.thumb) downloadThumb(j.thumb, j.id); return; }   // 바로 내려받기
+      resTab = act.dataset.cardAct;   // 썸네일 · 유튜브 버튼은 그 탭으로 바로
+    }
     location.hash = `#st-${c.dataset.id}`; renderStudio(deps);
   }));
   if (jobs.some((j) => ['queued', 'running', 'pick', 'thumb', 'images'].includes(j.status))) pollTimer = setTimeout(() => { if (!openId && document.contains(view)) renderList(); }, 5000);
@@ -170,7 +186,7 @@ function jobCard(j) {
       <p class="st-meta">${fmtDate(j.created_at)}${j.bytes ? ` · 그림 ${fmtBytes(j.bytes)}` : j.assets_purged ? ' · 그림 지움' : ''}${j.cost ? ` · ${money(j.cost)}` : ''}${j.error ? ` · <span class="err-inline">${esc(j.error.slice(0, 80))}</span>` : ''}</p>
       ${j.status === 'done' && j.kind === 'main' ? `<div class="st-card-actions">
         <a class="btn primary" href="/studio/show/${j.id}" target="_blank" rel="noopener" data-card-act="show">▶ 방송용 슬라이드쇼 새 창으로 열기</a>
-        <button class="btn" type="button" data-card-act="thumb">🖼 썸네일</button>
+        <div class="st-card-pair"><button class="btn" type="button" data-card-act="thumb">🖼 썸네일 메뉴</button><button class="btn" type="button" data-card-act="dl" ${j.thumb ? '' : 'disabled'}>⬇ 썸네일 다운로드</button></div>
         <button class="btn" type="button" data-card-act="yt">📺 유튜브 (제목 · 인트로 · 더보기)</button>
       </div>` : ''}
     </div></article>`;
@@ -494,15 +510,7 @@ function wireRes(job, blocks, thumb, summary) {
     if (note === null) return;
     await api(`/studio/jobs/${job.id}/redo`, { method: 'POST', data: { what: 'slide', idx: +b.dataset.redoSlide, note } }); toast('다시 만드는 중'); renderJob();
   }));
-  $('#st-dl-thumb')?.addEventListener('click', async () => {
-    // 1536x1024(3:2) 를 가운데 1280x720(16:9) 로 잘라 내려받는다
-    const img = new Image(); img.crossOrigin = 'anonymous'; img.src = thumb.url;
-    await img.decode();
-    const c = document.createElement('canvas'); c.width = 1280; c.height = 720;
-    const sh = img.width * 9 / 16, sy = (img.height - sh) / 2;
-    c.getContext('2d').drawImage(img, 0, sy, img.width, sh, 0, 0, 1280, 720);
-    const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `thumbnail-${job.id.slice(0, 6)}.png`; a.click();
-  });
+  $('#st-dl-thumb')?.addEventListener('click', () => downloadThumb(thumb.url, job.id));
   $('#st-rethumb-toggle')?.addEventListener('click', (e) => { const w = $('#st-rethumb-wrap'); w.hidden = !w.hidden; e.currentTarget.classList.toggle('on', !w.hidden); if (!w.hidden) w.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   const rf = $('#st-rethumb');
   if (rf) { setupThumbForm(rf); rf.addEventListener('submit', (e) => { e.preventDefault(); busy(rf.querySelector('[type=submit]'), $('#rt-err'), async () => { const pick = readThumbForm(rf); if (!pick.title) throw new Error('제목을 고르거나 넣어 주세요.'); await api(`/studio/jobs/${job.id}/redo`, { method: 'POST', data: { what: 'thumb', pick } }); await api(`/studio/jobs/${job.id}/rethumb`, { method: 'POST', data: {} }); toast('PC 도우미가 다시 그립니다'); renderJob(); }); }); }
