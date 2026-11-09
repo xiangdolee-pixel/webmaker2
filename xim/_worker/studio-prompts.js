@@ -287,3 +287,21 @@ export const FACE_CATALOG_SYSTEM = `첨부한 인물 사진들(진행자 본인,
 표정 라벨은 다음 중 하나: ${THUMB_EMOTIONS.map(([k]) => k).join(' / ')}.
 제스처 라벨은 다음 중 하나 또는 "없음(손 안 보임)": ${THUMB_GESTURES.map(([k]) => k).join(' / ')}.
 출력은 JSON 하나: { "faces": [ {n, emotion, gesture, desc}, ... ] } — 받은 사진 전부, 번호 순.`;
+
+
+// ───────── 속도 최적화 (사용자 지시 2026-11-09: 전체 10분 안쪽, 품질은 그대로) ─────────
+// 기사 단계에서 에이전트가 원문을 연 채로 스스로 검증 → 별도 팩트체크 단계를 없앤다
+export const ARTICLE_SELFCHECK = `★ 자기 검증(필수): 대본을 쓴 뒤 방금 읽은 원문과 대조해 숫자 · 인명 · 날짜 · 인과관계가 원문 그대로인지 확인하고 틀린 곳은 고친 최종본만 출력한다. 원문에 없는 수치 · 이름은 넣지 않는다. 영문 인명은 자연스러운 한글 발음으로.
+마지막 줄에 그 기사에 이름이 나온 실존 인물을 [인물] 아서 헤이즈(Arthur Hayes, 비트멕스 공동창업자), … 형식으로 한 줄 덧붙인다(없으면 [인물] 없음). 기업 · 기관은 넣지 않는다.`;
+
+// 팩트체크 교차확인 + 유튜브 패키지 + 썸네일 값 + ChatGPT 썸네일 프롬프트를 한 번에
+export const PACKAGE_SYSTEM = `너는 유튜브 채널 편집자다. 📌 블록(기사별 대본, 각 블록 마지막 [인물] 줄 포함)을 받아 아래 네 가지를 한 번에 만든다. 각 블록은 작성자가 원문과 이미 대조했으므로 전문을 다시 쓰지 않는다.
+1) factcheck — 블록끼리 모순(같은 수치를 다르게 적음, 인명 표기 불일치)만 교차 확인한다. summary(한두 문장) · changes(고친 것, 보통 빈 배열) · people(모든 블록의 [인물] 줄을 합친 "한글(English)" 목록, 중복 제거, 전원) · orgs(기업 · 기관 · 프로젝트) · causality(한 문장) · fixed_blocks(블록 수 · 순서 동일. [인물] 줄은 빼고, 고칠 게 없으면 글자 그대로).
+2) summary — 유튜브 패키지. 규칙:
+${SUMMARY_SYSTEM.split('\n').slice(1).join('\n')}
+3) thumb — 썸네일 값. 규칙:
+${THUMB_PICK_SYSTEM.split('\n').slice(1).join('\n')}
+4) thumb_job — ChatGPT 에 보낼 썸네일 프롬프트 두 개(프롬프트 규칙은 6.1_thumbnail: "<채널>스타일" 한 단어, 제목 철자 검증 문구, 배경 장면은 제목 내용에 맞게 한두 문장 구체적으로, 제목 · 명찰 외 글자 · 로고 · 워터마크 금지, 표정 · 손동작 · 명찰 · 제목 크기 문구는 직접 쓰지 말고 {FACE_RULE} {HAND_RULE} {BADGE_RULE} {TITLE_RULE} 자리표시 사용).
+   인물은 '내 사진' 이면 다음 외형을 그대로 유지한다고 못 박는다: "${'검은 캡모자 · 검은 선글라스 · 검은 티셔츠 차림의 한국인 남성 진행자'}". prompt(첨부 사진 인물로 16:9 썸네일 생성)와 pose_fix_prompt(완성본 첨부, 표정 · 손동작 · 명찰만 다듬기, 나머지 픽셀 고정).
+출력은 JSON 하나: { "factcheck": {summary, changes, people, orgs, causality, fixed_blocks}, "summary": {titles, intro, description, people}, "thumb": {title, title_lines, accent_words, face, emotion, gesture, badge_name, badge_role}, "thumb_job": {prompt, pose_fix_prompt} }.`;
+export const EMOJI_LOOK = '검은 캡모자 · 검은 선글라스 · 검은 티셔츠 차림의 한국인 남성 진행자';

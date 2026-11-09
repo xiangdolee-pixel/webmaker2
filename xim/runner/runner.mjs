@@ -155,6 +155,7 @@ async function runText(payload, work, { stage = 'run' } = {}) {
 ★ 속도 규칙: Agent 도구(general-purpose)를 기사 수만큼 한 메시지에 동시에 띄워 병렬로 처리한다(기사 1개 = 에이전트 1개). 각 에이전트는 URL 을 WebFetch 로 1회만 읽고 대본 텍스트만 돌려준다. 원문을 메인에 쌓지 않는다.
 각 대본 형식 · 문체:
 ${P.ARTICLE_FORMAT}
+${P.ARTICLE_SELFCHECK}
 결과: 대본 ${items.length}개를 위 순서대로, 블록 사이 빈 줄 1개로 이어 붙여 출력한다. 각 블록은 📌 로 시작한다. 다른 설명 · 머리말 · 코드펜스 없이 대본만.
 
 ${list}`;
@@ -190,39 +191,32 @@ ${P.ARTICLE_FORMAT}
     }
   }
 
-  let fact = parse('factcheck');
-  if (!fact) {
+  // 패키지 한 번에: 교차 팩트체크 + 유튜브 패키지 + 썸네일 값 + ChatGPT 썸네일 프롬프트 (속도 최적화 2026-11-09: Claude 3~4회 → 1회)
+  let fact = parse('factcheck'), summary = parse('summary'), pick = parse('thumb_pick');
+  if (!fact || !summary) {
     await assertAlive(j);
-    fact = await stepRun(j, 'factcheck', '', async () => {
-      const f = parseJson(await claude(`${P.FACTCHECK_SYSTEM}\n\n${blocks.map((b, i) => `[블록 ${i + 1}]\n${b}`).join('\n\n')}${SHAPE(P.FACTCHECK_SCHEMA)}${JSON_ONLY}`, { label: '팩트체크' }), '팩트체크');
-      if (!Array.isArray(f.fixed_blocks) || f.fixed_blocks.length !== blocks.length) f.fixed_blocks = blocks;
+    const catalog = payload.face_catalog ? JSON.parse(payload.face_catalog) : null;
+    const faces = catalog?.faces?.length ? catalog.faces.map((f) => `${f.n}: ${f.emotion} / ${f.gesture} — ${f.desc}`).join('\n') : '(분류표 없음 — face 는 "auto" 로)';
+    const out = await stepRun(j, 'package', '', async () => {
+      const o = parseJson(await claude(`${P.PACKAGE_SYSTEM}\n\n채널: ${job.channel} (${job.channel}스타일)\n\n인물 사진 목록(내 사진 87장):\n${faces}\n\n${blocks.map((b, i) => `[블록 ${i + 1}]\n${b}`).join('\n\n')}${JSON_ONLY}`, { label: '패키지', timeoutMin: 15 }), '패키지');
+      const f = o.factcheck || {};
+      if (!Array.isArray(f.fixed_blocks) || f.fixed_blocks.length !== blocks.length) f.fixed_blocks = blocks.map((b) => b.replace(/\n\[인물\][^\n]*$/m, '').trim());
+      f.fixed_blocks = f.fixed_blocks.map((b) => String(b).replace(/\n\[인물\][^\n]*$/m, '').trim());
+      f.people = Array.isArray(f.people) ? f.people : []; f.orgs = Array.isArray(f.orgs) ? f.orgs : []; f.changes = Array.isArray(f.changes) ? f.changes : []; f.summary = f.summary || ''; f.causality = f.causality || '';
+      const sm = o.summary || {}; sm.titles = Array.isArray(sm.titles) ? sm.titles : []; sm.people = Array.isArray(sm.people) ? sm.people : f.people;
       await j.doc('factcheck', f);
-      return f;
+      await j.doc('summary', sm);
+      const p = o.thumb || {};
+      const pk = { title: p.title || sm.titles[0] || '', title_lines: p.title_lines || [], accent_words: p.accent_words || [], emotion: p.emotion || '자동', gesture: p.gesture || '자동', badgeName: p.badge_name || '', badgeRole: p.badge_role || '', face: /^\d{3}$/.test(p.face || '') ? `emoji:${p.face}` : 'emoji:auto' };
+      if (o.thumb_job?.prompt) await j.doc('thumb_job', { prompt: o.thumb_job.prompt, pose_fix_prompt: o.thumb_job.pose_fix_prompt || '', for: pk.face, made_at: Date.now() });
+      return { f, sm, pk, note: `${sm.titles[0] || ''} · 인물 ${f.people.length}명` };
     });
-    await j.step('factcheck', 'done', String(fact.summary || '').slice(0, 120));
-  }
-  let summary = parse('summary');
-  if (!summary) {
-    await assertAlive(j);
-    summary = await stepRun(j, 'summary', '', async () => {
-      const s = parseJson(await claude(`${P.SUMMARY_SYSTEM}\n\n[사람 이름] ${(fact.people || []).join(', ') || '없음'}\n\n${fact.fixed_blocks.join('\n\n')}${SHAPE(P.SUMMARY_SCHEMA)}${JSON_ONLY}`, { label: '유튜브 패키지' }), '유튜브 패키지');
-      await j.doc('summary', s);
-      return s;
-    });
-    await j.step('summary', 'done', summary.titles?.[0] || '');
-  }
-  // 썸네일 값 — 자동이면 Claude 가 고르고, 수동이면 사용자가 고를 때까지 기다린다
-  let pick = parse('thumb_pick');
-  if (!pick) {
+    fact = out.f; summary = out.sm;
+    if (!pick) { if (job.options.thumb === 'manual') { await j.status('thumb', 'thumb'); log('  썸네일 선택 대기'); return 'wait'; } pick = out.pk; await j.doc('thumb_pick', pick); }
+  } else if (!pick) {
     if (job.options.thumb === 'manual') { await j.status('thumb', 'thumb'); log('  썸네일 선택 대기'); return 'wait'; }
-    pick = await stepRun(j, 'thumb-pick', '', async () => {
-      const catalog = payload.face_catalog ? JSON.parse(payload.face_catalog) : null;
-      const faces = catalog?.faces?.length ? catalog.faces.map((f) => `${f.n}: ${f.emotion} / ${f.gesture} — ${f.desc}`).join('\n') : '(분류표 없음 — face 는 "auto" 로)';
-      const p = parseJson(await claude(`${P.THUMB_PICK_SYSTEM}\n\n추천 제목:\n${(summary.titles || []).map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\n등장 인물:\n${(summary.people || []).join('\n') || '없음'}\n\n인물 사진 목록:\n${faces}\n\n★ 출력 JSON 모양: { "title": "…", "title_lines": ["…"], "accent_words": ["…"], "face": "001", "emotion": "…", "gesture": "…", "badge_name": "…", "badge_role": "…" }${JSON_ONLY}`, { label: '썸네일 값' }), '썸네일 값');
-      const out = { title: p.title || summary.titles?.[0] || '', title_lines: p.title_lines || [], accent_words: p.accent_words || [], emotion: p.emotion || '자동', gesture: p.gesture || '자동', badgeName: p.badge_name || '', badgeRole: p.badge_role || '', face: /^\d{3}$/.test(p.face || '') ? `emoji:${p.face}` : 'emoji:auto' };
-      await j.doc('thumb_pick', out);
-      return out;
-    });
+    pick = { title: summary.titles?.[0] || '', title_lines: [], accent_words: [], emotion: '자동', gesture: '자동', badgeName: '', badgeRole: '', face: 'emoji:auto' };
+    await j.doc('thumb_pick', pick);
   }
   return 'images';
 }
@@ -239,7 +233,7 @@ function py(argsArr, { cwd, env = {}, timeoutMin = 30, label = 'python' } = {}) 
     child.on('close', (code) => { clearTimeout(timer); resolve({ code, out }); });
   });
 }
-const engineEnv = () => ({ BROWSER_EXE: BROWSER, BRAVE_USER_DATA: PROFILE, KEEP_CF_COOKIES: '1' });
+const engineEnv = () => ({ BROWSER_EXE: BROWSER, BRAVE_USER_DATA: PROFILE, KEEP_CF_COOKIES: '1', SLIDE_PARALLEL: process.env.SLIDE_PARALLEL || '4' });   // 4 = 슬라이드 3 + 썸네일 1 동시 (속도 최적화)
 
 async function toWebp(src) {
   const dst = src.replace(/\.[a-z]+$/i, '.webp');
@@ -263,10 +257,20 @@ async function runImages(payload, work) {
   const pick = parse('thumb_pick');
   const withThumb = !onlyNums.length && !!pick && !(payload.assetsHaveThumb);
 
-  // 썸네일 잡 파일 — Claude 가 인물 사진을 보고 6.1 '실행 방법' 대로 프롬프트를 쓴다
+  // 썸네일 잡 파일 — 패키지 단계가 써 둔 프롬프트(thumb_job)가 있고 내 사진이면 바로 쓴다(Claude 호출 없음). 기사 속 인물 · 업로드 사진이면 Claude 가 사진을 보고 쓴다
+  const premade = parse('thumb_job');
   if (withThumb) {
     await stepRun(j, 'thumb-prompt', pick.title, async () => {
       let face = '';
+      const usePremade = premade?.prompt && !(pick.face || '').startsWith('person:') && !(pick.face || '').startsWith('asset:');
+      if (usePremade) {
+        if ((pick.face || '').startsWith('emoji:') && pick.face !== 'emoji:auto') face = await download(`/api/studio/helper/face/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
+        else face = await download(`/api/studio/helper/face/${String(1 + Math.floor(Math.random() * 87)).padStart(3, '0')}`, path.join(work, 'face.webp'));
+        const outPng = path.join(work, '06_thumbnail.png');
+        const jobJson = { title: pick.title, title_lines: pick.title_lines || [], channel: `${job.channel}스타일`, badge_name: pick.badgeName || '', badge_role: pick.badgeRole || '', emotion: pick.emotion || '자동', gesture: pick.gesture || '자동', face_file: face, out: outPng, prompt: premade.prompt, pose_fix_prompt: premade.pose_fix_prompt || '', skip_pose_fix: true };
+        fs.writeFileSync(path.join(DOCS, 'tools', '_thumb_job.json'), JSON.stringify(jobJson, null, 2), 'utf8');
+        return `${jobJson.emotion} · ${jobJson.gesture} (프롬프트 미리 작성됨)`;
+      }
       if ((pick.face || '').startsWith('person:')) {
         // 기사 속 인물: 구글 이미지에서 사진 1장 (tools/img_search.py — 이름(영문 우선)으로, 실패하면 내 사진으로)
         const name = pick.face.slice(7).trim(); const dest = path.join(work, 'face.png');
@@ -282,7 +286,7 @@ async function runImages(payload, work) {
 2) 값: title="${pick.title}", title_lines=${JSON.stringify(pick.title_lines || [])} (비어 있으면 3~4줄로 4~8자씩 끊어 직접), channel="${job.channel}스타일", badge_name="${pick.badgeName || ''}", badge_role="${pick.badgeRole || ''}", emotion="${pick.emotion || '자동'}", gesture="${pick.gesture || '자동'}", face_file="${face.replace(/\\/g, '/')}", out="${outPng.replace(/\\/g, '/')}".
 3) prompt 와 pose_fix_prompt 는 6.1 의 5 · 6 · 실행 방법 절 규칙 그대로 쓰되, 표정 · 손동작 · 명찰 · 제목 크기 문구는 직접 쓰지 말고 {FACE_RULE} {HAND_RULE} {BADGE_RULE} {TITLE_RULE} 자리표시를 쓴다. 배경 장면은 제목 내용에 맞게 한두 문장으로 구체적으로. "${job.channel}스타일" 을 한 단어로 붙여 쓴다. 제목 철자 검증 문구를 넣는다. 배경에 제목 · 명찰 외 글자 · 로고 · 워터마크 금지 문구를 넣는다.${JSON_ONLY}`;
       const jobJson = parseJson(await claude(prompt, { cwd: work, label: '썸네일 프롬프트', timeoutMin: 10 }), '썸네일 잡');
-      jobJson.face_file = face; jobJson.out = outPng; jobJson.title = pick.title; jobJson.channel = `${job.channel}스타일`;
+      jobJson.face_file = face; jobJson.out = outPng; jobJson.title = pick.title; jobJson.channel = `${job.channel}스타일`; jobJson.skip_pose_fix = true;   // 교정은 검수 뒤 필요할 때만
       fs.writeFileSync(path.join(DOCS, 'tools', '_thumb_job.json'), JSON.stringify(jobJson, null, 2), 'utf8');
       return jobJson.emotion + ' · ' + jobJson.gesture;
     });
@@ -337,8 +341,20 @@ async function runImages(payload, work) {
   }
   if (withThumb) {
     const png = path.join(work, '06_thumbnail.png');
-    if (fs.existsSync(png)) { const { file, w, h } = await toWebp(png); await j.asset('thumb', 1, fs.readFileSync(file), 'image/webp', w, h); await j.step('thumb', 'done', `${w}x${h}`); }
-    else await j.step('thumb', 'failed', '썸네일이 안 나옴 (gpt_slide_text 종료코드 ' + r.code + ')');
+    if (fs.existsSync(png)) {
+      // 검수 → 불합격이면 교정(--edit, 완성본 첨부해 표정 · 손동작 · 명찰만) 1회 — 예전엔 항상 교정해 100초씩 썼다
+      let note = '';
+      try {
+        const rv = parseJson(await claude(`${P.REVIEW_THUMB_SYSTEM}\n\n썸네일 ${png} 를 Read 로 보고 판정한다. 요구: 제목 "${pick.title}", 표정 ${pick.emotion || '자동'}, 제스처 ${pick.gesture || '자동'}, 명찰 ${pick.badgeName ? `"${pick.badgeName}" / "${pick.badgeRole || ''}"` : '없음'}.${SHAPE(P.REVIEW_SCHEMA)}${JSON_ONLY}`, { cwd: work, label: '썸네일 검수', timeoutMin: 6 }), '썸네일 검수');
+        if (rv.pass) note = '검수 합격';
+        else {
+          await j.step('thumb', 'running', `검수 불합격(${String(rv.reason || '').slice(0, 60)}) → 교정`);
+          const e = await py(['tools\\gpt_thumbnail.py', '--edit'], { cwd: DOCS, env: engineEnv(), timeoutMin: 10, label: '썸네일 교정' });
+          note = e.code === 0 ? `교정 완료 (${String(rv.reason || '').slice(0, 60)})` : `교정 실패 — 1차본 사용 (${String(rv.reason || '').slice(0, 60)})`;
+        }
+      } catch (e) { note = '검수 생략: ' + e.message.slice(0, 80); }
+      const { file, w, h } = await toWebp(png); await j.asset('thumb', 1, fs.readFileSync(file), 'image/webp', w, h); await j.step('thumb', 'done', `${w}x${h} · ${note}`);
+    } else await j.step('thumb', 'failed', '썸네일이 안 나옴 (gpt_slide_text 종료코드 ' + r.code + ')');
   }
 }
 
