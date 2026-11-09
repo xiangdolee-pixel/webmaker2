@@ -281,6 +281,7 @@ export const THUMB_PICK_SYSTEM = `너는 유튜브 썸네일 편집자다. 추�
 - face: 인물 사진 목록에서 제목이 담은 감정에 가장 맞는 사진 번호 하나(세 자리 문자열). 매번 같은 사진으로 수렴하지 말고 감정에 맞게 고른다.
 - emotion · gesture: 고른 사진의 표정 · 제스처 라벨.
 - badge_name · badge_role: 기사 속 실존 인물 중 제목과 가장 관련 깊은 1명의 "한글 이름" 과 "소속·직함". 인물이 없거나 제목과 무관하면 둘 다 "".
+- ★ 명찰과 사진은 같은 사람이어야 한다(사용자 지시 2026-11-09): badge_name 이 있으면 face 는 내 사진 번호가 아니라 "person:English Name"(그 인물의 영문 이름)으로 쓴다. 명찰이 없을 때만 내 사진 번호를 쓴다.
 출력은 JSON 하나: { title, title_lines, accent_words, face, emotion, gesture, badge_name, badge_role }.`;
 
 export const FACE_CATALOG_SYSTEM = `첨부한 인물 사진들(진행자 본인, 검은 캡모자·선글라스·검은 옷)의 표정과 손동작을 분류한다. 사진마다 { "n": "번호", "emotion": 표정 라벨, "gesture": 제스처 라벨, "desc": 한 줄 설명(15자 이내) } 을 쓴다.
