@@ -12,7 +12,7 @@ import { deleteRequest } from './request-files.js';
 import { linkUrl as cleanUrl, scrapeMeta } from './scrape.js';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 // 스튜디오(유튜브 발표자료 제작) — /api/studio/* · /studio/* · Workflow StudioMain (xim/_worker/studio.js)
-import { studioApi, studioPublic, StudioMain } from './studio.js';
+import { studioApi, studioHelper, studioPublic, StudioMain } from './studio.js';
 export { StudioMain };
 // 관리자 계정 추가도 그 사이트 홈페이지 회원가입과 같은 항목 · 같은 검사로 (xms 와 같은 코드)
 import { siteSettings, memberValues, uniqueProblem } from '../../xms/_worker/lib.js';
@@ -43,7 +43,7 @@ function json(data, status = 200, headers = {}) {
 }
 
 function fail(err) {
-  if (err instanceof HttpError) return json({ error: err.message }, err.status);
+  if (err instanceof HttpError || (err && Number.isInteger(err.status) && err.status >= 400 && err.status < 600)) return json({ error: err.message }, err.status);   // studio.js 의 HttpError 도
   console.error(err);
   return json({ error: '서버 오류가 났습니다.' }, 500);
 }
@@ -223,6 +223,9 @@ async function ximApi(request, env, url, ctx) {
     return res;
   }
 
+  // 스튜디오 도우미(PC · GitHub Actions)는 로그인 대신 토큰으로
+  if (path.startsWith('/api/studio/helper/')) return studioHelper(request, env, url, path, method);
+
   const session = await readSession(db, request, XIM_COOKIE, 'xim');
   if (!session) throw new HttpError(401, '로그인이 필요합니다.');
 
@@ -232,7 +235,7 @@ async function ximApi(request, env, url, ctx) {
     return json({ ok: true }, 200, { 'Set-Cookie': setCookie(XIM_COOKIE, '', 0) });
   }
   if (path === '/api/me') return json({ ok: true });
-  if (path.startsWith('/api/studio/') || path === '/api/studio') return studioApi(request, env, url, ctx, path, method, body, (a, t, d) => audit(db, request, a, t, d));
+  if (path.startsWith('/api/studio/') || path === '/api/studio') return studioApi(request, env, url, ctx, path, method, body, (a, t, d) => audit(db, request, a, t, d), (p, d) => github(env, p, d));
 
   // 구글 OTP 등록 · 해제
   if (path === '/api/otp' && method === 'GET') {
