@@ -291,6 +291,13 @@ async function runImages(payload, work) {
     for (const n of names) await j.step(n, 'failed', 'ChatGPT 로그인 필요');
     throw new Error('LOGIN_REQUIRED');
   }
+  if (r.code !== 0 && !names.some((n) => fs.existsSync(path.join(work, 'shot2', `${n.replace('slide-', '')}.png`)))) {
+    // 브라우저가 안 뜨는 등 엔진 자체가 실패 — 그림 대기로 되돌려 다음에 다시 시도
+    const tail = r.out.trim().split(/\r?\n/).filter((l) => !/dbg|Warning/.test(l)).slice(-3).join(' | ');
+    for (const n of names) await j.step(n, 'failed', tail.slice(0, 200));
+    if (withThumb) await j.step('thumb', 'failed', '엔진 실패');
+    throw new Error('ENGINE_FAILED: ' + tail.slice(0, 300));
+  }
   // 검수 (03.5 합격 기준) → 불합격 번호만 1회 재생성
   const nums = onlyNums.length ? onlyNums.map(Number) : blocks.map((_, i) => i + 1);
   const made = nums.filter((n) => fs.existsSync(path.join(work, 'shot2', `${n}.png`)));
@@ -338,19 +345,22 @@ async function processJob(payload) {
     log(`✅ ${job.id} 완료`);
   } catch (e) {
     if (e.message === 'STOPPED') { log('  사용자가 멈춤'); return; }
-    if (e.message === 'LOGIN_REQUIRED') { await j.status('images', 'slides', { error: 'ChatGPT 로그인이 필요합니다 — PC 에서 `node xim/runner/runner.mjs --login` 뒤 다시 시도됩니다.' }); loginNeeded = true; return; }
+    if (e.message === 'LOGIN_REQUIRED') { await j.status('images', 'slides', { error: 'ChatGPT 로그인이 필요합니다 — PC 에서 스튜디오_ChatGPT로그인.bat 로 로그인하면 다시 시도됩니다.' }); loginNeeded = true; return; }
+    if (e.message.startsWith('ENGINE_FAILED')) { await j.status('images', 'slides', { error: `그림 엔진 실패 — 잠시 뒤 다시 시도합니다. ${e.message.slice(15, 200)}` }); engineFailAt = Date.now(); return; }
     log('❌', e.message);
     await j.status('failed', '', { error: e.message }).catch(() => {});
   }
 }
 let loginNeeded = false;
+let engineFailAt = 0;   // 그림 엔진이 실패하면 2분 뒤에 다시 그림 일감을 집는다
 
 async function pcLoop() {
   if (!DOCS) { console.error('PC 모드는 DOCS(엔진 폴더) 설정이 필요합니다.'); process.exit(1); }
   log(`PC 도우미 시작 — ${XIM} · 엔진 ${DOCS} · 브라우저 ${path.basename(BROWSER)}`);
   for (;;) {
     try {
-      const r = await api(`/api/studio/helper/next?want=${loginNeeded ? 'text' : 'text,images'}`, { method: 'POST', body: {} });
+      const imagesOk = !loginNeeded && Date.now() - engineFailAt > 120000;
+      const r = await api(`/api/studio/helper/next?want=${imagesOk ? 'text,images' : 'text'}`, { method: 'POST', body: {} });
       if (r.job) { await processJob(r); continue; }
     } catch (e) { log('(대기 중 오류)', e.message); }
     await sleep(5000);
