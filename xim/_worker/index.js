@@ -11,6 +11,9 @@ import { ensureMailDomain, ensureTurnstile } from './mail-domain.js';
 import { deleteRequest } from './request-files.js';
 import { linkUrl as cleanUrl, scrapeMeta } from './scrape.js';
 import { WorkerEntrypoint } from 'cloudflare:workers';
+// 스튜디오(유튜브 발표자료 제작) — /api/studio/* · /studio/* · Workflow StudioMain (xim/_worker/studio.js)
+import { studioApi, studioPublic, StudioMain } from './studio.js';
+export { StudioMain };
 // 관리자 계정 추가도 그 사이트 홈페이지 회원가입과 같은 항목 · 같은 검사로 (xms 와 같은 코드)
 import { siteSettings, memberValues, uniqueProblem } from '../../xms/_worker/lib.js';
 
@@ -229,6 +232,7 @@ async function ximApi(request, env, url, ctx) {
     return json({ ok: true }, 200, { 'Set-Cookie': setCookie(XIM_COOKIE, '', 0) });
   }
   if (path === '/api/me') return json({ ok: true });
+  if (path.startsWith('/api/studio/') || path === '/api/studio') return studioApi(request, env, url, ctx, path, method, body, (a, t, d) => audit(db, request, a, t, d));
 
   // 구글 OTP 등록 · 해제
   if (path === '/api/otp' && method === 'GET') {
@@ -994,6 +998,10 @@ export default {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/')) {
       try { return await ximApi(request, env, url, ctx); } catch (e) { return fail(e); }
+    }
+    // 스튜디오 공개 주소(그림 · 방송용 슬라이드쇼) — 주소를 아는 사람만, 로그인 없음
+    if (url.pathname.startsWith('/studio/')) {
+      try { const r = await studioPublic(request, env, url); if (r) return r; } catch (e) { return fail(e); }
     }
     return staticFile(request, env, url);
   },

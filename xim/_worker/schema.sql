@@ -168,3 +168,71 @@ CREATE TABLE IF NOT EXISTS portfolio_links (
   created_at  INTEGER NOT NULL
 );
 --   ALTER TABLE sites ADD COLUMN portfolio_tag TEXT NOT NULL DEFAULT '';  -- 포트폴리오 분류(홈페이지 · 웹서비스 · 웹앱 · 웹게임), 사이트 수정 창에서
+
+-- ───────── 스튜디오 (유튜브 발표자료 제작, 2026-11-09) ─────────
+-- 작업 하나 = 발표자료 한 회차 (본편 main · 폰UI 쇼츠 phone · 썸네일만 thumb)
+CREATE TABLE IF NOT EXISTS studio_jobs (
+  id            TEXT PRIMARY KEY,                  -- 20자리 hex (주소에 쓰이므로 추측 불가)
+  kind          TEXT NOT NULL,                     -- main | phone | thumb
+  channel       TEXT NOT NULL DEFAULT '사섬',       -- 사섬 | 순섬 (썸네일 스타일 · 인사말)
+  source        TEXT NOT NULL DEFAULT 'rss',       -- rss(웹 뉴스) | capture(캡쳐 올림) | text(글 직접)
+  options       TEXT NOT NULL DEFAULT '{}',        -- { pick:'auto'|'manual', thumb:'auto'|'manual', engine:'api'|'pc', ... }
+  status        TEXT NOT NULL DEFAULT 'queued',    -- queued | running | pick(6개 고르기 대기) | thumb(썸네일 선택 대기) | done | failed | stopped
+  step          TEXT NOT NULL DEFAULT '',          -- 지금 도는 단계 이름
+  title         TEXT NOT NULL DEFAULT '',          -- 목록에 보일 제목 (요약 패키지 1번 제목)
+  error         TEXT NOT NULL DEFAULT '',
+  wf_id         TEXT NOT NULL DEFAULT '',          -- Cloudflare Workflow 인스턴스
+  cost          REAL NOT NULL DEFAULT 0,           -- 누적 비용(달러, 대략)
+  assets_purged INTEGER NOT NULL DEFAULT 0,        -- 1 = 보관 규칙(최근 10개)으로 그림을 지움
+  created_at    INTEGER NOT NULL,
+  updated_at    INTEGER NOT NULL,
+  finished_at   INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_studio_jobs_created ON studio_jobs(created_at);
+
+CREATE TABLE IF NOT EXISTS studio_steps (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id      TEXT NOT NULL REFERENCES studio_jobs(id) ON DELETE CASCADE,
+  step        TEXT NOT NULL,                       -- rss · top15 · pick · articles · factcheck · summary · slides · review · thumb · ...
+  status      TEXT NOT NULL DEFAULT 'running',     -- running | done | failed | skipped
+  note        TEXT NOT NULL DEFAULT '',
+  tokens_in   INTEGER NOT NULL DEFAULT 0,
+  tokens_out  INTEGER NOT NULL DEFAULT 0,
+  cost        REAL NOT NULL DEFAULT 0,
+  started_at  INTEGER NOT NULL,
+  finished_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_studio_steps_job ON studio_steps(job_id, id);
+
+-- 글 산출물 (버전이 쌓인다 — 웹에서 고쳐 저장할 때마다 +1). 최신 = 같은 kind 중 version 최대
+CREATE TABLE IF NOT EXISTS studio_docs (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id      TEXT NOT NULL REFERENCES studio_jobs(id) ON DELETE CASCADE,
+  kind        TEXT NOT NULL,                       -- candidates · top15 · articles · factcheck · summary · show_texts · phone_job · script
+  version     INTEGER NOT NULL DEFAULT 1,
+  body        TEXT NOT NULL,                       -- 글 또는 JSON
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_studio_docs ON studio_docs(job_id, kind, version);
+
+-- 그림 · 파일 (R2 xms-files 의 studio/<job>/… , 최근 10개 작업 분만 보관)
+CREATE TABLE IF NOT EXISTS studio_assets (
+  id          TEXT PRIMARY KEY,                    -- 24자리 hex (공개 주소 /studio/a/<id>)
+  job_id      TEXT NOT NULL DEFAULT '',            -- '' = 아직 작업에 안 붙은 업로드
+  kind        TEXT NOT NULL,                       -- slide · thumb · capture · face_upload · phone_cut
+  idx         INTEGER NOT NULL DEFAULT 0,          -- 슬라이드 번호(1~) 등
+  r2_key      TEXT NOT NULL,
+  mime        TEXT NOT NULL DEFAULT 'image/webp',
+  size        INTEGER NOT NULL DEFAULT 0,
+  width       INTEGER NOT NULL DEFAULT 0,
+  height      INTEGER NOT NULL DEFAULT 0,
+  meta        TEXT NOT NULL DEFAULT '{}',          -- { prompt, model, review, ... }
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_studio_assets_job ON studio_assets(job_id, kind, idx);
+
+-- 스튜디오 설정 (스타일 프리셋 규칙 · 모델 이름 · 하루 한도 등)
+CREATE TABLE IF NOT EXISTS studio_settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);

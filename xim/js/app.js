@@ -1,6 +1,7 @@
 // xim 운영자 화면
 import { $, $$, esc, makeApi, fmtDate, badge, toast, pillTabs, slideTabs, formData, openDialog, busy } from './common.js';
 import { qrSvg } from './qr.js';
+import { renderStudio, stopStudio } from './studio.js';
 
 const api = makeApi('/api');
 const view = $('#view');
@@ -59,6 +60,7 @@ const NAV_ICON = {
   portfolio2: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M12 11v5M9.5 13.5h5"/></svg>',
   pricing: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>',
   security: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
+  studio: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M10 9l5 2.5-5 2.5zM8 21h8"/></svg>',
 };
 let navReady = false;
 function showApp() {
@@ -66,7 +68,7 @@ function showApp() {
   $('#app').hidden = false;
   if (!navReady) {
     navReady = true;
-    pillTabs($('#nav'), [['sites', '사이트'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제']], tab, (v) => {
+    pillTabs($('#nav'), [['sites', '사이트'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['studio', '스튜디오'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제']], tab, (v) => {
       tab = v;
       if (reqOpen && !(v === 'requests' && /^#req-\d+$/.test(location.hash))) { reqOpen = 0; if (location.hash) history.replaceState(null, '', location.pathname); }
       render();
@@ -156,6 +158,7 @@ function render() {
     if (tab === 'monitor') tasks.push(renderMonitor());
     if (tab === 'audit') tasks.push(renderAudit());
     if (tab === 'pricing') renderPricing();
+    if (tab === 'studio') tasks.push(renderStudio({ view, api, shrinkImage })); else stopStudio();
     await Promise.all(tasks);
   });
 }
@@ -730,6 +733,7 @@ function syncRequestHash() {
 }
 window.addEventListener('hashchange', syncRequestHash);
 if (/^#req-\d+$/.test(location.hash)) { reqOpen = +location.hash.slice(5); tab = 'requests'; }
+if (/^#st-[a-f0-9]{20}$/.test(location.hash)) tab = 'studio';
 
 async function renderRequestView(id) {
   let r;

@@ -1,0 +1,343 @@
+// xim 스튜디오 화면 — 유튜브 발표자료(본편 · 썸네일 · 쇼츠)를 웹에서 만들고 기록을 본다
+import { $, $$, esc, fmtDate, toast, pillTabs, openDialog, busy } from './common.js';
+
+let deps = null;            // { view, api, shrinkImage }
+let opts = null;            // /api/studio/options
+let pollTimer = 0;
+let openId = '';            // 보고 있는 작업 id
+let resTab = 'script';      // 결과 탭
+
+const STATUS = { queued: ['대기', 'wait'], running: ['진행 중', 'run'], pick: ['6개 고르기', 'ask'], thumb: ['썸네일 선택', 'ask'], done: ['완료', 'done'], failed: ['실패', 'fail'], stopped: ['멈춤', 'stop'] };
+const KIND = { main: '본편', thumb: '썸네일만', phone: '폰UI 쇼츠' };
+const SOURCE = { rss: '웹 뉴스', capture: '캡쳐', text: '글 직접' };
+const STEP_LABEL = (s) => {
+  let m;
+  if ((m = s.match(/^article-(\d+)$/))) return `기사 ${m[1]}`;
+  if ((m = s.match(/^slide-(\d+)$/))) return `슬라이드 ${m[1]}`;
+  if ((m = s.match(/^review-(\d+)$/))) return `검수 ${m[1]}`;
+  return { rss: '뉴스 후보', top15: 'Top15 선정', pick: '6개 고르기', factcheck: '팩트체크', summary: '유튜브 패키지', thumb: '썸네일', slides: '슬라이드', purge: '정리' }[s] || s;
+};
+const sbadge = (st) => { const [l, c] = STATUS[st] || [st, '']; return `<span class="badge st-${c}">${esc(l)}</span>`; };
+const dur = (a, b) => { if (!a) return ''; const s = Math.round(((b || Date.now()) - a) / 1000); return s < 60 ? `${s}초` : `${Math.floor(s / 60)}분 ${s % 60}초`; };
+const money = (d) => (d ? `$${d.toFixed(2)}` : '');
+const copyBtn = (text) => `<button class="btn sm copy" type="button" data-copy="${esc(text)}">복사</button>`;
+
+export function stopStudio() { clearTimeout(pollTimer); pollTimer = 0; }
+
+export async function renderStudio(d) {
+  deps = d;
+  stopStudio();
+  if (!opts) opts = await deps.api('/studio/options');
+  const m = location.hash.match(/^#st-([a-f0-9]{20})$/);
+  openId = m ? m[1] : '';
+  if (openId) return renderJob();
+  return renderList();
+}
+
+// ───────── 목록 ─────────
+async function renderList() {
+  const { view, api } = deps;
+  const jobs = await api('/studio/jobs?limit=60');
+  const keyWarn = !opts.keys.anthropic || !opts.keys.openai
+    ? `<p class="st-warn">${!opts.keys.anthropic ? 'Anthropic 키가 없어 글 단계를 돌릴 수 없습니다. ' : ''}${!opts.keys.openai ? 'OpenAI 키가 없어 그림(슬라이드 · 썸네일)은 건너뜁니다.' : ''}</p>` : '';
+  view.innerHTML = `
+    <div class="bar st-bar">
+      <h2>스튜디오 <small>유튜브 발표자료</small></h2>
+      <button class="btn primary" id="st-new" type="button">+ 새 발표자료</button>
+      <button class="btn sm" id="st-settings" type="button">설정</button>
+    </div>
+    ${keyWarn}
+    ${jobs.length ? `<div class="st-grid">${jobs.map(jobCard).join('')}</div>` : '<p class="empty">아직 만든 발표자료가 없습니다. "새 발표자료" 를 눌러 시작하세요.</p>'}`;
+  $('#st-new').addEventListener('click', newJobDialog);
+  $('#st-settings').addEventListener('click', settingsDialog);
+  $$('.st-card').forEach((c) => c.addEventListener('click', () => { location.hash = `#st-${c.dataset.id}`; renderStudio(deps); }));
+  if (jobs.some((j) => ['queued', 'running', 'pick', 'thumb'].includes(j.status))) pollTimer = setTimeout(() => { if (!openId && document.contains(view)) renderList(); }, 5000);
+}
+function jobCard(j) {
+  return `<article class="card st-card" data-id="${j.id}">
+    <div class="st-thumb">${j.thumb ? `<img src="${esc(j.thumb)}" alt="" loading="lazy">` : `<span>${j.assets_purged ? '그림 지워짐' : KIND[j.kind] || ''}</span>`}</div>
+    <div class="st-body">
+      <div class="st-top">${sbadge(j.status)}<span class="badge ch-${j.channel === '순섬' ? 'lime' : 'orange'}">${esc(j.channel)}</span><span class="st-kind">${esc(KIND[j.kind] || j.kind)} · ${esc(SOURCE[j.source] || j.source)}</span></div>
+      <h3>${esc(j.title || (j.status === 'running' ? STEP_LABEL(j.step) + ' 진행 중…' : '제목 없음'))}</h3>
+      <p class="st-meta">${fmtDate(j.created_at)}${j.finished_at ? ` · ${dur(j.created_at, j.finished_at)}` : ''}${j.cost ? ` · ${money(j.cost)}` : ''}${j.error ? ` · <span class="err-inline">${esc(j.error.slice(0, 80))}</span>` : ''}</p>
+    </div></article>`;
+}
+
+// ───────── 새 작업 ─────────
+function newJobDialog() {
+  const { api, shrinkImage } = deps;
+  const uploads = [];     // 캡쳐 {id,url}
+  const dlg = openDialog(`
+    <h2>새 발표자료</h2>
+    <form id="st-form">
+      <fieldset class="choice-set"><legend>종류</legend><div class="tabs seg" id="f-kind"></div></fieldset>
+      <fieldset class="choice-set"><legend>채널 스타일</legend><div class="tabs seg" id="f-channel"></div></fieldset>
+      <div id="main-opts">
+        <fieldset class="choice-set"><legend>소스</legend><div class="tabs seg" id="f-source"></div></fieldset>
+        <div id="src-capture" hidden>
+          <label class="field"><span>캡쳐 이미지 (1~6장, 한 장 = 기사 하나)</span><input class="input" type="file" id="f-files" accept="image/*" multiple></label>
+          <div class="st-ups" id="f-ups"></div>
+        </div>
+        <label class="field" id="src-text" hidden><span>글</span><textarea class="input" name="text" rows="6" placeholder="기사 본문이나 메모를 붙여 넣으세요"></textarea></label>
+        <fieldset class="choice-set" id="pick-set"><legend>기사 고르기</legend><div class="tabs seg" id="f-pick"></div><small>자동이면 클로드 추천 6개로 바로 진행합니다.</small></fieldset>
+        <fieldset class="choice-set"><legend>썸네일</legend><div class="tabs seg" id="f-thumb"></div><small>내가 고르기 = 글이 끝난 뒤 제목 · 인물 · 표정 · 제스처를 웹에서 고릅니다.</small></fieldset>
+      </div>
+      <div id="thumb-opts" hidden>${thumbPickForm({}, [], [])}</div>
+      <p class="err" id="f-err"></p>
+      <div class="dlg-actions"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">시작</button></div>
+    </form>`, (dlg) => {
+    const st = { kind: 'main', channel: '사섬', source: 'rss', pick: 'auto', thumb: 'manual' };
+    pillTabs($('#f-kind', dlg), [['main', '본편'], ['thumb', '썸네일만'], ['phone', '폰UI 쇼츠 (준비 중)']], st.kind, (v) => { if (v === 'phone') { toast('폰UI 쇼츠는 다음 단계에서 열립니다.'); return; } st.kind = v; $('#main-opts', dlg).hidden = v !== 'main'; $('#thumb-opts', dlg).hidden = v !== 'thumb'; });
+    pillTabs($('#f-channel', dlg), [['사섬', '사섬'], ['순섬', '순섬']], st.channel, (v) => { st.channel = v; });
+    pillTabs($('#f-source', dlg), [['rss', '웹 뉴스 (12시간)'], ['capture', '캡쳐 올리기'], ['text', '글 직접']], st.source, (v) => { st.source = v; $('#src-capture', dlg).hidden = v !== 'capture'; $('#src-text', dlg).hidden = v !== 'text'; $('#pick-set', dlg).hidden = v !== 'rss'; });
+    pillTabs($('#f-pick', dlg), [['auto', '자동 (추천 6개)'], ['manual', '내가 고르기']], st.pick, (v) => { st.pick = v; });
+    pillTabs($('#f-thumb', dlg), [['manual', '내가 고르기'], ['auto', '자동']], st.thumb, (v) => { st.thumb = v; });
+    setupThumbForm(dlg);
+    $('#f-files', dlg).addEventListener('change', async (e) => {
+      const box = $('#f-ups', dlg);
+      for (const file of [...e.target.files].slice(0, 6 - uploads.length)) {
+        const ph = document.createElement('div'); ph.className = 'st-up'; ph.textContent = '올리는 중…'; box.append(ph);
+        try {
+          const blob = await shrinkImage(file);
+          const res = await fetch('/api/studio/upload', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': blob.type || 'image/webp', 'X-Name': encodeURIComponent(file.name) }, body: blob });
+          const out = await res.json(); if (!res.ok) throw new Error(out.error || '업로드 실패');
+          uploads.push(out); ph.innerHTML = `<img src="${out.url}" alt=""><button type="button" class="x" aria-label="빼기">×</button>`;
+          ph.querySelector('.x').addEventListener('click', () => { uploads.splice(uploads.indexOf(out), 1); ph.remove(); });
+        } catch (err) { ph.textContent = err.message; ph.classList.add('bad'); }
+      }
+      e.target.value = '';
+    });
+    $('#st-form', dlg).addEventListener('submit', (e) => {
+      e.preventDefault();
+      const f = e.currentTarget;
+      busy(f.querySelector('[type=submit]'), $('#f-err', dlg), async () => {
+        const data = { kind: st.kind, channel: st.channel, source: st.source, pick: st.pick, thumb: st.thumb, text: f.text.value, captures: uploads.map((u) => u.id) };
+        if (st.kind === 'thumb') Object.assign(data, readThumbForm(dlg));
+        const r = await api('/studio/jobs', { method: 'POST', data });
+        dlg.close();
+        location.hash = `#st-${r.id}`;
+        renderStudio(deps);
+      });
+    });
+  });
+  return dlg;
+}
+
+// 썸네일 선택 폼 (새 작업 '썸네일만' · 진행 중 '썸네일 선택' · 결과 '다시 만들기' 가 같이 쓴다)
+function thumbPickForm(prev, titles, people) {
+  const opt = (list, cur) => `<option value="자동" ${!cur || cur === '자동' ? 'selected' : ''}>자동 (제목 감정에 맞게)</option>${list.map(([k, d]) => `<option value="${esc(k)}" ${cur === k ? 'selected' : ''} title="${esc(d)}">${esc(k)}</option>`).join('')}`;
+  return `
+    <label class="field"><span>제목</span>
+      ${titles.length ? `<div class="st-titles">${titles.map((t, i) => `<label><input type="radio" name="tp-title-pick" value="${esc(t)}" ${i === 0 && !prev.title ? 'checked' : prev.title === t ? 'checked' : ''}> ${esc(t)}</label>`).join('')}<label><input type="radio" name="tp-title-pick" value="" ${prev.title && !titles.includes(prev.title) ? 'checked' : ''}> 직접 입력</label></div>` : ''}
+      <input class="input" name="tp-title" value="${esc(prev.title && !titles.includes(prev.title) ? prev.title : '')}" placeholder="직접 입력할 제목">
+    </label>
+    <div class="row2">
+      <label class="field"><span>인물 명찰 이름 (선택)</span><input class="input" name="tp-badge-name" value="${esc(prev.badgeName || '')}" list="tp-people" placeholder="예: 유리엔 티머"><datalist id="tp-people">${people.map((p) => `<option value="${esc(p.split(' (')[0])}">${esc(p)}</option>`).join('')}</datalist></label>
+      <label class="field"><span>소속 · 직함 (선택)</span><input class="input" name="tp-badge-role" value="${esc(prev.badgeRole || '')}" placeholder="예: 피델리티 글로벌 매크로 이사"></label>
+    </div>
+    ${people.length ? `<p class="st-people">기사 속 인물: ${people.map(esc).join(' · ')}</p>` : ''}
+    <div class="row2">
+      <label class="field"><span>표정</span><select class="input" name="tp-emotion">${opt(opts.emotions, prev.emotion)}</select></label>
+      <label class="field"><span>제스처</span><select class="input" name="tp-gesture">${opt(opts.gestures, prev.gesture)}</select></label>
+    </div>
+    <fieldset class="choice-set"><legend>인물 사진</legend>
+      <div class="tabs seg" data-face-mode></div>
+      <div class="st-faces" data-faces hidden>${opts.faces.map((n) => `<button type="button" class="st-face ${prev.face === 'emoji:' + n ? 'on' : ''}" data-face="emoji:${n}"><img src="/api/studio/face/${n}" alt="${n}" loading="lazy"></button>`).join('')}</div>
+      <div data-face-up hidden><input class="input" type="file" accept="image/*" data-face-file><div class="st-ups" data-face-prev></div></div>
+      <input type="hidden" name="tp-face" value="${esc(prev.face || 'emoji:auto')}">
+    </fieldset>`;
+}
+function setupThumbForm(root) {
+  const hidden = $('[name=tp-face]', root);
+  const cur = hidden.value;
+  const mode = cur.startsWith('asset:') ? 'upload' : cur === 'emoji:auto' ? 'auto' : cur.startsWith('emoji:') ? 'pick' : 'none';
+  pillTabs($('[data-face-mode]', root), [['auto', '내 사진 (자동 선택)'], ['pick', '내 사진 고르기'], ['upload', '다른 인물 올리기'], ['none', '인물 없음']], mode, (v) => {
+    $('[data-faces]', root).hidden = v !== 'pick'; $('[data-face-up]', root).hidden = v !== 'upload';
+    if (v === 'auto') hidden.value = 'emoji:auto'; else if (v === 'none') hidden.value = ''; else if (v === 'pick') hidden.value = $('.st-face.on', root)?.dataset.face || 'emoji:001';
+  });
+  $('[data-faces]', root).hidden = mode !== 'pick'; $('[data-face-up]', root).hidden = mode !== 'upload';
+  $$('.st-face', root).forEach((b) => b.addEventListener('click', () => { $$('.st-face.on', root).forEach((x) => x.classList.remove('on')); b.classList.add('on'); hidden.value = b.dataset.face; }));
+  $('[data-face-file]', root).addEventListener('change', async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const box = $('[data-face-prev]', root); box.innerHTML = '<div class="st-up">올리는 중…</div>';
+    try {
+      const blob = await deps.shrinkImage(file);
+      const res = await fetch('/api/studio/upload?kind=face', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': blob.type || 'image/webp' }, body: blob });
+      const out = await res.json(); if (!res.ok) throw new Error(out.error || '업로드 실패');
+      hidden.value = `asset:${out.id}`; box.innerHTML = `<div class="st-up"><img src="${out.url}" alt=""></div>`;
+    } catch (err) { box.innerHTML = `<div class="st-up bad">${esc(err.message)}</div>`; }
+  });
+  $$('[name=tp-title-pick]', root).forEach((r) => r.addEventListener('change', () => { const t = $('[name=tp-title]', root); t.hidden = !!r.value && r.checked; if (!r.value) t.focus(); }));
+  const first = $('[name=tp-title-pick]:checked', root); if (first && first.value) $('[name=tp-title]', root).hidden = true;
+}
+function readThumbForm(root) {
+  const picked = $('[name=tp-title-pick]:checked', root);
+  const title = (picked && picked.value) || $('[name=tp-title]', root).value.trim();
+  return { title, badgeName: $('[name=tp-badge-name]', root).value.trim(), badgeRole: $('[name=tp-badge-role]', root).value.trim(), emotion: $('[name=tp-emotion]', root).value, gesture: $('[name=tp-gesture]', root).value, face: $('[name=tp-face]', root).value };
+}
+
+// ───────── 작업 상세 ─────────
+async function renderJob() {
+  const { view, api } = deps;
+  let r;
+  try { r = await api(`/studio/jobs/${openId}`); } catch (e) { toast(e.message); location.hash = ''; return renderStudio(deps); }
+  const { job, steps, docs, assets } = r;
+  const active = ['queued', 'running', 'pick', 'thumb'].includes(job.status);
+  const J = (k) => { try { return docs[k] ? JSON.parse(docs[k].body) : null; } catch { return null; } };
+  const top15 = J('top15'), fact = J('factcheck'), summary = J('summary'), showTexts = J('show_texts');
+  const slides = assets.filter((a) => a.kind === 'slide').sort((a, b) => a.idx - b.idx);
+  const thumb = assets.filter((a) => a.kind === 'thumb').pop();
+  const captures = assets.filter((a) => a.kind === 'capture');
+  const blocks = fact?.fixed_blocks || (docs.articles ? docs.articles.body.split(/\n(?=📌)/) : []);
+
+  view.innerHTML = `
+    <div class="bar st-bar">
+      <button class="btn sm" id="st-back" type="button">← 목록</button>
+      <h2 class="st-h">${esc(job.title || KIND[job.kind] || '')}</h2>
+      ${sbadge(job.status)}<span class="badge ch-${job.channel === '순섬' ? 'lime' : 'orange'}">${esc(job.channel)}</span>
+      <span class="st-meta">${fmtDate(job.created_at)} · ${esc(KIND[job.kind])} · ${esc(SOURCE[job.source])}${job.cost ? ` · ${money(job.cost)}` : ''}</span>
+      <span class="sp"></span>
+      ${job.kind === 'main' ? `<a class="btn sm" href="${r.show_url}" target="_blank" rel="noopener">슬라이드쇼 열기 ↗</a>` : ''}
+      ${active ? '<button class="btn sm danger" id="st-stop" type="button">멈춤</button>' : '<button class="btn sm danger" id="st-del" type="button">삭제</button>'}
+    </div>
+    ${job.error ? `<p class="st-warn">${esc(job.error)}</p>` : ''}
+    <section class="card st-steps">
+      <ol>${steps.map((s) => `<li class="s-${s.status}"><b>${esc(STEP_LABEL(s.step))}</b><span class="s-note">${esc(s.note || '')}</span><span class="s-dur">${s.status === 'running' ? '진행 중…' : dur(s.started_at, s.finished_at)}${s.cost ? ` · ${money(s.cost)}` : ''}</span></li>`).join('')}
+      ${job.status === 'queued' ? '<li class="s-running"><b>시작 대기</b><span class="s-note">곧 시작합니다</span></li>' : ''}</ol>
+    </section>
+    ${job.status === 'pick' && top15 ? pickPanel(top15) : ''}
+    ${job.status === 'thumb' ? `<section class="card st-panel"><h3>썸네일 고르기</h3><form id="st-thumb-form">${thumbPickForm({}, summary?.titles || [], summary?.people || [])}<p class="err" id="tp-err"></p><button class="btn primary" type="submit">이대로 썸네일 만들기</button></form></section>` : ''}
+    ${blocks.length || slides.length || thumb || top15 || captures.length ? `<section class="card st-panel">
+      <div class="tabs st-restabs" id="st-restabs"></div>
+      <div id="st-res"></div>
+    </section>` : ''}`;
+  $('#st-back').addEventListener('click', () => { location.hash = ''; renderStudio(deps); });
+  $('#st-stop')?.addEventListener('click', async () => { if (!confirm('지금 진행 중인 작업을 멈출까요?')) return; await api(`/studio/jobs/${job.id}/stop`, { method: 'POST', data: {} }); renderJob(); });
+  $('#st-del')?.addEventListener('click', async () => { if (!confirm('이 발표자료와 그림을 모두 지울까요? 되돌릴 수 없습니다.')) return; await api(`/studio/jobs/${job.id}`, { method: 'DELETE' }); location.hash = ''; renderStudio(deps); });
+  $('#st-pick-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const chosen = $$('#st-pick-form input:checked').map((i) => +i.value);
+    busy(e.currentTarget.querySelector('[type=submit]'), $('#pk-err'), async () => {
+      if (chosen.length !== 6 && !confirm(`${chosen.length}개를 골랐습니다. 6개가 아니어도 진행할까요?`)) return;
+      await api(`/studio/jobs/${job.id}/pick`, { method: 'POST', data: { chosen } }); renderJob();
+    });
+  });
+  $$('#st-pick-form input[type=checkbox]').forEach((c) => c.addEventListener('change', () => { $('#pk-count').textContent = `${$$('#st-pick-form input:checked').length} / 6`; }));
+  if (job.status === 'thumb') {
+    setupThumbForm($('#st-thumb-form'));
+    $('#st-thumb-form').addEventListener('submit', (e) => { e.preventDefault(); busy(e.currentTarget.querySelector('[type=submit]'), $('#tp-err'), async () => { const d = readThumbForm(e.currentTarget); if (!d.title) throw new Error('제목을 고르거나 넣어 주세요.'); await api(`/studio/jobs/${job.id}/thumb`, { method: 'POST', data: d }); renderJob(); }); });
+  }
+  // 결과 탭
+  const tabs = [];
+  if (blocks.length) tabs.push(['script', '원고']);
+  if (slides.length) tabs.push(['slides', `슬라이드 ${slides.length}`]);
+  if (thumb || (job.status === 'done' && job.kind === 'main')) tabs.push(['thumb', '썸네일']);
+  if (summary) tabs.push(['yt', '유튜브']);
+  if (top15) tabs.push(['news', `뉴스 ${top15.items.length}`]);
+  if (captures.length) tabs.push(['caps', `캡쳐 ${captures.length}`]);
+  if (tabs.length) {
+    if (!tabs.some(([k]) => k === resTab)) resTab = tabs[0][0];
+    pillTabs($('#st-restabs'), tabs, resTab, (v) => { resTab = v; drawRes(); });
+    const drawRes = () => {
+      const box = $('#st-res');
+      if (resTab === 'script') box.innerHTML = scriptPanel(job, blocks, showTexts, fact);
+      else if (resTab === 'slides') box.innerHTML = slidesPanel(job, slides, blocks);
+      else if (resTab === 'thumb') box.innerHTML = thumbPanel(job, thumb, summary);
+      else if (resTab === 'yt') box.innerHTML = ytPanel(summary);
+      else if (resTab === 'news') box.innerHTML = newsPanel(top15, J('chosen'));
+      else if (resTab === 'caps') box.innerHTML = `<div class="st-slides">${captures.map((a) => `<figure><img src="${a.url}" alt=""><figcaption>캡쳐 ${a.idx}</figcaption></figure>`).join('')}</div>`;
+      wireRes(job, blocks, thumb, summary);
+    };
+    drawRes();
+  }
+  if (active) pollTimer = setTimeout(() => { if (openId === job.id && document.contains(view)) renderJob(); }, 4000);
+}
+
+function pickPanel(top) {
+  const rec = new Set(top.picks);
+  const reason = Object.fromEntries(top.pick_reasons.map((p) => [p.n, p.reason]));
+  return `<section class="card st-panel"><h3>기사 6개 고르기 <small id="pk-count">0 / 6</small></h3>
+    <p class="st-hint">클로드 추천은 ★ 로 표시됩니다. 처음엔 아무것도 체크돼 있지 않습니다.</p>
+    <form id="st-pick-form"><ul class="st-news">${top.items.map((it) => `<li><label><input type="checkbox" value="${it.n}">
+      <div><div class="n-top"><b>${it.n}.</b> ${esc(it.title)} ${rec.has(it.n) ? `<span class="n-rec" title="${esc(reason[it.n] || '')}">★ 추천</span>` : ''}</div>
+      <div class="n-meta">${esc(it.source_label)} · ${esc(it.published_kst)} · <a href="${esc(it.url)}" target="_blank" rel="noopener">원문</a></div>
+      <div class="n-sum">${esc(it.summary)}</div></div></label></li>`).join('')}</ul>
+    <p class="err" id="pk-err"></p><button class="btn primary" type="submit">이 기사들로 진행</button></form></section>`;
+}
+function newsPanel(top, chosen) {
+  const rec = new Set(top.picks), ch = new Set(chosen || top.picks);
+  return `<ul class="st-news plain">${top.items.map((it) => `<li class="${ch.has(it.n) ? 'chosen' : ''}"><div><div class="n-top"><b>${it.n}.</b> ${esc(it.title)} ${ch.has(it.n) ? '<span class="n-rec">✓ 선택</span>' : rec.has(it.n) ? '<span class="n-rec dim">★ 추천</span>' : ''}</div><div class="n-meta">${esc(it.source_label)} · ${esc(it.published_kst)} · <a href="${esc(it.url)}" target="_blank" rel="noopener">원문</a></div><div class="n-sum">${esc(it.summary)}</div></div></li>`).join('')}</ul>`;
+}
+function scriptPanel(job, blocks, showTexts, fact) {
+  return `${fact ? `<div class="st-fact"><b>팩트체크</b> ${esc(fact.summary)}${fact.changes?.length ? `<ul>${fact.changes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}<p>인물: ${esc(fact.people.join(', ') || '없음')} / 기관: ${esc(fact.orgs.join(', ') || '없음')}</p></div>` : ''}
+    <p class="st-hint">방송 대본은 슬라이드쇼 오른쪽에 그대로 들어갑니다. 여기서 고쳐 저장하면 새 버전으로 쌓입니다.</p>
+    ${(showTexts || blocks).map((t, i) => `<div class="st-block"><div class="st-block-h"><b>슬라이드 ${i + 1}</b>${copyBtn(t)}</div><textarea class="input st-ta" data-i="${i}" rows="${Math.min(18, t.split('\n').length + 2)}">${esc(t)}</textarea></div>`).join('')}
+    <div class="dlg-actions"><button class="btn primary" id="st-save-texts" type="button">대본 저장</button><span class="st-savemsg" id="st-savemsg"></span></div>`;
+}
+function slidesPanel(job, slides, blocks) {
+  const done = !['queued', 'running', 'pick', 'thumb'].includes(job.status);
+  return `<div class="st-slides">${slides.map((a) => { const rv = a.meta?.review; return `<figure>
+    <a href="${a.url}" target="_blank" rel="noopener"><img src="${a.url}" alt="슬라이드 ${a.idx}"></a>
+    <figcaption><b>${a.idx}</b> ${esc((blocks[a.idx - 1] || '').split('\n')[0].replace(/^📌/, ''))}
+      ${rv ? `<span class="badge ${rv.pass ? 'done' : 'suspended'}" title="${esc(rv.reason || '')}">${rv.pass ? '검수 합격' : '검수 불합격'}</span>` : ''}
+      ${done ? `<button class="btn sm" type="button" data-redo-slide="${a.idx}">이 장만 다시</button>` : ''}</figcaption>
+    ${rv && !rv.pass ? `<p class="st-reason">${esc(rv.reason)}</p>` : ''}</figure>`; }).join('')}</div>`;
+}
+function thumbPanel(job, thumb, summary) {
+  const done = !['queued', 'running', 'pick', 'thumb'].includes(job.status);
+  const rv = thumb?.meta?.review, pick = thumb?.meta?.pick;
+  return `${thumb ? `<div class="st-thumb-big"><a href="${thumb.url}" target="_blank" rel="noopener"><img src="${thumb.url}" alt="썸네일"></a>
+    <p>${rv ? `<span class="badge ${rv.pass ? 'done' : 'suspended'}">${rv.pass ? '검수 합격' : '검수 불합격'}</span> ${esc(rv.reason || '')}` : ''}</p>
+    ${pick ? `<p class="st-meta">제목 "${esc(pick.title)}" · 표정 ${esc(pick.emotion || '자동')} · 제스처 ${esc(pick.gesture || '자동')}${pick.badgeName ? ` · 명찰 ${esc(pick.badgeName)}` : ''}</p>` : ''}
+    <div class="dlg-actions"><button class="btn sm" type="button" id="st-dl-thumb">16:9 로 내려받기</button></div></div>` : '<p class="empty">썸네일이 없습니다.</p>'}
+    ${done ? `<details class="st-redo"><summary>다시 만들기 (제목 · 표정 · 제스처 · 인물 바꾸기)</summary><form id="st-rethumb">${thumbPickForm(pick || {}, summary?.titles || [], summary?.people || [])}<p class="err" id="rt-err"></p><button class="btn primary" type="submit">다시 만들기</button></form></details>` : ''}`;
+}
+function ytPanel(s) {
+  return `<h4>제목 추천</h4><ol class="st-titles-list">${s.titles.map((t) => `<li>${esc(t)} ${copyBtn(t)}</li>`).join('')}</ol>
+    <h4>인트로 대본 ${copyBtn(s.intro)}</h4><p class="st-pre">${esc(s.intro)}</p>
+    <h4>더보기란 ${copyBtn(s.description)}</h4><pre class="st-pre">${esc(s.description)}</pre>
+    <h4>등장 인물</h4><ul>${s.people.length ? s.people.map((p) => `<li>${esc(p)}</li>`).join('') : '<li>없음</li>'}</ul>`;
+}
+function wireRes(job, blocks, thumb, summary) {
+  const { api } = deps;
+  $$('[data-copy]').forEach((b) => b.addEventListener('click', async () => { try { await navigator.clipboard.writeText(b.dataset.copy); toast('복사했습니다'); } catch { toast('복사하지 못했습니다'); } }));
+  $('#st-save-texts')?.addEventListener('click', async (e) => {
+    const texts = $$('.st-ta').map((t) => t.value);
+    await busy(e.currentTarget, null, async () => { const r = await api(`/studio/jobs/${job.id}/docs/show_texts`, { method: 'PUT', data: { body: texts } }); $('#st-savemsg').textContent = `저장됨 · 버전 ${r.version}`; });
+  });
+  $$('[data-redo-slide]').forEach((b) => b.addEventListener('click', async () => {
+    const note = prompt(`슬라이드 ${b.dataset.redoSlide} 을 다시 만듭니다. 추가로 요청할 것이 있으면 적어 주세요(없으면 빈 칸).`, '');
+    if (note === null) return;
+    await api(`/studio/jobs/${job.id}/redo`, { method: 'POST', data: { what: 'slide', idx: +b.dataset.redoSlide, note } }); toast('다시 만드는 중'); renderJob();
+  }));
+  $('#st-dl-thumb')?.addEventListener('click', async () => {
+    // 1536x1024(3:2) 를 가운데 1280x720(16:9) 로 잘라 내려받는다
+    const img = new Image(); img.crossOrigin = 'anonymous'; img.src = thumb.url;
+    await img.decode();
+    const c = document.createElement('canvas'); c.width = 1280; c.height = 720;
+    const sh = img.width * 9 / 16, sy = (img.height - sh) / 2;
+    c.getContext('2d').drawImage(img, 0, sy, img.width, sh, 0, 0, 1280, 720);
+    const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `thumbnail-${job.id.slice(0, 6)}.png`; a.click();
+  });
+  const rf = $('#st-rethumb');
+  if (rf) { setupThumbForm(rf); rf.addEventListener('submit', (e) => { e.preventDefault(); busy(rf.querySelector('[type=submit]'), $('#rt-err'), async () => { const pick = readThumbForm(rf); if (!pick.title) throw new Error('제목을 고르거나 넣어 주세요.'); await api(`/studio/jobs/${job.id}/redo`, { method: 'POST', data: { what: 'thumb', pick } }); toast('다시 만드는 중'); renderJob(); }); }); }
+}
+
+// ───────── 설정 ─────────
+function settingsDialog() {
+  const s = opts.settings;
+  const f = (k, label, rows) => `<label class="field"><span>${label}</span>${rows ? `<textarea class="input" name="${k}" rows="${rows}">${esc(s[k])}</textarea>` : `<input class="input" name="${k}" value="${esc(s[k])}">`}</label>`;
+  openDialog(`<h2>스튜디오 설정</h2><form id="st-set">
+    <p class="st-hint">키: Anthropic ${opts.keys.anthropic ? '✅' : '❌ 없음'} · OpenAI ${opts.keys.openai ? '✅' : '❌ 없음'} (키는 Worker 비밀값이라 여기서는 넣을 수 없습니다)</p>
+    ${f('slide_style', '슬라이드 스타일 규칙(ppt1)', 3)}
+    ${f('thumb_style_사섬', '썸네일 스타일 · 사섬', 2)}
+    ${f('thumb_style_순섬', '썸네일 스타일 · 순섬', 2)}
+    <div class="row2">${f('image_model', '이미지 모델')}${f('image_quality', '이미지 품질 (low · medium · high)')}</div>
+    <div class="row2">${f('daily_limit', '하루 최대 실행 횟수')}</div>
+    ${f('greeting_사섬', '인사말 · 사섬', 2)}
+    ${f('greeting_순섬', '인사말 · 순섬', 2)}
+    <p class="err" id="set-err"></p>
+    <div class="dlg-actions"><button class="btn" type="button" data-close>닫기</button><button class="btn primary" type="submit">저장</button></div></form>`, (dlg) => {
+    $('#st-set', dlg).addEventListener('submit', (e) => { e.preventDefault(); busy(e.currentTarget.querySelector('[type=submit]'), $('#set-err', dlg), async () => { const data = Object.fromEntries(new FormData(e.currentTarget).entries()); const r = await deps.api('/studio/settings', { method: 'PUT', data }); opts.settings = r.settings; toast('저장했습니다'); dlg.close(); }); });
+  });
+}

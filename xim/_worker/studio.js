@@ -1,0 +1,669 @@
+// xim 스튜디오 — 유튜브 발표자료 제작을 웹에서 (기획: xim/studio-plan.md)
+//
+//   /api/studio/*            운영자 API (로그인 뒤) — 작업 만들기 · 진행 · 선택 · 결과 · 기록 · 설정
+//   /studio/show/<작업id>     방송용 슬라이드쇼 (주소를 아는 사람만, 로그인 없음 — 어디서든 띄워 놓고 찍는다)
+//   /studio/a/<자산id>        그림 (R2, 1년 캐시)
+//   StudioMain (Workflow)    단계 실행 — 글은 Claude API, 그림은 OpenAI 이미지 API. PC 필요 없음.
+//
+//   비밀값: ANTHROPIC_API_KEY · OPENAI_API_KEY (wrangler secret, 리포에 없음)
+//   보관 규칙: 그림은 최근 10개 작업 분만 R2 에 둔다. 글은 계속.
+import { WorkflowEntrypoint } from 'cloudflare:workers';
+import { NonRetryableError } from 'cloudflare:workflows';
+import * as P from './studio-prompts.js';
+
+const KEEP_JOBS = 10;                      // 그림을 보관할 최근 작업 수
+const CLAUDE_MODEL = 'claude-opus-5-5';
+const PRICE = { in: 4 / 1e6, out: 20 / 1e6 };   // 달러 / 토큰 (Opus 5.5)
+const IMAGE_PRICE = 0.17;                   // 장당 대략(고품질) — 설정에서 모델을 바꾸면 달라진다. 표시용.
+const now = () => Date.now();
+const hex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
+const bad = (m) => new HttpError(400, m);
+const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } });
+
+// ───────────────────────── DB 도우미 ─────────────────────────
+const getJob = (db, id) => db.prepare('SELECT * FROM studio_jobs WHERE id = ?').bind(id).first();
+async function setJob(db, id, fields) {
+  const keys = Object.keys(fields);
+  await db.prepare(`UPDATE studio_jobs SET ${keys.map((k) => `${k} = ?`).join(', ')}, updated_at = ? WHERE id = ?`).bind(...keys.map((k) => fields[k]), now(), id).run();
+}
+async function latestDoc(db, jobId, kind) {
+  return db.prepare('SELECT * FROM studio_docs WHERE job_id = ? AND kind = ? ORDER BY version DESC LIMIT 1').bind(jobId, kind).first();
+}
+async function saveDoc(db, jobId, kind, body) {
+  const prev = await latestDoc(db, jobId, kind);
+  const v = (prev?.version || 0) + 1;
+  await db.prepare('INSERT INTO studio_docs (job_id, kind, version, body, created_at) VALUES (?, ?, ?, ?, ?)').bind(jobId, kind, v, typeof body === 'string' ? body : JSON.stringify(body), now()).run();
+  return v;
+}
+const docJson = (d) => { try { return d ? JSON.parse(d.body) : null; } catch { return null; } };
+async function stepStart(db, jobId, step, note = '') {
+  await db.prepare("UPDATE studio_steps SET status = 'failed', finished_at = ? WHERE job_id = ? AND step = ? AND status = 'running'").bind(now(), jobId, step).run();
+  const r = await db.prepare("INSERT INTO studio_steps (job_id, step, status, note, started_at) VALUES (?, ?, 'running', ?, ?)").bind(jobId, step, note, now()).run();
+  await setJob(db, jobId, { step, status: 'running' });
+  return r.meta.last_row_id;
+}
+async function stepEnd(db, id, jobId, status, note = '', usage = null) {
+  const cost = usage ? (usage.in || 0) * PRICE.in + (usage.out || 0) * PRICE.out + (usage.images || 0) * IMAGE_PRICE : 0;
+  await db.prepare('UPDATE studio_steps SET status = ?, note = ?, tokens_in = ?, tokens_out = ?, cost = ?, finished_at = ? WHERE id = ?')
+    .bind(status, String(note || '').slice(0, 2000), usage?.in || 0, usage?.out || 0, cost, now(), id).run();
+  if (cost) await db.prepare('UPDATE studio_jobs SET cost = cost + ? WHERE id = ?').bind(cost, jobId).run();
+}
+async function getSettings(db) {
+  const { results } = await db.prepare('SELECT key, value FROM studio_settings').all();
+  const s = Object.fromEntries(results.map((r) => [r.key, r.value]));
+  return {
+    slide_style: s.slide_style || P.DEFAULT_SLIDE_STYLE,
+    thumb_style_사섬: s['thumb_style_사섬'] || P.DEFAULT_THUMB_STYLE.사섬,
+    thumb_style_순섬: s['thumb_style_순섬'] || P.DEFAULT_THUMB_STYLE.순섬,
+    image_model: s.image_model || 'gpt-image-1',
+    image_quality: s.image_quality || 'high',
+    daily_limit: +(s.daily_limit || 12),
+    greeting_사섬: s['greeting_사섬'] || '내 돈이 몰래 불어나는 진짜 비트코인 뉴스, 안녕하세요, 사적인 자산왕입니다.',
+    greeting_순섬: s['greeting_순섬'] || '돈 버는 지식만 순수하게 뽑아내는 뉴스 장인, 안녕하세요, 순수한 크립토입니다.',
+  };
+}
+const SETTING_KEYS = ['slide_style', 'thumb_style_사섬', 'thumb_style_순섬', 'image_model', 'image_quality', 'daily_limit', 'greeting_사섬', 'greeting_순섬'];
+
+// ───────────────────────── R2 그림 ─────────────────────────
+async function putAsset(env, jobId, kind, idx, bytes, mime, meta = {}, dims = {}) {
+  const id = hex(12);
+  const ext = mime === 'image/png' ? 'png' : mime === 'image/jpeg' ? 'jpg' : 'webp';
+  const key = `studio/${jobId || 'up'}/${kind}-${idx}-${id}.${ext}`;
+  await env.FILES.put(key, bytes, { httpMetadata: { contentType: mime, cacheControl: 'public, max-age=31536000, immutable' } });
+  await env.DB.prepare('INSERT INTO studio_assets (id, job_id, kind, idx, r2_key, mime, size, width, height, meta, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, jobId, kind, idx, key, mime, bytes.byteLength, dims.w || 0, dims.h || 0, JSON.stringify(meta), now()).run();
+  return id;
+}
+async function dropAsset(env, a) { await env.FILES.delete(a.r2_key).catch(() => {}); await env.DB.prepare('DELETE FROM studio_assets WHERE id = ?').bind(a.id).run(); }
+const jobAssets = async (db, jobId) => (await db.prepare('SELECT * FROM studio_assets WHERE job_id = ? ORDER BY kind, idx, created_at').bind(jobId).all()).results;
+async function readAssetB64(env, a) {
+  const o = await env.FILES.get(a.r2_key);
+  if (!o) return null;
+  const buf = new Uint8Array(await o.arrayBuffer());
+  let s = ''; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  return { b64: btoa(s), mime: a.mime };
+}
+const b64ToBytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+
+// 보관 규칙: 최근 KEEP_JOBS 개(끝난 작업 기준)만 그림을 남기고, 그 뒤 작업의 그림은 지운다
+async function purgeOld(env) {
+  const db = env.DB;
+  const { results } = await db.prepare("SELECT id FROM studio_jobs WHERE status IN ('done','failed','stopped') AND assets_purged = 0 ORDER BY created_at DESC").all();
+  const old = results.slice(KEEP_JOBS);
+  for (const j of old) {
+    for (const a of await jobAssets(db, j.id)) await dropAsset(env, a);
+    await setJob(db, j.id, { assets_purged: 1 });
+  }
+  // 작업에 안 붙은 업로드(하루 지난 것) 정리
+  for (const a of (await db.prepare("SELECT * FROM studio_assets WHERE job_id = '' AND created_at < ?").bind(now() - 86400000).all()).results) await dropAsset(env, a);
+  return old.length;
+}
+
+// ───────────────────────── Claude API ─────────────────────────
+async function claude(env, { system, messages, schema, tools, maxTokens = 16000, effort }) {
+  if (!env.ANTHROPIC_API_KEY) throw new NonRetryableError('ANTHROPIC_API_KEY 가 없습니다. 키를 넣어 주세요.');
+  const body = { model: CLAUDE_MODEL, max_tokens: maxTokens, messages, fallbacks: 'default' };
+  if (system) body.system = system;
+  if (tools) body.tools = tools;
+  body.output_config = {};
+  if (schema) body.output_config.format = { type: 'json_schema', schema };
+  if (effort) body.output_config.effort = effort;
+  const usage = { in: 0, out: 0 };
+  let msgs = messages;
+  for (let turn = 0; turn < 4; turn++) {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2026-10-21', 'anthropic-beta': 'server-side-fallback-2026-07-01' },
+      body: JSON.stringify({ ...body, messages: msgs }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      if (res.status === 401 || res.status === 403 || res.status === 400) throw new NonRetryableError(`Claude API ${res.status}: ${t.slice(0, 300)}`);
+      throw new Error(`Claude API ${res.status}: ${t.slice(0, 300)}`);
+    }
+    const out = await res.json();
+    usage.in += out.usage?.input_tokens || 0; usage.out += out.usage?.output_tokens || 0;
+    if (out.stop_reason === 'refusal') throw new NonRetryableError(`Claude 가 요청을 거절했습니다 (${out.stop_details?.category || '사유 없음'}).`);
+    if (out.stop_reason === 'pause_turn') { msgs = [...msgs, { role: 'assistant', content: out.content }]; continue; }   // 서버 도구가 아직 도는 중
+    const text = out.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+    let parsed = null;
+    if (schema) { try { parsed = JSON.parse(text); } catch { throw new Error('Claude 응답이 JSON 이 아닙니다: ' + text.slice(0, 200)); } }
+    return { text, json: parsed, usage };
+  }
+  throw new Error('Claude 응답이 끝나지 않았습니다 (pause_turn 반복).');
+}
+const imgBlock = (b64, mime) => ({ type: 'image', source: { type: 'base64', media_type: mime, data: b64 } });
+
+// ───────────────────────── OpenAI 이미지 API ─────────────────────────
+//   참고 사진이 있으면 /images/edits (참고 이미지 + 프롬프트), 없으면 /images/generations. 결과는 webp 로 받는다.
+async function openaiImage(env, settings, { prompt, size, refs = [] }) {
+  if (!env.OPENAI_API_KEY) throw new NonRetryableError('OPENAI_API_KEY 가 없습니다. 키를 넣어 주세요.');
+  const headers = { Authorization: `Bearer ${env.OPENAI_API_KEY}` };
+  let res;
+  if (refs.length) {
+    const fd = new FormData();
+    fd.set('model', settings.image_model); fd.set('prompt', prompt); fd.set('size', size); fd.set('quality', settings.image_quality); fd.set('output_format', 'webp'); fd.set('n', '1');
+    refs.forEach((r, i) => fd.append('image[]', new Blob([r.bytes], { type: r.mime }), `ref${i}.${r.mime === 'image/png' ? 'png' : r.mime === 'image/jpeg' ? 'jpg' : 'webp'}`));
+    res = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers, body: fd });
+  } else {
+    res = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: settings.image_model, prompt, size, quality: settings.image_quality, output_format: 'webp', n: 1 }),
+    });
+  }
+  if (!res.ok) {
+    const t = await res.text();
+    if (res.status === 401 || res.status === 403) throw new NonRetryableError(`OpenAI ${res.status}: ${t.slice(0, 300)}`);
+    throw new Error(`OpenAI ${res.status}: ${t.slice(0, 300)}`);
+  }
+  const out = await res.json();
+  const b64 = out.data?.[0]?.b64_json;
+  if (!b64) throw new Error('OpenAI 응답에 이미지가 없습니다.');
+  const [w, h] = size.split('x').map(Number);
+  return { bytes: b64ToBytes(b64), mime: 'image/webp', w, h };
+}
+
+// ───────────────────────── RSS 후보 (news_rss.py 를 Worker 로) ─────────────────────────
+const FEEDS = [
+  ['CoinDesk', 'https://www.coindesk.com/arc/outboundfeeds/rss/', '코인데스크', '해외·미국', '🇺🇸'],
+  ['Cointelegraph', 'https://cointelegraph.com/rss', '코인텔레그래프', '해외·미국', '🇺🇸'],
+  ['TheBlock', 'https://www.theblock.co/rss.xml', '더블록', '해외·미국', '🇺🇸'],
+  ['Decrypt', 'https://decrypt.co/feed', '디크립트', '해외·미국', '🇺🇸'],
+  ['CryptoSlate', 'https://cryptoslate.com/feed/', '크립토슬레이트', '해외·미국', '🇺🇸'],
+  ['BitcoinMagazine', 'https://bitcoinmagazine.com/feed', '비트코인매거진', '해외·미국', '🇺🇸'],
+  ['블록미디어', 'https://www.blockmedia.co.kr/feed', 'Blockmedia', '국내', '🇰🇷'],
+  ['토큰포스트', 'https://www.tokenpost.kr/rss', 'TokenPost', '국내', '🇰🇷'],
+  ['비인크립토', 'https://kr.beincrypto.com/feed/', 'BeInCrypto', '해외·글로벌(한국어판)', '🌐'],
+];
+const KW_CORE = ['bitcoin', 'btc', 'ethereum', ' eth ', 'crypto', 'etf', 'sec ', 'cftc', 'fed ', 'federal reserve', 'cpi', 'inflation', 'rate cut', 'stablecoin', 'regulation', 'regulator', '비트코인', '이더리움', '가상자산', '암호화폐', '스테이블코인', '금리', '규제', '연준'];
+const KW_EVENT = ['hack', 'exploit', 'breach', 'lawsuit', 'sues', 'sued', 'ban ', 'approve', 'launch', 'surge', 'crash', 'plunge', 'soar', 'record', 'billion', 'million', 'halt', 'outage', 'unlock', 'layoff', 'acquire', 'ipo', 'filing', 'vote', 'ruling', '해킹', '상장', '급등', '급락', '폭락', '폭등', '승인', '소송', '제재', '출시', '사상 최고', '억달러', '조원', '상장폐지', '압수'];
+const KW_ACTOR = ['binance', 'coinbase', 'blackrock', 'fidelity', 'tether', 'ripple', 'xrp', 'solana', 'kraken', 'grayscale', 'strategy', 'microstrategy', 'circle', 'trump', 'polygon', 'bank of', '업비트', '빗썸', '코인원', '금융위', '금감원', '한국은행', '바이낸스', '코인베이스', '블랙록', '테더', '리플', '솔라나', '트럼프', '국민연금'];
+const KW_NOISE = ['price prediction', 'how to', 'beginner', 'guide to', 'sponsored', 'best crypto', 'casino', 'presale', 'top 5', 'top 10', 'review:', '프리세일', '카지노', '에어드랍 이벤트', '가격 전망', '매수 추천', '시세브리핑', '뉴스브리핑'];
+const unesc = (s) => String(s || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n)).replace(/\s+/g, ' ').trim();
+const tag = (xml, name) => { const m = xml.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`, 'i')); return m ? m[1] : ''; };
+function score(title, summary) {
+  const t = title.toLowerCase(), s = summary.toLowerCase();
+  let sc = 0;
+  for (const [kws, w] of [[KW_CORE, 3], [KW_EVENT, 2], [KW_ACTOR, 2]]) for (const k of kws) { if (t.includes(k)) sc += w * 2; else if (s.includes(k)) sc += w; }
+  for (const k of KW_NOISE) if (t.includes(k) || s.includes(k)) sc -= 10;
+  return sc;
+}
+const kst = (ms) => { const d = new Date(ms + 9 * 3600000); const p = (n) => String(n).padStart(2, '0'); return `${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} KST`; };
+async function rssCandidates(hours = 12) {
+  const since = now() - hours * 3600000;
+  const all = [];
+  await Promise.all(FEEDS.map(async ([name, url, alt, region, flag]) => {
+    try {
+      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 xim-studio/1.0' }, signal: AbortSignal.timeout(15000) });
+      if (!res.ok) return;
+      const xml = await res.text();
+      const items = xml.match(/<item[\s>][\s\S]*?<\/item>|<entry[\s>][\s\S]*?<\/entry>/gi) || [];
+      for (const it of items) {
+        const title = unesc(tag(it, 'title'));
+        const link = unesc(tag(it, 'link')) || (it.match(/<link[^>]*href="([^"]+)"/i)?.[1] || '');
+        const date = Date.parse(unesc(tag(it, 'pubDate') || tag(it, 'published') || tag(it, 'updated') || tag(it, 'dc:date')));
+        if (!title || !link || !date || date < since) continue;
+        const summary = unesc(tag(it, 'description') || tag(it, 'summary') || tag(it, 'content:encoded')).slice(0, 180);
+        all.push({ source: name, label: `${flag} ${name}(${alt}·${region})`, kr: region === '국내', title, url: link, published: date, published_kst: kst(date), summary, score: score(title, summary) });
+      }
+    } catch { /* 피드 하나 실패는 넘어간다 */ }
+  }));
+  all.sort((a, b) => b.score - a.score || b.published - a.published);
+  const kr = all.filter((x) => x.kr).slice(0, 8);
+  const picked = [...kr];
+  for (const x of all) { if (picked.length >= 28) break; if (!picked.includes(x)) picked.push(x); }
+  picked.sort((a, b) => b.published - a.published);
+  return picked.map((x, i) => ({ n: i + 1, ...x }));
+}
+
+// ───────────────────────── 📌 블록 ─────────────────────────
+const splitBlocks = (text) => String(text || '').split(/\n(?=📌)/).map((b) => b.trim()).filter((b) => b.startsWith('📌'));
+
+// ───────────────────────── Workflow: 단계 실행 ─────────────────────────
+export class StudioMain extends WorkflowEntrypoint {
+  async run(event, step) {
+    const { jobId, task = 'run' } = event.payload;
+    const env = this.env, db = env.DB;
+    const job = await getJob(db, jobId);
+    if (!job) throw new NonRetryableError('작업이 없습니다.');
+    const opt = JSON.parse(job.options || '{}');
+    const settings = await getSettings(db);
+    const S = (name, fn, note) => step.do(name, { retries: { limit: 2, delay: '15 seconds', backoff: 'exponential' }, timeout: '12 minutes' }, async () => {
+      const sid = await stepStart(db, jobId, name, note);
+      try { const r = await fn(); await stepEnd(db, sid, jobId, 'done', r?.note || '', r?.usage); return r?.out ?? null; }
+      catch (e) { await stepEnd(db, sid, jobId, 'failed', e.message); throw e; }
+    });
+    try {
+      if (task === 'redo') await this.redo(S, step, job, opt, settings, event.payload);
+      else if (job.kind === 'main') await this.runMain(S, step, job, opt, settings);
+      else if (job.kind === 'thumb') await this.runThumbOnly(S, step, job, opt, settings);
+      else throw new NonRetryableError('아직 준비되지 않은 종류입니다: ' + job.kind);
+      if (task !== 'redo') await setJob(db, jobId, { status: 'done', step: '', finished_at: now() });
+      else await setJob(db, jobId, { status: 'done', step: '' });
+      await step.do('purge', async () => { await purgeOld(env); });
+    } catch (e) {
+      const cur = await getJob(db, jobId);
+      if (cur?.status !== 'stopped') await setJob(db, jobId, { status: 'failed', step: '', error: String(e.message || e).slice(0, 500), finished_at: now() });
+      throw e;
+    }
+  }
+
+  // 본편: 뉴스 후보 → Top15 → (6개 고르기) → 기사 6 → 팩트체크 → 유튜브 패키지 → 슬라이드 → 검수 → 썸네일
+  async runMain(S, step, job, opt, settings) {
+    const env = this.env, db = env.DB, jobId = job.id;
+    let blocks;
+    if (job.source === 'rss') {
+      const cands = await S('rss', async () => { const c = await rssCandidates(12); if (c.length < 3) throw new Error(`RSS 후보가 ${c.length}건뿐입니다.`); await saveDoc(db, jobId, 'candidates', c); return { out: c, note: `${c.length}건` }; });
+      const top = await S('top15', async () => {
+        const list = cands.map((c) => `[${c.n}] ${c.title}\n    ${c.label} | ${c.published_kst}\n    ${c.url}\n    ${c.summary}`).join('\n');
+        const r = await claude(env, { system: P.TOP15_SYSTEM, schema: P.TOP15_SCHEMA, messages: [{ role: 'user', content: `기준 시각: ${kst(now())} (최근 12시간)\n\n후보 목록:\n${list}` }] });
+        const t = r.json; t.items = t.items.slice(0, 15);
+        await saveDoc(db, jobId, 'top15', t);
+        return { out: t, usage: r.usage, note: `${t.items.length}개 · 추천 ${t.picks.join(',')}` };
+      });
+      let chosen = top.picks.slice(0, 6);
+      if (opt.pick === 'manual') {
+        await setJob(db, jobId, { status: 'pick', step: 'pick' });
+        const ev = await step.waitForEvent('pick', { type: 'pick', timeout: '3 days' });
+        chosen = (ev.payload?.chosen || []).map(Number).filter((n) => top.items.some((i) => i.n === n)).slice(0, 6);
+        if (!chosen.length) throw new NonRetryableError('고른 기사가 없습니다.');
+        await saveDoc(db, jobId, 'chosen', chosen);
+      }
+      const items = chosen.map((n) => top.items.find((i) => i.n === n)).filter(Boolean);
+      const arts = await Promise.all(items.map((it, i) => S(`article-${i + 1}`, async () => {
+        const r = await claude(env, {
+          messages: [{ role: 'user', content: P.ARTICLE_FROM_URL(it.url, `${it.title} — ${it.summary}`) }],
+          tools: [{ type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 2 }],
+        });
+        const text = r.text.replace(/^```[\w]*\n?|```$/g, '').trim();
+        if (!text.startsWith('📌')) throw new Error('대본 형식이 아닙니다(📌 없음).');
+        return { out: text, usage: r.usage, note: text.split('\n')[0].slice(0, 60) };
+      }, it.title)));
+      blocks = arts;
+    } else if (job.source === 'capture') {
+      const caps = (await jobAssets(db, jobId)).filter((a) => a.kind === 'capture').sort((a, b) => a.idx - b.idx);
+      if (!caps.length) throw new NonRetryableError('캡쳐 이미지가 없습니다.');
+      blocks = await Promise.all(caps.map((a, i) => S(`article-${i + 1}`, async () => {
+        const img = await readAssetB64(env, a);
+        const r = await claude(env, { messages: [{ role: 'user', content: [imgBlock(img.b64, img.mime), { type: 'text', text: P.ARTICLE_FROM_IMAGE }] }] });
+        const text = r.text.replace(/^```[\w]*\n?|```$/g, '').trim();
+        if (!text.startsWith('📌')) throw new Error('대본 형식이 아닙니다(📌 없음).');
+        return { out: text, usage: r.usage, note: text.split('\n')[0].slice(0, 60) };
+      })));
+    } else {
+      const text = opt.text || '';
+      if (!text.trim()) throw new NonRetryableError('글이 비어 있습니다.');
+      blocks = [await S('article-1', async () => {
+        const r = await claude(env, { messages: [{ role: 'user', content: P.ARTICLE_FROM_TEXT(text) }] });
+        const t = r.text.replace(/^```[\w]*\n?|```$/g, '').trim();
+        return { out: t, usage: r.usage, note: t.split('\n')[0].slice(0, 60) };
+      })];
+    }
+    await step.do('save-articles', async () => { await saveDoc(db, jobId, 'articles', blocks.join('\n\n')); });
+
+    const fact = await S('factcheck', async () => {
+      const r = await claude(env, { system: P.FACTCHECK_SYSTEM, schema: P.FACTCHECK_SCHEMA, messages: [{ role: 'user', content: blocks.map((b, i) => `[블록 ${i + 1}]\n${b}`).join('\n\n') }] });
+      const f = r.json;
+      if (!Array.isArray(f.fixed_blocks) || f.fixed_blocks.length !== blocks.length) f.fixed_blocks = blocks;
+      await saveDoc(db, jobId, 'factcheck', f);
+      return { out: f, usage: r.usage, note: f.summary.slice(0, 120) };
+    });
+    const fixed = fact.fixed_blocks;
+
+    const summary = await S('summary', async () => {
+      const r = await claude(env, { system: P.SUMMARY_SYSTEM, schema: P.SUMMARY_SCHEMA, messages: [{ role: 'user', content: `[사람 이름] ${fact.people.join(', ') || '없음'}\n\n${fixed.join('\n\n')}` }] });
+      const s = r.json;
+      await saveDoc(db, jobId, 'summary', s);
+      await setJob(db, jobId, { title: (s.titles?.[0] || '').slice(0, 120) });
+      return { out: s, usage: r.usage, note: s.titles?.[0] || '' };
+    });
+    // 방송 대본(슬라이드쇼 오른쪽): 첫 장 앞에 인사말 + 인트로
+    await step.do('show-texts', async () => {
+      const texts = fixed.map((b) => b.replace(/^📌\s*/, '📌'));
+      texts[0] = `${settings[`greeting_${job.channel}`] || ''}\n${summary.intro || ''}\n\n${texts[0]}`.trim();
+      await saveDoc(db, jobId, 'show_texts', texts);
+    });
+
+    // 슬라이드 (그림 키가 없으면 건너뛰고 기록만 남긴다)
+    if (env.OPENAI_API_KEY && opt.engine !== 'none') {
+      await Promise.all(fixed.map((b, i) => S(`slide-${i + 1}`, () => this.makeSlide(settings, jobId, i + 1, b))));
+      await Promise.all(fixed.map((b, i) => S(`review-${i + 1}`, () => this.reviewSlide(settings, jobId, i + 1, b))));
+      // 썸네일
+      let pick = { title: summary.titles?.[0] || job.title, emotion: '자동', gesture: '자동', badgeName: '', badgeRole: '', face: 'emoji:auto' };
+      if (opt.thumb === 'manual') {
+        await setJob(db, jobId, { status: 'thumb', step: 'thumb' });
+        const ev = await step.waitForEvent('thumb', { type: 'thumb', timeout: '3 days' });
+        pick = { ...pick, ...(ev.payload || {}) };
+        await saveDoc(db, jobId, 'thumb_pick', pick);
+      }
+      await S('thumb', () => this.makeThumb(settings, job, pick));
+    } else {
+      await step.do('slides-skipped', async () => {
+        const sid = await stepStart(db, jobId, 'slides', '');
+        await stepEnd(db, sid, jobId, 'skipped', env.OPENAI_API_KEY ? '그림 엔진 꺼짐' : 'OPENAI_API_KEY 가 없어 그림 단계를 건너뜀');
+      });
+    }
+  }
+
+  async runThumbOnly(S, step, job, opt, settings) {
+    const pick = { title: opt.title || job.title, emotion: opt.emotion || '자동', gesture: opt.gesture || '자동', badgeName: opt.badgeName || '', badgeRole: opt.badgeRole || '', face: opt.face || 'emoji:auto' };
+    await S('thumb', () => this.makeThumb(settings, job, pick));
+  }
+
+  // 다시 만들기: { what: 'slide'|'thumb', idx, ...선택 }
+  async redo(S, step, job, opt, settings, p) {
+    const db = this.env.DB;
+    if (p.what === 'slide') {
+      const fixed = docJson(await latestDoc(db, job.id, 'factcheck'))?.fixed_blocks || splitBlocks((await latestDoc(db, job.id, 'articles'))?.body);
+      const b = fixed[p.idx - 1];
+      if (!b) throw new NonRetryableError('그 번호의 원고가 없습니다.');
+      for (const a of (await jobAssets(db, job.id)).filter((a) => a.kind === 'slide' && a.idx === p.idx)) await dropAsset(this.env, a);
+      await S(`slide-${p.idx}`, () => this.makeSlide(settings, job.id, p.idx, b, p.note || ''));
+      await S(`review-${p.idx}`, () => this.reviewSlide(settings, job.id, p.idx, b));
+    } else if (p.what === 'thumb') {
+      const prev = docJson(await latestDoc(db, job.id, 'thumb_pick')) || {};
+      const pick = { ...prev, ...(p.pick || {}) };
+      if (!pick.title) pick.title = job.title;
+      await saveDoc(db, job.id, 'thumb_pick', pick);
+      for (const a of (await jobAssets(db, job.id)).filter((a) => a.kind === 'thumb')) await dropAsset(this.env, a);
+      await S('thumb', () => this.makeThumb(settings, job, pick));
+    } else throw new NonRetryableError('모르는 다시 만들기: ' + p.what);
+  }
+
+  async makeSlide(settings, jobId, idx, block, extra = '') {
+    const prompt = P.SLIDE_PROMPT(block, settings.slide_style) + (extra ? `\n\n추가 요청: ${extra}` : '');
+    const img = await openaiImage(this.env, settings, { prompt, size: '1536x1024' });
+    const id = await putAsset(this.env, jobId, 'slide', idx, img.bytes, img.mime, { prompt: prompt.slice(0, 4000), model: settings.image_model }, img);
+    return { out: id, usage: { images: 1 }, note: `${img.w}x${img.h}` };
+  }
+
+  async reviewSlide(settings, jobId, idx, block) {
+    const env = this.env, db = env.DB;
+    const a = (await jobAssets(db, jobId)).filter((x) => x.kind === 'slide' && x.idx === idx).pop();
+    if (!a) return { note: '그림 없음' };
+    const img = await readAssetB64(env, a);
+    const r = await claude(env, { system: P.REVIEW_SLIDE_SYSTEM, schema: P.REVIEW_SCHEMA, effort: 'low', messages: [{ role: 'user', content: [imgBlock(img.b64, img.mime), { type: 'text', text: `원고 블록:\n${block}` }] }] });
+    const meta = { ...JSON.parse(a.meta || '{}'), review: r.json };
+    await db.prepare('UPDATE studio_assets SET meta = ? WHERE id = ?').bind(JSON.stringify(meta), a.id).run();
+    if (!r.json.pass) {
+      // 불합격이면 한 번만 다시 만든다 (그래도 불합격이면 표시만 남긴다)
+      await dropAsset(env, a);
+      const prompt = P.SLIDE_PROMPT(block, settings.slide_style) + `\n\n이전 시도의 문제(반드시 고칠 것): ${r.json.reason}`;
+      const img2 = await openaiImage(env, settings, { prompt, size: '1536x1024' });
+      const id2 = await putAsset(env, jobId, 'slide', idx, img2.bytes, img2.mime, { prompt: prompt.slice(0, 4000), model: settings.image_model, retry_of: r.json.reason }, img2);
+      const b = await readAssetB64(env, { r2_key: (await db.prepare('SELECT r2_key FROM studio_assets WHERE id = ?').bind(id2).first()).r2_key, mime: img2.mime });
+      const r2 = await claude(env, { system: P.REVIEW_SLIDE_SYSTEM, schema: P.REVIEW_SCHEMA, effort: 'low', messages: [{ role: 'user', content: [imgBlock(b.b64, b.mime), { type: 'text', text: `원고 블록:\n${block}` }] }] });
+      await db.prepare('UPDATE studio_assets SET meta = json_set(meta, \'$.review\', json(?)) WHERE id = ?').bind(JSON.stringify(r2.json), id2).run();
+      return { usage: { in: r.usage.in + r2.usage.in, out: r.usage.out + r2.usage.out, images: 1 }, note: `1차 불합격(${r.json.reason}) → 재생성 ${r2.json.pass ? '합격' : '불합격: ' + r2.json.reason}` };
+    }
+    return { usage: r.usage, note: '합격' };
+  }
+
+  async makeThumb(settings, job, pick) {
+    const env = this.env, db = env.DB;
+    const refs = [];
+    let face = pick.face || '';
+    if (face === 'emoji:auto') face = `emoji:${String(1 + Math.floor(Math.random() * 87)).padStart(3, '0')}`;
+    if (face.startsWith('emoji:')) {
+      const o = await env.FILES.get(`studio/faces/${face.slice(6)}.webp`);
+      if (o) refs.push({ bytes: new Uint8Array(await o.arrayBuffer()), mime: 'image/webp' });
+    } else if (face.startsWith('asset:')) {
+      const a = await db.prepare('SELECT * FROM studio_assets WHERE id = ?').bind(face.slice(6)).first();
+      if (a) { const o = await env.FILES.get(a.r2_key); if (o) refs.push({ bytes: new Uint8Array(await o.arrayBuffer()), mime: a.mime }); }
+    }
+    const prompt = P.thumbPrompt({ title: pick.title, channel: job.channel, emotion: pick.emotion, gesture: pick.gesture, badgeName: pick.badgeName, badgeRole: pick.badgeRole, styleRules: settings[`thumb_style_${job.channel}`], hasFace: refs.length > 0 });
+    const img = await openaiImage(env, settings, { prompt, size: '1536x1024', refs });
+    const id = await putAsset(env, job.id, 'thumb', 1, img.bytes, img.mime, { prompt: prompt.slice(0, 4000), model: settings.image_model, pick, face }, img);
+    // 검수 1회 (불합격이면 표시만 — 재생성은 사용자가 '다시 만들기' 로)
+    const b = await readAssetB64(env, { r2_key: (await db.prepare('SELECT r2_key FROM studio_assets WHERE id = ?').bind(id).first()).r2_key, mime: img.mime });
+    const r = await claude(env, { system: P.REVIEW_THUMB_SYSTEM, schema: P.REVIEW_SCHEMA, effort: 'low', messages: [{ role: 'user', content: [imgBlock(b.b64, b.mime), { type: 'text', text: `요구: 제목 "${pick.title}", 표정 ${pick.emotion || '자동'}, 제스처 ${pick.gesture || '자동'}, 명찰 ${pick.badgeName ? `"${pick.badgeName}" / "${pick.badgeRole || ''}"` : '없음'}, 인물 ${refs.length ? '있음' : '없음'}` }] }] });
+    await db.prepare('UPDATE studio_assets SET meta = json_set(meta, \'$.review\', json(?)) WHERE id = ?').bind(JSON.stringify(r.json), id).run();
+    return { out: id, usage: { ...r.usage, images: 1 }, note: r.json.pass ? '합격' : `불합격: ${r.json.reason}` };
+  }
+}
+
+// ───────────────────────── 운영자 API ─────────────────────────
+export async function studioApi(request, env, url, ctx, path, method, bodyFn, audit) {
+  const db = env.DB;
+  const m = (re) => path.match(re);
+
+  if (path === '/api/studio/options' && method === 'GET') {
+    const settings = await getSettings(db);
+    return json({ emotions: P.THUMB_EMOTIONS, gestures: P.THUMB_GESTURES, faces: Array.from({ length: 87 }, (_, i) => String(i + 1).padStart(3, '0')), settings, keys: { anthropic: !!env.ANTHROPIC_API_KEY, openai: !!env.OPENAI_API_KEY } });
+  }
+  if (path === '/api/studio/settings' && method === 'PUT') {
+    const data = await bodyFn(request);
+    const stmts = [];
+    for (const k of SETTING_KEYS) if (k in data) stmts.push(db.prepare('INSERT INTO studio_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(k, String(data[k] ?? '').slice(0, 4000)));
+    if (stmts.length) await db.batch(stmts);
+    await audit?.('STUDIO_SETTINGS', '스튜디오 설정', Object.keys(data).join(', '));
+    return json({ ok: true, settings: await getSettings(db) });
+  }
+  let mm;
+  if ((mm = m(/^\/api\/studio\/face\/(\d{3})$/)) && method === 'GET') {
+    const o = await env.FILES.get(`studio/faces/${mm[1]}.webp`);
+    if (!o) return new Response('없음', { status: 404 });
+    return new Response(o.body, { headers: { 'Content-Type': 'image/webp', 'Cache-Control': 'private, max-age=86400' } });
+  }
+
+  // 업로드(캡쳐 · 인물 사진): 브라우저가 webp 로 줄여 보낸다. 본문 = 이미지 바이트
+  if (path === '/api/studio/upload' && method === 'POST') {
+    const mime = request.headers.get('Content-Type') || '';
+    if (!/^image\/(webp|png|jpeg)$/.test(mime)) throw bad('webp · png · jpg 이미지만 올릴 수 있습니다.');
+    const bytes = new Uint8Array(await request.arrayBuffer());
+    if (bytes.byteLength > 6 * 1024 * 1024) throw bad('6MB 이하로 올려 주세요.');
+    const kind = url.searchParams.get('kind') === 'face' ? 'face_upload' : 'capture';
+    const id = await putAsset(env, '', kind, 0, bytes, mime, { name: request.headers.get('X-Name') || '' });
+    return json({ id, url: `/studio/a/${id}` });
+  }
+
+  if (path === '/api/studio/jobs' && method === 'GET') {
+    const limit = Math.min(100, +(url.searchParams.get('limit') || 40));
+    const { results } = await db.prepare('SELECT id, kind, channel, source, status, step, title, error, cost, assets_purged, created_at, updated_at, finished_at FROM studio_jobs ORDER BY created_at DESC LIMIT ?').bind(limit).all();
+    const thumbs = results.length ? (await db.prepare(`SELECT job_id, id FROM studio_assets WHERE kind = 'thumb' AND job_id IN (${results.map(() => '?').join(',')})`).bind(...results.map((r) => r.id)).all()).results : [];
+    const tmap = Object.fromEntries(thumbs.map((t) => [t.job_id, t.id]));
+    return json(results.map((r) => ({ ...r, thumb: tmap[r.id] ? `/studio/a/${tmap[r.id]}` : '' })));
+  }
+
+  if (path === '/api/studio/jobs' && method === 'POST') {
+    const d = await bodyFn(request);
+    const kind = ['main', 'thumb', 'phone'].includes(d.kind) ? d.kind : 'main';
+    if (kind === 'phone') throw bad('폰UI 쇼츠는 다음 단계에서 열립니다.');
+    const channel = d.channel === '순섬' ? '순섬' : '사섬';
+    const source = ['rss', 'capture', 'text'].includes(d.source) ? d.source : 'rss';
+    const settings = await getSettings(db);
+    const today = await db.prepare('SELECT COUNT(*) AS n FROM studio_jobs WHERE created_at > ?').bind(now() - 86400000).first();
+    if (today.n >= settings.daily_limit) throw bad(`하루 최대 ${settings.daily_limit}회를 넘었습니다(과금 안전장치). 설정에서 바꿀 수 있습니다.`);
+    const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine: d.engine === 'none' ? 'none' : 'api', text: String(d.text || '').slice(0, 20000) };
+    if (kind === 'thumb') Object.assign(options, { title: String(d.title || '').slice(0, 200), emotion: d.emotion || '자동', gesture: d.gesture || '자동', badgeName: String(d.badgeName || '').slice(0, 60), badgeRole: String(d.badgeRole || '').slice(0, 80), face: d.face || 'emoji:auto' });
+    if (kind === 'thumb' && !options.title) throw bad('썸네일 제목을 넣어 주세요.');
+    const id = hex(10);
+    await db.prepare('INSERT INTO studio_jobs (id, kind, channel, source, options, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(id, kind, channel, source, JSON.stringify(options), 'queued', now(), now()).run();
+    // 올린 캡쳐를 이 작업에 붙인다
+    const caps = Array.isArray(d.captures) ? d.captures.filter((x) => /^[a-f0-9]{24}$/.test(x)).slice(0, 6) : [];
+    for (let i = 0; i < caps.length; i++) await db.prepare("UPDATE studio_assets SET job_id = ?, idx = ? WHERE id = ? AND job_id = ''").bind(id, i + 1, caps[i]).run();
+    if (source === 'capture' && !caps.length) { await db.prepare('DELETE FROM studio_jobs WHERE id = ?').bind(id).run(); throw bad('캡쳐 이미지를 올려 주세요.'); }
+    const inst = await env.STUDIO_WF.create({ id: `job-${id}-${hex(3)}`, params: { jobId: id } });
+    await setJob(db, id, { wf_id: inst.id });
+    await audit?.('STUDIO_JOB', `스튜디오 ${kind}`, `${channel} · ${source} · ${id}`);
+    return json({ id });
+  }
+
+  if ((mm = m(/^\/api\/studio\/jobs\/([a-f0-9]{20})$/))) {
+    const job = await getJob(db, mm[1]);
+    if (!job) throw new HttpError(404, '작업이 없습니다.');
+    if (method === 'GET') {
+      const steps = (await db.prepare('SELECT * FROM studio_steps WHERE job_id = ? ORDER BY id').bind(job.id).all()).results;
+      const docs = (await db.prepare('SELECT kind, MAX(version) AS version, body FROM studio_docs WHERE job_id = ? GROUP BY kind').bind(job.id).all()).results;
+      const assets = (await jobAssets(db, job.id)).map((a) => ({ ...a, url: `/studio/a/${a.id}`, meta: JSON.parse(a.meta || '{}') }));
+      // 혹시 Workflow 가 죽어 상태가 안 바뀌었으면 Workflow 상태로 맞춘다
+      if (['queued', 'running', 'pick', 'thumb'].includes(job.status) && job.wf_id) {
+        try { const st = await (await env.STUDIO_WF.get(job.wf_id)).status(); if (st.status === 'errored' || st.status === 'terminated') { await setJob(db, job.id, { status: st.status === 'errored' ? 'failed' : 'stopped', error: String(st.error?.message || st.error || '').slice(0, 500), finished_at: now() }); Object.assign(job, { status: st.status === 'errored' ? 'failed' : 'stopped' }); } } catch { /* 없으면 그대로 */ }
+      }
+      return json({ job: { ...job, options: JSON.parse(job.options || '{}') }, steps, docs: Object.fromEntries(docs.map((d) => [d.kind, { version: d.version, body: d.body }])), assets, show_url: `/studio/show/${job.id}` });
+    }
+    if (method === 'DELETE') {
+      for (const a of await jobAssets(db, job.id)) await dropAsset(env, a);
+      if (job.wf_id && ['queued', 'running', 'pick', 'thumb'].includes(job.status)) { try { await (await env.STUDIO_WF.get(job.wf_id)).terminate(); } catch { /* 이미 끝남 */ } }
+      await db.prepare('DELETE FROM studio_jobs WHERE id = ?').bind(job.id).run();
+      await audit?.('STUDIO_DELETE', '스튜디오 삭제', job.title || job.id);
+      return json({ ok: true });
+    }
+  }
+  if ((mm = m(/^\/api\/studio\/jobs\/([a-f0-9]{20})\/(pick|thumb|stop|redo)$/)) && method === 'POST') {
+    const job = await getJob(db, mm[1]);
+    if (!job) throw new HttpError(404, '작업이 없습니다.');
+    const d = await bodyFn(request);
+    const inst = job.wf_id ? await env.STUDIO_WF.get(job.wf_id) : null;
+    if (mm[2] === 'stop') {
+      if (inst) { try { await inst.terminate(); } catch { /* 이미 끝남 */ } }
+      await setJob(db, job.id, { status: 'stopped', step: '', finished_at: now() });
+      return json({ ok: true });
+    }
+    if (mm[2] === 'pick') {
+      if (job.status !== 'pick') throw bad('지금은 고르기 단계가 아닙니다.');
+      const chosen = (d.chosen || []).map(Number).filter(Boolean).slice(0, 6);
+      if (chosen.length < 1) throw bad('기사를 골라 주세요.');
+      await inst.sendEvent({ type: 'pick', payload: { chosen } });
+      await setJob(db, job.id, { status: 'running', step: 'articles' });
+      return json({ ok: true });
+    }
+    if (mm[2] === 'thumb') {
+      if (job.status !== 'thumb') throw bad('지금은 썸네일 선택 단계가 아닙니다.');
+      const pick = thumbPickFields(d);
+      await inst.sendEvent({ type: 'thumb', payload: pick });
+      await setJob(db, job.id, { status: 'running', step: 'thumb' });
+      return json({ ok: true });
+    }
+    if (mm[2] === 'redo') {
+      if (['queued', 'running', 'pick', 'thumb'].includes(job.status)) throw bad('작업이 끝난 뒤에 다시 만들 수 있습니다.');
+      const what = d.what === 'thumb' ? 'thumb' : 'slide';
+      const payload = { jobId: job.id, task: 'redo', what, idx: Math.max(1, Math.min(12, +(d.idx || 1))), note: String(d.note || '').slice(0, 500), pick: what === 'thumb' ? thumbPickFields(d.pick || {}) : null };
+      const i2 = await env.STUDIO_WF.create({ id: `redo-${job.id}-${hex(3)}`, params: payload });
+      await setJob(db, job.id, { wf_id: i2.id, status: 'running', step: what, error: '' });
+      return json({ ok: true });
+    }
+  }
+  if ((mm = m(/^\/api\/studio\/jobs\/([a-f0-9]{20})\/docs\/(articles|show_texts|summary|factcheck)$/)) && method === 'PUT') {
+    const job = await getJob(db, mm[1]);
+    if (!job) throw new HttpError(404, '작업이 없습니다.');
+    const d = await bodyFn(request);
+    const body = typeof d.body === 'string' ? d.body : JSON.stringify(d.body);
+    if (!body || body.length > 200000) throw bad('내용이 비었거나 너무 깁니다.');
+    const v = await saveDoc(db, job.id, mm[2], body);
+    return json({ ok: true, version: v });
+  }
+  if ((mm = m(/^\/api\/studio\/jobs\/([a-f0-9]{20})\/docs\/([a-z_]+)\/versions$/)) && method === 'GET') {
+    const { results } = await db.prepare('SELECT version, body, created_at FROM studio_docs WHERE job_id = ? AND kind = ? ORDER BY version DESC LIMIT 20').bind(mm[1], mm[2]).all();
+    return json(results);
+  }
+  throw new HttpError(404, '없는 주소입니다.');
+}
+function thumbPickFields(d) {
+  const o = {};
+  if (d.title) o.title = String(d.title).slice(0, 200);
+  o.emotion = String(d.emotion || '자동').slice(0, 40);
+  o.gesture = String(d.gesture || '자동').slice(0, 40);
+  o.badgeName = String(d.badgeName || '').slice(0, 60);
+  o.badgeRole = String(d.badgeRole || '').slice(0, 80);
+  o.face = /^(emoji:(\d{3}|auto)|asset:[a-f0-9]{24}|)$/.test(d.face || '') ? (d.face || '') : 'emoji:auto';
+  return o;
+}
+
+// ───────────────────────── 공개 주소: 그림 · 슬라이드쇼 ─────────────────────────
+export async function studioPublic(request, env, url) {
+  const db = env.DB;
+  let mm;
+  if ((mm = url.pathname.match(/^\/studio\/a\/([a-f0-9]{24})$/))) {
+    const a = await db.prepare('SELECT r2_key, mime FROM studio_assets WHERE id = ?').bind(mm[1]).first();
+    if (!a) return new Response('없음', { status: 404 });
+    const o = await env.FILES.get(a.r2_key);
+    if (!o) return new Response('없음', { status: 404 });
+    return new Response(o.body, { headers: { 'Content-Type': a.mime, 'Cache-Control': 'public, max-age=31536000, immutable' } });
+  }
+  if ((mm = url.pathname.match(/^\/studio\/show\/([a-f0-9]{20})(\/save)?$/))) {
+    const job = await getJob(db, mm[1]);
+    if (!job) return new Response('없는 작업입니다.', { status: 404 });
+    if (mm[2]) {
+      if (request.method !== 'POST') return new Response('POST', { status: 405 });
+      let d; try { d = await request.json(); } catch { return json({ error: 'JSON' }, 400); }
+      if (!Array.isArray(d.texts) || d.texts.length > 20) return json({ error: '형식' }, 400);
+      const v = await saveDoc(db, job.id, 'show_texts', d.texts.map((t) => String(t).slice(0, 20000)));
+      return json({ ok: true, version: v });
+    }
+    const texts = docJson(await latestDoc(db, job.id, 'show_texts')) || splitBlocks((await latestDoc(db, job.id, 'articles'))?.body) || [];
+    const slides = (await jobAssets(db, job.id)).filter((a) => a.kind === 'slide');
+    const imgs = texts.map((_, i) => { const a = slides.filter((s) => s.idx === i + 1).pop(); return a ? `/studio/a/${a.id}` : ''; });
+    return new Response(showHtml(job, texts, imgs), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
+  }
+  return null;
+}
+
+// 04_PPTMaker.md 스펙 그대로: 왼쪽 1400px 슬라이드 · 오른쪽 500px 대본 · 큰 페이지 버튼 · 타이머 · 좌우 커서 · 본문 편집 · Ctrl+S 저장(서버로)
+function showHtml(job, texts, imgs) {
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const data = JSON.stringify({ texts, imgs, id: job.id }).replace(/</g, '\\u003c');
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<title>${esc(job.title || '슬라이드쇼')}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{background:#e9e9e9}
+body{font-family:"Pretendard Variable",Pretendard,"Malgun Gothic","Noto Sans KR",sans-serif}
+.stage{display:flex;align-items:flex-start;gap:0}
+.left{width:1400px;flex:0 0 1400px}
+.slide-frame{width:1400px;height:787.5px;background:#000;overflow:hidden}
+.slide-frame img{width:1400px;height:787.5px;display:block;object-fit:cover;border-radius:0}
+.slide-frame .none{width:1400px;height:787.5px;display:grid;place-items:center;color:#777;font-size:28px}
+.right{width:500px;flex:0 0 500px}
+.textbox{width:500px;height:787.5px;overflow-y:auto;background:#fff;border-left:1px solid #d0d0d0;padding:26px 28px;font-size:19pt;font-weight:600;line-height:1.55;color:#111;outline:none;white-space:pre-wrap;word-break:keep-all}
+.nav{width:500px;margin-top:10px;display:flex;gap:12px;align-items:center;justify-content:center}
+.nav button{font-family:inherit;font-size:26px;font-weight:700;padding:14px 30px;border:1px solid #bbb;border-radius:10px;background:#fff;cursor:pointer}
+.nav button:disabled{opacity:.35;cursor:default}
+.nav .page{font-size:26px;font-weight:700;color:#444;min-width:110px;text-align:center}
+.timer{width:500px;margin-top:10px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.timer .disp{font-size:60px;font-weight:700;line-height:1;color:#111;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.timer .btns{display:flex;gap:12px}
+.timer .btns button{font-family:inherit;font-size:20px;font-weight:700;padding:8px 22px;border:1px solid #bbb;border-radius:10px;background:#fff;cursor:pointer}
+.savemsg{width:500px;margin-top:6px;min-height:18px;text-align:center;font-size:14px;color:#2f7d32}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="left"><div class="slide-frame" id="frame"></div></div>
+  <div class="right">
+    <div class="textbox" id="textbox" contenteditable="true" spellcheck="false"></div>
+    <div class="nav"><button id="btnPrev" type="button">◀ 이전</button><div class="page" id="pageLabel"></div><button id="btnNext" type="button">다음 ▶</button></div>
+    <div class="timer"><div class="disp" id="timerDisp">00:00</div><div class="btns"><button id="btnTimer" type="button">시작</button><button id="btnReset" type="button">리셋</button></div></div>
+    <div class="savemsg" id="saveMsg"></div>
+  </div>
+</div>
+<script id="data" type="application/json">${data}</script>
+<script>
+const D=JSON.parse(document.getElementById('data').textContent);let texts=D.texts,N=texts.length,cur=0;
+const frame=document.getElementById('frame'),box=document.getElementById('textbox'),lbl=document.getElementById('pageLabel'),bPrev=document.getElementById('btnPrev'),bNext=document.getElementById('btnNext'),msg=document.getElementById('saveMsg');
+function commitEdit(){texts[cur]=box.innerText.replace(/\\n{3,}/g,'\\n\\n');}
+function show(i){cur=i;frame.innerHTML=D.imgs[i]?'<img src="'+D.imgs[i]+'" alt="">':'<div class="none">슬라이드 '+(i+1)+' 그림 없음</div>';box.innerText=texts[i]||'';box.scrollTop=0;lbl.textContent=(i+1)+' / '+N;bPrev.disabled=i===0;bNext.disabled=i===N-1;}
+bPrev.addEventListener('click',()=>{if(cur>0){commitEdit();show(cur-1);}});
+bNext.addEventListener('click',()=>{if(cur<N-1){commitEdit();show(cur+1);}});
+box.addEventListener('paste',e=>{e.preventDefault();document.execCommand('insertText',false,(e.clipboardData||window.clipboardData).getData('text/plain'));});
+box.addEventListener('input',commitEdit);
+const tDisp=document.getElementById('timerDisp'),tBtn=document.getElementById('btnTimer');let tSec=0,tId=null;
+const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+tBtn.addEventListener('click',()=>{if(tId){clearInterval(tId);tId=null;tBtn.textContent='시작';}else{tId=setInterval(()=>{tSec++;tDisp.textContent=fmt(tSec);},1000);tBtn.textContent='정지';}});
+document.getElementById('btnReset').addEventListener('click',()=>{if(tId){clearInterval(tId);tId=null;tBtn.textContent='시작';}tSec=0;tDisp.textContent='00:00';});
+let dir=0,raf=null;function stepScroll(){if(dir){box.scrollTop+=dir*14;raf=requestAnimationFrame(stepScroll);}else raf=null;}
+document.addEventListener('keydown',e=>{const inBox=document.activeElement===box;if(e.key==='ArrowLeft'&&!inBox)bPrev.click();else if(e.key==='ArrowRight'&&!inBox)bNext.click();else if(e.key==='ArrowUp'&&!inBox){e.preventDefault();dir=-1;if(!raf)stepScroll();}else if(e.key==='ArrowDown'&&!inBox){e.preventDefault();dir=1;if(!raf)stepScroll();}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();commitEdit();fetch(location.pathname+'/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texts})}).then(r=>r.json()).then(r=>{msg.textContent=r.ok?'저장됨 (버전 '+r.version+') '+new Date().toLocaleTimeString():'저장 실패';setTimeout(()=>msg.textContent='',3000);}).catch(()=>{msg.textContent='저장 실패';});}});
+document.addEventListener('keyup',e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown')dir=0;});
+show(0);
+</script>
+</body>
+</html>`;
+}
