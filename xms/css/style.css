@@ -828,6 +828,19 @@ input[type="date"], input[type="datetime-local"], input[type="time"], input[type
 .st-rank b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .st-rank small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mute); font-size: 12px; }
 .st-rank li > span:last-of-type { flex: none; font-variant-numeric: tabular-nums; font-weight: 600; }
+/* 검색으로 들어옴 */
+.st-search h3 { margin: 0 0 8px; font-size: 15px; color: var(--sub); }
+.st-search h3.gap { margin-top: 18px; }
+.st-search h2 small, .st-search h3 small { display: inline; margin-left: 6px; font-weight: 400; }
+.st-recent-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.st-recent { min-width: 520px; }
+.st-recent td:first-child { white-space: nowrap; color: var(--sub); font-variant-numeric: tabular-nums; }
+.st-recent td:nth-child(2) { white-space: nowrap; }
+.st-recent td:nth-child(3) { overflow-wrap: anywhere; }
+.st-recent td a { color: var(--ink); text-decoration: none; }
+.st-recent td a:hover { text-decoration: underline; }
+.st-recent td small { display: block; color: var(--mute); font-size: 12px; }
+.st-hidden { color: var(--mute); font-style: normal; }
 @media (max-width: 1023px) { .st-cols { grid-template-columns: 1fr; } }
 @media (max-width: 767px) {
   .st-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

@@ -829,12 +829,12 @@ async function statsPage() {
   main.innerHTML = `${head('사이트', '방문 통계', '홈페이지 방문자와 많이 본 페이지입니다. 최근 1년치만 남고 그보다 오래된 기록은 저절로 지워집니다.')}
     <div class="st-bar"><div class="tabs" id="st-tabs"></div></div>
     <div id="st-body"></div>`;
-  const pg = { pp: 1, rp: 1, tp: 1 }; // 많이 본 페이지 · 들어온 곳 · 표 쪽 번호
+  const pg = { pp: 1, rp: 1, tp: 1, kp: 1, sp: 1 }; // 많이 본 페이지 · 들어온 곳 · 표 · 검색어 · 최근 검색 유입 쪽 번호
   let d = null;
   const body = $('#st-body');
   const load = async () => {
     body.classList.add('loading');
-    const r = await api(`/stats?range=${statsRange}&pp=${pg.pp}&rp=${pg.rp}`);
+    const r = await api(`/stats?range=${statsRange}&pp=${pg.pp}&rp=${pg.rp}&kp=${pg.kp}&sp=${pg.sp}`);
     if (location.hash.split('?')[0] !== '#/stats') return;
     d = r;
     const open = body.querySelector('.st-table')?.open;
@@ -855,7 +855,7 @@ async function statsPage() {
   });
   // 탭은 한 번만 그리고, 누르면 배경부터 미끄러진 뒤 아래 내용만 다시 받는다
   pillTabs($('#st-tabs'), Object.entries(RANGE_LABEL).map(([v, l]) => [v, l.replace('최근 ', '')]), statsRange, (v) => {
-    statsRange = v; pg.pp = 1; pg.rp = 1; pg.tp = 1;
+    statsRange = v; Object.keys(pg).forEach((k) => { pg[k] = 1; });
     load().catch((e) => toast(e.message));
   });
   await load();
@@ -915,7 +915,33 @@ function statsBody(d) {
         ${d.refs.length ? `<ol class="st-rank">${d.refs.map((r) => `<li><span class="st-name"><b>${esc(refName(r.ref) || r.ref)}</b>${r.ref && refName(r.ref) ? `<small>${esc(r.ref)}</small>` : ''}</span><span>${num(r.visitors)} <small>${Math.round((r.visitors / d.refs_sum) * 100)}%</small></span>${bar(r.visitors, d.refs_sum)}</li>`).join('')}</ol>${btnPager('rp', d.rp, d.rank_size, d.refs_total)}` : '<p class="meta">아직 기록이 없습니다.</p>'}
       </div>
     </div>
+    ${statsSearch(d, label, bar)}
     <p class="meta gap">방문자 = 그날 처음 들어온 브라우저 수(같은 사람이 하루에 여러 번 와도 1명), 페이지뷰 = 페이지를 연 횟수. 검색엔진 로봇과 관리 화면은 세지 않습니다.${d.first_day ? ` 기록 시작: ${esc(d.first_day)}` : ''}</p>`;
+}
+// 검색으로 들어옴: 검색엔진별 · 많이 찾은 검색어 · 최근 유입 한 줄씩
+const HIDDEN_KW = '<em class="st-hidden">검색어 비공개</em>';
+const fmtAt = (ms) => { const t = new Date(Number(ms) + 9 * 3600000); return `${t.getUTCMonth() + 1}/${t.getUTCDate()} ${String(t.getUTCHours()).padStart(2, '0')}:${String(t.getUTCMinutes()).padStart(2, '0')}`; };
+function statsSearch(d, label, bar) {
+  if (!d.searches_total) {
+    return `<div class="panel pad gap"><h2>검색으로 들어옴</h2><p class="meta">아직 ${label} 동안 검색엔진(네이버 · 구글 · 다음 등)에서 들어온 기록이 없습니다.</p></div>`;
+  }
+  const hidden = d.engines.reduce((a, e) => a + (e.n - e.with_kw), 0);
+  return `<div class="panel pad gap st-search"><h2>검색으로 들어옴 <small class="meta">${label.replace('최근 ', '')} · ${num(d.searches_total)}번</small></h2>
+      <div class="st-cols">
+        <div><h3>검색엔진</h3>
+          <ol class="st-rank">${d.engines.map((e) => `<li><span class="st-name"><b>${esc(e.engine)}</b><small>검색어 보임 ${num(e.with_kw)}번</small></span><span>${num(e.n)} <small>${Math.round((e.n / d.searches_total) * 100)}%</small></span>${bar(e.n, d.searches_total)}</li>`).join('')}</ol>
+        </div>
+        <div><h3>많이 찾은 검색어 <small class="meta">${num(d.keywords_total)}개</small></h3>
+          ${d.keywords.length ? `<ol class="st-rank">${d.keywords.map((k) => `<li><span class="st-name"><b>${esc(k.keyword)}</b><small>${esc(String(k.engines || '').replace(/,/g, ' · '))} · 마지막 ${fmtAt(k.last)}</small></span><span>${num(k.n)}</span>${bar(k.n, d.keywords_max)}</li>`).join('')}</ol>${btnPager('kp', d.kp, d.rank_size, d.keywords_total)}`
+            : `<p class="meta">검색어가 넘어온 기록이 없습니다. ${hidden ? `${num(hidden)}번은 검색엔진이 검색어를 알려 주지 않았습니다.` : ''}</p>`}
+        </div>
+      </div>
+      <h3 class="gap">최근 검색 유입</h3>
+      <div class="st-recent-wrap"><table class="tbl st-recent"><thead><tr><th>시각</th><th>검색엔진</th><th>검색어</th><th>들어온 페이지</th></tr></thead><tbody>
+        ${d.searches.map((r) => `<tr><td>${fmtAt(r.at)}</td><td>${esc(r.engine)}</td><td>${r.keyword ? `<b>${esc(r.keyword)}</b>` : HIDDEN_KW}</td><td><a href="${esc(r.path)}" target="_blank" rel="noopener">${esc(r.name || r.path)}</a>${r.name ? `<small>${esc(r.path)}</small>` : ''}</td></tr>`).join('')}
+      </tbody></table></div>${btnPager('sp', d.sp, d.recent_size, d.searches_total)}
+      <p class="meta">네이버 · 다음은 대개 검색어가 함께 넘어오지만, 구글 · 빙 · 덕덕고는 검색어를 알려 주지 않아 '검색어 비공개' 로 보입니다.</p>
+    </div>`;
 }
 // 눈금 간격: 1 · 2 · 5 × 10ⁿ 중 눈금이 4~5개 되는 것
 function niceStep(max) {

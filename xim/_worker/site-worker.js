@@ -124,6 +124,7 @@ export default {
 //   관리 화면 · API · 검색엔진 로봇 · 미리 불러오기 · 오류 화면은 세지 않는다.
 const BOT = /bot|crawl|spider|slurp|scrap|preview|fetch|curl|wget|python|java\/|go-http|okhttp|axios|node|headless|lighthouse|pagespeed|monitor|uptime|facebookexternalhit|kakaotalk-scrap|yeti|daumoa/i;
 const MOBILE = /Mobi|Android|iPhone|iPad|iPod/i;
+const SEARCH_HOST = /^search\.|^google\.|^bing\.com$|yahoo\.|^duckduckgo\.com$|^yandex\.|^baidu\.com$|^ecosia\.org$/;
 const kstDay = () => new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
 function countVisit(request, env, ctx, res) {
   if (request.method !== 'GET' || (res.status !== 200 && res.status !== 304)) return res;
@@ -137,9 +138,16 @@ function countVisit(request, env, ctx, res) {
   const day = kstDay();
   const fresh = !(h.get('Cookie') || '').split(/;\s*/).includes(`xms_v=${day}`);
   let ref = '';
-  try { const r = new URL(h.get('Referer') || ''); if (r.host !== url.host) ref = r.hostname.replace(/^(www|m)\./, ''); } catch { /* 바로 들어옴 */ }
+  let rq = ''; // 검색엔진에서 왔으면 그 주소의 ? 뒷부분(검색어가 들어 있다, xms 가 가려낸다)
+  try {
+    const r = new URL(h.get('Referer') || '');
+    if (r.host !== url.host) {
+      ref = r.hostname.replace(/^(www|m)\./, '');
+      if (SEARCH_HOST.test(ref)) rq = r.search.slice(1, 600);
+    }
+  } catch { /* 바로 들어옴 */ }
   const path = p === '/index.html' || p === '/index' ? '/' : p.replace(/\.html?$/i, '').replace(/(.)\/+$/, '$1');
-  ctx.waitUntil(env.XMS.visit(env.XIM_SITE, { path, fresh, ref, mobile: MOBILE.test(ua) }).catch(() => {}));
+  ctx.waitUntil(env.XMS.visit(env.XIM_SITE, { path, fresh, ref, rq, mobile: MOBILE.test(ua) }).catch(() => {}));
   if (!fresh) return res;
   const out = new Response(res.body, res);
   out.headers.append('Set-Cookie', `xms_v=${day}; Path=/; Max-Age=172800; SameSite=Lax${url.protocol === 'https:' ? '; Secure' : ''}`);

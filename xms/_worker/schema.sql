@@ -266,6 +266,16 @@ CREATE TABLE IF NOT EXISTS visit_refs (   -- 방문자가 들어온 곳 (다른 
 CREATE INDEX IF NOT EXISTS idx_visit_days_day ON visit_days(day);
 CREATE INDEX IF NOT EXISTS idx_visit_pages_day ON visit_pages(day);
 CREATE INDEX IF NOT EXISTS idx_visit_refs_day ON visit_refs(day);
+CREATE TABLE IF NOT EXISTS visit_searches ( -- 검색엔진에서 들어온 기록 한 번에 한 줄 (2026-11-09): 어떤 검색엔진 · 어떤 검색어(안 넘겨 주면 '') · 어느 페이지로
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  site    TEXT NOT NULL,
+  day     TEXT NOT NULL,
+  at      INTEGER NOT NULL,                 -- ms
+  engine  TEXT NOT NULL,                    -- 네이버 · 다음 · 구글 …
+  keyword TEXT NOT NULL DEFAULT '',
+  path    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_visit_searches_site ON visit_searches(site, day, at);
 
 -- 수정 모드(홈페이지 위에서 글자 고치기): 원래 글자의 지문(k)마다 고친 글자 조각들. path '*' = 머리 · 꼬리(모든 페이지 공통)
 CREATE TABLE IF NOT EXISTS page_texts (
