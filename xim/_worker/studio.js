@@ -478,7 +478,7 @@ export async function studioHelper(request, env, url, path, method) {
     await db.prepare('INSERT INTO studio_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(mm[1], typeof d.value === 'string' ? d.value : JSON.stringify(d.value)).run();
     return json({ ok: true });
   }
-  if ((mm = path.match(/^\/api\/studio\/helper\/jobs\/([a-f0-9]{20})(?:\/([a-z_]+)(?:\/([a-z_]+))?)?$/))) {
+  if ((mm = path.match(/^\/api\/studio\/helper\/jobs\/([a-f0-9]{20})(?:\/([a-z_]+)(?:\/([a-z0-9_]+))?)?$/))) {
     const job = await getJob(db, mm[1]);
     if (!job) throw new HttpError(404, '작업이 없습니다.');
     const sub = mm[2] || '', arg = mm[3] || '';
