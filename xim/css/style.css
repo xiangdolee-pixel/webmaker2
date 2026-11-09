@@ -564,3 +564,7 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 @media (max-width: 899px) { .side-nav .nav-sep { width: 1px; height: 24px; margin: 0 4px; align-self: center; } }
 .st-cmd { display: flex; gap: 8px; align-items: center; }
 .st-cmd code { flex: 1; min-width: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--bg); font-size: 12px; word-break: break-all; }
+
+/* 포트폴리오 링크가 메뉴 안(포트폴리오2 위)에 들어갈 때 */
+.side-nav > .side-link { margin-top: 0; min-height: 42px; }
+@media (max-width: 899px) { .side-nav > .side-link { flex: none; white-space: nowrap; } }

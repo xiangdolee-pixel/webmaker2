@@ -79,6 +79,9 @@ function showApp() {
     $$('#nav > button').forEach((b) => b.insertAdjacentHTML('afterbegin', NAV_ICON[b.dataset.v] || ''));
     // 제작 도구(스튜디오 · 내 목소리)는 구분선 아래 맨 끝에 따로 묶는다 (사용자 지시 2026-11-09)
     $('#nav > button[data-v="studio"]')?.insertAdjacentHTML('beforebegin', '<i class="nav-sep" aria-hidden="true"></i>');
+    // 포트폴리오(바깥 링크)는 포트폴리오2 바로 위에 (사용자 지시 2026-11-09)
+    const pfLink = $('.side > .side-link'); const pf2 = $('#nav > button[data-v="portfolio2"]');
+    if (pfLink && pf2) pf2.before(pfLink);
     requestAnimationFrame(() => slideTabs($('#nav')));
   }
   render();
