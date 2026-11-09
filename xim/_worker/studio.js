@@ -665,7 +665,13 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
   }
 
   // 예약표 (최대 3개): [{ id, time:'07:10', channel, on, last:'YYYY-MM-DD' }] — Cron(5분마다)이 보고 작업을 만든다
-  if (path === '/api/studio/schedules' && method === 'GET') return json({ schedules: await getSchedules(db), now_kst: kst(now()) });
+  if (path === '/api/studio/schedules' && method === 'GET') {
+    // 한 번 만드는 데 걸리는 시간: 최근 완료된 본편(자동 선택 · 자동 썸네일)의 시작→완료, 최근 10개 평균 · 마지막
+    const { results } = await db.prepare("SELECT created_at, finished_at FROM studio_jobs WHERE kind = 'main' AND status = 'done' AND finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 10").all();
+    const mins = results.map((r) => Math.round((r.finished_at - r.created_at) / 60000)).filter((m) => m > 0 && m < 240);
+    const avg = mins.length ? Math.round(mins.reduce((a, b) => a + b, 0) / mins.length) : 0;
+    return json({ schedules: await getSchedules(db), now_kst: kst(now()), duration: { avg_min: avg, last_min: mins[0] || 0, n: mins.length } });
+  }
   if (path === '/api/studio/schedules' && method === 'PUT') {
     const d = await bodyFn(request);
     const list = (Array.isArray(d.schedules) ? d.schedules : []).slice(0, 3).map((x, i) => ({

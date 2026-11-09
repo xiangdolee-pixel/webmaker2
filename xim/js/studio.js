@@ -467,14 +467,21 @@ async function scheduleDialog() {
       <label class="pf-sw" title="켜면 매일 이 시각에 만듭니다"><input type="checkbox" name="on" ${x.on ? 'checked' : ''}><i aria-hidden="true"></i>${x.on ? '켬' : '끔'}</label>
       <input class="input" type="time" name="time" value="${esc(x.time)}" step="300">
       <select class="input" name="channel"><option value="순섬" ${x.channel === '순섬' ? 'selected' : ''}>순섬 · 순수한 크립토</option><option value="사섬" ${x.channel === '사섬' ? 'selected' : ''}>사섬 · 사적인 자산왕</option></select>
-      <span class="st-meta">${x.last ? `마지막 ${esc(x.last)}` : '아직 안 돌림'}</span>
+      <span class="st-meta"><span class="sc-eta" data-eta>${x.on ? `→ 약 ${plusMin(x.time, est)} 완성` : ''}</span>${x.last ? ` · 마지막 ${esc(x.last)}` : ''}</span>
       <input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="last" value="${esc(x.last)}">
     </div>`;
+  const d = r.duration || {}; const est = d.avg_min || 20;
+  const plusMin = (hhmm, add) => { const [h, m] = hhmm.split(':').map(Number); const t = (h * 60 + m + add) % 1440; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
   openDialog(`<h2>예약 <small class="st-meta">하루 최대 3개 · 한국 시각 · 지금 ${esc(r.now_kst)}</small></h2>
     <p class="st-hint">예약 시각이 되면 그 시각 기준 최근 8시간 웹 뉴스로 자동 선택 · 자동 썸네일 본편을 만듭니다. PC 도우미가 꺼져 있으면 "대기" 로 쌓였다가 켤 때 이어집니다.</p>
+    <p class="st-dur"><b>한 번 만드는 데 약 ${est}분</b> <span class="st-meta">${d.n ? `최근 ${d.n}회 평균 ${d.avg_min}분 · 마지막 ${d.last_min}분` : '아직 기록 없음 — 글 약 10분 + 그림(ChatGPT) 약 10분'} · 글 단계 ≈ 10분, 슬라이드 6장 + 썸네일 ≈ 7~10분, 검수 · 재생성 ≈ 2~3분</span></p>
     <form id="st-sched-form">${rows.map(row).join('')}<p class="err" id="sc-err"></p>
     <div class="dlg-actions"><button class="btn" type="button" data-close>닫기</button><button class="btn primary" type="submit">저장</button></div></form>`, (dlg) => {
-    $$('.st-sched-row input[name=on]', dlg).forEach((c) => c.addEventListener('change', () => { c.parentElement.lastChild.textContent = c.checked ? '켬' : '끔'; }));
+    const refreshEta = (row) => { const on = row.querySelector('[name=on]').checked, tm = row.querySelector('[name=time]').value; row.querySelector('[data-eta]').textContent = on && tm ? `→ 약 ${plusMin(tm, est)} 완성` : ''; };
+    $$('.st-sched-row', dlg).forEach((row) => {
+      row.querySelector('[name=on]').addEventListener('change', (e) => { e.target.parentElement.lastChild.textContent = e.target.checked ? '켬' : '끔'; refreshEta(row); });
+      row.querySelector('[name=time]').addEventListener('input', () => refreshEta(row));
+    });
     $('#st-sched-form', dlg).addEventListener('submit', (e) => {
       e.preventDefault();
       busy(e.currentTarget.querySelector('[type=submit]'), $('#sc-err', dlg), async () => {
