@@ -152,7 +152,11 @@ async function renderList() {
   $('#st-settings').addEventListener('click', settingsDialog);
   $('[data-help-pc]')?.addEventListener('click', (e) => { e.preventDefault(); settingsDialog(); });
   $('#st-sched').addEventListener('click', scheduleDialog);
-  $$('.st-card').forEach((c) => c.addEventListener('click', () => { location.hash = `#st-${c.dataset.id}`; renderStudio(deps); }));
+  $$('.st-card').forEach((c) => c.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-card-act]');
+    if (act) { e.stopPropagation(); if (act.dataset.cardAct === 'show') return; resTab = act.dataset.cardAct; }   // 썸네일 · 유튜브 버튼은 그 탭으로 바로
+    location.hash = `#st-${c.dataset.id}`; renderStudio(deps);
+  }));
   if (jobs.some((j) => ['queued', 'running', 'pick', 'thumb', 'images'].includes(j.status))) pollTimer = setTimeout(() => { if (!openId && document.contains(view)) renderList(); }, 5000);
 }
 function jobCard(j) {
@@ -164,6 +168,11 @@ function jobCard(j) {
       ${cardProgress(j)}
       ${j.finished_at ? `<p class="st-time">⏱ 만드는 데 <b>${mins(Math.max(1, Math.round((j.finished_at - (j.started_at || j.created_at)) / 1000)))}</b>${j.started_at && j.started_at - j.created_at > 120000 ? ` <span class="st-meta">(대기 ${mins(Math.round((j.started_at - j.created_at) / 1000))} 제외)</span>` : ''}</p>` : ''}
       <p class="st-meta">${fmtDate(j.created_at)}${j.bytes ? ` · 그림 ${fmtBytes(j.bytes)}` : j.assets_purged ? ' · 그림 지움' : ''}${j.cost ? ` · ${money(j.cost)}` : ''}${j.error ? ` · <span class="err-inline">${esc(j.error.slice(0, 80))}</span>` : ''}</p>
+      ${j.status === 'done' && j.kind === 'main' ? `<div class="st-card-actions">
+        <a class="btn primary" href="/studio/show/${j.id}" target="_blank" rel="noopener" data-card-act="show">▶ 방송용 슬라이드쇼 새 창으로 열기</a>
+        <button class="btn" type="button" data-card-act="thumb">🖼 썸네일</button>
+        <button class="btn" type="button" data-card-act="yt">📺 유튜브 (제목 · 인트로 · 더보기)</button>
+      </div>` : ''}
     </div></article>`;
 }
 
