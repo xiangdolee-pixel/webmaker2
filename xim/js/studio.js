@@ -5,7 +5,7 @@ let deps = null;            // { view, api, shrinkImage }
 let opts = null;            // /api/studio/options
 let pollTimer = 0;
 let openId = '';            // 보고 있는 작업 id
-let resTab = 'script';      // 결과 탭
+let resTab = 'show';        // 결과 탭 (기본: 슬라이드쇼)
 
 const STATUS = { queued: ['대기', 'wait'], running: ['진행 중', 'run'], pick: ['6개 고르기', 'ask'], thumb: ['썸네일 선택', 'ask'], images: ['그림 대기 (PC)', 'wait'], done: ['완료', 'done'], failed: ['실패', 'fail'], stopped: ['멈춤', 'stop'] };
 const KIND = { main: '본편', thumb: '썸네일만', phone: '폰UI 쇼츠' };
@@ -374,12 +374,13 @@ async function renderJob() {
     $('#st-thumb-form').addEventListener('submit', (e) => { e.preventDefault(); busy(e.currentTarget.querySelector('[type=submit]'), $('#tp-err'), async () => { const d = readThumbForm(e.currentTarget); if (!d.title) throw new Error('제목을 고르거나 넣어 주세요.'); await api(`/studio/jobs/${job.id}/thumb`, { method: 'POST', data: d }); renderJob(); }); });
   }
   // 결과 탭
+  // 순서: 방송 때 바로 쓰는 것(슬라이드쇼 · 썸네일 · 유튜브)을 앞에, 나머지는 뒤에 (사용자 지시 2026-11-09)
   const tabs = [];
-  if (blocks.length) tabs.push(['script', '원고']);
-  if (slides.length) tabs.push(['slides', `슬라이드 ${slides.length}`]);
   if (job.kind === 'main' && blocks.length) tabs.push(['show', '슬라이드쇼']);
   if (thumb || (job.status === 'done' && job.kind === 'main')) tabs.push(['thumb', '썸네일']);
   if (summary) tabs.push(['yt', '유튜브']);
+  if (blocks.length) tabs.push(['script', '원고']);
+  if (slides.length) tabs.push(['slides', `슬라이드 ${slides.length}`]);
   if (top15) tabs.push(['news', `뉴스 ${top15.items.length}`]);
   if (captures.length) tabs.push(['caps', `캡쳐 ${captures.length}`]);
   if (tabs.length) {
