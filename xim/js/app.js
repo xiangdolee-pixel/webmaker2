@@ -78,6 +78,14 @@ function showApp() {
       if (reqOpen && !(v === 'requests' && /^#req-\d+$/.test(location.hash))) { reqOpen = 0; if (location.hash) history.replaceState(null, '', location.pathname); }
       render();
     });
+    // 이미 켜진 메뉴를 다시 누르면 그 메뉴의 첫 화면으로 (상세 화면 → 목록) — 사용자 지시 2026-11-10
+    $('#nav').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-v]');
+      if (!b || !b.classList.contains('on')) return;
+      reqOpen = 0;
+      if (location.hash) history.replaceState(null, '', location.pathname);
+      render();
+    });
     // 왼쪽 메뉴: 글자 앞에 그림
     $$('#nav > button').forEach((b) => b.insertAdjacentHTML('afterbegin', NAV_ICON[b.dataset.v] || ''));
     // 제작 도구(스튜디오 · 내 목소리)는 구분선 아래 맨 끝에 따로 묶는다 (사용자 지시 2026-11-09)
