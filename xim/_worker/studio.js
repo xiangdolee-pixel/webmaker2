@@ -433,6 +433,22 @@ export class StudioMain extends WorkflowEntrypoint {
   }
 }
 
+// 최근 회차에서 이미 다룬 기사 — Top15 를 고를 때 같은 사건을 빼기 위해 (사용자 지시 2026-11-09: Top15 단계의 목적)
+//   최근 7일 · 15개 작업의 '선택된 기사'(chosen 또는 추천 6개)의 제목 · 주소 · 날짜. 없으면 기사 📌 제목으로.
+async function recentlyCovered(db, exceptId) {
+  const { results } = await db.prepare("SELECT id, created_at FROM studio_jobs WHERE id != ? AND kind = 'main' AND created_at > ? ORDER BY created_at DESC LIMIT 15").bind(exceptId, now() - 7 * 86400000).all();
+  const out = [];
+  for (const j of results) {
+    const top = docJson(await latestDoc(db, j.id, 'top15'));
+    const chosen = docJson(await latestDoc(db, j.id, 'chosen')) || top?.picks || [];
+    const when = kst(j.created_at).slice(0, 11);
+    if (top?.items?.length) for (const n of chosen) { const it = top.items.find((i) => i.n === n); if (it) out.push({ when, title: it.title, url: it.url }); }
+    else { const a = await latestDoc(db, j.id, 'articles'); for (const b of splitBlocks(a?.body)) out.push({ when, title: b.split('
+')[0].replace(/^📌\s*/, ''), url: '' }); }
+  }
+  return out.slice(0, 60);
+}
+
 // 방송 대본(슬라이드쇼 오른쪽) = 인사말 + 인트로 + 첫 블록, 나머지 블록 그대로
 async function buildShowTexts(db, job, fixed, intro) {
   const settings = await getSettings(db);
@@ -491,7 +507,7 @@ export async function studioHelper(request, env, url, path, method) {
     if (sub === 'rss' && method === 'POST') {
       const c = await rssCandidates(12);
       await saveDoc(db, job.id, 'candidates', c);
-      return json({ candidates: c, now_kst: kst(now()) });
+      return json({ candidates: c, now_kst: kst(now()), covered: await recentlyCovered(db, job.id) });
     }
     if (sub === 'step' && method === 'POST') {
       const d = await readJson();
