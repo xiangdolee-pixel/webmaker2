@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>clone — 내 목소리 읽어주기</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="./">clone <small>내 목소리 읽어주기</small></a>
+    <div class="top-right">
+      <span class="agent" id="agent" title="음성을 만드는 PC 처리기 상태"><i></i><span>확인 중…</span></span>
+      <button type="button" class="link" id="logout" hidden>로그아웃</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="main">
+  <!-- 로그인 -->
+  <section class="card login" id="login" hidden>
+    <h1>내 목소리로 읽어 주기</h1>
+    <p class="sub">글을 넣으면 학습한 내 목소리로 읽어 고른 음량의 음성 파일로 만들어 줍니다.</p>
+    <form id="login-form">
+      <label for="pass">비밀번호</label>
+      <input id="pass" type="password" autocomplete="current-password" required>
+      <button type="submit" class="btn">들어가기</button>
+      <p class="err" id="login-err" role="alert"></p>
+    </form>
+  </section>
+
+  <!-- 작업 -->
+  <section id="app" hidden>
+    <form class="card compose" id="compose">
+      <label for="text" class="sr">읽을 글</label>
+      <textarea id="text" rows="8" placeholder="여기에 읽을 글을 넣으세요. 문장 단위로 나누어 만들고, 숫자 · 퍼센트 · 영문 약어는 한글 발음으로 읽습니다. (Ctrl+Enter 로 바로 요청)"></textarea>
+      <div class="compose-bar">
+        <span class="count"><b id="count">0</b> / <span id="max">6,000</span>자</span>
+        <label class="speed">속도 <select id="speed"><option value="0.9">느리게 0.9</option><option value="1" selected>보통 1.0</option><option value="1.1">조금 빠르게 1.1</option><option value="1.2">빠르게 1.2</option></select></label>
+        <button type="submit" class="btn" id="go">읽어줘</button>
+      </div>
+      <p class="err" id="compose-err" role="alert"></p>
+    </form>
+
+    <p class="note" id="offline-note" hidden>지금 PC 처리기가 꺼져 있어 요청은 대기열에 남습니다. PC 가 켜지면 차례로 만들어집니다.</p>
+
+    <h2 class="list-h">만든 음성 <small id="list-meta"></small></h2>
+    <ol class="jobs" id="jobs"></ol>
+    <p class="empty" id="empty" hidden>아직 만든 음성이 없습니다. 위에 글을 넣고 ‘읽어줘’를 누르세요.</p>
+  </section>
+</main>
+
+<template id="job-tpl">
+  <li class="job">
+    <div class="job-head">
+      <span class="chip"></span>
+      <b class="title"></b>
+      <time class="when"></time>
+    </div>
+    <div class="job-body">
+      <audio controls preload="none" hidden></audio>
+      <p class="stats"></p>
+      <p class="fail"></p>
+    </div>
+    <div class="job-actions">
+      <a class="link dl" download hidden>내려받기</a>
+      <button type="button" class="link show-text">글 보기</button>
+      <button type="button" class="link retry" hidden>다시 만들기</button>
+      <button type="button" class="link danger del">지우기</button>
+    </div>
+    <pre class="text" hidden></pre>
+  </li>
+</template>
+
+<script src="js/app.js" defer></script>
+</body>
+</html>

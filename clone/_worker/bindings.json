@@ -1,0 +1,10 @@
+{
+  "placement": { "region": "aws:ap-northeast-2" },
+  "assets": { "run_worker_first": ["/api/*", "/audio/*"] },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "clone", "database_id": "3a1936b7-d385-4507-bf1a-6db8423b76a1" }
+  ],
+  "r2_buckets": [
+    { "binding": "AUDIO", "bucket_name": "clone-audio" }
+  ]
+}

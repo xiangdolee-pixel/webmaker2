@@ -1,0 +1,165 @@
+// clone — 내 목소리 읽어주기 (Worker)
+//   화면(정적 파일)은 ASSETS 가, /api/* 와 /audio/* 는 이 Worker 가 맡는다.
+//   음성 생성은 Cloudflare 가 하지 않는다 — 사용자 PC 의 처리기(D:\ws\clone\agent\agent.py)가 대기열(D1)을 가져가
+//   내 목소리 모델(GPT-SoVITS)로 만들고 음량을 고르게 맞춘 뒤 결과 WAV 를 올린다(R2). PC 가 꺼져 있으면 켜질 때 처리.
+//   비밀값(wrangler secret): CLONE_PASS(화면 로그인 비밀번호) · AGENT_TOKEN(PC 처리기 인증)
+//
+//   화면 API(쿠키 clone_sess):  POST /api/login {pass} · POST /api/logout · GET /api/me
+//     GET /api/jobs · POST /api/jobs {text, speed?} · GET /api/jobs/:id · DELETE /api/jobs/:id · POST /api/jobs/:id/retry
+//     GET /audio/:id.wav (Range 지원)
+//   처리기 API(헤더 X-Agent-Token):  POST /api/agent/claim {info} → 가장 오래된 대기 작업 하나(없으면 null)
+//     POST /api/agent/heartbeat · PUT /api/agent/jobs/:id/result?seconds&lufs&lra&tp&sentences&engine (본문 = wav) · POST /api/agent/jobs/:id/fail {error}
+
+const MAX_CHARS = 6000;
+const STALE_MS = 60 * 60 * 1000; // running 인 채 1시간 지나면 다시 대기열로(PC 가 중간에 꺼진 경우)
+const COOKIE = 'clone_sess';
+
+class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
+const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } });
+const now = () => Date.now();
+
+async function hmac(secret, text) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(text));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+const sameText = (a, b) => { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; };
+const cookieOf = (request, name) => (request.headers.get('Cookie') || '').split(/;\s*/).map((c) => c.split('=')).find((c) => c[0] === name)?.[1] || '';
+
+async function sessionToken(env) { return hmac(env.CLONE_PASS, 'clone-session-v1'); }
+async function requireUser(request, env) {
+  if (!env.CLONE_PASS) throw new HttpError(503, '비밀번호(CLONE_PASS)가 아직 설정되지 않았습니다.');
+  const tok = cookieOf(request, COOKIE);
+  if (!tok || !sameText(tok, await sessionToken(env))) throw new HttpError(401, '로그인이 필요합니다.');
+}
+function requireAgent(request, env) {
+  if (!env.AGENT_TOKEN) throw new HttpError(503, '처리기 토큰(AGENT_TOKEN)이 아직 설정되지 않았습니다.');
+  const t = request.headers.get('X-Agent-Token') || '';
+  if (!t || !sameText(t, env.AGENT_TOKEN)) throw new HttpError(401, '처리기 인증 실패');
+}
+async function body(request) { try { return (await request.json()) || {}; } catch { throw new HttpError(400, 'JSON 본문이 필요합니다.'); } }
+const titleOf = (text) => text.replace(/\s+/g, ' ').trim().slice(0, 40);
+const newId = () => { const t = new Date(); const d = `${t.getUTCFullYear()}${String(t.getUTCMonth() + 1).padStart(2, '0')}${String(t.getUTCDate()).padStart(2, '0')}`; return `${d}-${crypto.randomUUID().slice(0, 8)}`; };
+const JOB_COLS = 'id, created_at, started_at, done_at, status, title, chars, speed, seconds, lufs, lra, tp, sentences, engine, error, attempts';
+
+async function agentStatus(db) {
+  const row = await db.prepare('SELECT seen_at, info FROM agent WHERE id = ?').bind('pc').first();
+  const online = !!row && now() - row.seen_at < 90 * 1000;
+  return { online, seen_at: row?.seen_at || null, info: row?.info || '' };
+}
+async function touchAgent(db, info) {
+  await db.prepare("INSERT INTO agent (id, seen_at, info) VALUES ('pc', ?, ?) ON CONFLICT(id) DO UPDATE SET seen_at = excluded.seen_at, info = CASE WHEN excluded.info = '' THEN agent.info ELSE excluded.info END").bind(now(), String(info || '').slice(0, 200)).run();
+}
+
+async function handle(request, env, ctx) {
+  const url = new URL(request.url);
+  const path = url.pathname.replace(/\/+$/, '') || '/';
+  const method = request.method;
+  const db = env.DB;
+
+  // ───── 화면 로그인 ─────
+  if (path === '/api/login' && method === 'POST') {
+    if (!env.CLONE_PASS) throw new HttpError(503, '비밀번호(CLONE_PASS)가 아직 설정되지 않았습니다.');
+    const { pass } = await body(request);
+    const ok = sameText(await hmac('clone-login', String(pass ?? '').slice(0, 200)), await hmac('clone-login', env.CLONE_PASS));
+    if (!ok) { await new Promise((r) => setTimeout(r, 800)); throw new HttpError(401, '비밀번호가 맞지 않습니다.'); }
+    const tok = await sessionToken(env);
+    return json({ ok: true }, 200, { 'Set-Cookie': `${COOKIE}=${tok}; Path=/; Max-Age=${30 * 86400}; HttpOnly; Secure; SameSite=Lax` });
+  }
+  if (path === '/api/logout' && method === 'POST') return json({ ok: true }, 200, { 'Set-Cookie': `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax` });
+  if (path === '/api/me' && method === 'GET') {
+    try { await requireUser(request, env); } catch (e) { if (e.status === 401) return json({ ok: false }); throw e; }
+    return json({ ok: true, agent: await agentStatus(db), max_chars: MAX_CHARS });
+  }
+
+  // ───── PC 처리기 ─────
+  if (path.startsWith('/api/agent/')) {
+    requireAgent(request, env);
+    if (path === '/api/agent/heartbeat' && method === 'POST') { const { info } = await body(request).catch(() => ({})); await touchAgent(db, info); return json({ ok: true }); }
+    if (path === '/api/agent/claim' && method === 'POST') {
+      const { info } = await body(request).catch(() => ({}));
+      await touchAgent(db, info);
+      // 1시간 넘게 running 인 것은 PC 가 중간에 꺼진 것 → 다시 대기열로
+      await db.prepare("UPDATE jobs SET status = 'queued', started_at = NULL WHERE status = 'running' AND started_at < ?").bind(now() - STALE_MS).run();
+      const job = await db.prepare(`UPDATE jobs SET status = 'running', started_at = ?1, attempts = attempts + 1, error = NULL
+        WHERE id = (SELECT id FROM jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1) RETURNING id, text, speed, attempts`).bind(now()).first();
+      return json({ job: job || null });
+    }
+    const m = path.match(/^\/api\/agent\/jobs\/([\w-]+)\/(result|fail)$/);
+    if (m && m[2] === 'result' && method === 'PUT') {
+      const id = m[1];
+      const job = await db.prepare('SELECT id, status FROM jobs WHERE id = ?').bind(id).first();
+      if (!job) throw new HttpError(404, '없는 작업');
+      const q = (k) => { const v = parseFloat(url.searchParams.get(k)); return Number.isFinite(v) ? v : null; };
+      const bytes = await request.arrayBuffer();
+      if (bytes.byteLength < 1000) throw new HttpError(400, '음성 파일이 비어 있습니다.');
+      await env.AUDIO.put(`audio/${id}.wav`, bytes, { httpMetadata: { contentType: 'audio/wav' } });
+      await db.prepare(`UPDATE jobs SET status = 'done', done_at = ?, seconds = ?, lufs = ?, lra = ?, tp = ?, sentences = ?, engine = ?, error = NULL WHERE id = ?`)
+        .bind(now(), q('seconds'), q('lufs'), q('lra'), q('tp'), q('sentences'), (url.searchParams.get('engine') || '').slice(0, 80), id).run();
+      await touchAgent(db, '');
+      return json({ ok: true });
+    }
+    if (m && m[2] === 'fail' && method === 'POST') {
+      const { error } = await body(request).catch(() => ({}));
+      await db.prepare("UPDATE jobs SET status = 'failed', error = ? WHERE id = ?").bind(String(error || '알 수 없는 오류').slice(0, 500), m[1]).run();
+      await touchAgent(db, '');
+      return json({ ok: true });
+    }
+    throw new HttpError(404, '없는 주소');
+  }
+
+  // ───── 화면 API (로그인 필요) ─────
+  if (path.startsWith('/api/') || path.startsWith('/audio/')) await requireUser(request, env);
+
+  if (path === '/api/jobs' && method === 'GET') {
+    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 50));
+    const { results } = await db.prepare(`SELECT ${JOB_COLS} FROM jobs ORDER BY created_at DESC LIMIT ?`).bind(limit).all();
+    return json({ jobs: results, agent: await agentStatus(db) });
+  }
+  if (path === '/api/jobs' && method === 'POST') {
+    const { text, speed } = await body(request);
+    const t = String(text ?? '').replace(/\r\n?/g, '\n').trim();
+    if (!t) throw new HttpError(400, '읽을 글을 넣어 주세요.');
+    if (t.length > MAX_CHARS) throw new HttpError(400, `한 번에 ${MAX_CHARS.toLocaleString('ko-KR')}자까지만 됩니다. (지금 ${t.length.toLocaleString('ko-KR')}자)`);
+    const sp = Math.min(1.3, Math.max(0.8, parseFloat(speed) || 1));
+    const id = newId();
+    await db.prepare('INSERT INTO jobs (id, created_at, status, title, text, chars, speed) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(id, now(), 'queued', titleOf(t), t, t.length, sp).run();
+    const job = await db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE id = ?`).bind(id).first();
+    return json({ job, agent: await agentStatus(db) }, 201);
+  }
+  let m = path.match(/^\/api\/jobs\/([\w-]+)(?:\/(retry|text))?$/);
+  if (m) {
+    const id = m[1];
+    if (!m[2] && method === 'GET') { const job = await db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE id = ?`).bind(id).first(); if (!job) throw new HttpError(404, '없는 작업'); return json({ job }); }
+    if (m[2] === 'text' && method === 'GET') { const row = await db.prepare('SELECT text FROM jobs WHERE id = ?').bind(id).first(); if (!row) throw new HttpError(404, '없는 작업'); return json({ text: row.text }); }
+    if (!m[2] && method === 'DELETE') { await db.prepare('DELETE FROM jobs WHERE id = ?').bind(id).run(); ctx.waitUntil(env.AUDIO.delete(`audio/${id}.wav`)); return json({ ok: true }); }
+    if (m[2] === 'retry' && method === 'POST') { await db.prepare("UPDATE jobs SET status = 'queued', started_at = NULL, done_at = NULL, error = NULL WHERE id = ? AND status IN ('failed', 'done', 'running')").bind(id).run(); const job = await db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE id = ?`).bind(id).first(); return json({ job }); }
+  }
+  m = path.match(/^\/audio\/([\w-]+)\.wav$/);
+  if (m && (method === 'GET' || method === 'HEAD')) {
+    const key = `audio/${m[1]}.wav`;
+    const range = request.headers.get('Range');
+    const obj = range ? await env.AUDIO.get(key, { range: request.headers }) : await env.AUDIO.get(key);
+    if (!obj) throw new HttpError(404, '아직 음성이 없습니다.');
+    const h = new Headers({ 'Content-Type': 'audio/wav', 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, max-age=3600', ETag: obj.httpEtag,
+      'Content-Disposition': `${url.searchParams.has('dl') ? 'attachment' : 'inline'}; filename="clone-${m[1]}.wav"` });
+    if (range && obj.range) {
+      const r = obj.range; const start = r.offset ?? 0; const len = r.length ?? (obj.size - start);
+      h.set('Content-Range', `bytes ${start}-${start + len - 1}/${obj.size}`); h.set('Content-Length', String(len));
+      return new Response(method === 'HEAD' ? null : obj.body, { status: 206, headers: h });
+    }
+    h.set('Content-Length', String(obj.size));
+    return new Response(method === 'HEAD' ? null : obj.body, { status: 200, headers: h });
+  }
+  if (path.startsWith('/api/')) throw new HttpError(404, '없는 주소');
+  return env.ASSETS.fetch(request);
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    try { return await handle(request, env, ctx); } catch (e) {
+      if (e instanceof HttpError) return json({ error: e.message }, e.status);
+      console.error(e); return json({ error: '서버 오류: ' + (e.message || e) }, 500);
+    }
+  },
+};
