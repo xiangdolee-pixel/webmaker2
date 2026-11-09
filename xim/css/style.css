@@ -505,6 +505,9 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .vc-panel { padding: 20px; }
 .vc-panel + .vc-panel { margin-top: 16px; }
 .vc-panel h2 { margin: 0 0 8px; font-size: 18px; }
+.vc-desc { margin: 0; color: var(--sub); font-size: 14px; }
+.vc-desc b { color: var(--ink); }
+.vc-sub { margin-left: 8px; color: var(--mute); font-size: 13px; font-weight: 500; }
 .vc-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .vc-head h2 { margin: 0; }
 .vc-agent { display: inline-flex; align-items: center; gap: 6px; color: var(--sub); font-size: 13px; }

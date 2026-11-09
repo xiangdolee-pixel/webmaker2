@@ -22,7 +22,7 @@ export async function renderVoice(d) {
   view.innerHTML = `
     <div class="card vc-panel">
       <div class="vc-head"><h2>내 목소리 읽기</h2><span class="vc-agent" id="vc-agent"><i></i><span></span></span></div>
-      <p class="meta">글을 넣으면 운영자 목소리로 학습한 모델이 문장마다 읽어 <b>고른 음량(-16 LUFS)</b>의 음성 파일로 만듭니다. 숫자 · 퍼센트 · 영문 약어는 한글 발음으로 읽습니다. 만드는 일은 운영자 PC 가 하므로 PC 가 켜져 있어야 합니다.</p>
+      <p class="vc-desc">글을 넣으면 운영자 목소리로 학습한 모델이 문장마다 읽어 <b>고른 음량(-16 LUFS)</b>의 음성 파일로 만듭니다. 숫자 · 퍼센트 · 영문 약어는 한글 발음으로 읽습니다. 만드는 일은 운영자 PC 가 하므로 PC 가 켜져 있어야 합니다.</p>
       <form id="vc-form">
         <textarea class="input" id="vc-text" rows="7" placeholder="여기에 읽을 글을 넣으세요. (Ctrl+Enter 로 바로 요청)"></textarea>
         <div class="vc-bar">
@@ -35,9 +35,9 @@ export async function renderVoice(d) {
       <p class="vc-note" id="vc-offline" hidden>지금 PC 처리기가 꺼져 있어 요청은 대기열에 남습니다. PC 가 켜지면 차례로 만들어집니다.</p>
     </div>
     <div class="card vc-panel">
-      <h2>만든 음성 <small class="meta" id="vc-meta"></small></h2>
+      <h2>만든 음성 <small class="vc-sub" id="vc-meta"></small></h2>
       <ol class="vc-jobs" id="vc-jobs"></ol>
-      <p class="meta" id="vc-empty" hidden>아직 만든 음성이 없습니다.</p>
+      <p class="vc-desc" id="vc-empty" hidden>아직 만든 음성이 없습니다.</p>
     </div>`;
   setAgent(me.agent);
 
