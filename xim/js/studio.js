@@ -73,26 +73,34 @@ function timelineHtml(job, steps) {
     <ol class="tl">${t.rows.map((r, i) => `<li class="tl-${r.status}"><span class="tl-no">${i + 1}</span><span class="tl-ic">${icon[r.status]}</span><b>${esc(r.label)}</b><span class="tl-note">${esc(r.note)}</span><span class="tl-dur">${r.status === 'running' ? `${mins(r.secs)} 진행 중` : r.status === 'wait' ? '기다리는 중' : r.status === 'pending' ? `예상 ${mins(EXPECT[r.key] || 60)}` : r.secs ? mins(r.secs) : ''}</span></li>`).join('')}</ol>
   </section>`;
 }
-// 제작 조건 — 스튜디오 첫 화면에 늘 보인다 (사용자 지시 2026-11-09: 어떤 계정으로 어디에 로그인돼 있어야 하는지, 지금 충족하는지)
+// 제작 조건 — 스튜디오 첫 화면에 늘 보인다 (사용자 지시 2026-11-09). 네 칸: PC 도우미 · Claude(글) · ChatGPT(그림) · 예약
+//   기술적인 항목(엔진 폴더 · 브라우저 · 토큰)은 문제가 있을 때만 빨간 줄로.
 function conditionsHtml(hs) {
-  const info = hs.info || {}, ex = hs.expected || {};
-  const rows = [];
-  const R = (ok, label, detail, warn) => rows.push({ ok, label, detail, warn });
-  R(hs.online, 'PC 도우미 켜짐', hs.online ? `연결됨 · ${ago(hs.helper_seen)}${info.pc ? ` · PC ${esc(info.pc)}` : ''}` : `꺼짐${hs.helper_seen ? ` · 마지막 ${ago(hs.helper_seen)}` : ''} — PC 에서 스튜디오도우미_시작.bat 을 켜 주세요`);
-  const c = info.claude || {};
+  const info = hs.info || {}, ex = hs.expected || {}, c = info.claude || {}, g = info.chatgpt || {};
   const cOk = !!c.loggedIn && (!ex.claude || c.email === ex.claude);
-  R(c.loggedIn ? cOk : false, `Claude Code 로그인 — ${esc(ex.claude || '')}`, c.loggedIn ? `${esc(c.email || '')}${c.plan ? ` · ${esc(c.plan)}` : ''}${c.expires ? ` · ${fmtDate(Date.parse(c.expires)).slice(0, 10)} 까지` : ''}${!cOk ? ' — 기대한 계정과 다릅니다' : ''}` : (info.at ? '로그인 안 됨 — PC 터미널에서 claude 를 실행해 로그인' : '도우미가 보고하면 표시됩니다'), c.loggedIn && !cOk);
-  const g = info.chatgpt || {};
   const gOk = !!g.loggedIn && (!ex.chatgpt || !g.email || g.email === ex.chatgpt);
-  R(g.loggedIn ? gOk : false, `ChatGPT 로그인(자동화 엣지 프로필) — ${esc(ex.chatgpt || '')}`, g.loggedIn ? `${esc(g.email || '로그인됨(계정 확인 못 함)')}${!gOk ? ' — 기대한 계정과 다릅니다' : ''}` : (info.at ? `로그인 안 됨${g.error ? ` (${esc(g.error)})` : ''} — PC 에서 스튜디오_ChatGPT로그인.bat 실행 뒤 그 창에서 로그인` : '도우미가 보고하면 표시됩니다'), g.loggedIn && !gOk);
-  if (info.at) R(!!info.engine && !!info.browserOk, '엔진 · 브라우저', `${info.browserOk ? esc(info.browser) : '브라우저 없음'} · ${info.engine ? esc(info.docs) : '엔진 폴더(docs\\tools) 없음'}`);
-  R(!!hs.token_ok, '도우미 토큰(xim)', hs.token_ok ? '설정됨' : '없음 — 비밀값 STUDIO_HELPER_TOKEN');
   const sc = hs.schedules || [];
-  R(true, '예약', sc.length ? sc.map((x) => `${x.time} ${x.channel}`).join(' · ') : '없음', !sc.length);
-  const allOk = rows.every((x) => x.ok);
+  const tiles = [
+    { icon: '🖥️', name: 'PC 도우미', ok: hs.online, big: hs.online ? '켜짐' : '꺼짐',
+      sub: hs.online ? `${esc(info.pc || '')} · ${ago(hs.helper_seen)}` : (hs.helper_seen ? `마지막 ${ago(hs.helper_seen)}` : '아직 연결된 적 없음'),
+      fix: hs.online ? '' : 'PC 에서 스튜디오도우미_시작.bat 을 켜 주세요' },
+    { icon: '✍️', name: 'Claude · 글', ok: cOk, big: c.loggedIn ? esc(c.email || '') : (info.at ? '로그인 안 됨' : '확인 전'),
+      sub: c.loggedIn ? `${esc(c.plan || '')}${c.expires ? ` · ${fmtDate(Date.parse(c.expires)).slice(0, 10)} 까지` : ''}` : `${esc(ex.claude || '')} 계정이어야 합니다`,
+      fix: !c.loggedIn && info.at ? 'PC 터미널에서 claude 를 실행해 로그인' : c.loggedIn && !cOk ? `기대한 계정(${esc(ex.claude)})과 다릅니다` : '' },
+    { icon: '🎨', name: 'ChatGPT · 그림', ok: gOk, big: g.loggedIn ? esc(g.email || '로그인됨') : (info.at ? '로그인 안 됨' : '확인 전'),
+      sub: g.loggedIn ? '자동화용 엣지 프로필' : `${esc(ex.chatgpt || '')} 계정이어야 합니다`,
+      fix: !g.loggedIn && info.at ? '스튜디오_ChatGPT로그인.bat → 뜨는 창에서 로그인' : g.loggedIn && !gOk ? `기대한 계정(${esc(ex.chatgpt)})과 다릅니다` : '' },
+    { icon: '⏰', name: '예약', ok: true, big: sc.length ? sc.map((x) => `${x.time} ${x.channel}`).join(' · ') : '없음', sub: sc.length ? '매일 자동으로 만듭니다' : '예약 버튼에서 켤 수 있습니다', fix: '' },
+  ];
+  const problems = [];
+  if (info.at && !info.browserOk) problems.push(`그림용 브라우저(${esc(info.browser || '')})가 그 PC 에 없습니다.`);
+  if (info.at && !info.engine) problems.push(`그림 엔진 폴더(${esc(info.docs || 'docs')}\\tools)가 그 PC 에 없습니다 — ws 저장소를 받아 주세요.`);
+  if (!hs.token_ok) problems.push('xim 에 도우미 토큰(STUDIO_HELPER_TOKEN)이 없습니다.');
+  const allOk = tiles.every((t) => t.ok) && !problems.length;
   return `<section class="card st-cond ${allOk ? 'ok' : 'bad'}">
-    <div class="st-cond-head"><b>${allOk ? '✅ 제작 조건 충족 — 지금 만들 수 있습니다' : '⚠️ 제작 조건이 아직 안 맞습니다'}</b><span class="st-meta">${info.at ? `마지막 점검 ${ago(info.at)} · ` : ''}보관 중인 그림 ${fmtBytes(hs.total_bytes || 0)} (${hs.total_files || 0}장 · 작업 ${hs.kept_jobs || 0}개, 최근 ${hs.keep || 10}개까지)</span></div>
-    <ul>${rows.map((x) => `<li class="${x.ok ? (x.warn ? 'warn' : 'ok') : 'bad'}"><i>${x.ok ? (x.warn ? '⚠️' : '✅') : '❌'}</i><b>${x.label}</b><span>${x.detail}</span></li>`).join('')}</ul>
+    <div class="st-cond-head"><b>${allOk ? '✅ 지금 만들 수 있습니다' : '⚠️ 아직 만들 수 없습니다 — 아래 빨간 칸을 확인하세요'}</b><span class="st-meta">${info.at ? `점검 ${ago(info.at)} · ` : ''}그림 보관 ${fmtBytes(hs.total_bytes || 0)} (${hs.total_files || 0}장 · 작업 ${hs.kept_jobs || 0}개)${hs.online ? '' : ' · <a href="#" data-help-pc>다른 PC 에서 쓰려면?</a>'}</span></div>
+    <div class="st-cond-grid">${tiles.map((t) => `<div class="st-cond-tile ${t.ok ? 'ok' : 'bad'}"><span class="ic">${t.icon}</span><div><span class="nm">${t.name}</span><b>${t.big}</b><small>${t.sub}</small>${t.fix ? `<em>${t.fix}</em>` : ''}</div></div>`).join('')}</div>
+    ${problems.length ? `<ul class="st-cond-problems">${problems.map((p) => `<li>${p}</li>`).join('')}</ul>` : ''}
   </section>`;
 }
 function cardProgress(j) {
@@ -142,6 +150,7 @@ async function renderList() {
     ${jobs.length ? `<div class="st-grid">${jobs.map(jobCard).join('')}</div>` : '<p class="empty">아직 만든 발표자료가 없습니다. "새 발표자료" 를 눌러 시작하세요.</p>'}`;
   $('#st-new').addEventListener('click', newJobDialog);
   $('#st-settings').addEventListener('click', settingsDialog);
+  $('[data-help-pc]')?.addEventListener('click', (e) => { e.preventDefault(); settingsDialog(); });
   $('#st-sched').addEventListener('click', scheduleDialog);
   $$('.st-card').forEach((c) => c.addEventListener('click', () => { location.hash = `#st-${c.dataset.id}`; renderStudio(deps); }));
   if (jobs.some((j) => ['queued', 'running', 'pick', 'thumb', 'images'].includes(j.status))) pollTimer = setTimeout(() => { if (!openId && document.contains(view)) renderList(); }, 5000);
