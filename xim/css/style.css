@@ -532,8 +532,14 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .vc-note { margin: 12px 0 0; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--warn-soft); color: var(--warn); font-size: 14px; }
 .vc-jobs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .vc-jobs li { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
-.vc-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.vc-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.vc-row { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.vc-row .badge { flex: none; margin-top: 1px; }
+.vc-title { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-weight: 600; line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere; }   /* 제목 = 원고 앞부분 두 줄, 전체는 '원고 전체 보기' */
+.vc-jobs li.open .vc-title { -webkit-line-clamp: unset; }
+.vc-prog { position: relative; height: 6px; margin-top: 10px; border-radius: 99px; background: #e6e9ef; overflow: hidden; }
+.vc-prog i { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6a4bd8, #8e6cf0); transition: width .9s linear; }
+.vc-prog.over i { background: linear-gradient(90deg, #d08a2f, #f0b45a); }
+@media (prefers-reduced-motion: reduce) { .vc-prog i { transition: none; } }
 .vc-row time { flex: none; color: var(--mute); font-size: 13px; font-variant-numeric: tabular-nums; }
 .vc-jobs audio { display: block; width: 100%; height: 40px; margin-top: 10px; }
 .vc-stats { margin: 6px 0 0; color: var(--sub); font-size: 13px; font-variant-numeric: tabular-nums; }

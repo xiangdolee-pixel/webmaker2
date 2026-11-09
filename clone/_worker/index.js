@@ -41,7 +41,7 @@ function requireAgent(request, env) {
   if (!t || !sameText(t, env.AGENT_TOKEN)) throw new HttpError(401, '처리기 인증 실패');
 }
 async function body(request) { try { return (await request.json()) || {}; } catch { throw new HttpError(400, 'JSON 본문이 필요합니다.'); } }
-const titleOf = (text) => text.replace(/\s+/g, ' ').trim().slice(0, 40);
+const titleOf = (text) => text.replace(/\s+/g, ' ').trim().slice(0, 160); // 목록 제목 = 원고 앞부분(전체는 /text)
 const newId = () => { const t = new Date(); const d = `${t.getUTCFullYear()}${String(t.getUTCMonth() + 1).padStart(2, '0')}${String(t.getUTCDate()).padStart(2, '0')}`; return `${d}-${crypto.randomUUID().slice(0, 8)}`; };
 const JOB_COLS = 'id, created_at, started_at, done_at, status, title, chars, speed, seconds, lufs, lra, tp, sentences, engine, error, attempts';
 
@@ -49,6 +49,12 @@ async function agentStatus(db) {
   const row = await db.prepare('SELECT seen_at, info FROM agent WHERE id = ?').bind('pc').first();
   const online = !!row && now() - row.seen_at < 90 * 1000;
   return { online, seen_at: row?.seen_at || null, info: row?.info || '' };
+}
+// 글자당 걸리는 시간(초) — 최근 완료 10건의 중간값. 화면의 "예상 시간" 에 쓴다. 기록이 없으면 0.3초/자.
+async function pace(db) {
+  const { results } = await db.prepare("SELECT chars, started_at, done_at FROM jobs WHERE status = 'done' AND started_at IS NOT NULL AND done_at > started_at AND chars > 0 ORDER BY done_at DESC LIMIT 10").all();
+  const v = results.map((r) => (r.done_at - r.started_at) / 1000 / r.chars).sort((a, b) => a - b);
+  return v.length ? Math.max(0.05, Math.min(3, v[Math.floor(v.length / 2)])) : 0.3;
 }
 async function touchAgent(db, info) {
   await db.prepare("INSERT INTO agent (id, seen_at, info) VALUES ('pc', ?, ?) ON CONFLICT(id) DO UPDATE SET seen_at = excluded.seen_at, info = CASE WHEN excluded.info = '' THEN agent.info ELSE excluded.info END").bind(now(), String(info || '').slice(0, 200)).run();
@@ -117,7 +123,7 @@ async function handle(request, env, ctx) {
   if (path === '/api/jobs' && method === 'GET') {
     const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 50));
     const { results } = await db.prepare(`SELECT ${JOB_COLS} FROM jobs ORDER BY created_at DESC LIMIT ?`).bind(limit).all();
-    return json({ jobs: results, agent: await agentStatus(db) });
+    return json({ jobs: results, agent: await agentStatus(db), sec_per_char: await pace(db) });
   }
   if (path === '/api/jobs' && method === 'POST') {
     const { text, speed } = await body(request);
