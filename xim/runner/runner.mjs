@@ -91,6 +91,18 @@ function parseJson(text, label = '응답') {
   if (a < 0 || b < 0) throw new Error(`${label}이 JSON 이 아닙니다: ${s.slice(0, 200)}`);
   return JSON.parse(s.slice(a, b + 1));
 }
+// JSON 스키마 → 모양 예시 (claude -p 는 output_config 가 없어 모양을 글로 못 박는다)
+function shape(schema) {
+  if (!schema || typeof schema !== 'object') return '…';
+  if (schema.type === 'object') return '{ ' + Object.entries(schema.properties || {}).map(([k, v]) => `"${k}": ${shape(v)}`).join(', ') + ' }';
+  if (schema.type === 'array') return `[ ${shape(schema.items)}, … ]`;
+  if (schema.type === 'integer' || schema.type === 'number') return '0';
+  if (schema.type === 'boolean') return 'true|false';
+  return '"…"';
+}
+const SHAPE = (schema) => `
+
+★ 출력 JSON 모양(키 이름 · 구조를 정확히 이렇게, 다른 키 금지): ${shape(schema)}`;
 const JSON_ONLY = '\n\n★ 출력 규칙: 설명 · 머리말 · 코드펜스 없이 JSON 객체 하나만 출력한다. 파일을 만들거나 질문하지 않는다. 사용자에게 묻지 말고 끝까지 스스로 판단한다.';
 const splitBlocks = (text) => String(text || '').split(/\n(?=📌)/).map((b) => b.trim()).filter((b) => b.startsWith('📌'));
 
@@ -116,12 +128,15 @@ async function runText(payload, work, { stage = 'run' } = {}) {
   if (!blocks) {
     if (job.source === 'rss') {
       let top = parse('top15'), chosen = parse('chosen');
+      if (top && !(top.items || []).length) top = null;   // 모양이 어긋난 예전 결과는 버린다
       if (!top) {
         const cands = await stepRun(j, 'rss', '', async () => { const r = await j.rss(); if (r.candidates.length < 3) throw new Error(`RSS 후보가 ${r.candidates.length}건뿐입니다.`); return r.candidates; });
         top = await stepRun(j, 'top15', '', async () => {
           const list = cands.map((c) => `[${c.n}] ${c.title}\n    ${c.label} | ${c.published_kst}\n    ${c.url}\n    ${c.summary}`).join('\n');
-          const t = parseJson(await claude(`${P.TOP15_SYSTEM}\n\n기준 시각: ${kstNow()} (최근 12시간)\n\n후보 목록:\n${list}${JSON_ONLY}`, { label: 'Top15' }), 'Top15');
+          const t = parseJson(await claude(`${P.TOP15_SYSTEM}\n\n기준 시각: ${kstNow()} (최근 12시간)\n\n후보 목록:\n${list}\n\n★ items[].n 과 picks 의 숫자는 후보 목록의 [n] 번호를 그대로 쓴다(새로 매기지 않는다). items 는 고른 15개 전부.${SHAPE(P.TOP15_SCHEMA)}${JSON_ONLY}`, { label: 'Top15' }), 'Top15');
           t.items = (t.items || []).slice(0, 15);
+          t.picks = (t.picks || []).map((x) => (typeof x === 'object' && x ? (x.n ?? x.candidate ?? x.no) : x)).map(Number).filter(Boolean);
+          if (!t.items.length) throw new Error('Top15 결과에 items 가 없습니다.');
           await j.doc('top15', t);
           return t;
         });
@@ -177,7 +192,7 @@ ${P.ARTICLE_FORMAT}
   if (!fact) {
     await assertAlive(j);
     fact = await stepRun(j, 'factcheck', '', async () => {
-      const f = parseJson(await claude(`${P.FACTCHECK_SYSTEM}\n\n${blocks.map((b, i) => `[블록 ${i + 1}]\n${b}`).join('\n\n')}${JSON_ONLY}`, { label: '팩트체크' }), '팩트체크');
+      const f = parseJson(await claude(`${P.FACTCHECK_SYSTEM}\n\n${blocks.map((b, i) => `[블록 ${i + 1}]\n${b}`).join('\n\n')}${SHAPE(P.FACTCHECK_SCHEMA)}${JSON_ONLY}`, { label: '팩트체크' }), '팩트체크');
       if (!Array.isArray(f.fixed_blocks) || f.fixed_blocks.length !== blocks.length) f.fixed_blocks = blocks;
       await j.doc('factcheck', f);
       return f;
@@ -188,7 +203,7 @@ ${P.ARTICLE_FORMAT}
   if (!summary) {
     await assertAlive(j);
     summary = await stepRun(j, 'summary', '', async () => {
-      const s = parseJson(await claude(`${P.SUMMARY_SYSTEM}\n\n[사람 이름] ${(fact.people || []).join(', ') || '없음'}\n\n${fact.fixed_blocks.join('\n\n')}${JSON_ONLY}`, { label: '유튜브 패키지' }), '유튜브 패키지');
+      const s = parseJson(await claude(`${P.SUMMARY_SYSTEM}\n\n[사람 이름] ${(fact.people || []).join(', ') || '없음'}\n\n${fact.fixed_blocks.join('\n\n')}${SHAPE(P.SUMMARY_SCHEMA)}${JSON_ONLY}`, { label: '유튜브 패키지' }), '유튜브 패키지');
       await j.doc('summary', s);
       return s;
     });
@@ -201,7 +216,7 @@ ${P.ARTICLE_FORMAT}
     pick = await stepRun(j, 'thumb-pick', '', async () => {
       const catalog = payload.face_catalog ? JSON.parse(payload.face_catalog) : null;
       const faces = catalog?.faces?.length ? catalog.faces.map((f) => `${f.n}: ${f.emotion} / ${f.gesture} — ${f.desc}`).join('\n') : '(분류표 없음 — face 는 "auto" 로)';
-      const p = parseJson(await claude(`${P.THUMB_PICK_SYSTEM}\n\n추천 제목:\n${(summary.titles || []).map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\n등장 인물:\n${(summary.people || []).join('\n') || '없음'}\n\n인물 사진 목록:\n${faces}${JSON_ONLY}`, { label: '썸네일 값' }), '썸네일 값');
+      const p = parseJson(await claude(`${P.THUMB_PICK_SYSTEM}\n\n추천 제목:\n${(summary.titles || []).map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\n등장 인물:\n${(summary.people || []).join('\n') || '없음'}\n\n인물 사진 목록:\n${faces}\n\n★ 출력 JSON 모양: { "title": "…", "title_lines": ["…"], "accent_words": ["…"], "face": "001", "emotion": "…", "gesture": "…", "badge_name": "…", "badge_role": "…" }${JSON_ONLY}`, { label: '썸네일 값' }), '썸네일 값');
       const out = { title: p.title || summary.titles?.[0] || '', title_lines: p.title_lines || [], accent_words: p.accent_words || [], emotion: p.emotion || '자동', gesture: p.gesture || '자동', badgeName: p.badge_name || '', badgeRole: p.badge_role || '', face: /^\d{3}$/.test(p.face || '') ? `emoji:${p.face}` : 'emoji:auto' };
       await j.doc('thumb_pick', out);
       return out;
