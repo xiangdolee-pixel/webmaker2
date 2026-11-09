@@ -111,7 +111,7 @@ function cardProgress(j) {
   if (j.status === 'thumb') i = plan.findIndex(([key]) => key === 'thumb-wait');
   if (j.status === 'images' && i < 0) i = plan.findIndex(([key]) => key === 'slides');
   const n = i < 0 ? 0 : i; const pct = Math.round((n / plan.length) * 100);
-  return `<div class="tl-bar sm"><i style="width:${pct}%"></i></div><p class="st-meta">${plan.length}단계 중 ${n + 1}번째 · ${esc(plan[n]?.[1] || STEP_LABEL(j.step))} · ${mins(Math.round((Date.now() - j.created_at) / 1000))} 경과</p>`;
+  return `<div class="tl-bar sm"><i style="width:${pct}%"></i></div><p class="st-meta">${plan.length}단계 중 ${n + 1}번째 · ${esc(plan[n]?.[1] || STEP_LABEL(j.step))}</p><p class="st-time">⏱ <b>${mins(Math.round((Date.now() - (j.started_at || j.created_at)) / 1000))}</b>째 만드는 중</p>`;
 }
 
 const sbadge = (st) => { const [l, c] = STATUS[st] || [st, '']; return `<span class="badge st-${c}">${esc(l)}</span>`; };
@@ -160,9 +160,10 @@ function jobCard(j) {
     <div class="st-thumb">${j.thumb ? `<img src="${esc(j.thumb)}" alt="" loading="lazy">` : `<span>${j.assets_purged ? '그림 지워짐' : KIND[j.kind] || ''}</span>`}</div>
     <div class="st-body">
       <div class="st-top">${sbadge(j.status)}<span class="badge ch-${j.channel === '순섬' ? 'lime' : 'orange'}">${esc(j.channel)}</span><span class="st-kind">${esc(KIND[j.kind] || j.kind)} · ${esc(SOURCE[j.source] || j.source)}${j.options?.scheduled ? ` · ⏰ 예약 ${esc(j.options.scheduled.split(' ')[0])}` : ''}</span></div>
-      <h3>${esc(j.title || (j.status === 'running' ? STEP_LABEL(j.step) + ' 진행 중…' : '제목 없음'))}</h3>
+      <h3>${esc(j.title || (['running', 'queued', 'images', 'pick', 'thumb'].includes(j.status) ? `${STEP_LABEL(j.step || '') || '시작'} 진행 중…` : '제목 없음'))}</h3>
       ${cardProgress(j)}
-      <p class="st-meta">${fmtDate(j.created_at)}${j.finished_at ? ` · ${dur(j.created_at, j.finished_at)}` : ''}${j.bytes ? ` · 그림 ${fmtBytes(j.bytes)}` : j.assets_purged ? ' · 그림 지움' : ''}${j.cost ? ` · ${money(j.cost)}` : ''}${j.error ? ` · <span class="err-inline">${esc(j.error.slice(0, 80))}</span>` : ''}</p>
+      ${j.finished_at ? `<p class="st-time">⏱ 만드는 데 <b>${mins(Math.max(1, Math.round((j.finished_at - (j.started_at || j.created_at)) / 1000)))}</b>${j.started_at && j.started_at - j.created_at > 120000 ? ` <span class="st-meta">(대기 ${mins(Math.round((j.started_at - j.created_at) / 1000))} 제외)</span>` : ''}</p>` : ''}
+      <p class="st-meta">${fmtDate(j.created_at)}${j.bytes ? ` · 그림 ${fmtBytes(j.bytes)}` : j.assets_purged ? ' · 그림 지움' : ''}${j.cost ? ` · ${money(j.cost)}` : ''}${j.error ? ` · <span class="err-inline">${esc(j.error.slice(0, 80))}</span>` : ''}</p>
     </div></article>`;
 }
 
