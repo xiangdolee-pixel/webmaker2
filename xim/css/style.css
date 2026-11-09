@@ -579,3 +579,11 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .st-show-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
 .st-show-wrap { --k: .5; position: relative; width: 100%; aspect-ratio: 1900 / 1000; overflow: hidden; border-radius: var(--radius-sm); background: #e9e9e9; border: 1px solid var(--line); }
 .st-show-wrap iframe { position: absolute; left: 0; top: 0; width: 1900px; height: 1000px; border: 0; transform-origin: 0 0; transform: scale(var(--k)); }
+
+/* 스튜디오 — 캡쳐 끌어다 놓기 */
+.st-drop { display: grid; gap: 4px; justify-items: center; padding: 22px 16px; border: 2px dashed #c9ced8; border-radius: var(--radius-sm); background: #fbfbfd; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; }
+.st-drop b { font-size: 15px; }
+.st-drop span { font-size: 13px; color: var(--mute); }
+.st-drop:hover, .st-drop:focus-visible { border-color: var(--brand); background: var(--brand-soft); }
+.st-drop.over { border-color: var(--brand); background: var(--brand-soft); border-style: solid; }
+.st-drop.full { opacity: .55; }

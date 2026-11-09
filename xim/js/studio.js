@@ -147,8 +147,13 @@ function newJobDialog() {
       <div id="main-opts">
         <fieldset class="choice-set"><legend>소스</legend><div class="tabs seg" id="f-source"></div></fieldset>
         <div id="src-capture" hidden>
-          <label class="field"><span>캡쳐 이미지 (1~6장, 한 장 = 기사 하나)</span><input class="input" type="file" id="f-files" accept="image/*" multiple></label>
-          <div class="st-ups" id="f-ups"></div>
+          <div class="field"><span>캡쳐 이미지 (1~6장, 한 장 = 기사 하나)</span>
+            <div class="st-drop" id="f-drop" tabindex="0" role="button" aria-label="캡쳐 이미지 올리기">
+              <b>여기에 이미지를 끌어다 놓으세요</b><span>또는 눌러서 고르기 · Ctrl+V 로 붙여넣기 — 한 번에 최대 6장</span>
+              <input type="file" id="f-files" accept="image/*" multiple hidden>
+            </div>
+            <div class="st-ups" id="f-ups"></div>
+          </div>
         </div>
         <label class="field" id="src-text" hidden><span>글</span><textarea class="input" name="text" rows="6" placeholder="기사 본문이나 메모를 붙여 넣으세요"></textarea></label>
         <fieldset class="choice-set" id="pick-set"><legend>기사 고르기</legend><div class="tabs seg" id="f-pick"></div><small>자동이면 클로드 추천 6개로 바로 진행합니다.</small></fieldset>
@@ -158,16 +163,21 @@ function newJobDialog() {
       <p class="err" id="f-err"></p>
       <div class="dlg-actions"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">시작</button></div>
     </form>`, (dlg) => {
-    const st = { kind: 'main', channel: '사섬', source: 'rss', pick: 'auto', thumb: 'manual' };
+    const st = { kind: 'main', channel: '사섬', source: 'rss', pick: 'auto', thumb: 'auto' };
     pillTabs($('#f-kind', dlg), [['main', '본편'], ['thumb', '썸네일만'], ['phone', '폰UI 쇼츠 (준비 중)']], st.kind, (v) => { if (v === 'phone') { toast('폰UI 쇼츠는 다음 단계에서 열립니다.'); return; } st.kind = v; $('#main-opts', dlg).hidden = v !== 'main'; $('#thumb-opts', dlg).hidden = v !== 'thumb'; });
     pillTabs($('#f-channel', dlg), [['사섬', '사섬'], ['순섬', '순섬']], st.channel, (v) => { st.channel = v; });
     pillTabs($('#f-source', dlg), [['rss', '웹 뉴스 (12시간)'], ['capture', '캡쳐 올리기'], ['text', '글 직접']], st.source, (v) => { st.source = v; $('#src-capture', dlg).hidden = v !== 'capture'; $('#src-text', dlg).hidden = v !== 'text'; $('#pick-set', dlg).hidden = v !== 'rss'; });
     pillTabs($('#f-pick', dlg), [['auto', '자동 (추천 6개)'], ['manual', '내가 고르기']], st.pick, (v) => { st.pick = v; });
-    pillTabs($('#f-thumb', dlg), [['manual', '내가 고르기'], ['auto', '자동']], st.thumb, (v) => { st.thumb = v; });
+    pillTabs($('#f-thumb', dlg), [['auto', '자동'], ['manual', '내가 고르기']], st.thumb, (v) => { st.thumb = v; });
     setupThumbForm(dlg);
-    $('#f-files', dlg).addEventListener('change', async (e) => {
+    // 캡쳐 올리기: 끌어다 놓기 · 눌러서 고르기 · 붙여넣기(Ctrl+V) 모두 같은 함수로
+    const drop = $('#f-drop', dlg);
+    const addFiles = async (files) => {
       const box = $('#f-ups', dlg);
-      for (const file of [...e.target.files].slice(0, 6 - uploads.length)) {
+      const imgs = [...files].filter((f) => /^image\//.test(f.type));
+      if (!imgs.length) return;
+      if (uploads.length >= 6) { toast('캡쳐는 6장까지입니다'); return; }
+      for (const file of imgs.slice(0, 6 - uploads.length)) {
         const ph = document.createElement('div'); ph.className = 'st-up'; ph.textContent = '올리는 중…'; box.append(ph);
         try {
           const blob = await shrinkImage(file);
@@ -177,8 +187,15 @@ function newJobDialog() {
           ph.querySelector('.x').addEventListener('click', () => { uploads.splice(uploads.indexOf(out), 1); ph.remove(); });
         } catch (err) { ph.textContent = err.message; ph.classList.add('bad'); }
       }
-      e.target.value = '';
-    });
+      drop.classList.toggle('full', uploads.length >= 6);
+    };
+    $('#f-files', dlg).addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
+    drop.addEventListener('click', (e) => { if (e.target.tagName !== 'INPUT') $('#f-files', dlg).click(); });
+    drop.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#f-files', dlg).click(); } });
+    ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
+    dlg.addEventListener('paste', (e) => { if (st.source !== 'capture') return; const fs = [...(e.clipboardData?.items || [])].filter((i) => i.kind === 'file').map((i) => i.getAsFile()).filter(Boolean); if (fs.length) { e.preventDefault(); addFiles(fs); } });
     $('#st-form', dlg).addEventListener('submit', (e) => {
       e.preventDefault();
       const f = e.currentTarget;
