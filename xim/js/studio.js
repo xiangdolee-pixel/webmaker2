@@ -221,30 +221,58 @@ function thumbPickForm(prev, titles, people) {
       <input class="input" name="tp-title" value="${esc(prev.title && !titles.includes(prev.title) ? prev.title : '')}" placeholder="직접 입력할 제목">
     </label>
     <div class="row2">
-      <label class="field"><span>인물 명찰 이름 (선택)</span><input class="input" name="tp-badge-name" value="${esc(prev.badgeName || '')}" list="tp-people" placeholder="예: 유리엔 티머"><datalist id="tp-people">${people.map((p) => `<option value="${esc(p.split(' (')[0])}">${esc(p)}</option>`).join('')}</datalist></label>
-      <label class="field"><span>소속 · 직함 (선택)</span><input class="input" name="tp-badge-role" value="${esc(prev.badgeRole || '')}" placeholder="예: 피델리티 글로벌 매크로 이사"></label>
+      <label class="field"><span>인물 명찰 (기사 속 인물에서 고르기)</span>
+        <select class="input" name="tp-badge-sel">
+          <option value="">명찰 없음</option>
+          ${people.map((p, i) => { const q = parsePerson(p); return `<option value="${i}" data-name="${esc(q.name)}" data-en="${esc(q.en)}" data-role="${esc(q.role)}" ${prev.badgeName && prev.badgeName === q.name ? 'selected' : ''}>${esc(p)}</option>`; }).join('')}
+          <option value="custom" ${prev.badgeName && !people.some((p) => parsePerson(p).name === prev.badgeName) ? 'selected' : ''}>직접 입력</option>
+        </select></label>
+      <div class="row2 tp-badge-fields">
+        <label class="field"><span>이름</span><input class="input" name="tp-badge-name" value="${esc(prev.badgeName || '')}" placeholder="예: 유리엔 티머"></label>
+        <label class="field"><span>소속 · 직함</span><input class="input" name="tp-badge-role" value="${esc(prev.badgeRole || '')}" placeholder="예: 피델리티 글로벌 매크로 이사"></label>
+      </div>
     </div>
-    ${people.length ? `<p class="st-people">기사 속 인물: ${people.map(esc).join(' · ')}</p>` : ''}
     <div class="row2">
       <label class="field"><span>표정</span><select class="input" name="tp-emotion">${opt(opts.emotions, prev.emotion)}</select></label>
       <label class="field"><span>제스처</span><select class="input" name="tp-gesture">${opt(opts.gestures, prev.gesture)}</select></label>
     </div>
     <fieldset class="choice-set"><legend>인물 사진</legend>
       <div class="tabs seg" data-face-mode></div>
+      <p class="st-hint" data-face-person hidden>명찰에서 고른 인물의 사진을 PC 도우미가 검색해 붙입니다 (닮은 캐리커처로 그려집니다).</p>
       <div class="st-faces" data-faces hidden>${opts.faces.map((n) => `<button type="button" class="st-face ${prev.face === 'emoji:' + n ? 'on' : ''}" data-face="emoji:${n}"><img src="/api/studio/face/${n}" alt="${n}" loading="lazy"></button>`).join('')}</div>
       <div data-face-up hidden><input class="input" type="file" accept="image/*" data-face-file><div class="st-ups" data-face-prev></div></div>
       <input type="hidden" name="tp-face" value="${esc(prev.face || 'emoji:auto')}">
     </fieldset>`;
 }
+// "한글 이름 (English Name, 소속·직함)" → { name, en, role }
+function parsePerson(p) {
+  const m = String(p).match(/^(.+?)\s*\((.+)\)\s*$/);
+  if (!m) return { name: String(p).trim(), en: '', role: '' };
+  const inner = m[2]; const i = inner.indexOf(',');
+  return { name: m[1].trim(), en: (i >= 0 ? inner.slice(0, i) : inner).trim(), role: i >= 0 ? inner.slice(i + 1).trim() : '' };
+}
 function setupThumbForm(root) {
   const hidden = $('[name=tp-face]', root);
   const cur = hidden.value;
-  const mode = cur.startsWith('asset:') ? 'upload' : cur === 'emoji:auto' ? 'auto' : cur.startsWith('emoji:') ? 'pick' : 'none';
-  pillTabs($('[data-face-mode]', root), [['auto', '내 사진 (자동 선택)'], ['pick', '내 사진 고르기'], ['upload', '다른 인물 올리기'], ['none', '인물 없음']], mode, (v) => {
-    $('[data-faces]', root).hidden = v !== 'pick'; $('[data-face-up]', root).hidden = v !== 'upload';
+  const mode = cur.startsWith('asset:') ? 'upload' : cur.startsWith('person:') ? 'person' : cur === 'emoji:auto' ? 'auto' : cur.startsWith('emoji:') ? 'pick' : 'none';
+  const personName = () => { const o = $('[name=tp-badge-sel] option:checked', root); return o && o.value !== '' && o.value !== 'custom' ? (o.dataset.en || o.dataset.name) : ($('[name=tp-badge-name]', root).value.trim()); };
+  pillTabs($('[data-face-mode]', root), [['auto', '내 사진 (자동 선택)'], ['pick', '내 사진 고르기'], ['person', '기사 속 인물 사진'], ['upload', '다른 인물 올리기'], ['none', '인물 없음']], mode, (v) => {
+    $('[data-faces]', root).hidden = v !== 'pick'; $('[data-face-up]', root).hidden = v !== 'upload'; $('[data-face-person]', root).hidden = v !== 'person';
     if (v === 'auto') hidden.value = 'emoji:auto'; else if (v === 'none') hidden.value = ''; else if (v === 'pick') hidden.value = $('.st-face.on', root)?.dataset.face || 'emoji:001';
+    else if (v === 'person') { const n = personName(); if (!n) { toast('먼저 명찰에서 인물을 고르거나 이름을 적어 주세요'); } hidden.value = n ? `person:${n}` : 'emoji:auto'; }
   });
-  $('[data-faces]', root).hidden = mode !== 'pick'; $('[data-face-up]', root).hidden = mode !== 'upload';
+  $('[data-faces]', root).hidden = mode !== 'pick'; $('[data-face-up]', root).hidden = mode !== 'upload'; $('[data-face-person]', root).hidden = mode !== 'person';
+  // 명찰 인물을 고르면 이름 · 소속이 채워지고, 인물 사진도 그 인물로 바뀐다 (사용자 지시 2026-11-09)
+  const sel = $('[name=tp-badge-sel]', root), nameIn = $('[name=tp-badge-name]', root), roleIn = $('[name=tp-badge-role]', root), fields = $('.tp-badge-fields', root);
+  const applySel = (changed) => {
+    const o = sel.options[sel.selectedIndex];
+    if (o.value === '') { if (changed) { nameIn.value = ''; roleIn.value = ''; } fields.hidden = true; }
+    else if (o.value === 'custom') { fields.hidden = false; if (changed) nameIn.focus(); }
+    else { nameIn.value = o.dataset.name; roleIn.value = o.dataset.role; fields.hidden = false; if (changed) $('[data-face-mode] button[data-v="person"]', root)?.click(); }
+  };
+  sel.addEventListener('change', () => applySel(true));
+  applySel(false);
+  if (mode === 'person' && !cur.slice(7)) hidden.value = personName() ? `person:${personName()}` : 'emoji:auto';
   $$('.st-face', root).forEach((b) => b.addEventListener('click', () => { $$('.st-face.on', root).forEach((x) => x.classList.remove('on')); b.classList.add('on'); hidden.value = b.dataset.face; }));
   $('[data-face-file]', root).addEventListener('change', async (e) => {
     const file = e.target.files[0]; if (!file) return;

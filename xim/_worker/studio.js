@@ -747,7 +747,7 @@ function thumbPickFields(d) {
   o.gesture = String(d.gesture || '자동').slice(0, 40);
   o.badgeName = String(d.badgeName || '').slice(0, 60);
   o.badgeRole = String(d.badgeRole || '').slice(0, 80);
-  o.face = /^(emoji:(\d{3}|auto)|asset:[a-f0-9]{24}|)$/.test(d.face || '') ? (d.face || '') : 'emoji:auto';
+  o.face = /^(emoji:(\d{3}|auto)|asset:[a-f0-9]{24}|person:[^|<>"]{1,80}|)$/.test(d.face || '') ? (d.face || '') : 'emoji:auto';   // person:<이름> = 기사 속 인물 사진을 PC 도우미가 검색
   return o;
 }
 

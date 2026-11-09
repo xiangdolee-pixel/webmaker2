@@ -266,9 +266,15 @@ async function runImages(payload, work) {
   if (withThumb) {
     await stepRun(j, 'thumb-prompt', pick.title, async () => {
       let face = '';
-      if ((pick.face || '').startsWith('emoji:') && pick.face !== 'emoji:auto') face = await download(`/api/studio/helper/face/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
-      else if ((pick.face || '').startsWith('asset:')) face = await download(`/studio/a/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
-      else face = await download(`/api/studio/helper/face/${String(1 + Math.floor(Math.random() * 87)).padStart(3, '0')}`, path.join(work, 'face.webp'));
+      if ((pick.face || '').startsWith('person:')) {
+        // 기사 속 인물: 구글 이미지에서 사진 1장 (tools/img_search.py — 이름(영문 우선)으로, 실패하면 내 사진으로)
+        const name = pick.face.slice(7).trim(); const dest = path.join(work, 'face.png');
+        const r = await py(['tools\\img_search.py', name, dest], { cwd: DOCS, timeoutMin: 4, label: '인물 사진 검색' });
+        if (r.code === 0 && fs.existsSync(dest)) face = dest; else log(`  인물 사진 검색 실패(${name}) → 내 사진으로`);
+      }
+      if (!face && (pick.face || '').startsWith('emoji:') && pick.face !== 'emoji:auto') face = await download(`/api/studio/helper/face/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
+      else if (!face && (pick.face || '').startsWith('asset:')) face = await download(`/studio/a/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
+      if (!face) face = await download(`/api/studio/helper/face/${String(1 + Math.floor(Math.random() * 87)).padStart(3, '0')}`, path.join(work, 'face.webp'));
       const outPng = path.join(work, '06_thumbnail.png');
       const prompt = `${DOCS}\\6.1_thumbnail.md 의 '실행 방법 — 고정 엔진 + 잡 파일' 절차대로 tools\\_thumb_job.json 의 내용을 JSON 으로 만든다. 파일을 쓰지 말고 JSON 만 출력한다.
 1) 인물 원본 ${face} 를 Read 로 직접 보고 외형(머리 · 모자 · 선글라스 · 수염 · 의상)을 파악한다 — 프롬프트에 "이 외형은 그대로 유지" 라고 못 박는 근거다.
