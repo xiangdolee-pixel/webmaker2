@@ -546,7 +546,12 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .vc-stats b { color: var(--ink); font-weight: 600; }
 .vc-fail { margin: 6px 0 0; color: var(--danger); font-size: 14px; }
 .vc-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.vc-text { margin: 10px 0 0; padding: 12px; border-radius: var(--radius-sm); background: var(--bg); color: var(--sub); font: inherit; font-size: 14px; white-space: pre-wrap; max-height: 260px; overflow: auto; }
+.vc-text { margin: 10px 0 0; padding: 12px; border-radius: var(--radius-sm); background: var(--bg); color: var(--sub); font: inherit; font-size: 14px; white-space: pre-wrap; max-height: 260px; overflow: auto; position: relative; }
+.vc-text.timed { white-space: normal; line-height: 1.9; }
+.vc-text .s { cursor: pointer; border-radius: 4px; padding: 1px 3px; transition: background .25s, color .25s; }   /* 재생 위치의 문장 — 누르면 그 문장부터 */
+.vc-text .s:hover { background: #e9ebf2; }
+.vc-text .s.now { background: var(--brand, #4f46e5); color: #fff; }
+.vc-text .s.now:hover { background: var(--brand, #4f46e5); }
 @media (max-width: 767px) { .vc-row time { display: none; } .vc-bar .btn { width: 100%; margin-left: 0; } }
 
 /* 스튜디오 — 단계 지도 · 진행률 */

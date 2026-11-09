@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   sentences  INTEGER,              -- 문장 수
   engine     TEXT,                 -- 어떤 모델로 만들었나(예: gsv-v2Pro me_e8)
   error      TEXT,
-  attempts   INTEGER NOT NULL DEFAULT 0
+  attempts   INTEGER NOT NULL DEFAULT 0,
+  timings    TEXT                   -- 문장별 시작 · 끝 시각 JSON [{s, e, t}] (2026-11-10 추가: ALTER TABLE jobs ADD COLUMN timings TEXT)
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created_at DESC);

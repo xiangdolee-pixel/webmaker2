@@ -5,7 +5,6 @@ import { $, $$, esc } from './common.js';
 let deps = null;     // { view, api }
 let timer = 0;
 let tick = 0;        // 1초마다 "지남 · 남음" 글자만 고치는 시계(목록은 다시 그리지 않음 — 재생 중인 소리가 끊기지 않게)
-let sig = '';        // 목록 상태 요약 — 바뀌었을 때만 다시 그린다
 let pace = 0.3;      // 글자당 걸리는 초(서버가 최근 완료 기록으로 계산)
 let max = 6000;
 const STATUS = { queued: ['대기 중', 'new'], running: ['만드는 중', 'doing'], done: ['완료', 'done'], failed: ['실패', 'suspended'] };
@@ -14,7 +13,7 @@ const fmtSec = (s) => { s = Math.round(s || 0); return s >= 60 ? `${Math.floor(s
 const num = (v, d = 1) => (v == null ? '-' : Number(v).toFixed(d));
 const n = (v) => Number(v || 0).toLocaleString('ko-KR');
 
-export function stopVoice() { clearTimeout(timer); timer = 0; clearInterval(tick); tick = 0; sig = ''; }
+export function stopVoice() { clearTimeout(timer); timer = 0; clearInterval(tick); tick = 0; }
 const est = (chars) => Math.max(10, Math.round(chars * pace)); // 예상 소요(초)
 const fmtEst = (s) => (s >= 60 ? `약 ${Math.round(s / 60)}분` : `약 ${Math.max(10, Math.round(s / 10) * 10)}초`);
 
@@ -69,12 +68,35 @@ export async function renderVoice(d) {
     try {
       if (b.dataset.act === 'text') {
         const pre = $('.vc-text', li);
-        if (pre.hidden) { const r = await api(`/voice/jobs/${id}/text`); pre.textContent = r.text; pre.hidden = false; b.textContent = '원고 닫기'; li.classList.add('open'); } else { pre.hidden = true; b.textContent = '원고 전체 보기'; li.classList.remove('open'); }
+        if (pre.hidden) { const r = await api(`/voice/jobs/${id}/text`); fillScript(pre, r, $('audio', li)); pre.hidden = false; b.textContent = '원고 닫기'; li.classList.add('open'); } else { pre.hidden = true; b.textContent = '원고 전체 보기'; li.classList.remove('open'); }
       } else if (b.dataset.act === 'retry') { b.disabled = true; await api(`/voice/jobs/${id}/retry`, { method: 'POST' }); await load(); }
       else if (b.dataset.act === 'del') { if (!confirm('이 음성을 지울까요? 되돌릴 수 없습니다.')) return; await api(`/voice/jobs/${id}`, { method: 'DELETE' }); await load(); }
     } catch (ex) { err.textContent = ex.message; }
   });
   await load();
+}
+
+// 원고 칸 채우기 — 문장별 시각(timings)이 있으면 문장마다 span 으로 두고, 재생 위치의 문장을 표시(누르면 그 문장부터 재생)
+function fillScript(pre, r, audio) {
+  const tm = Array.isArray(r.timings) && r.timings.length ? r.timings : null;
+  if (!tm || !audio) { pre.textContent = r.text; return; }
+  pre.innerHTML = tm.map((x, i) => `<span class="s" data-i="${i}" data-s="${x.s}" data-e="${x.e}" title="여기부터 듣기">${esc(x.t)}</span>`).join(' ');
+  pre.classList.add('timed');
+  const spans = $$('.s', pre);
+  let cur = -1;
+  const mark = () => {
+    const t = audio.currentTime; let k = -1;
+    for (let i = 0; i < tm.length; i++) if (t >= tm[i].s - 0.05 && t < (tm[i + 1]?.s ?? tm[i].e + 0.6)) { k = i; break; }
+    if (k === cur) return;
+    spans.forEach((sp, i) => sp.classList.toggle('now', i === k));
+    cur = k;
+    if (k >= 0 && !pre.hidden) { const sp = spans[k]; const top = sp.offsetTop - pre.offsetTop; if (top < pre.scrollTop || top > pre.scrollTop + pre.clientHeight - 40) pre.scrollTo({ top: Math.max(0, top - 24), behavior: 'smooth' }); }
+  };
+  audio.addEventListener('timeupdate', mark);
+  audio.addEventListener('seeked', mark);
+  audio.addEventListener('ended', () => { spans.forEach((sp) => sp.classList.remove('now')); cur = -1; });
+  pre.addEventListener('click', (e) => { const sp = e.target.closest('.s'); if (!sp) return; audio.currentTime = +sp.dataset.s; audio.play().catch(() => {}); });
+  mark();
 }
 
 function setAgent(a) {
@@ -95,42 +117,52 @@ async function load() {
   const jobs = d.jobs;
   $('#vc-empty').hidden = jobs.length > 0;
   $('#vc-meta').textContent = jobs.length ? `${jobs.length}개 · 완료 ${jobs.filter((j) => j.status === 'done').length}개` : '';
-  const next = jobs.map((j) => `${j.id}:${j.status}:${j.started_at || 0}`).join(',');
-  if (next !== sig) { // 상태가 바뀌었을 때만 다시 그린다(4초마다 다시 그리면 듣던 소리가 끊긴다)
-    sig = next;
-    const pending = jobs.filter((j) => j.status === 'queued' || j.status === 'running'); // 최신순
-    $('#vc-jobs').innerHTML = jobs.map((j) => {
-      const [label, cls] = STATUS[j.status] || [j.status, 'idle'];
-      const cut = (j.title || '').length < (j.chars || 0); // 제목은 원고 앞부분 — 잘렸으면 … 로 표시
-      let body = '';
-      if (j.status === 'done') {
-        const took = j.started_at && j.done_at > j.started_at ? ` · 만드는 데 ${fmtSec((j.done_at - j.started_at) / 1000)}` : '';
-        body = `<audio controls preload="none" src="/api/voice/audio/${esc(j.id)}.wav"></audio>
-          <p class="vc-stats">음성 <b>${fmtSec(j.seconds)}</b> · ${n(j.chars)}자 · 문장 ${j.sentences ?? '-'}개${took} · 음량 <b>${num(j.lufs)} LUFS</b> · 변동폭 ${num(j.lra)} LU · 피크 ${num(j.tp)} dBTP${j.engine ? ` · ${esc(j.engine)}` : ''}</p>`;
-      } else if (j.status === 'failed') body = `<p class="vc-fail">${esc(j.error || '실패했습니다.')}</p>`;
-      else if (j.status === 'running') {
-        body = `<div class="vc-prog" data-start="${j.started_at || j.created_at}" data-est="${est(j.chars)}"><i></i></div>
-          <p class="vc-stats" data-tick="running" data-start="${j.started_at || j.created_at}" data-est="${est(j.chars)}" data-chars="${j.chars}">PC 에서 만드는 중…</p>`;
-      } else {
-        // 앞에 선 작업(먼저 넣은 대기 · 진행 중)의 남은 시간을 더해 "시작까지" 를 어림한다
-        const ahead = pending.filter((p) => p.created_at < j.created_at);
-        const wait = ahead.reduce((s, p) => s + (p.status === 'running' ? Math.max(5, est(p.chars) - (Date.now() - (p.started_at || p.created_at)) / 1000) : est(p.chars)), 0);
-        body = `<p class="vc-stats">대기 중 · ${n(j.chars)}자 · 만드는 데 ${fmtEst(est(j.chars))} 예상${ahead.length ? ` · 앞에 ${ahead.length}개(시작까지 ${fmtEst(wait)})` : d.agent?.online ? ' · 곧 시작' : ' · PC 가 켜지면 시작'}</p>`;
-      }
-      return `<li data-id="${esc(j.id)}">
-        <div class="vc-row"><span class="badge ${cls}">${label}</span><b class="vc-title">${esc(j.title || '(제목 없음)')}${cut ? '…' : ''}</b><time>${fmtWhen(j.created_at)}</time></div>
-        ${body}
-        <div class="vc-actions">
-          ${j.status === 'done' ? `<a class="btn sm" href="/api/voice/audio/${esc(j.id)}.wav?dl=1" download="clone-${esc(j.id)}.wav">내려받기</a>` : ''}
-          <button class="btn sm" type="button" data-act="text">원고 전체 보기</button>
-          ${j.status === 'done' || j.status === 'failed' ? `<button class="btn sm" type="button" data-act="retry">${j.status === 'done' ? '다시 만들기' : '다시 시도'}</button>` : ''}
-          <button class="btn sm danger" type="button" data-act="del">지우기</button>
-        </div>
-        <pre class="vc-text" hidden></pre>
-      </li>`;
-    }).join('');
-    tickOnce();
+  const pending = jobs.filter((j) => j.status === 'queued' || j.status === 'running'); // 최신순
+  const make = (j, key) => {
+    const [label, cls] = STATUS[j.status] || [j.status, 'idle'];
+    const cut = (j.title || '').length < (j.chars || 0); // 제목은 원고 앞부분 — 잘렸으면 … 로 표시
+    let body = '';
+    if (j.status === 'done') {
+      const took = j.started_at && j.done_at > j.started_at ? ` · 만드는 데 ${fmtSec((j.done_at - j.started_at) / 1000)}` : '';
+      body = `<audio controls preload="none" src="/api/voice/audio/${esc(j.id)}.wav?v=${j.done_at || 0}"></audio>
+        <p class="vc-stats">음성 <b>${fmtSec(j.seconds)}</b> · ${n(j.chars)}자 · 문장 ${j.sentences ?? '-'}개${took} · 음량 <b>${num(j.lufs)} LUFS</b> · 변동폭 ${num(j.lra)} LU · 피크 ${num(j.tp)} dBTP${j.engine ? ` · ${esc(j.engine)}` : ''}</p>`;
+    } else if (j.status === 'failed') body = `<p class="vc-fail">${esc(j.error || '실패했습니다.')}</p>`;
+    else if (j.status === 'running') {
+      body = `<div class="vc-prog" data-start="${j.started_at || j.created_at}" data-est="${est(j.chars)}"><i></i></div>
+        <p class="vc-stats" data-tick="running" data-start="${j.started_at || j.created_at}" data-est="${est(j.chars)}" data-chars="${j.chars}">PC 에서 만드는 중…</p>`;
+    } else {
+      // 앞에 선 작업(먼저 넣은 대기 · 진행 중)의 남은 시간을 더해 "시작까지" 를 어림한다
+      const ahead = pending.filter((p) => p.created_at < j.created_at);
+      const wait = ahead.reduce((s, p) => s + (p.status === 'running' ? Math.max(5, est(p.chars) - (Date.now() - (p.started_at || p.created_at)) / 1000) : est(p.chars)), 0);
+      body = `<p class="vc-stats">대기 중 · ${n(j.chars)}자 · 만드는 데 ${fmtEst(est(j.chars))} 예상${ahead.length ? ` · 앞에 ${ahead.length}개(시작까지 ${fmtEst(wait)})` : d.agent?.online ? ' · 곧 시작' : ' · PC 가 켜지면 시작'}</p>`;
+    }
+    const li = document.createElement('li');
+    li.dataset.id = j.id; li.dataset.key = key;
+    li.innerHTML = `
+      <div class="vc-row"><span class="badge ${cls}">${label}</span><b class="vc-title">${esc(j.title || '(제목 없음)')}${cut ? '…' : ''}</b><time>${fmtWhen(j.created_at)}</time></div>
+      ${body}
+      <div class="vc-actions">
+        ${j.status === 'done' ? `<a class="btn sm" href="/api/voice/audio/${esc(j.id)}.wav?dl=1" download="clone-${esc(j.id)}.wav">내려받기</a>` : ''}
+        <button class="btn sm" type="button" data-act="text">원고 전체 보기</button>
+        ${j.status === 'done' || j.status === 'failed' ? `<button class="btn sm" type="button" data-act="retry">${j.status === 'done' ? '다시 만들기' : '다시 시도'}</button>` : ''}
+        <button class="btn sm danger" type="button" data-act="del">지우기</button>
+      </div>
+      <pre class="vc-text" hidden></pre>`;
+    return li;
+  };
+  // 항목 단위로만 고친다 — 완료된 칸은 그대로 두어 듣던 소리가 끊기지 않게(목록 전체를 다시 그리면 재생 중인 플레이어가 사라진다)
+  const ol = $('#vc-jobs');
+  const old = new Map([...ol.children].map((li) => [li.dataset.id, li]));
+  let ref = ol.firstElementChild;
+  for (const j of jobs) {
+    let li = old.get(j.id); old.delete(j.id);
+    const key = `${j.status}:${j.started_at || 0}:${j.done_at || 0}`;
+    const keep = li && li.dataset.key === key && (j.status === 'done' || j.status === 'failed');
+    if (!keep) { const fresh = make(j, key); if (li) { if (ref === li) ref = li.nextElementSibling; li.replaceWith(fresh); } li = fresh; }
+    if (li === ref) ref = ref.nextElementSibling; else ol.insertBefore(li, ref);
   }
+  old.forEach((li) => li.remove());
+  tickOnce();
   const busy = jobs.some((j) => j.status === 'queued' || j.status === 'running');
   clearTimeout(timer);
   timer = setTimeout(() => load().catch(() => {}), busy ? 4000 : 30000);

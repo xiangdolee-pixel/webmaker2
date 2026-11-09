@@ -94,7 +94,7 @@ async function handle(request, env, ctx) {
         WHERE id = (SELECT id FROM jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1) RETURNING id, text, speed, attempts`).bind(now()).first();
       return json({ job: job || null });
     }
-    const m = path.match(/^\/api\/agent\/jobs\/([\w-]+)\/(result|fail)$/);
+    const m = path.match(/^\/api\/agent\/jobs\/([\w-]+)\/(result|fail|timings)$/);
     if (m && m[2] === 'result' && method === 'PUT') {
       const id = m[1];
       const job = await db.prepare('SELECT id, status FROM jobs WHERE id = ?').bind(id).first();
@@ -106,6 +106,13 @@ async function handle(request, env, ctx) {
       await db.prepare(`UPDATE jobs SET status = 'done', done_at = ?, seconds = ?, lufs = ?, lra = ?, tp = ?, sentences = ?, engine = ?, error = NULL WHERE id = ?`)
         .bind(now(), q('seconds'), q('lufs'), q('lra'), q('tp'), q('sentences'), (url.searchParams.get('engine') || '').slice(0, 80), id).run();
       await touchAgent(db, '');
+      return json({ ok: true });
+    }
+    if (m && m[2] === 'timings' && method === 'PUT') { // 문장별 시작 · 끝 시각 [{s, e, t}] — 화면에서 읽는 문장 표시
+      const { timings } = await body(request).catch(() => ({}));
+      if (!Array.isArray(timings)) throw new HttpError(400, 'timings 배열이 필요합니다.');
+      const clean = timings.slice(0, 400).map((x) => ({ s: +x.s || 0, e: +x.e || 0, t: String(x.t || '').slice(0, 400) }));
+      await db.prepare('UPDATE jobs SET timings = ? WHERE id = ?').bind(JSON.stringify(clean), m[1]).run();
       return json({ ok: true });
     }
     if (m && m[2] === 'fail' && method === 'POST') {
@@ -140,7 +147,7 @@ async function handle(request, env, ctx) {
   if (m) {
     const id = m[1];
     if (!m[2] && method === 'GET') { const job = await db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE id = ?`).bind(id).first(); if (!job) throw new HttpError(404, '없는 작업'); return json({ job }); }
-    if (m[2] === 'text' && method === 'GET') { const row = await db.prepare('SELECT text FROM jobs WHERE id = ?').bind(id).first(); if (!row) throw new HttpError(404, '없는 작업'); return json({ text: row.text }); }
+    if (m[2] === 'text' && method === 'GET') { const row = await db.prepare('SELECT text, timings FROM jobs WHERE id = ?').bind(id).first(); if (!row) throw new HttpError(404, '없는 작업'); let timings = null; try { timings = row.timings ? JSON.parse(row.timings) : null; } catch { /* 옛 기록 */ } return json({ text: row.text, timings }); }
     if (!m[2] && method === 'DELETE') { await db.prepare('DELETE FROM jobs WHERE id = ?').bind(id).run(); ctx.waitUntil(env.AUDIO.delete(`audio/${id}.wav`)); return json({ ok: true }); }
     if (m[2] === 'retry' && method === 'POST') { await db.prepare("UPDATE jobs SET status = 'queued', started_at = NULL, done_at = NULL, error = NULL WHERE id = ? AND status IN ('failed', 'done', 'running')").bind(id).run(); const job = await db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE id = ?`).bind(id).first(); return json({ job }); }
   }
