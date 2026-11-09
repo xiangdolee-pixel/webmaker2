@@ -115,12 +115,14 @@ async function renderList() {
     <div class="bar st-bar">
       <h2>스튜디오 <small>유튜브 발표자료</small></h2>
       <button class="btn primary" id="st-new" type="button">+ 새 발표자료</button>
+      <button class="btn sm" id="st-sched" type="button">⏰ 예약</button>
       <button class="btn sm" id="st-settings" type="button">설정</button>
     </div>
     ${keyWarn}
     ${jobs.length ? `<div class="st-grid">${jobs.map(jobCard).join('')}</div>` : '<p class="empty">아직 만든 발표자료가 없습니다. "새 발표자료" 를 눌러 시작하세요.</p>'}`;
   $('#st-new').addEventListener('click', newJobDialog);
   $('#st-settings').addEventListener('click', settingsDialog);
+  $('#st-sched').addEventListener('click', scheduleDialog);
   $$('.st-card').forEach((c) => c.addEventListener('click', () => { location.hash = `#st-${c.dataset.id}`; renderStudio(deps); }));
   if (jobs.some((j) => ['queued', 'running', 'pick', 'thumb', 'images'].includes(j.status))) pollTimer = setTimeout(() => { if (!openId && document.contains(view)) renderList(); }, 5000);
 }
@@ -128,7 +130,7 @@ function jobCard(j) {
   return `<article class="card st-card" data-id="${j.id}">
     <div class="st-thumb">${j.thumb ? `<img src="${esc(j.thumb)}" alt="" loading="lazy">` : `<span>${j.assets_purged ? '그림 지워짐' : KIND[j.kind] || ''}</span>`}</div>
     <div class="st-body">
-      <div class="st-top">${sbadge(j.status)}<span class="badge ch-${j.channel === '순섬' ? 'lime' : 'orange'}">${esc(j.channel)}</span><span class="st-kind">${esc(KIND[j.kind] || j.kind)} · ${esc(SOURCE[j.source] || j.source)}</span></div>
+      <div class="st-top">${sbadge(j.status)}<span class="badge ch-${j.channel === '순섬' ? 'lime' : 'orange'}">${esc(j.channel)}</span><span class="st-kind">${esc(KIND[j.kind] || j.kind)} · ${esc(SOURCE[j.source] || j.source)}${j.options?.scheduled ? ` · ⏰ 예약 ${esc(j.options.scheduled.split(' ')[0])}` : ''}</span></div>
       <h3>${esc(j.title || (j.status === 'running' ? STEP_LABEL(j.step) + ' 진행 중…' : '제목 없음'))}</h3>
       ${cardProgress(j)}
       <p class="st-meta">${fmtDate(j.created_at)}${j.finished_at ? ` · ${dur(j.created_at, j.finished_at)}` : ''}${j.bytes ? ` · 그림 ${fmtBytes(j.bytes)}` : j.assets_purged ? ' · 그림 지움' : ''}${j.cost ? ` · ${money(j.cost)}` : ''}${j.error ? ` · <span class="err-inline">${esc(j.error.slice(0, 80))}</span>` : ''}</p>
@@ -166,7 +168,7 @@ function newJobDialog() {
     const st = { kind: 'main', channel: '사섬', source: 'rss', pick: 'auto', thumb: 'auto' };
     pillTabs($('#f-kind', dlg), [['main', '본편'], ['thumb', '썸네일만'], ['phone', '폰UI 쇼츠 (준비 중)']], st.kind, (v) => { if (v === 'phone') { toast('폰UI 쇼츠는 다음 단계에서 열립니다.'); return; } st.kind = v; $('#main-opts', dlg).hidden = v !== 'main'; $('#thumb-opts', dlg).hidden = v !== 'thumb'; });
     pillTabs($('#f-channel', dlg), [['사섬', '사섬'], ['순섬', '순섬']], st.channel, (v) => { st.channel = v; });
-    pillTabs($('#f-source', dlg), [['rss', '웹 뉴스 (12시간)'], ['capture', '캡쳐 올리기'], ['text', '글 직접']], st.source, (v) => { st.source = v; $('#src-capture', dlg).hidden = v !== 'capture'; $('#src-text', dlg).hidden = v !== 'text'; $('#pick-set', dlg).hidden = v !== 'rss'; });
+    pillTabs($('#f-source', dlg), [['rss', '웹 뉴스 (최근 8시간)'], ['capture', '캡쳐 올리기'], ['text', '글 직접']], st.source, (v) => { st.source = v; $('#src-capture', dlg).hidden = v !== 'capture'; $('#src-text', dlg).hidden = v !== 'text'; $('#pick-set', dlg).hidden = v !== 'rss'; });
     pillTabs($('#f-pick', dlg), [['auto', '자동 (추천 6개)'], ['manual', '내가 고르기']], st.pick, (v) => { st.pick = v; });
     pillTabs($('#f-thumb', dlg), [['auto', '자동'], ['manual', '내가 고르기']], st.thumb, (v) => { st.thumb = v; });
     setupThumbForm(dlg);
@@ -454,6 +456,34 @@ function wireRes(job, blocks, thumb, summary) {
   });
   const rf = $('#st-rethumb');
   if (rf) { setupThumbForm(rf); rf.addEventListener('submit', (e) => { e.preventDefault(); busy(rf.querySelector('[type=submit]'), $('#rt-err'), async () => { const pick = readThumbForm(rf); if (!pick.title) throw new Error('제목을 고르거나 넣어 주세요.'); await api(`/studio/jobs/${job.id}/redo`, { method: 'POST', data: { what: 'thumb', pick } }); await api(`/studio/jobs/${job.id}/rethumb`, { method: 'POST', data: {} }); toast('PC 도우미가 다시 그립니다'); renderJob(); }); }); }
+}
+
+// ───────── 예약 (하루 최대 3개) ─────────
+async function scheduleDialog() {
+  const { api } = deps;
+  const r = await api('/studio/schedules');
+  const rows = [...r.schedules]; while (rows.length < 3) rows.push({ id: '', time: ['07:10', '20:00', '12:00'][rows.length], channel: rows.length === 0 ? '순섬' : '사섬', on: false, last: '' });
+  const row = (x, i) => `<div class="st-sched-row" data-i="${i}">
+      <label class="pf-sw" title="켜면 매일 이 시각에 만듭니다"><input type="checkbox" name="on" ${x.on ? 'checked' : ''}><i aria-hidden="true"></i>${x.on ? '켬' : '끔'}</label>
+      <input class="input" type="time" name="time" value="${esc(x.time)}" step="300">
+      <select class="input" name="channel"><option value="순섬" ${x.channel === '순섬' ? 'selected' : ''}>순섬 · 순수한 크립토</option><option value="사섬" ${x.channel === '사섬' ? 'selected' : ''}>사섬 · 사적인 자산왕</option></select>
+      <span class="st-meta">${x.last ? `마지막 ${esc(x.last)}` : '아직 안 돌림'}</span>
+      <input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="last" value="${esc(x.last)}">
+    </div>`;
+  openDialog(`<h2>예약 <small class="st-meta">하루 최대 3개 · 한국 시각 · 지금 ${esc(r.now_kst)}</small></h2>
+    <p class="st-hint">예약 시각이 되면 그 시각 기준 최근 8시간 웹 뉴스로 자동 선택 · 자동 썸네일 본편을 만듭니다. PC 도우미가 꺼져 있으면 "대기" 로 쌓였다가 켤 때 이어집니다.</p>
+    <form id="st-sched-form">${rows.map(row).join('')}<p class="err" id="sc-err"></p>
+    <div class="dlg-actions"><button class="btn" type="button" data-close>닫기</button><button class="btn primary" type="submit">저장</button></div></form>`, (dlg) => {
+    $$('.st-sched-row input[name=on]', dlg).forEach((c) => c.addEventListener('change', () => { c.parentElement.lastChild.textContent = c.checked ? '켬' : '끔'; }));
+    $('#st-sched-form', dlg).addEventListener('submit', (e) => {
+      e.preventDefault();
+      busy(e.currentTarget.querySelector('[type=submit]'), $('#sc-err', dlg), async () => {
+        const schedules = $$('.st-sched-row', dlg).map((el) => ({ id: el.querySelector('[name=id]').value, time: el.querySelector('[name=time]').value, channel: el.querySelector('[name=channel]').value, on: el.querySelector('[name=on]').checked, last: el.querySelector('[name=last]').value }));
+        await api('/studio/schedules', { method: 'PUT', data: { schedules } });
+        toast('예약을 저장했습니다'); dlg.close();
+      });
+    });
+  });
 }
 
 // ───────── 설정 ─────────

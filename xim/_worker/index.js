@@ -12,7 +12,7 @@ import { deleteRequest } from './request-files.js';
 import { linkUrl as cleanUrl, scrapeMeta } from './scrape.js';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 // 스튜디오(유튜브 발표자료 제작) — /api/studio/* · /studio/* · Workflow StudioMain (xim/_worker/studio.js)
-import { studioApi, studioHelper, studioPublic, StudioMain } from './studio.js';
+import { studioApi, studioHelper, studioPublic, studioScheduled, StudioMain } from './studio.js';
 export { StudioMain };
 // 관리자 계정 추가도 그 사이트 홈페이지 회원가입과 같은 항목 · 같은 검사로 (xms 와 같은 코드)
 import { siteSettings, memberValues, uniqueProblem } from '../../xms/_worker/lib.js';
@@ -1010,6 +1010,10 @@ export class Engine extends WorkerEntrypoint {
 // ───────────────────────── 기본 export: xim 운영자 화면 ─────────────────────────
 
 export default {
+  // Cron(5분마다, bindings.json triggers): 스튜디오 예약 확인
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(studioScheduled(env, (p, d) => github(env, p, d)));
+  },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/')) {

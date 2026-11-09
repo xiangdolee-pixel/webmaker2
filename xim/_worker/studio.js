@@ -20,6 +20,7 @@ import { slideHtml, SLIDE_CSS } from '../js/slide-template.js';
 const RUN_WORKFLOW = 'studio-run.yml';
 
 const KEEP_JOBS = 10;                      // 그림을 보관할 최근 작업 수
+const NEWS_HOURS = 8;                      // 뉴스 후보 범위: 제작 시각 기준 최근 N시간 (사용자 지시 2026-11-09: 12 → 8)
 const CLAUDE_MODEL = 'claude-opus-5-5';
 const PRICE = { in: 4 / 1e6, out: 20 / 1e6 };   // 달러 / 토큰 (Opus 5.5)
 const IMAGE_PRICE = 0.17;                   // 장당 대략(고품질) — 설정에서 모델을 바꾸면 달라진다. 표시용.
@@ -264,10 +265,10 @@ export class StudioMain extends WorkflowEntrypoint {
     const env = this.env, db = env.DB, jobId = job.id;
     let blocks;
     if (job.source === 'rss') {
-      const cands = await S('rss', async () => { const c = await rssCandidates(12); if (c.length < 3) throw new Error(`RSS 후보가 ${c.length}건뿐입니다.`); await saveDoc(db, jobId, 'candidates', c); return { out: c, note: `${c.length}건` }; });
+      const cands = await S('rss', async () => { const c = await rssCandidates(NEWS_HOURS); if (c.length < 3) throw new Error(`RSS 후보가 ${c.length}건뿐입니다.`); await saveDoc(db, jobId, 'candidates', c); return { out: c, note: `${c.length}건` }; });
       const top = await S('top15', async () => {
         const list = cands.map((c) => `[${c.n}] ${c.title}\n    ${c.label} | ${c.published_kst}\n    ${c.url}\n    ${c.summary}`).join('\n');
-        const r = await claude(env, { system: P.TOP15_SYSTEM, schema: P.TOP15_SCHEMA, messages: [{ role: 'user', content: `기준 시각: ${kst(now())} (최근 12시간)\n\n후보 목록:\n${list}` }] });
+        const r = await claude(env, { system: P.TOP15_SYSTEM, schema: P.TOP15_SCHEMA, messages: [{ role: 'user', content: `기준 시각: ${kst(now())} (최근 ${NEWS_HOURS}시간)\n\n후보 목록:\n${list}` }] });
         const t = r.json; t.items = t.items.slice(0, 15);
         await saveDoc(db, jobId, 'top15', t);
         return { out: t, usage: r.usage, note: `${t.items.length}개 · 추천 ${t.picks.join(',')}` };
@@ -504,9 +505,9 @@ export async function studioHelper(request, env, url, path, method) {
       return json({ job: { ...job, options: JSON.parse(job.options || '{}') }, docs: Object.fromEntries(docs.map((d) => [d.kind, d.body])), captures: caps, settings: await getSettings(db), face_catalog: catalog });
     }
     if (sub === 'rss' && method === 'POST') {
-      const c = await rssCandidates(12);
+      const c = await rssCandidates(NEWS_HOURS);
       await saveDoc(db, job.id, 'candidates', c);
-      return json({ candidates: c, now_kst: kst(now()), covered: await recentlyCovered(db, job.id) });
+      return json({ candidates: c, now_kst: kst(now()), hours: NEWS_HOURS, covered: await recentlyCovered(db, job.id) });
     }
     if (sub === 'step' && method === 'POST') {
       const d = await readJson();
@@ -556,6 +557,60 @@ export async function studioHelper(request, env, url, path, method) {
     }
   }
   throw new HttpError(404, '없는 주소입니다.');
+}
+
+// 작업 만들기 (운영자 API · 예약 공용)
+async function createJob(env, gh, d) {
+  const db = env.DB;
+  const kind = ['main', 'thumb', 'phone'].includes(d.kind) ? d.kind : 'main';
+  if (kind === 'phone') throw bad('폰UI 쇼츠는 다음 단계에서 열립니다.');
+  const channel = d.channel === '순섬' ? '순섬' : '사섬';
+  const source = ['rss', 'capture', 'text'].includes(d.source) ? d.source : 'rss';
+  const settings = await getSettings(db);
+  const today = await db.prepare('SELECT COUNT(*) AS n FROM studio_jobs WHERE created_at > ?').bind(now() - 86400000).first();
+  if (today.n >= settings.daily_limit) throw bad(`하루 최대 ${settings.daily_limit}회를 넘었습니다(과금 안전장치). 설정에서 바꿀 수 있습니다.`);
+  const engine = ['cloud', 'pc', 'api', 'none'].includes(d.engine) ? d.engine : 'cloud';
+  if (['api', 'none'].includes(engine) && !env.ANTHROPIC_API_KEY) throw bad('API 방식은 ANTHROPIC_API_KEY 가 있어야 합니다. 기본(클라우드 · 구독)으로 하세요.');
+  if (engine === 'cloud' && !env.STUDIO_HELPER_TOKEN) throw bad('도우미 토큰(STUDIO_HELPER_TOKEN)이 아직 없습니다.');
+  const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000) };
+  if (d.scheduled) options.scheduled = String(d.scheduled).slice(0, 40);
+  if (kind === 'thumb') Object.assign(options, { title: String(d.title || '').slice(0, 200), emotion: d.emotion || '자동', gesture: d.gesture || '자동', badgeName: String(d.badgeName || '').slice(0, 60), badgeRole: String(d.badgeRole || '').slice(0, 80), face: d.face || 'emoji:auto' });
+  if (kind === 'thumb' && !options.title) throw bad('썸네일 제목을 넣어 주세요.');
+  const id = hex(10);
+  await db.prepare('INSERT INTO studio_jobs (id, kind, channel, source, options, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(id, kind, channel, source, JSON.stringify(options), 'queued', now(), now()).run();
+  const caps = Array.isArray(d.captures) ? d.captures.filter((x) => /^[a-f0-9]{24}$/.test(x)).slice(0, 6) : [];
+  for (let i = 0; i < caps.length; i++) await db.prepare("UPDATE studio_assets SET job_id = ?, idx = ? WHERE id = ? AND job_id = ''").bind(id, i + 1, caps[i]).run();
+  if (source === 'capture' && !caps.length) { await db.prepare('DELETE FROM studio_jobs WHERE id = ?').bind(id).run(); throw bad('캡쳐 이미지를 올려 주세요.'); }
+  if (engine === 'cloud' && settings.cloud_text === 'on') await dispatchRun(env, gh, { id }, 'run');
+  else if (engine !== 'pc' && engine !== 'cloud') {
+    const inst = await env.STUDIO_WF.create({ id: `job-${id}-${hex(3)}`, params: { jobId: id } });
+    await setJob(db, id, { wf_id: inst.id });
+  }
+  return id;
+}
+async function getSchedules(db) {
+  const row = await db.prepare("SELECT value FROM studio_settings WHERE key = 'schedules'").first();
+  if (row) { try { return JSON.parse(row.value); } catch { /* 아래 기본값 */ } }
+  // 기본: 아침 7:10 순섬(순수한 크립토), 저녁 8:00 사섬(사적인 자산왕) — 사용자 지시 2026-11-09
+  return [{ id: 'a1b2c3', time: '07:10', channel: '순섬', on: true, last: '' }, { id: 'd4e5f6', time: '20:00', channel: '사섬', on: true, last: '' }];
+}
+const kstDate = (ms) => new Date(ms + 9 * 3600000).toISOString().slice(0, 10);
+const kstHM = (ms) => new Date(ms + 9 * 3600000).toISOString().slice(11, 16);
+// Cron(5분마다): 예약 시각이 지났고 오늘 아직 안 만든 예약 → 작업 만들기 (PC 가 꺼져 있어도 '대기' 로 쌓인다)
+export async function studioScheduled(env, gh) {
+  const db = env.DB;
+  const list = await getSchedules(db);
+  const today = kstDate(now()), hm = kstHM(now());
+  let changed = false;
+  for (const s of list) {
+    if (!s.on || s.last === today || s.time > hm) continue;
+    try {
+      const id = await createJob(env, gh, { kind: 'main', channel: s.channel, source: 'rss', pick: 'auto', thumb: 'auto', engine: 'cloud', scheduled: `${s.time} ${s.channel}` });
+      await db.prepare("INSERT INTO audit_log (action, target, detail, ip, created_at) VALUES ('STUDIO_JOB', ?, ?, '예약', ?)").bind(`스튜디오 예약 ${s.time}`, `${s.channel} · ${id}`, now()).run().catch(() => {});
+    } catch (e) { console.error('예약 작업 실패', s.time, e.message); }
+    s.last = today; changed = true;
+  }
+  if (changed) await db.prepare("INSERT INTO studio_settings (key, value) VALUES ('schedules', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(JSON.stringify(list)).run();
 }
 
 // ───────────────────────── 운영자 API ─────────────────────────
@@ -609,8 +664,30 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
     return json(results.map((r) => ({ ...r, options: JSON.parse(r.options || '{}'), thumb: tmap[r.id] ? `/studio/a/${tmap[r.id]}` : '' })));
   }
 
+  // 예약표 (최대 3개): [{ id, time:'07:10', channel, on, last:'YYYY-MM-DD' }] — Cron(5분마다)이 보고 작업을 만든다
+  if (path === '/api/studio/schedules' && method === 'GET') return json({ schedules: await getSchedules(db), now_kst: kst(now()) });
+  if (path === '/api/studio/schedules' && method === 'PUT') {
+    const d = await bodyFn(request);
+    const list = (Array.isArray(d.schedules) ? d.schedules : []).slice(0, 3).map((x, i) => ({
+      id: /^[a-f0-9]{6}$/.test(x.id || '') ? x.id : hex(3),
+      time: /^([01]\d|2[0-3]):[0-5]\d$/.test(x.time || '') ? x.time : ['07:10', '20:00', '12:00'][i],
+      channel: x.channel === '순섬' ? '순섬' : '사섬',
+      on: !!x.on,
+      last: String(x.last || ''),
+    }));
+    await db.prepare("INSERT INTO studio_settings (key, value) VALUES ('schedules', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(JSON.stringify(list)).run();
+    await audit?.('STUDIO_SCHEDULE', '스튜디오 예약', list.filter((x) => x.on).map((x) => `${x.time} ${x.channel}`).join(', ') || '없음');
+    return json({ schedules: list });
+  }
+
   if (path === '/api/studio/jobs' && method === 'POST') {
     const d = await bodyFn(request);
+    const id = await createJob(env, gh, d);
+    await audit?.('STUDIO_JOB', `스튜디오 ${d.kind || 'main'}`, `${d.channel || '사섬'} · ${d.source || 'rss'} · ${id}`);
+    return json({ id });
+  }
+  if (false) {
+    const d = null;
     const kind = ['main', 'thumb', 'phone'].includes(d.kind) ? d.kind : 'main';
     if (kind === 'phone') throw bad('폰UI 쇼츠는 다음 단계에서 열립니다.');
     const channel = d.channel === '순섬' ? '순섬' : '사섬';
@@ -635,8 +712,6 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
       const inst = await env.STUDIO_WF.create({ id: `job-${id}-${hex(3)}`, params: { jobId: id } });
       await setJob(db, id, { wf_id: inst.id });
     }
-    await audit?.('STUDIO_JOB', `스튜디오 ${kind}`, `${channel} · ${source} · ${engine} · ${id}`);
-    return json({ id });
   }
 
   if ((mm = m(/^\/api\/studio\/jobs\/([a-f0-9]{20})$/))) {
