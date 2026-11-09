@@ -454,8 +454,8 @@ function thumbPanel(job, thumb, summary) {
   return `${thumb ? `<div class="st-thumb-big"><a href="${thumb.url}" target="_blank" rel="noopener"><img src="${thumb.url}" alt="썸네일"></a>
     <p>${rv ? `<span class="badge ${rv.pass ? 'done' : 'suspended'}">${rv.pass ? '검수 합격' : '검수 불합격'}</span> ${esc(rv.reason || '')}` : ''}</p>
     ${pick ? `<p class="st-meta">제목 "${esc(pick.title)}" · 표정 ${esc(pick.emotion || '자동')} · 제스처 ${esc(pick.gesture || '자동')}${pick.badgeName ? ` · 명찰 ${esc(pick.badgeName)}` : ''}</p>` : ''}
-    <div class="dlg-actions"><button class="btn sm" type="button" id="st-dl-thumb">16:9 로 내려받기</button></div></div>` : '<p class="empty">썸네일이 없습니다.</p>'}
-    ${done ? `<details class="st-redo"><summary class="btn sm">🔁 썸네일 다시 만들기</summary><div class="st-redo-body"><p class="st-hint">제목 · 인물 명찰 · 표정 · 제스처 · 인물 사진을 바꿔 저장하면 PC 의 ChatGPT 가 다시 그립니다(3~5분).</p><form id="st-rethumb">${thumbPickForm(pick || {}, summary?.titles || [], summary?.people || [])}<p class="err" id="rt-err"></p><button class="btn primary" type="submit">이대로 다시 만들기</button></form></div></details>` : ''}`;
+    <div class="dlg-actions st-thumb-actions"><button class="btn sm" type="button" id="st-dl-thumb">16:9 로 내려받기</button>${done ? '<button class="btn sm" type="button" id="st-rethumb-toggle">🔁 썸네일 다시 만들기</button>' : ''}</div></div>` : `<p class="empty">썸네일이 없습니다.</p>${done ? '<div class="dlg-actions"><button class="btn sm" type="button" id="st-rethumb-toggle">🔁 썸네일 만들기</button></div>' : ''}`}
+    ${done ? `<div class="st-redo-body" id="st-rethumb-wrap" hidden><p class="st-hint">제목 · 인물 명찰 · 표정 · 제스처 · 인물 사진을 바꿔 저장하면 PC 의 ChatGPT 가 다시 그립니다(3~5분).</p><form id="st-rethumb">${thumbPickForm(pick || {}, summary?.titles || [], summary?.people || [])}<p class="err" id="rt-err"></p><button class="btn primary" type="submit">이대로 다시 만들기</button></form></div>` : ''}`;
 }
 function ytPanel(s) {
   return `<h4>제목 추천</h4><ol class="st-titles-list">${s.titles.map((t) => `<li>${esc(t)} ${copyBtn(t)}</li>`).join('')}</ol>
@@ -484,6 +484,7 @@ function wireRes(job, blocks, thumb, summary) {
     c.getContext('2d').drawImage(img, 0, sy, img.width, sh, 0, 0, 1280, 720);
     const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `thumbnail-${job.id.slice(0, 6)}.png`; a.click();
   });
+  $('#st-rethumb-toggle')?.addEventListener('click', (e) => { const w = $('#st-rethumb-wrap'); w.hidden = !w.hidden; e.currentTarget.classList.toggle('on', !w.hidden); if (!w.hidden) w.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   const rf = $('#st-rethumb');
   if (rf) { setupThumbForm(rf); rf.addEventListener('submit', (e) => { e.preventDefault(); busy(rf.querySelector('[type=submit]'), $('#rt-err'), async () => { const pick = readThumbForm(rf); if (!pick.title) throw new Error('제목을 고르거나 넣어 주세요.'); await api(`/studio/jobs/${job.id}/redo`, { method: 'POST', data: { what: 'thumb', pick } }); await api(`/studio/jobs/${job.id}/rethumb`, { method: 'POST', data: {} }); toast('PC 도우미가 다시 그립니다'); renderJob(); }); }); }
 }
