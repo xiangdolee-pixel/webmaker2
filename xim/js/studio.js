@@ -299,6 +299,7 @@ async function renderJob() {
   const tabs = [];
   if (blocks.length) tabs.push(['script', '원고']);
   if (slides.length) tabs.push(['slides', `슬라이드 ${slides.length}`]);
+  if (job.kind === 'main' && blocks.length) tabs.push(['show', '슬라이드쇼']);
   if (thumb || (job.status === 'done' && job.kind === 'main')) tabs.push(['thumb', '썸네일']);
   if (summary) tabs.push(['yt', '유튜브']);
   if (top15) tabs.push(['news', `뉴스 ${top15.items.length}`]);
@@ -310,11 +311,13 @@ async function renderJob() {
       const box = $('#st-res');
       if (resTab === 'script') box.innerHTML = scriptPanel(job, blocks, showTexts, fact);
       else if (resTab === 'slides') box.innerHTML = slidesPanel(job, slides, blocks);
+      else if (resTab === 'show') box.innerHTML = showPanel(r.show_url, slides.length, blocks.length);
       else if (resTab === 'thumb') box.innerHTML = thumbPanel(job, thumb, summary);
       else if (resTab === 'yt') box.innerHTML = ytPanel(summary);
       else if (resTab === 'news') box.innerHTML = newsPanel(top15, J('chosen'));
       else if (resTab === 'caps') box.innerHTML = `<div class="st-slides">${captures.map((a) => `<figure><img src="${a.url}" alt=""><figcaption>캡쳐 ${a.idx}</figcaption></figure>`).join('')}</div>`;
       wireRes(job, blocks, thumb, summary);
+      fitShowPreview();
     };
     drawRes();
   }
@@ -351,6 +354,22 @@ function slidesPanel(job, slides, blocks) {
       ${done ? `<button class="btn sm" type="button" data-redo-slide="${a.idx}">이 장만 다시</button>` : ''}</figcaption>
     ${rv && !rv.pass ? `<p class="st-reason">${esc(rv.reason)}</p>` : ''}</figure>`; }).join('')}</div>`;
 }
+// 방송용 슬라이드쇼(04_PPTMaker 규격) — 미리보기(축소) + 새 창으로 열기. 방송 때는 새 창을 1900px 이상 화면에 띄운다
+function showPanel(url, nSlides, nBlocks) {
+  const full = location.origin + url;
+  return `<div class="st-show-head">
+      <a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener">▶ 방송용 슬라이드쇼 새 창으로 열기</a>
+      <button class="btn sm" type="button" data-copy="${esc(full)}">주소 복사</button>
+      <span class="st-meta">왼쪽 1400px 슬라이드 · 오른쪽 대본 · 이전/다음 · 좌우 화살표 · 타이머 · 대본 편집(Ctrl+S 저장) — 슬라이드 ${nSlides}/${nBlocks}장${nSlides < nBlocks ? ' (그림이 아직 없는 장은 "그림 없음" 으로 보임)' : ''}</span>
+    </div>
+    <p class="st-hint">아래는 축소 미리보기입니다. 화살표 · 버튼도 눌러 볼 수 있지만 방송 때는 위 버튼으로 새 창을 띄우세요.</p>
+    <div class="st-show-wrap" id="st-show-wrap"><iframe src="${esc(url)}" title="슬라이드쇼 미리보기" loading="lazy"></iframe></div>`;
+}
+function fitShowPreview() {
+  const w = $('#st-show-wrap'); if (!w) return;
+  w.style.setProperty('--k', String(Math.min(1, w.clientWidth / 1900)));
+}
+addEventListener('resize', fitShowPreview);
 function thumbPanel(job, thumb, summary) {
   const done = !['queued', 'running', 'pick', 'thumb', 'images'].includes(job.status);
   const rv = thumb?.meta?.review, pick = thumb?.meta?.pick;
