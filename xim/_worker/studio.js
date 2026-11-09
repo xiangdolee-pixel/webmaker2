@@ -431,7 +431,12 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
 
   if (path === '/api/studio/options' && method === 'GET') {
     const settings = await getSettings(db);
-    return json({ emotions: P.THUMB_EMOTIONS, gestures: P.THUMB_GESTURES, faces: Array.from({ length: 87 }, (_, i) => String(i + 1).padStart(3, '0')), settings, keys: { anthropic: !!env.ANTHROPIC_API_KEY, openai: !!env.OPENAI_API_KEY } });
+    const seen = +((await db.prepare("SELECT value FROM studio_settings WHERE key = 'helper_seen'").first())?.value || 0);
+    return json({ emotions: P.THUMB_EMOTIONS, gestures: P.THUMB_GESTURES, faces: Array.from({ length: 87 }, (_, i) => String(i + 1).padStart(3, '0')), settings, keys: { anthropic: !!env.ANTHROPIC_API_KEY, openai: !!env.OPENAI_API_KEY, helper: !!env.STUDIO_HELPER_TOKEN }, helper_seen: seen });
+  }
+  if (path === '/api/studio/helper-status' && method === 'GET') {
+    const seen = +((await db.prepare("SELECT value FROM studio_settings WHERE key = 'helper_seen'").first())?.value || 0);
+    return json({ helper_seen: seen, online: now() - seen < 40000 });
   }
   if (path === '/api/studio/settings' && method === 'PUT') {
     const data = await bodyFn(request);
@@ -476,7 +481,10 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
     const settings = await getSettings(db);
     const today = await db.prepare('SELECT COUNT(*) AS n FROM studio_jobs WHERE created_at > ?').bind(now() - 86400000).first();
     if (today.n >= settings.daily_limit) throw bad(`하루 최대 ${settings.daily_limit}회를 넘었습니다(과금 안전장치). 설정에서 바꿀 수 있습니다.`);
-    const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine: d.engine === 'none' ? 'none' : 'api', text: String(d.text || '').slice(0, 20000) };
+    // engine: pc(기본 — 내 PC 도우미가 Claude Code · ChatGPT 구독으로 실행, 추가 비용 없음) | api(Claude · OpenAI API, 유료) | none(그림 없이 API)
+    const engine = ['pc', 'api', 'none'].includes(d.engine) ? d.engine : 'pc';
+    if (engine !== 'pc' && !env.ANTHROPIC_API_KEY) throw bad('API 방식은 ANTHROPIC_API_KEY 가 있어야 합니다. 기본(내 PC 도우미)으로 하세요.');
+    const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000) };
     if (kind === 'thumb') Object.assign(options, { title: String(d.title || '').slice(0, 200), emotion: d.emotion || '자동', gesture: d.gesture || '자동', badgeName: String(d.badgeName || '').slice(0, 60), badgeRole: String(d.badgeRole || '').slice(0, 80), face: d.face || 'emoji:auto' });
     if (kind === 'thumb' && !options.title) throw bad('썸네일 제목을 넣어 주세요.');
     const id = hex(10);
@@ -485,9 +493,11 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
     const caps = Array.isArray(d.captures) ? d.captures.filter((x) => /^[a-f0-9]{24}$/.test(x)).slice(0, 6) : [];
     for (let i = 0; i < caps.length; i++) await db.prepare("UPDATE studio_assets SET job_id = ?, idx = ? WHERE id = ? AND job_id = ''").bind(id, i + 1, caps[i]).run();
     if (source === 'capture' && !caps.length) { await db.prepare('DELETE FROM studio_jobs WHERE id = ?').bind(id).run(); throw bad('캡쳐 이미지를 올려 주세요.'); }
-    const inst = await env.STUDIO_WF.create({ id: `job-${id}-${hex(3)}`, params: { jobId: id } });
-    await setJob(db, id, { wf_id: inst.id });
-    await audit?.('STUDIO_JOB', `스튜디오 ${kind}`, `${channel} · ${source} · ${id}`);
+    if (engine !== 'pc') {
+      const inst = await env.STUDIO_WF.create({ id: `job-${id}-${hex(3)}`, params: { jobId: id } });
+      await setJob(db, id, { wf_id: inst.id });
+    }
+    await audit?.('STUDIO_JOB', `스튜디오 ${kind}`, `${channel} · ${source} · ${engine} · ${id}`);
     return json({ id });
   }
 
@@ -516,24 +526,28 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
     const job = await getJob(db, mm[1]);
     if (!job) throw new HttpError(404, '작업이 없습니다.');
     const d = await bodyFn(request);
-    const inst = job.wf_id ? await env.STUDIO_WF.get(job.wf_id) : null;
+    const jo = JSON.parse(job.options || '{}');
+    const pc = jo.engine === 'pc';
+    const inst = !pc && job.wf_id ? await env.STUDIO_WF.get(job.wf_id) : null;
     if (mm[2] === 'stop') {
       if (inst) { try { await inst.terminate(); } catch { /* 이미 끝남 */ } }
-      await setJob(db, job.id, { status: 'stopped', step: '', finished_at: now() });
+      await setJob(db, job.id, { status: 'stopped', step: '', finished_at: now() });   // pc 도우미는 상태를 보고 claude 를 끊는다
       return json({ ok: true });
     }
     if (mm[2] === 'pick') {
       if (job.status !== 'pick') throw bad('지금은 고르기 단계가 아닙니다.');
       const chosen = (d.chosen || []).map(Number).filter(Boolean).slice(0, 6);
       if (chosen.length < 1) throw bad('기사를 골라 주세요.');
-      await inst.sendEvent({ type: 'pick', payload: { chosen } });
+      await saveDoc(db, job.id, 'chosen', chosen);
+      if (inst) await inst.sendEvent({ type: 'pick', payload: { chosen } });
       await setJob(db, job.id, { status: 'running', step: 'articles' });
       return json({ ok: true });
     }
     if (mm[2] === 'thumb') {
       if (job.status !== 'thumb') throw bad('지금은 썸네일 선택 단계가 아닙니다.');
       const pick = thumbPickFields(d);
-      await inst.sendEvent({ type: 'thumb', payload: pick });
+      await saveDoc(db, job.id, 'thumb_pick', pick);
+      if (inst) await inst.sendEvent({ type: 'thumb', payload: pick });
       await setJob(db, job.id, { status: 'running', step: 'thumb' });
       return json({ ok: true });
     }
@@ -541,6 +555,12 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
       if (['queued', 'running', 'pick', 'thumb'].includes(job.status)) throw bad('작업이 끝난 뒤에 다시 만들 수 있습니다.');
       const what = d.what === 'thumb' ? 'thumb' : 'slide';
       const payload = { jobId: job.id, task: 'redo', what, idx: Math.max(1, Math.min(12, +(d.idx || 1))), note: String(d.note || '').slice(0, 500), pick: what === 'thumb' ? thumbPickFields(d.pick || {}) : null };
+      if (pc) {
+        // 도우미가 다음 폴링에서 집어 간다 (options.redo)
+        if (what === 'thumb') await saveDoc(db, job.id, 'thumb_pick', { ...(docJson(await latestDoc(db, job.id, 'thumb_pick')) || {}), ...payload.pick });
+        await setJob(db, job.id, { options: JSON.stringify({ ...jo, redo: { what, idx: payload.idx, note: payload.note } }), status: 'queued', step: what, error: '' });
+        return json({ ok: true });
+      }
       const i2 = await env.STUDIO_WF.create({ id: `redo-${job.id}-${hex(3)}`, params: payload });
       await setJob(db, job.id, { wf_id: i2.id, status: 'running', step: what, error: '' });
       return json({ ok: true });
