@@ -73,6 +73,28 @@ function timelineHtml(job, steps) {
     <ol class="tl">${t.rows.map((r, i) => `<li class="tl-${r.status}"><span class="tl-no">${i + 1}</span><span class="tl-ic">${icon[r.status]}</span><b>${esc(r.label)}</b><span class="tl-note">${esc(r.note)}</span><span class="tl-dur">${r.status === 'running' ? `${mins(r.secs)} 진행 중` : r.status === 'wait' ? '기다리는 중' : r.status === 'pending' ? `예상 ${mins(EXPECT[r.key] || 60)}` : r.secs ? mins(r.secs) : ''}</span></li>`).join('')}</ol>
   </section>`;
 }
+// 제작 조건 — 스튜디오 첫 화면에 늘 보인다 (사용자 지시 2026-11-09: 어떤 계정으로 어디에 로그인돼 있어야 하는지, 지금 충족하는지)
+function conditionsHtml(hs) {
+  const info = hs.info || {}, ex = hs.expected || {};
+  const rows = [];
+  const R = (ok, label, detail, warn) => rows.push({ ok, label, detail, warn });
+  R(hs.online, 'PC 도우미 켜짐', hs.online ? `연결됨 · ${ago(hs.helper_seen)}${info.pc ? ` · PC ${esc(info.pc)}` : ''}` : `꺼짐${hs.helper_seen ? ` · 마지막 ${ago(hs.helper_seen)}` : ''} — PC 에서 스튜디오도우미_시작.bat 을 켜 주세요`);
+  const c = info.claude || {};
+  const cOk = !!c.loggedIn && (!ex.claude || c.email === ex.claude);
+  R(c.loggedIn ? cOk : false, `Claude Code 로그인 — ${esc(ex.claude || '')}`, c.loggedIn ? `${esc(c.email || '')}${c.plan ? ` · ${esc(c.plan)}` : ''}${c.expires ? ` · ${fmtDate(Date.parse(c.expires)).slice(0, 10)} 까지` : ''}${!cOk ? ' — 기대한 계정과 다릅니다' : ''}` : (info.at ? '로그인 안 됨 — PC 터미널에서 claude 를 실행해 로그인' : '도우미가 보고하면 표시됩니다'), c.loggedIn && !cOk);
+  const g = info.chatgpt || {};
+  const gOk = !!g.loggedIn && (!ex.chatgpt || !g.email || g.email === ex.chatgpt);
+  R(g.loggedIn ? gOk : false, `ChatGPT 로그인(자동화 엣지 프로필) — ${esc(ex.chatgpt || '')}`, g.loggedIn ? `${esc(g.email || '로그인됨(계정 확인 못 함)')}${!gOk ? ' — 기대한 계정과 다릅니다' : ''}` : (info.at ? `로그인 안 됨${g.error ? ` (${esc(g.error)})` : ''} — PC 에서 스튜디오_ChatGPT로그인.bat 실행 뒤 그 창에서 로그인` : '도우미가 보고하면 표시됩니다'), g.loggedIn && !gOk);
+  if (info.at) R(!!info.engine && !!info.browserOk, '엔진 · 브라우저', `${info.browserOk ? esc(info.browser) : '브라우저 없음'} · ${info.engine ? esc(info.docs) : '엔진 폴더(docs\\tools) 없음'}`);
+  R(!!hs.token_ok, '도우미 토큰(xim)', hs.token_ok ? '설정됨' : '없음 — 비밀값 STUDIO_HELPER_TOKEN');
+  const sc = hs.schedules || [];
+  R(true, '예약', sc.length ? sc.map((x) => `${x.time} ${x.channel}`).join(' · ') : '없음', !sc.length);
+  const allOk = rows.every((x) => x.ok);
+  return `<section class="card st-cond ${allOk ? 'ok' : 'bad'}">
+    <div class="st-cond-head"><b>${allOk ? '✅ 제작 조건 충족 — 지금 만들 수 있습니다' : '⚠️ 제작 조건이 아직 안 맞습니다'}</b><span class="st-meta">${info.at ? `마지막 점검 ${ago(info.at)} · ` : ''}보관 중인 그림 ${fmtBytes(hs.total_bytes || 0)} (${hs.total_files || 0}장 · 작업 ${hs.kept_jobs || 0}개, 최근 ${hs.keep || 10}개까지)</span></div>
+    <ul>${rows.map((x) => `<li class="${x.ok ? (x.warn ? 'warn' : 'ok') : 'bad'}"><i>${x.ok ? (x.warn ? '⚠️' : '✅') : '❌'}</i><b>${x.label}</b><span>${x.detail}</span></li>`).join('')}</ul>
+  </section>`;
+}
 function cardProgress(j) {
   if (!['queued', 'running', 'pick', 'thumb', 'images'].includes(j.status)) return '';
   const plan = planFor({ ...j, options: j.options || {} });
@@ -108,9 +130,7 @@ async function renderList() {
   const { view, api } = deps;
   const jobs = await api('/studio/jobs?limit=60');
   const hs = await api('/studio/helper-status').catch(() => ({ online: false, helper_seen: 0 }));
-  const keyWarn = hs.online
-    ? `<p class="st-hint">🟢 PC 도우미 연결됨 (${ago(hs.helper_seen)}) — 글은 Claude Code, 그림은 이 PC 의 ChatGPT 로 만듭니다. · 보관 중인 그림 <b>${fmtBytes(hs.total_bytes || 0)}</b> (${hs.total_files || 0}장 · 작업 ${hs.kept_jobs || 0}개, 최근 ${hs.keep || 10}개까지 보관)</p>`
-    : `<p class="st-warn">PC 도우미가 꺼져 있습니다${hs.helper_seen ? ` (마지막 ${ago(hs.helper_seen)})` : ''}. 보관 중인 그림 ${fmtBytes(hs.total_bytes || 0)}. 작업은 "대기" 로 쌓였다가 PC 에서 <b>스튜디오도우미_시작.bat</b> 을 켜면 이어집니다.${opts.settings.cloud_text === 'on' ? ' 글 단계는 클라우드(GitHub Actions)에서 먼저 돕니다.' : ''}</p>`;
+  const keyWarn = conditionsHtml(hs);
   view.innerHTML = `
     <div class="bar st-bar">
       <h2>스튜디오 <small>유튜브 발표자료</small></h2>
@@ -470,11 +490,11 @@ async function scheduleDialog() {
       <span class="st-meta"><span class="sc-eta" data-eta>${x.on ? `→ 약 ${plusMin(x.time, est)} 완성` : ''}</span>${x.last ? ` · 마지막 ${esc(x.last)}` : ''}</span>
       <input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="last" value="${esc(x.last)}">
     </div>`;
-  const d = r.duration || {}; const est = d.avg_min || 20;
+  const d = r.duration || {}; const est = d.n >= 3 ? d.avg_min : 20;   // 기록이 3회 미만이면 기본 20분 (첫 시험 회차는 재시작이 섞여 43분으로 잡힘)
   const plusMin = (hhmm, add) => { const [h, m] = hhmm.split(':').map(Number); const t = (h * 60 + m + add) % 1440; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
   openDialog(`<h2>예약 <small class="st-meta">하루 최대 3개 · 한국 시각 · 지금 ${esc(r.now_kst)}</small></h2>
     <p class="st-hint">예약 시각이 되면 그 시각 기준 최근 8시간 웹 뉴스로 자동 선택 · 자동 썸네일 본편을 만듭니다. PC 도우미가 꺼져 있으면 "대기" 로 쌓였다가 켤 때 이어집니다.</p>
-    <p class="st-dur"><b>한 번 만드는 데 약 ${est}분</b> <span class="st-meta">${d.n ? `최근 ${d.n}회 평균 ${d.avg_min}분 · 마지막 ${d.last_min}분` : '아직 기록 없음 — 글 약 10분 + 그림(ChatGPT) 약 10분'} · 글 단계 ≈ 10분, 슬라이드 6장 + 썸네일 ≈ 7~10분, 검수 · 재생성 ≈ 2~3분</span></p>
+    <p class="st-dur"><b>한 번 만드는 데 약 ${est}분</b> <span class="st-meta">${d.n >= 3 ? `최근 ${d.n}회 평균 ${d.avg_min}분 · 마지막 ${d.last_min}분` : `기록이 ${d.n || 0}회뿐이라 기본값 20분으로 계산${d.n ? ` (마지막 ${d.last_min}분)` : ''}`} · 글 단계 ≈ 10분, 슬라이드 6장 + 썸네일 ≈ 7~10분, 검수 · 재생성 ≈ 2~3분</span></p>
     <form id="st-sched-form">${rows.map(row).join('')}<p class="err" id="sc-err"></p>
     <div class="dlg-actions"><button class="btn" type="button" data-close>닫기</button><button class="btn primary" type="submit">저장</button></div></form>`, (dlg) => {
     const refreshEta = (row) => { const on = row.querySelector('[name=on]').checked, tm = row.querySelector('[name=time]').value; row.querySelector('[data-eta]').textContent = on && tm ? `→ 약 ${plusMin(tm, est)} 완성` : ''; };
@@ -503,6 +523,7 @@ function settingsDialog() {
     ${f('thumb_style_사섬', '썸네일 스타일 · 사섬', 2)}
     ${f('thumb_style_순섬', '썸네일 스타일 · 순섬', 2)}
     <div class="row2">${f('daily_limit', '하루 최대 실행 횟수')}<label class="field"><span>글 단계를 클라우드(GitHub Actions)에서</span><select class="input" name="cloud_text"><option value="off" ${s.cloud_text !== 'on' ? 'selected' : ''}>끔 — PC 도우미가 전부</option><option value="on" ${s.cloud_text === 'on' ? 'selected' : ''}>켬 — PC 꺼져 있어도 원고까지(구독 토큰 필요)</option></select></label></div>
+    <div class="row2">${f('claude_account', 'Claude Code 로그인 계정(제작 조건)')}${f('chatgpt_account', 'ChatGPT 로그인 계정(제작 조건)')}</div>
     ${f('greeting_사섬', '인사말 · 사섬', 2)}
     ${f('greeting_순섬', '인사말 · 순섬', 2)}
     <div class="field"><span>다른 PC 에 도우미 설치</span><small>그 PC 에 Node · Python · Claude Code · webmaker2 · ws(docs) 가 있으면 아래 한 줄을 붙여 넣어 실행합니다. 자세한 순서는 xim/runner/README.md.</small>

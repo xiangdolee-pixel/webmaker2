@@ -71,10 +71,12 @@ async function getSettings(db) {
     daily_limit: +(s.daily_limit || 12),
     greeting_사섬: s['greeting_사섬'] || '내 돈이 몰래 불어나는 진짜 비트코인 뉴스, 안녕하세요, 사적인 자산왕입니다.',
     greeting_순섬: s['greeting_순섬'] || '돈 버는 지식만 순수하게 뽑아내는 뉴스 장인, 안녕하세요, 순수한 크립토입니다.',
-    cloud_text: s.cloud_text === 'on' ? 'on' : 'off',   // on = 글 단계를 GitHub Actions(Claude 구독 토큰)에서, off = PC 도우미가 전부
+    cloud_text: s.cloud_text === 'on' ? 'on' : 'off',
+    claude_account: s.claude_account || 'master@webchon.com',      // 제작 조건: Claude Code 가 이 계정으로 로그인돼 있어야 (사용자 지시 2026-11-09)
+    chatgpt_account: s.chatgpt_account || 'xiangdolee@gmail.com',  // 제작 조건: 자동화 엣지 프로필의 ChatGPT 계정   // on = 글 단계를 GitHub Actions(Claude 구독 토큰)에서, off = PC 도우미가 전부
   };
 }
-const SETTING_KEYS = ['slide_style', 'thumb_style_사섬', 'thumb_style_순섬', 'image_model', 'image_quality', 'daily_limit', 'greeting_사섬', 'greeting_순섬', 'cloud_text'];
+const SETTING_KEYS = ['slide_style', 'thumb_style_사섬', 'thumb_style_순섬', 'image_model', 'image_quality', 'daily_limit', 'greeting_사섬', 'greeting_순섬', 'cloud_text', 'claude_account', 'chatgpt_account'];
 
 // ───────────────────────── R2 그림 ─────────────────────────
 async function putAsset(env, jobId, kind, idx, bytes, mime, meta = {}, dims = {}) {
@@ -469,7 +471,10 @@ export async function studioHelper(request, env, url, path, method) {
   await db.prepare("INSERT INTO studio_settings (key, value) VALUES ('helper_seen', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(String(now())).run();
   const readJson = async () => { try { return await request.json(); } catch { throw bad('JSON 으로 보내 주세요.'); } };
   let mm;
-  if (path === '/api/studio/helper/ping') return json({ ok: true, at: now() });
+  if (path === '/api/studio/helper/ping') {
+    if (method === 'POST') { try { const d = await request.json(); if (d && d.info) await db.prepare("INSERT INTO studio_settings (key, value) VALUES ('helper_info', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(JSON.stringify(d.info).slice(0, 8000)).run(); } catch { /* 본문 없음 */ } }
+    return json({ ok: true, at: now() });
+  }
   // 다음 일감 하나를 집어 간다. want=text,images — text: 글부터(queued), images: 그림만(images 상태). 가져가면 running 으로 바꿔 두 번 집지 않게 한다
   if (path === '/api/studio/helper/next' && method === 'POST') {
     const want = (url.searchParams.get('want') || 'text,images').split(',');
@@ -628,7 +633,9 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
   if (path === '/api/studio/helper-status' && method === 'GET') {
     const seen = +((await db.prepare("SELECT value FROM studio_settings WHERE key = 'helper_seen'").first())?.value || 0);
     const tot = await db.prepare('SELECT COALESCE(SUM(size), 0) AS bytes, COUNT(*) AS n, COUNT(DISTINCT job_id) AS jobs FROM studio_assets').first();
-    return json({ helper_seen: seen, online: now() - seen < 40000, total_bytes: tot.bytes, total_files: tot.n, kept_jobs: tot.jobs, keep: KEEP_JOBS });
+    let info = null; try { info = JSON.parse((await db.prepare("SELECT value FROM studio_settings WHERE key = 'helper_info'").first())?.value || 'null'); } catch { /* 없음 */ }
+    const st = await getSettings(db);
+    return json({ helper_seen: seen, online: now() - seen < 40000, total_bytes: tot.bytes, total_files: tot.n, kept_jobs: tot.jobs, keep: KEEP_JOBS, info, expected: { claude: st.claude_account, chatgpt: st.chatgpt_account }, token_ok: !!env.STUDIO_HELPER_TOKEN, schedules: (await getSchedules(db)).filter((x) => x.on) });
   }
   if (path === '/api/studio/settings' && method === 'PUT') {
     const data = await bodyFn(request);

@@ -595,3 +595,16 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 @media (max-width: 640px) { .st-sched-row { grid-template-columns: auto minmax(0, 1fr); } .st-sched-row .st-meta { grid-column: 1 / -1; } }
 .st-dur { margin: -4px 0 12px; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--brand-soft); font-size: 14px; }
 .st-dur b { color: var(--brand); margin-right: 6px; }
+
+/* 스튜디오 — 제작 조건 */
+.st-cond { padding: 12px 16px; margin-bottom: 16px; border-left: 4px solid var(--ok); }
+.st-cond.bad { border-left-color: var(--danger); }
+.st-cond-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; margin-bottom: 6px; font-size: 15px; }
+.st-cond ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.st-cond li { display: grid; grid-template-columns: 22px auto minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 4px 0; font-size: 14px; }
+.st-cond li i { font-style: normal; }
+.st-cond li b { white-space: nowrap; }
+.st-cond li span { color: var(--sub); overflow-wrap: anywhere; }
+.st-cond li.bad span { color: var(--danger); }
+.st-cond li.warn span { color: var(--warn); }
+@media (max-width: 640px) { .st-cond li { grid-template-columns: 22px minmax(0, 1fr); } .st-cond li span { grid-column: 2; } }

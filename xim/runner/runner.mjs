@@ -361,7 +361,7 @@ async function processJob(payload) {
     log(`✅ ${job.id} 완료`);
   } catch (e) {
     if (e.message === 'STOPPED') { log('  사용자가 멈춤'); return; }
-    if (e.message === 'LOGIN_REQUIRED') { await j.status('images', 'slides', { error: 'ChatGPT 로그인이 필요합니다 — PC 에서 스튜디오_ChatGPT로그인.bat 로 로그인하면 다시 시도됩니다.' }); loginNeeded = true; return; }
+    if (e.message === 'LOGIN_REQUIRED') { await j.status('images', 'slides', { error: 'ChatGPT 로그인이 필요합니다 — PC 에서 스튜디오_ChatGPT로그인.bat 로 로그인하면 다시 시도됩니다.' }); loginNeeded = true; lastReport = Date.now() - 20 * 60000; return; }   // 10분 뒤 다시 점검
     if (e.message.startsWith('ENGINE_FAILED')) { await j.status('images', 'slides', { error: `그림 엔진 실패 — 잠시 뒤 다시 시도합니다. ${e.message.slice(15, 200)}` }); engineFailAt = Date.now(); return; }
     log('❌', e.message);
     await j.status('failed', '', { error: e.message }).catch(() => {});
@@ -370,11 +370,35 @@ async function processJob(payload) {
 let loginNeeded = false;
 let engineFailAt = 0;   // 그림 엔진이 실패하면 2분 뒤에 다시 그림 일감을 집는다
 
+// 제작 조건 보고 — 도우미가 시작할 때 · 30분마다 · 그림 작업 뒤에 xim 에 올린다 (스튜디오 첫 화면 '제작 조건' 표시)
+let lastReport = 0;
+async function reportEnv(force = false) {
+  if (!force && Date.now() - lastReport < 30 * 60000) return;
+  lastReport = Date.now();
+  const info = { at: Date.now(), node: process.version, browser: path.basename(BROWSER), docs: DOCS, profile: PROFILE, pc: os.hostname() };
+  try {
+    const c = spawnSync(claudeBin, ['auth', 'status', '--json'], { encoding: 'utf8', shell: process.platform === 'win32', timeout: 60000 });
+    const j = JSON.parse((c.stdout || '').slice((c.stdout || '').indexOf('{')));
+    info.claude = { loggedIn: !!j.loggedIn, email: j.email || '', plan: j.subscriptionType || '', expires: j.loginExpiresAt || '' };
+  } catch (e) { info.claude = { loggedIn: false, error: String(e.message).slice(0, 120) }; }
+  try {
+    const p = spawnSync('python', ['-u', 'tools\\chatgpt_login_check.py'], { cwd: DOCS, encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8', ...engineEnv() }, timeout: 150000, windowsHide: true });
+    const line = (p.stdout || '').trim().split(/\r?\n/).reverse().find((l) => l.startsWith('{')) || '{}';
+    info.chatgpt = JSON.parse(line);
+  } catch (e) { info.chatgpt = { loggedIn: false, error: String(e.message).slice(0, 120) }; }
+  info.engine = fs.existsSync(path.join(DOCS, 'tools', 'gpt_slide_text.py'));
+  info.browserOk = fs.existsSync(BROWSER);
+  try { await api('/api/studio/helper/ping', { method: 'POST', body: { info } }); log(`  제작 조건 보고: Claude ${info.claude.email || '로그인 안 됨'} · ChatGPT ${info.chatgpt.loggedIn ? (info.chatgpt.email || '로그인됨') : '로그인 안 됨'}`); } catch (e) { log('(조건 보고 실패)', e.message); }
+  if (info.chatgpt && info.chatgpt.loggedIn) loginNeeded = false;
+}
+
 async function pcLoop() {
   if (!DOCS) { console.error('PC 모드는 DOCS(엔진 폴더) 설정이 필요합니다.'); process.exit(1); }
   log(`PC 도우미 시작 — ${XIM} · 엔진 ${DOCS} · 브라우저 ${path.basename(BROWSER)}`);
+  await reportEnv(true);
   for (;;) {
     try {
+      await reportEnv();
       const imagesOk = !loginNeeded && Date.now() - engineFailAt > 120000;
       const r = await api(`/api/studio/helper/next?want=${imagesOk ? 'text,images' : 'text'}`, { method: 'POST', body: {} });
       if (r.job) { await processJob(r); continue; }
