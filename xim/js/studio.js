@@ -403,8 +403,12 @@ function settingsDialog() {
     <div class="row2">${f('daily_limit', '하루 최대 실행 횟수')}<label class="field"><span>글 단계를 클라우드(GitHub Actions)에서</span><select class="input" name="cloud_text"><option value="off" ${s.cloud_text !== 'on' ? 'selected' : ''}>끔 — PC 도우미가 전부</option><option value="on" ${s.cloud_text === 'on' ? 'selected' : ''}>켬 — PC 꺼져 있어도 원고까지(구독 토큰 필요)</option></select></label></div>
     ${f('greeting_사섬', '인사말 · 사섬', 2)}
     ${f('greeting_순섬', '인사말 · 순섬', 2)}
+    <div class="field"><span>다른 PC 에 도우미 설치</span><small>그 PC 에 Node · Python · Claude Code · webmaker2 · ws(docs) 가 있으면 아래 한 줄을 붙여 넣어 실행합니다. 자세한 순서는 xim/runner/README.md.</small>
+      <div class="st-cmd"><code id="st-setup-cmd">불러오는 중…</code><button class="btn sm" type="button" id="st-setup-copy">복사</button></div></div>
     <p class="err" id="set-err"></p>
     <div class="dlg-actions"><button class="btn" type="button" data-close>닫기</button><button class="btn primary" type="submit">저장</button></div></form>`, (dlg) => {
+    deps.api('/studio/helper-token').then((r) => { $('#st-setup-cmd', dlg).textContent = r.token ? `node D:\\ws\\webmaker2\\xim\\runner\\runner.mjs --setup --token ${r.token}` : '도우미 토큰이 아직 없습니다.'; }).catch(() => {});
+    $('#st-setup-copy', dlg).addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#st-setup-cmd', dlg).textContent); toast('복사했습니다'); } catch { toast('복사하지 못했습니다'); } });
     $('#st-set', dlg).addEventListener('submit', (e) => { e.preventDefault(); busy(e.currentTarget.querySelector('[type=submit]'), $('#set-err', dlg), async () => { const data = Object.fromEntries(new FormData(e.currentTarget).entries()); const r = await deps.api('/studio/settings', { method: 'PUT', data }); opts.settings = r.settings; toast('저장했습니다'); dlg.close(); }); });
   });
 }

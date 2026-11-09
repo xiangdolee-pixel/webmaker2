@@ -70,13 +70,15 @@ function showApp() {
   $('#app').hidden = false;
   if (!navReady) {
     navReady = true;
-    pillTabs($('#nav'), [['sites', '사이트'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제']], tab, (v) => {
+    pillTabs($('#nav'), [['sites', '사이트'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리']], tab, (v) => {
       tab = v;
       if (reqOpen && !(v === 'requests' && /^#req-\d+$/.test(location.hash))) { reqOpen = 0; if (location.hash) history.replaceState(null, '', location.pathname); }
       render();
     });
     // 왼쪽 메뉴: 글자 앞에 그림
     $$('#nav > button').forEach((b) => b.insertAdjacentHTML('afterbegin', NAV_ICON[b.dataset.v] || ''));
+    // 제작 도구(스튜디오 · 내 목소리)는 구분선 아래 맨 끝에 따로 묶는다 (사용자 지시 2026-11-09)
+    $('#nav > button[data-v="studio"]')?.insertAdjacentHTML('beforebegin', '<i class="nav-sep" aria-hidden="true"></i>');
     requestAnimationFrame(() => slideTabs($('#nav')));
   }
   render();

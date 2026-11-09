@@ -568,6 +568,8 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
     const seen = +((await db.prepare("SELECT value FROM studio_settings WHERE key = 'helper_seen'").first())?.value || 0);
     return json({ emotions: P.THUMB_EMOTIONS, gestures: P.THUMB_GESTURES, faces: Array.from({ length: 87 }, (_, i) => String(i + 1).padStart(3, '0')), settings, keys: { anthropic: !!env.ANTHROPIC_API_KEY, openai: !!env.OPENAI_API_KEY, helper: !!env.STUDIO_HELPER_TOKEN }, helper_seen: seen });
   }
+  // 다른 PC 에 도우미를 깔 때 붙여 넣을 토큰 (운영자 로그인 뒤에만)
+  if (path === '/api/studio/helper-token' && method === 'GET') return json({ token: env.STUDIO_HELPER_TOKEN || '', url: url.origin });
   if (path === '/api/studio/helper-status' && method === 'GET') {
     const seen = +((await db.prepare("SELECT value FROM studio_settings WHERE key = 'helper_seen'").first())?.value || 0);
     return json({ helper_seen: seen, online: now() - seen < 40000 });

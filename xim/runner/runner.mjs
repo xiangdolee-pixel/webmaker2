@@ -20,7 +20,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const opt = (k, d = '') => { const i = args.indexOf(k); return i >= 0 ? (args[i + 1] ?? '') : d; };
 const has = (k) => args.includes(k);
-const MODE = has('--catalog') ? 'catalog' : has('--login') ? 'login' : opt('--mode', 'pc');
+const MODE = has('--setup') ? 'setup' : has('--catalog') ? 'catalog' : has('--login') ? 'login' : opt('--mode', 'pc');
 
 // ───────── 설정 ─────────
 const cfgFile = [process.env.DOCS && path.join(process.env.DOCS, 'tools', '_xim_helper.json'), 'D:\\ws\\docs\\tools\\_xim_helper.json'].filter(Boolean).find((f) => fs.existsSync(f));
@@ -32,7 +32,7 @@ const BROWSER = process.env.BROWSER_EXE || (cfg.browser === 'brave' ? 'C:\\Progr
 const PROFILE = DOCS ? path.join(DOCS, 'tools', cfg.browser === 'brave' ? '_brave_profile' : '_edge_profile') : '';
 const WORK_ROOT = DOCS ? path.join(DOCS, 'xim') : path.join(process.cwd(), 'work');
 const MARKER = '=====[교정된 최종 원고]=====';
-if (!TOKEN) { console.error('STUDIO_HELPER_TOKEN 이 없습니다 (환경변수 또는 tools/_xim_helper.json).'); process.exit(1); }
+if (!TOKEN && MODE !== 'setup') { console.error('STUDIO_HELPER_TOKEN 이 없습니다 — 먼저  node xim/runner/runner.mjs --setup --token <토큰>  (토큰은 xim 스튜디오 > 설정 > 다른 PC 설치)'); process.exit(1); }
 
 const log = (...a) => console.log(new Date().toLocaleTimeString('ko-KR', { hour12: false }), ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -312,6 +312,14 @@ async function runImages(payload, work) {
     } catch (e) { await j.step('review', 'failed', e.message); }
     if (fails.length) await py(['tools\\gpt_slide_text.py', '--result', work, ...fails.map(String)], { cwd: DOCS, env: engineEnv(), timeoutMin: 25, label: '재생성' });
   }
+  // 예전과 같은 산출물 파일도 작업 폴더에 남긴다: 01/03 txt + 04_slideshow.html (04_PPTMaker.md 규격, make_slideshow.py)
+  try {
+    const summary = parse('summary');
+    fs.writeFileSync(path.join(work, '01_ArticleMaker.txt'), splitBlocks(docs.articles).join('\n\n') + '\n', 'utf8');
+    if (summary) fs.writeFileSync(path.join(work, '03_Summary.txt'), `## 제목 추천\n\n${(summary.titles || []).map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\n---\n\n## 인트로 대본\n\n${summary.intro || ''}\n\n---\n\n## 유튜브 더보기란\n\n${summary.description || ''}\n\n---\n\n## 등장 인물\n\n${(summary.people || []).map((p) => `- ${p}`).join('\n') || '- 없음'}\n`, 'utf8');
+    const sh = await py(['tools\\make_slideshow.py', work], { cwd: DOCS, timeoutMin: 2, label: '슬라이드쇼 파일' });
+    if (sh.code === 0) log(`  04_slideshow.html → ${path.join(work, '04_slideshow.html')}`);
+  } catch (e) { log('  (슬라이드쇼 파일 생략)', e.message); }
   // 올리기
   for (const n of nums) {
     const png = path.join(work, 'shot2', `${n}.png`);
@@ -395,7 +403,37 @@ function login() {
   spawn(BROWSER, [`--user-data-dir=${PROFILE}`, '--no-first-run', '--no-default-browser-check', '--window-size=1200,900', 'https://chatgpt.com/'], { detached: true, stdio: 'ignore' }).unref();
 }
 
-if (MODE === 'login') login();
+// ───────── 다른 PC 세팅: 점검 + 설정 파일 ─────────
+//   node xim/runner/runner.mjs --setup --token <토큰> [--docs D:\ws\docs] [--browser edge|brave]
+async function setup() {
+  const ok = (b, label, hint = '') => console.log(`  ${b ? '✅' : '❌'} ${label}${!b && hint ? ` — ${hint}` : ''}`);
+  console.log('xim 스튜디오 PC 도우미 — 설치 점검');
+  const docs = opt('--docs', DOCS || 'D:\\ws\\docs');
+  const browser = opt('--browser', cfg.browser || 'edge');
+  const token = opt('--token', TOKEN);
+  const which = (c) => { const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', [c], { encoding: 'utf8' }); return r.status === 0 ? r.stdout.split(/\r?\n/)[0].trim() : ''; };
+  ok(true, `Node ${process.version}`);
+  const py3 = which('python'); ok(!!py3, 'Python', 'python.org 에서 3.10+ 설치 (PATH 추가)');
+  if (py3) { const r = spawnSync('python', ['-c', 'import playwright, PIL; print("ok")'], { encoding: 'utf8' }); ok(/ok/.test(r.stdout), 'Python 패키지 playwright · pillow', `pip install -r "${docs}\\tools\\requirements.txt"`); }
+  const cl = which('claude'); ok(!!cl, 'Claude Code (claude)', 'npm install -g @anthropic-ai/claude-code 뒤 claude 실행해서 로그인');
+  if (cl) { const r = spawnSync(cl, ['-p', '1+1=? 숫자만', '--output-format', 'json'], { encoding: 'utf8', shell: process.platform === 'win32', timeout: 90000 }); ok(/"result"/.test(r.stdout || ''), 'Claude Code 로그인 상태', 'claude 를 한 번 실행해 로그인'); }
+  const exe = browser === 'brave' ? 'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe' : 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+  ok(fs.existsSync(exe), `브라우저 ${path.basename(exe)}`, `${exe} 가 없습니다`);
+  ok(fs.existsSync(path.join(docs, 'tools', 'gpt_slide_text.py')), `엔진 폴더 ${docs}`, 'ws 저장소(비공개)를 받아 docs 폴더가 있어야 합니다');
+  ok(!!token, '도우미 토큰', 'xim 스튜디오 > 설정 > 다른 PC 설치 의 명령을 그대로 실행하세요');
+  if (!token) return;
+  try { const r = await fetch(`${XIM}/api/studio/helper/ping`, { method: 'POST', headers: { 'X-Studio-Token': token } }); ok(r.ok, `xim 연결 (${XIM})`, `응답 ${r.status} — 토큰이 다릅니다`); if (!r.ok) return; } catch (e) { ok(false, 'xim 연결', e.message); return; }
+  const file = path.join(docs, 'tools', '_xim_helper.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ url: XIM, token, browser, docs: docs.replace(/\\/g, '/') }, null, 2), 'utf8');
+  console.log(`  ✅ 설정 저장 ${file}`);
+  const prof = path.join(docs, 'tools', browser === 'brave' ? '_brave_profile' : '_edge_profile');
+  ok(fs.existsSync(path.join(prof, 'Default', 'Network', 'Cookies')), 'ChatGPT 로그인(자동화 프로필)', `node xim/runner/runner.mjs --login  → 뜨는 창에서 chatgpt.com 로그인 뒤 창 닫기`);
+  console.log('\n다음: 1) 로그인이 ❌ 면 위 --login 실행  2) 도우미 시작: node xim/runner/runner.mjs --mode pc  (또는 docs\\tools\\스튜디오도우미_시작.bat)');
+}
+
+if (MODE === 'setup') setup().catch((e) => { console.error(e.message); process.exit(1); });
+else if (MODE === 'login') login();
 else if (MODE === 'catalog') catalog().catch((e) => { console.error(e.message); process.exit(1); });
 else if (MODE === 'cloud') cloudOnce().catch((e) => { console.error(e.message); process.exit(1); });
 else pcLoop();
