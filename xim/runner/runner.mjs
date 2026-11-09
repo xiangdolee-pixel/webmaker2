@@ -64,9 +64,10 @@ async function download(urlPath, dest) {
 // ───────── Claude Code (구독) ─────────
 //   프롬프트는 stdin 으로 넘긴다(윈도우 명령줄 길이 제한). --output-format json 의 result 가 답.
 const claudeBin = (() => { const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['claude'], { encoding: 'utf8' }); const l = (r.stdout || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean); return l.find((x) => /\.cmd$/i.test(x)) || l[0] || 'claude'; })();
-async function claude(prompt, { cwd, timeoutMin = 25, label = 'claude' } = {}) {
+async function claude(prompt, { cwd, timeoutMin = 25, label = 'claude', model } = {}) {
   const t0 = Date.now();
   const extra = cwd ? ['--add-dir', cwd] : [];
+  if (model) extra.push('--model', model);   // 분류 · 선별처럼 가벼운 단계는 sonnet 으로 빠르게
   return new Promise((resolve, reject) => {
     const child = spawn(claudeBin, ['-p', '--output-format', 'json', '--dangerously-skip-permissions', ...extra], { cwd: cwd || process.cwd(), shell: process.platform === 'win32', windowsHide: true, env: { ...process.env } });
     let out = '', err = '';
@@ -119,7 +120,7 @@ async function assertAlive(j) {
 }
 const kstNow = () => new Date(Date.now() + 9 * 3600000).toISOString().slice(5, 16).replace('T', ' ') + ' KST';
 
-async function runText(payload, work, { stage = 'run' } = {}) {
+async function runText(payload, work, { stage = 'run', onBlocks } = {}) {
   const job = payload.job, j = J(job.id), docs = payload.docs || {};
   const parse = (k) => { try { return docs[k] ? JSON.parse(docs[k]) : null; } catch { return null; } };
   fs.mkdirSync(work, { recursive: true });
@@ -135,7 +136,7 @@ async function runText(payload, work, { stage = 'run' } = {}) {
         const cands = await stepRun(j, 'rss', '', async () => { const r = await j.rss(); covered = r.covered || []; hours = r.hours || 8; if (r.candidates.length < 3) throw new Error(`RSS 후보가 ${r.candidates.length}건뿐입니다.`); return r.candidates; });
         top = await stepRun(j, 'top15', '', async () => {
           const list = cands.map((c) => `[${c.n}] ${c.title}\n    ${c.label} | ${c.published_kst}\n    ${c.url}\n    ${c.summary}`).join('\n');
-          const t = parseJson(await claude(`${P.TOP15_SYSTEM}\n\n기준 시각: ${kstNow()} (최근 ${hours}시간 — 제작 시각 기준)\n\n후보 목록:\n${list}${covered.length ? `\n\n★ 이미 다룬 뉴스(최근 회차) — 아래와 같은 사건 · 같은 소재의 후속 재보도는 Top15 와 추천에서 모두 뺀다(수치만 갱신된 같은 이야기도 같은 사건으로 본다). 정말 새로운 전개(새 결정 · 큰 변화)일 때만 예외:\n${covered.map((c) => `- [${c.when}] ${c.title}${c.url ? ` (${c.url})` : ''}`).join('\n')}` : ''}\n\n★ items[].n 과 picks 의 숫자는 후보 목록의 [n] 번호를 그대로 쓴다(새로 매기지 않는다). items 는 고른 15개 전부.${SHAPE(P.TOP15_SCHEMA)}${JSON_ONLY}`, { label: 'Top15' }), 'Top15');
+          const t = parseJson(await claude(`${P.TOP15_SYSTEM}\n\n기준 시각: ${kstNow()} (최근 ${hours}시간 — 제작 시각 기준)\n\n후보 목록:\n${list}${covered.length ? `\n\n★ 이미 다룬 뉴스(최근 회차) — 아래와 같은 사건 · 같은 소재의 후속 재보도는 Top15 와 추천에서 모두 뺀다(수치만 갱신된 같은 이야기도 같은 사건으로 본다). 정말 새로운 전개(새 결정 · 큰 변화)일 때만 예외:\n${covered.map((c) => `- [${c.when}] ${c.title}${c.url ? ` (${c.url})` : ''}`).join('\n')}` : ''}\n\n★ items[].n 과 picks 의 숫자는 후보 목록의 [n] 번호를 그대로 쓴다(새로 매기지 않는다). items 는 고른 15개 전부.${SHAPE(P.TOP15_SCHEMA)}${JSON_ONLY}`, { label: 'Top15', model: 'sonnet' }), 'Top15');
           t.items = (t.items || []).slice(0, 15);
           t.picks = (t.picks || []).map((x) => (typeof x === 'object' && x ? (x.n ?? x.candidate ?? x.no) : x)).map(Number).filter(Boolean);
           if (!t.items.length) throw new Error('Top15 결과에 items 가 없습니다.');
@@ -149,19 +150,19 @@ async function runText(payload, work, { stage = 'run' } = {}) {
       const items = picks.map((n) => top.items.find((i) => i.n === n)).filter(Boolean);
       if (!items.length) throw new Error('고른 기사가 없습니다.');
       await assertAlive(j);
-      blocks = await stepRun(j, 'articles', `${items.length}개`, async () => {
-        const list = items.map((it, i) => `${i + 1}. ${it.title}\n   URL: ${it.url}\n   요지: ${it.summary}`).join('\n');
-        const prompt = `아래 기사 ${items.length}개로 한국어 유튜브 해설 대본 ${items.length}개를 쓴다.
-★ 속도 규칙: Agent 도구(general-purpose)를 기사 수만큼 한 메시지에 동시에 띄워 병렬로 처리한다(기사 1개 = 에이전트 1개). 각 에이전트는 URL 을 WebFetch 로 1회만 읽고 대본 텍스트만 돌려준다. 원문을 메인에 쌓지 않는다.
-각 대본 형식 · 문체:
-${P.ARTICLE_FORMAT}
-${P.ARTICLE_SELFCHECK}
-결과: 대본 ${items.length}개를 위 순서대로, 블록 사이 빈 줄 1개로 이어 붙여 출력한다. 각 블록은 📌 로 시작한다. 다른 설명 · 머리말 · 코드펜스 없이 대본만.
-
-${list}`;
-        const out = await claude(prompt, { label: '기사' });
-        const b = splitBlocks(out.replace(/```[a-z]*\n?/g, ''));
-        if (b.length < Math.min(items.length, 1)) throw new Error(`대본 블록이 ${b.length}개뿐입니다.`);
+      blocks = await stepRun(j, 'articles', `${items.length}개 동시`, async () => {
+        // 속도: 기사마다 독립 Claude Code 프로세스를 동시에 띄운다(오케스트레이터 1개 + 서브에이전트 6개보다 1~2분 빠름). 실패한 기사만 1회 재시도
+        const one = async (it) => {
+          const prompt = `${P.ARTICLE_FROM_URL(it.url, `${it.title} — ${it.summary}`)}\n${P.ARTICLE_SELFCHECK}\n\n★ WebFetch 로 URL 을 1회만 읽는다. 결과는 📌 로 시작하는 대본 텍스트만(마지막 줄 [인물] 포함). 설명 · 머리말 · 코드펜스 금지. 사용자에게 묻지 않는다.`;
+          const out = (await claude(prompt, { label: `기사 ${it.n}`, timeoutMin: 8 })).replace(/```[a-z]*\n?/g, '').trim();
+          const b = splitBlocks(out)[0];
+          if (!b) throw new Error(`기사 ${it.n} 대본 형식 아님`);
+          return b;
+        };
+        const results = await Promise.all(items.map(async (it) => { try { return await one(it); } catch (e) { log(`  기사 ${it.n} 실패(${e.message.slice(0, 60)}) → 재시도`); try { return await one(it); } catch { return null; } } }));
+        const b = results.filter(Boolean);
+        if (!b.length) throw new Error('대본을 하나도 만들지 못했습니다.');
+        if (b.length < items.length) log(`  기사 ${items.length - b.length}개는 끝내 실패 — ${b.length}개로 진행`);
         await j.doc('articles', b.join('\n\n'));
         return b;
       });
@@ -191,6 +192,7 @@ ${P.ARTICLE_FORMAT}
     }
   }
 
+  if (onBlocks) { try { await onBlocks(blocks); } catch (e) { log('  (훅 오류)', e.message); } }
   // 패키지 한 번에: 교차 팩트체크 + 유튜브 패키지 + 썸네일 값 + ChatGPT 썸네일 프롬프트 (속도 최적화 2026-11-09: Claude 3~4회 → 1회)
   let fact = parse('factcheck'), summary = parse('summary'), pick = parse('thumb_pick');
   if (!fact || !summary) {
@@ -243,87 +245,73 @@ async function toWebp(src) {
   return { file: dst, w, h };
 }
 
-async function runImages(payload, work) {
-  if (!DOCS) throw new Error('그림 단계는 PC 도우미(DOCS 설정)에서만 됩니다.');
-  const job = payload.job, j = J(job.id), docs = payload.docs || {};
-  const parse = (k) => { try { return docs[k] ? JSON.parse(docs[k]) : null; } catch { return null; } };
-  const fact = parse('factcheck');
-  const blocks = fact?.fixed_blocks || splitBlocks(docs.articles);
-  if (!blocks?.length) throw new Error('원고가 없어 그림을 만들 수 없습니다.');
-  fs.mkdirSync(path.join(work, 'shot2'), { recursive: true });
-  fs.writeFileSync(path.join(work, '02_FactChecker.txt'), `${MARKER}\n\n${blocks.join('\n\n')}\n`, 'utf8');
-  const redo = job.options.redo;
-  const onlyNums = redo?.what === 'slide' ? [String(redo.idx)] : [];
-  const pick = parse('thumb_pick');
-  const withThumb = !onlyNums.length && !!pick && !(payload.assetsHaveThumb);
-
-  // 썸네일 잡 파일 — 패키지 단계가 써 둔 프롬프트(thumb_job)가 있고 내 사진이면 바로 쓴다(Claude 호출 없음). 기사 속 인물 · 업로드 사진이면 Claude 가 사진을 보고 쓴다
-  const premade = parse('thumb_job');
-  if (withThumb) {
-    await stepRun(j, 'thumb-prompt', pick.title, async () => {
-      let face = '';
-      const usePremade = premade?.prompt && !(pick.face || '').startsWith('person:') && !(pick.face || '').startsWith('asset:');
-      if (usePremade) {
-        if ((pick.face || '').startsWith('emoji:') && pick.face !== 'emoji:auto') face = await download(`/api/studio/helper/face/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
-        else face = await download(`/api/studio/helper/face/${String(1 + Math.floor(Math.random() * 87)).padStart(3, '0')}`, path.join(work, 'face.webp'));
-        const outPng = path.join(work, '06_thumbnail.png');
-        const jobJson = { title: pick.title, title_lines: pick.title_lines || [], channel: `${job.channel}스타일`, badge_name: pick.badgeName || '', badge_role: pick.badgeRole || '', emotion: pick.emotion || '자동', gesture: pick.gesture || '자동', face_file: face, out: outPng, prompt: premade.prompt, pose_fix_prompt: premade.pose_fix_prompt || '', skip_pose_fix: true };
-        fs.writeFileSync(path.join(DOCS, 'tools', '_thumb_job.json'), JSON.stringify(jobJson, null, 2), 'utf8');
-        return `${jobJson.emotion} · ${jobJson.gesture} (프롬프트 미리 작성됨)`;
-      }
-      if ((pick.face || '').startsWith('person:')) {
-        // 기사 속 인물: 구글 이미지에서 사진 1장 (tools/img_search.py — 이름(영문 우선)으로, 실패하면 내 사진으로)
-        const name = pick.face.slice(7).trim(); const dest = path.join(work, 'face.png');
-        const r = await py(['tools\\img_search.py', name, dest], { cwd: DOCS, timeoutMin: 4, label: '인물 사진 검색' });
-        if (r.code === 0 && fs.existsSync(dest)) face = dest; else log(`  인물 사진 검색 실패(${name}) → 내 사진으로`);
-      }
-      if (!face && (pick.face || '').startsWith('emoji:') && pick.face !== 'emoji:auto') face = await download(`/api/studio/helper/face/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
-      else if (!face && (pick.face || '').startsWith('asset:')) face = await download(`/studio/a/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
-      if (!face) face = await download(`/api/studio/helper/face/${String(1 + Math.floor(Math.random() * 87)).padStart(3, '0')}`, path.join(work, 'face.webp'));
-      const outPng = path.join(work, '06_thumbnail.png');
-      const prompt = `${DOCS}\\6.1_thumbnail.md 의 '실행 방법 — 고정 엔진 + 잡 파일' 절차대로 tools\\_thumb_job.json 의 내용을 JSON 으로 만든다. 파일을 쓰지 말고 JSON 만 출력한다.
+const write02 = (work, blocks) => { fs.mkdirSync(path.join(work, 'shot2'), { recursive: true }); fs.writeFileSync(path.join(work, '02_FactChecker.txt'), `${MARKER}\n\n${blocks.join('\n\n')}\n`, 'utf8'); };
+const engineErr = (r, names, j) => async () => {
+  if (r.code === 2 || /LOGIN_REQUIRED/.test(r.out)) { for (const n of names) await j.step(n, 'failed', 'ChatGPT 로그인 필요'); throw new Error('LOGIN_REQUIRED'); }
+  const tail = r.out.trim().split(/\r?\n/).filter((l) => !/dbg|Warning/.test(l)).slice(-3).join(' | ');
+  for (const n of names) await j.step(n, 'failed', tail.slice(0, 200));
+  throw new Error('ENGINE_FAILED: ' + tail.slice(0, 300));
+};
+// 슬라이드 엔진(ChatGPT) — nums 만, 썸네일 없이. 실패 판정은 호출한 쪽에서(결과 r 반환)
+async function runSlidesEngine(j, work, nums, label = '슬라이드') {
+  const names = nums.map((n) => `slide-${n}`);
+  for (const n of names) await j.step(n, 'running', 'ChatGPT');
+  const r = await py(['tools\\gpt_slide_text.py', '--result', work, ...nums.map(String)], { cwd: DOCS, env: engineEnv(), timeoutMin: 40, label });
+  if (!nums.some((n) => fs.existsSync(path.join(work, 'shot2', `${n}.png`))) && r.code !== 0) await engineErr(r, names, j)();
+  return r;
+}
+// 썸네일 잡 파일 작성(패키지가 써 둔 프롬프트가 있고 내 사진이면 Claude 호출 없음) → 썸네일 엔진(ChatGPT, 교정 패스 없이)
+async function runThumb(j, job, work, pick, premade) {
+  await stepRun(j, 'thumb-prompt', pick.title, async () => {
+    let face = '';
+    const usePremade = premade?.prompt && !(pick.face || '').startsWith('person:') && !(pick.face || '').startsWith('asset:');
+    const outPng = path.join(work, '06_thumbnail.png');
+    if (usePremade) {
+      if ((pick.face || '').startsWith('emoji:') && pick.face !== 'emoji:auto') face = await download(`/api/studio/helper/face/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
+      else face = await download(`/api/studio/helper/face/${String(1 + Math.floor(Math.random() * 87)).padStart(3, '0')}`, path.join(work, 'face.webp'));
+      const jobJson = { title: pick.title, title_lines: pick.title_lines || [], channel: `${job.channel}스타일`, badge_name: pick.badgeName || '', badge_role: pick.badgeRole || '', emotion: pick.emotion || '자동', gesture: pick.gesture || '자동', face_file: face, out: outPng, prompt: premade.prompt, pose_fix_prompt: premade.pose_fix_prompt || '', skip_pose_fix: true };
+      fs.writeFileSync(path.join(DOCS, 'tools', '_thumb_job.json'), JSON.stringify(jobJson, null, 2), 'utf8');
+      return `${jobJson.emotion} · ${jobJson.gesture} (프롬프트 미리 작성됨)`;
+    }
+    if ((pick.face || '').startsWith('person:')) {
+      const name = pick.face.slice(7).trim(); const dest = path.join(work, 'face.png');
+      const r = await py(['tools\\img_search.py', name, dest], { cwd: DOCS, timeoutMin: 4, label: '인물 사진 검색' });
+      if (r.code === 0 && fs.existsSync(dest)) face = dest; else log(`  인물 사진 검색 실패(${name}) → 내 사진으로`);
+    }
+    if (!face && (pick.face || '').startsWith('emoji:') && pick.face !== 'emoji:auto') face = await download(`/api/studio/helper/face/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
+    else if (!face && (pick.face || '').startsWith('asset:')) face = await download(`/studio/a/${pick.face.slice(6)}`, path.join(work, 'face.webp'));
+    if (!face) face = await download(`/api/studio/helper/face/${String(1 + Math.floor(Math.random() * 87)).padStart(3, '0')}`, path.join(work, 'face.webp'));
+    const prompt = `${DOCS}\\6.1_thumbnail.md 의 '실행 방법 — 고정 엔진 + 잡 파일' 절차대로 tools\\_thumb_job.json 의 내용을 JSON 으로 만든다. 파일을 쓰지 말고 JSON 만 출력한다.
 1) 인물 원본 ${face} 를 Read 로 직접 보고 외형(머리 · 모자 · 선글라스 · 수염 · 의상)을 파악한다 — 프롬프트에 "이 외형은 그대로 유지" 라고 못 박는 근거다.
 2) 값: title="${pick.title}", title_lines=${JSON.stringify(pick.title_lines || [])} (비어 있으면 3~4줄로 4~8자씩 끊어 직접), channel="${job.channel}스타일", badge_name="${pick.badgeName || ''}", badge_role="${pick.badgeRole || ''}", emotion="${pick.emotion || '자동'}", gesture="${pick.gesture || '자동'}", face_file="${face.replace(/\\/g, '/')}", out="${outPng.replace(/\\/g, '/')}".
 3) prompt 와 pose_fix_prompt 는 6.1 의 5 · 6 · 실행 방법 절 규칙 그대로 쓰되, 표정 · 손동작 · 명찰 · 제목 크기 문구는 직접 쓰지 말고 {FACE_RULE} {HAND_RULE} {BADGE_RULE} {TITLE_RULE} 자리표시를 쓴다. 배경 장면은 제목 내용에 맞게 한두 문장으로 구체적으로. "${job.channel}스타일" 을 한 단어로 붙여 쓴다. 제목 철자 검증 문구를 넣는다. 배경에 제목 · 명찰 외 글자 · 로고 · 워터마크 금지 문구를 넣는다.${JSON_ONLY}`;
-      const jobJson = parseJson(await claude(prompt, { cwd: work, label: '썸네일 프롬프트', timeoutMin: 10 }), '썸네일 잡');
-      jobJson.face_file = face; jobJson.out = outPng; jobJson.title = pick.title; jobJson.channel = `${job.channel}스타일`; jobJson.skip_pose_fix = true;   // 교정은 검수 뒤 필요할 때만
-      fs.writeFileSync(path.join(DOCS, 'tools', '_thumb_job.json'), JSON.stringify(jobJson, null, 2), 'utf8');
-      return jobJson.emotion + ' · ' + jobJson.gesture;
-    });
-  }
-
-  // 슬라이드(+썸네일) — ChatGPT 엔진 그대로
-  await assertAlive(j);
-  const names = onlyNums.length ? onlyNums.map((n) => `slide-${n}`) : blocks.map((_, i) => `slide-${i + 1}`);
-  for (const n of names) await j.step(n, 'running', 'ChatGPT');
-  if (withThumb) await j.step('thumb', 'running', 'ChatGPT');
-  const r = await py(['tools\\gpt_slide_text.py', ...(withThumb ? ['--with-thumb'] : []), '--result', work, ...onlyNums], { cwd: DOCS, env: engineEnv(), timeoutMin: 40, label: '슬라이드' });
-  if (r.code === 2 || /LOGIN_REQUIRED/.test(r.out)) {
-    for (const n of names) await j.step(n, 'failed', 'ChatGPT 로그인 필요');
-    throw new Error('LOGIN_REQUIRED');
-  }
-  if (r.code !== 0 && !names.some((n) => fs.existsSync(path.join(work, 'shot2', `${n.replace('slide-', '')}.png`)))) {
-    // 브라우저가 안 뜨는 등 엔진 자체가 실패 — 그림 대기로 되돌려 다음에 다시 시도
-    const tail = r.out.trim().split(/\r?\n/).filter((l) => !/dbg|Warning/.test(l)).slice(-3).join(' | ');
-    for (const n of names) await j.step(n, 'failed', tail.slice(0, 200));
-    if (withThumb) await j.step('thumb', 'failed', '엔진 실패');
-    throw new Error('ENGINE_FAILED: ' + tail.slice(0, 300));
-  }
-  // 검수 (03.5 합격 기준) → 불합격 번호만 1회 재생성
-  const nums = onlyNums.length ? onlyNums.map(Number) : blocks.map((_, i) => i + 1);
+    const jobJson = parseJson(await claude(prompt, { cwd: work, label: '썸네일 프롬프트', timeoutMin: 10 }), '썸네일 잡');
+    jobJson.face_file = face; jobJson.out = outPng; jobJson.title = pick.title; jobJson.channel = `${job.channel}스타일`; jobJson.skip_pose_fix = true;
+    fs.writeFileSync(path.join(DOCS, 'tools', '_thumb_job.json'), JSON.stringify(jobJson, null, 2), 'utf8');
+    return jobJson.emotion + ' · ' + jobJson.gesture;
+  });
+  await j.step('thumb', 'running', 'ChatGPT');
+  const r = await py(['tools\\gpt_thumbnail.py'], { cwd: DOCS, env: engineEnv(), timeoutMin: 15, label: '썸네일' });
+  if (!fs.existsSync(path.join(work, '06_thumbnail.png'))) await engineErr(r, ['thumb'], j)();
+  return r;
+}
+// 검수(03.5 합격 기준) → 불합격 번호만 1회 재생성
+async function reviewSlides(j, work, nums, blocks) {
   const made = nums.filter((n) => fs.existsSync(path.join(work, 'shot2', `${n}.png`)));
-  if (made.length) {
-    await j.step('review', 'running', `${made.length}장`);
-    let fails = [];
-    try {
-      const rv = parseJson(await claude(`${P.REVIEW_SLIDE_SYSTEM}\n\n슬라이드 이미지 ${made.map((n) => `${work}\\shot2\\${n}.png`).join(', ')} 를 Read 로 각각 보고 판정한다. 각 번호의 원고 블록:\n${made.map((n) => `[${n}]\n${blocks[n - 1]}`).join('\n\n')}\n\n출력: { "results": [ { "n": 번호, "pass": true|false, "reason": "" } ] }${JSON_ONLY}`, { cwd: work, label: '검수', timeoutMin: 10 }), '검수');
-      const bad = (rv.results || []).filter((x) => x.pass === false);
-      fails = bad.map((x) => x.n);
-      await j.step('review', 'done', fails.length ? `불합격 → 재생성: ${bad.map((x) => `${x.n}번(${String(x.reason || '').slice(0, 60)})`).join(' · ')}` : '전부 합격');
-    } catch (e) { await j.step('review', 'failed', e.message); }
-    if (fails.length) await py(['tools\\gpt_slide_text.py', '--result', work, ...fails.map(String)], { cwd: DOCS, env: engineEnv(), timeoutMin: 25, label: '재생성' });
-  }
-  // 예전과 같은 산출물 파일도 작업 폴더에 남긴다: 01/03 txt + 04_slideshow.html (04_PPTMaker.md 규격, make_slideshow.py)
+  if (!made.length) return;
+  await j.step('review', 'running', `${made.length}장`);
+  let fails = [];
+  try {
+    const rv = parseJson(await claude(`${P.REVIEW_SLIDE_SYSTEM}\n\n슬라이드 이미지 ${made.map((n) => `${work}\\shot2\\${n}.png`).join(', ')} 를 Read 로 각각 보고 판정한다. 각 번호의 원고 블록:\n${made.map((n) => `[${n}]\n${blocks[n - 1]}`).join('\n\n')}\n\n출력: { "results": [ { "n": 번호, "pass": true|false, "reason": "" } ] }${JSON_ONLY}`, { cwd: work, label: '검수', timeoutMin: 10 }), '검수');
+    const bad = (rv.results || []).filter((x) => x.pass === false);
+    fails = bad.map((x) => x.n);
+    await j.step('review', 'done', fails.length ? `불합격 → 재생성: ${bad.map((x) => `${x.n}번(${String(x.reason || '').slice(0, 60)})`).join(' · ')}` : '전부 합격');
+  } catch (e) { await j.step('review', 'failed', e.message); }
+  if (fails.length) await py(['tools\\gpt_slide_text.py', '--result', work, ...fails.map(String)], { cwd: DOCS, env: engineEnv(), timeoutMin: 25, label: '재생성' });
+}
+// 산출물 파일(01 · 03 · 04_slideshow) + 올리기 + 썸네일 검수(불합격이면 교정 1회)
+async function finishImages(j, work, docs, nums, pick, withThumb) {
+  const parse = (k) => { try { return docs[k] ? JSON.parse(docs[k]) : null; } catch { return null; } };
   try {
     const summary = parse('summary');
     fs.writeFileSync(path.join(work, '01_ArticleMaker.txt'), splitBlocks(docs.articles).join('\n\n') + '\n', 'utf8');
@@ -331,7 +319,6 @@ async function runImages(payload, work) {
     const sh = await py(['tools\\make_slideshow.py', work], { cwd: DOCS, timeoutMin: 2, label: '슬라이드쇼 파일' });
     if (sh.code === 0) log(`  04_slideshow.html → ${path.join(work, '04_slideshow.html')}`);
   } catch (e) { log('  (슬라이드쇼 파일 생략)', e.message); }
-  // 올리기
   for (const n of nums) {
     const png = path.join(work, 'shot2', `${n}.png`);
     if (!fs.existsSync(png)) { await j.step(`slide-${n}`, 'failed', '그림이 안 나옴'); continue; }
@@ -342,7 +329,6 @@ async function runImages(payload, work) {
   if (withThumb) {
     const png = path.join(work, '06_thumbnail.png');
     if (fs.existsSync(png)) {
-      // 검수 → 불합격이면 교정(--edit, 완성본 첨부해 표정 · 손동작 · 명찰만) 1회 — 예전엔 항상 교정해 100초씩 썼다
       let note = '';
       try {
         const rv = parseJson(await claude(`${P.REVIEW_THUMB_SYSTEM}\n\n썸네일 ${png} 를 Read 로 보고 판정한다. 요구: 제목 "${pick.title}", 표정 ${pick.emotion || '자동'}, 제스처 ${pick.gesture || '자동'}, 명찰 ${pick.badgeName ? `"${pick.badgeName}" / "${pick.badgeRole || ''}"` : '없음'}.${SHAPE(P.REVIEW_SCHEMA)}${JSON_ONLY}`, { cwd: work, label: '썸네일 검수', timeoutMin: 6 }), '썸네일 검수');
@@ -354,8 +340,35 @@ async function runImages(payload, work) {
         }
       } catch (e) { note = '검수 생략: ' + e.message.slice(0, 80); }
       const { file, w, h } = await toWebp(png); await j.asset('thumb', 1, fs.readFileSync(file), 'image/webp', w, h); await j.step('thumb', 'done', `${w}x${h} · ${note}`);
-    } else await j.step('thumb', 'failed', '썸네일이 안 나옴 (gpt_slide_text 종료코드 ' + r.code + ')');
+    } else await j.step('thumb', 'failed', '썸네일이 안 나옴');
   }
+}
+// 그림 단계 전체(이어서 할 때 · 다시 만들기). early = 글 단계와 겹쳐 미리 돌려 둔 슬라이드 엔진 { promise, blocks }
+async function runImages(payload, work, early = null) {
+  if (!DOCS) throw new Error('그림 단계는 PC 도우미(DOCS 설정)에서만 됩니다.');
+  const job = payload.job, j = J(job.id), docs = payload.docs || {};
+  const parse = (k) => { try { return docs[k] ? JSON.parse(docs[k]) : null; } catch { return null; } };
+  const fact = parse('factcheck');
+  const blocks = fact?.fixed_blocks || splitBlocks(docs.articles);
+  if (!blocks?.length) throw new Error('원고가 없어 그림을 만들 수 없습니다.');
+  const redo = job.options.redo;
+  const onlyNums = redo?.what === 'slide' ? [+redo.idx] : [];
+  const nums = onlyNums.length ? onlyNums : blocks.map((_, i) => i + 1);
+  const pick = parse('thumb_pick'), premade = parse('thumb_job');
+  const withThumb = !onlyNums.length && !!pick;
+  await assertAlive(j);
+  if (early) {
+    await early.promise;   // 글 단계와 겹쳐 돌린 슬라이드 (원고 초안 기준)
+    const changed = nums.filter((n) => (early.blocks[n - 1] || '') !== blocks[n - 1]);
+    write02(work, blocks);
+    if (changed.length) { log(`  교차 팩트체크로 바뀐 블록 ${changed.join(',')} → 그 장만 다시`); await runSlidesEngine(j, work, changed, '슬라이드(수정분)'); }
+  } else {
+    write02(work, blocks);
+    await runSlidesEngine(j, work, nums);
+  }
+  if (withThumb) await runThumb(j, job, work, pick, premade);
+  await reviewSlides(j, work, nums, blocks);
+  await finishImages(j, work, docs, nums, pick, withThumb);
 }
 
 // ───────── 모드 ─────────
@@ -365,11 +378,19 @@ async function processJob(payload) {
   log(`▶ ${job.id} ${job.kind} ${job.channel} ${job.source} (${job.phase})`);
   try {
     if (job.phase === 'text') {
-      const r = await runText(payload, work);
-      if (r === 'wait') return;
+      let early = null;
+      const onBlocks = MODE === 'pc' && DOCS ? async (blocks) => {
+        // 속도: 원고가 확정되면 패키지(Claude)를 기다리지 않고 슬라이드 엔진(ChatGPT)을 바로 띄운다 — 두 일이 겹쳐 돈다
+        write02(work, blocks);
+        early = { blocks: [...blocks], promise: runSlidesEngine(j, work, blocks.map((_, i) => i + 1)).catch((e) => { log('  (미리 띄운 슬라이드 실패)', e.message); early.failed = e; }) };
+        log('  슬라이드 엔진 미리 시작(패키지와 동시)');
+      } : null;
+      const r = await runText(payload, work, { onBlocks });
+      if (r === 'wait') { if (early) await early.promise; return; }
       if (MODE === 'cloud') { await j.status('images', 'slides'); log('  글 끝 → 그림은 PC 도우미가'); return; }
       const fresh = await j.get();
-      await runImages({ ...fresh, job: { ...fresh.job, options: fresh.job.options, phase: 'images' } }, work);
+      if (early) { await early.promise; if (early.failed) throw early.failed; }
+      await runImages({ ...fresh, job: { ...fresh.job, options: fresh.job.options, phase: 'images' } }, work, early);
     } else {
       await runImages(payload, work);
     }
