@@ -455,7 +455,7 @@ function thumbPanel(job, thumb, summary) {
     <p>${rv ? `<span class="badge ${rv.pass ? 'done' : 'suspended'}">${rv.pass ? '검수 합격' : '검수 불합격'}</span> ${esc(rv.reason || '')}` : ''}</p>
     ${pick ? `<p class="st-meta">제목 "${esc(pick.title)}" · 표정 ${esc(pick.emotion || '자동')} · 제스처 ${esc(pick.gesture || '자동')}${pick.badgeName ? ` · 명찰 ${esc(pick.badgeName)}` : ''}</p>` : ''}
     <div class="dlg-actions"><button class="btn sm" type="button" id="st-dl-thumb">16:9 로 내려받기</button></div></div>` : '<p class="empty">썸네일이 없습니다.</p>'}
-    ${done ? `<details class="st-redo"><summary>다시 만들기 (제목 · 표정 · 제스처 · 인물 바꾸기 → PC 의 ChatGPT 가 다시 그립니다)</summary><form id="st-rethumb">${thumbPickForm(pick || {}, summary?.titles || [], summary?.people || [])}<p class="err" id="rt-err"></p><button class="btn primary" type="submit">다시 만들기</button></form></details>` : ''}`;
+    ${done ? `<details class="st-redo"><summary class="btn sm">🔁 썸네일 다시 만들기</summary><div class="st-redo-body"><p class="st-hint">제목 · 인물 명찰 · 표정 · 제스처 · 인물 사진을 바꿔 저장하면 PC 의 ChatGPT 가 다시 그립니다(3~5분).</p><form id="st-rethumb">${thumbPickForm(pick || {}, summary?.titles || [], summary?.people || [])}<p class="err" id="rt-err"></p><button class="btn primary" type="submit">이대로 다시 만들기</button></form></div></details>` : ''}`;
 }
 function ytPanel(s) {
   return `<h4>제목 추천</h4><ol class="st-titles-list">${s.titles.map((t) => `<li>${esc(t)} ${copyBtn(t)}</li>`).join('')}</ol>

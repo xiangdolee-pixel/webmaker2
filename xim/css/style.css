@@ -624,3 +624,11 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .st-cond-head a { color: var(--brand); }
 .st-time { margin: 2px 0 4px; font-size: 14px; color: var(--sub); }
 .st-time b { color: var(--brand); font-size: 15px; }
+
+/* 스튜디오 — 썸네일 다시 만들기(details 를 버튼처럼) */
+.st-redo { margin-top: -44px; padding-left: 150px; }                 /* 내려받기 버튼 오른쪽에 나란히 */
+.st-redo > summary { list-style: none; cursor: pointer; }
+.st-redo > summary::-webkit-details-marker { display: none; }
+.st-redo[open] > summary { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); }
+.st-redo-body { margin-top: 14px; margin-left: -150px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fbfbfd; }
+@media (max-width: 640px) { .st-redo { margin-top: 10px; padding-left: 0; } .st-redo-body { margin-left: 0; } }
