@@ -306,8 +306,9 @@ async function runImages(payload, work) {
     let fails = [];
     try {
       const rv = parseJson(await claude(`${P.REVIEW_SLIDE_SYSTEM}\n\n슬라이드 이미지 ${made.map((n) => `${work}\\shot2\\${n}.png`).join(', ')} 를 Read 로 각각 보고 판정한다. 각 번호의 원고 블록:\n${made.map((n) => `[${n}]\n${blocks[n - 1]}`).join('\n\n')}\n\n출력: { "results": [ { "n": 번호, "pass": true|false, "reason": "" } ] }${JSON_ONLY}`, { cwd: work, label: '검수', timeoutMin: 10 }), '검수');
-      fails = (rv.results || []).filter((x) => x.pass === false).map((x) => x.n);
-      await j.step('review', 'done', fails.length ? `불합격 ${fails.join(',')} → 재생성` : '전부 합격');
+      const bad = (rv.results || []).filter((x) => x.pass === false);
+      fails = bad.map((x) => x.n);
+      await j.step('review', 'done', fails.length ? `불합격 → 재생성: ${bad.map((x) => `${x.n}번(${String(x.reason || '').slice(0, 60)})`).join(' · ')}` : '전부 합격');
     } catch (e) { await j.step('review', 'failed', e.message); }
     if (fails.length) await py(['tools\\gpt_slide_text.py', '--result', work, ...fails.map(String)], { cwd: DOCS, env: engineEnv(), timeoutMin: 25, label: '재생성' });
   }
