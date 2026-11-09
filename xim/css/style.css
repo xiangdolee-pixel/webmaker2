@@ -589,7 +589,8 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .st-drop.full { opacity: .55; }
 
 /* 스튜디오 — 예약 */
-.st-sched-row { display: grid; grid-template-columns: auto 130px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+.st-sched-row { display: grid; grid-template-columns: auto 190px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+.st-sched-row input[type=time] { font-size: 17px; font-variant-numeric: tabular-nums; padding: 8px 10px; }
 .st-sched-row:last-of-type { border-bottom: 0; }
 .st-sched-row .input { min-height: 40px; }
 @media (max-width: 640px) { .st-sched-row { grid-template-columns: auto minmax(0, 1fr); } .st-sched-row .st-meta { grid-column: 1 / -1; } }
