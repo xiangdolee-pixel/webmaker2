@@ -15,7 +15,7 @@ const STEP_LABEL = (s) => {
   if ((m = s.match(/^article-(\d+)$/))) return `기사 ${m[1]}`;
   if ((m = s.match(/^slide-(\d+)$/))) return `슬라이드 ${m[1]}`;
   if ((m = s.match(/^review-(\d+)$/))) return `검수 ${m[1]}`;
-  return { rss: '뉴스 후보', top15: 'Top15 선정', pick: '6개 고르기', factcheck: '팩트체크', summary: '유튜브 패키지', package: '패키지(팩트체크 · 제목 · 썸네일 값)', 'thumb-prompt': '썸네일 프롬프트', thumb: '썸네일', slides: '슬라이드', review: '검수', purge: '정리' }[s] || s;
+  return { rss: '뉴스 후보', top15: 'Top12 선정', pick: '6개 고르기', factcheck: '팩트체크', summary: '유튜브 패키지', package: '패키지(팩트체크 · 제목 · 썸네일 값)', 'thumb-prompt': '썸네일 프롬프트', thumb: '썸네일', slides: '슬라이드', review: '검수', purge: '정리' }[s] || s;
 };
 // ───── 단계 지도(계획) · 진행률 ─────
 //   작업 종류 · 옵션에 따라 밟을 단계를 미리 그리고, 실제 단계 기록(studio_steps)을 그 위에 얹는다.
@@ -24,7 +24,7 @@ function planFor(job) {
   const o = job.options || {};
   if (job.kind === 'thumb') return [['thumb-prompt', '썸네일 프롬프트'], ['thumb', '썸네일 (ChatGPT)']];
   const p = [];
-  if (job.source === 'rss') { p.push(['rss', '뉴스 후보 모으기'], ['top15', 'Top15 선정 (이미 다룬 뉴스 제외)']); if (o.pick === 'manual') p.push(['pick', '6개 고르기 (내가)']); }
+  if (job.source === 'rss') { p.push(['rss', '뉴스 후보 모으기'], ['top15', 'Top12 선정 (이미 다룬 뉴스 제외)']); if (o.pick === 'manual') p.push(['pick', '6개 고르기 (내가)']); }
   p.push(['articles', job.source === 'rss' ? '기사 대본 6개 (원문 대조 포함)' : '대본 쓰기 (원문 대조 포함)'], ['package', '패키지 — 교차 팩트체크 · 제목 · 인트로 · 더보기 · 썸네일 값 (슬라이드와 동시)']);
   if (o.thumb === 'manual') p.push(['thumb-wait', '썸네일 선택 (내가)']);
   p.push(['slides', '슬라이드 6장 → 썸네일 (ChatGPT)'], ['review', '슬라이드 검수 · 썸네일 검수']);

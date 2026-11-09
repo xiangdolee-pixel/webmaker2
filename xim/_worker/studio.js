@@ -271,7 +271,7 @@ export class StudioMain extends WorkflowEntrypoint {
       const top = await S('top15', async () => {
         const list = cands.map((c) => `[${c.n}] ${c.title}\n    ${c.label} | ${c.published_kst}\n    ${c.url}\n    ${c.summary}`).join('\n');
         const r = await claude(env, { system: P.TOP15_SYSTEM, schema: P.TOP15_SCHEMA, messages: [{ role: 'user', content: `기준 시각: ${kst(now())} (최근 ${NEWS_HOURS}시간)\n\n후보 목록:\n${list}` }] });
-        const t = r.json; t.items = t.items.slice(0, 15);
+        const t = r.json; t.items = t.items.slice(0, 12);
         await saveDoc(db, jobId, 'top15', t);
         return { out: t, usage: r.usage, note: `${t.items.length}개 · 추천 ${t.picks.join(',')}` };
       });
