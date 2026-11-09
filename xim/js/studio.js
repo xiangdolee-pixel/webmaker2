@@ -87,6 +87,7 @@ function cardProgress(j) {
 const sbadge = (st) => { const [l, c] = STATUS[st] || [st, '']; return `<span class="badge st-${c}">${esc(l)}</span>`; };
 const dur = (a, b) => { if (!a) return ''; const s = Math.round(((b || Date.now()) - a) / 1000); return s < 60 ? `${s}초` : `${Math.floor(s / 60)}분 ${s % 60}초`; };
 const money = (d) => (d ? `$${d.toFixed(2)}` : '');
+const fmtBytes = (b) => (!b ? '0' : b >= 1048576 ? `${(b / 1048576).toFixed(b >= 104857600 ? 0 : 1)}MB` : b >= 1024 ? `${Math.round(b / 1024)}KB` : `${b}B`);
 const ago = (t) => { const sec = Math.max(0, Math.round((Date.now() - t) / 1000)); return sec < 60 ? `${sec}초 전` : sec < 3600 ? `${Math.floor(sec / 60)}분 전` : sec < 86400 ? `${Math.floor(sec / 3600)}시간 전` : fmtDate(t); };
 const copyBtn = (text) => `<button class="btn sm copy" type="button" data-copy="${esc(text)}">복사</button>`;
 
@@ -108,8 +109,8 @@ async function renderList() {
   const jobs = await api('/studio/jobs?limit=60');
   const hs = await api('/studio/helper-status').catch(() => ({ online: false, helper_seen: 0 }));
   const keyWarn = hs.online
-    ? `<p class="st-hint">🟢 PC 도우미 연결됨 (${ago(hs.helper_seen)}) — 글은 Claude Code, 그림은 이 PC 의 ChatGPT 로 만듭니다.</p>`
-    : `<p class="st-warn">PC 도우미가 꺼져 있습니다${hs.helper_seen ? ` (마지막 ${ago(hs.helper_seen)})` : ''}. 작업은 "대기" 로 쌓였다가 PC 에서 <b>스튜디오도우미_시작.bat</b> 을 켜면 이어집니다.${opts.settings.cloud_text === 'on' ? ' 글 단계는 클라우드(GitHub Actions)에서 먼저 돕니다.' : ''}</p>`;
+    ? `<p class="st-hint">🟢 PC 도우미 연결됨 (${ago(hs.helper_seen)}) — 글은 Claude Code, 그림은 이 PC 의 ChatGPT 로 만듭니다. · 보관 중인 그림 <b>${fmtBytes(hs.total_bytes || 0)}</b> (${hs.total_files || 0}장 · 작업 ${hs.kept_jobs || 0}개, 최근 ${hs.keep || 10}개까지 보관)</p>`
+    : `<p class="st-warn">PC 도우미가 꺼져 있습니다${hs.helper_seen ? ` (마지막 ${ago(hs.helper_seen)})` : ''}. 보관 중인 그림 ${fmtBytes(hs.total_bytes || 0)}. 작업은 "대기" 로 쌓였다가 PC 에서 <b>스튜디오도우미_시작.bat</b> 을 켜면 이어집니다.${opts.settings.cloud_text === 'on' ? ' 글 단계는 클라우드(GitHub Actions)에서 먼저 돕니다.' : ''}</p>`;
   view.innerHTML = `
     <div class="bar st-bar">
       <h2>스튜디오 <small>유튜브 발표자료</small></h2>
@@ -130,7 +131,7 @@ function jobCard(j) {
       <div class="st-top">${sbadge(j.status)}<span class="badge ch-${j.channel === '순섬' ? 'lime' : 'orange'}">${esc(j.channel)}</span><span class="st-kind">${esc(KIND[j.kind] || j.kind)} · ${esc(SOURCE[j.source] || j.source)}</span></div>
       <h3>${esc(j.title || (j.status === 'running' ? STEP_LABEL(j.step) + ' 진행 중…' : '제목 없음'))}</h3>
       ${cardProgress(j)}
-      <p class="st-meta">${fmtDate(j.created_at)}${j.finished_at ? ` · ${dur(j.created_at, j.finished_at)}` : ''}${j.cost ? ` · ${money(j.cost)}` : ''}${j.error ? ` · <span class="err-inline">${esc(j.error.slice(0, 80))}</span>` : ''}</p>
+      <p class="st-meta">${fmtDate(j.created_at)}${j.finished_at ? ` · ${dur(j.created_at, j.finished_at)}` : ''}${j.bytes ? ` · 그림 ${fmtBytes(j.bytes)}` : j.assets_purged ? ' · 그림 지움' : ''}${j.cost ? ` · ${money(j.cost)}` : ''}${j.error ? ` · <span class="err-inline">${esc(j.error.slice(0, 80))}</span>` : ''}</p>
     </div></article>`;
 }
 

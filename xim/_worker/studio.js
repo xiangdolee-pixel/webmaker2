@@ -572,7 +572,8 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
   if (path === '/api/studio/helper-token' && method === 'GET') return json({ token: env.STUDIO_HELPER_TOKEN || '', url: url.origin });
   if (path === '/api/studio/helper-status' && method === 'GET') {
     const seen = +((await db.prepare("SELECT value FROM studio_settings WHERE key = 'helper_seen'").first())?.value || 0);
-    return json({ helper_seen: seen, online: now() - seen < 40000 });
+    const tot = await db.prepare('SELECT COALESCE(SUM(size), 0) AS bytes, COUNT(*) AS n, COUNT(DISTINCT job_id) AS jobs FROM studio_assets').first();
+    return json({ helper_seen: seen, online: now() - seen < 40000, total_bytes: tot.bytes, total_files: tot.n, kept_jobs: tot.jobs, keep: KEEP_JOBS });
   }
   if (path === '/api/studio/settings' && method === 'PUT') {
     const data = await bodyFn(request);
@@ -602,7 +603,7 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
 
   if (path === '/api/studio/jobs' && method === 'GET') {
     const limit = Math.min(100, +(url.searchParams.get('limit') || 40));
-    const { results } = await db.prepare('SELECT id, kind, channel, source, status, step, title, error, cost, assets_purged, options, created_at, updated_at, finished_at FROM studio_jobs ORDER BY created_at DESC LIMIT ?').bind(limit).all();
+    const { results } = await db.prepare('SELECT id, kind, channel, source, status, step, title, error, cost, assets_purged, options, created_at, updated_at, finished_at, (SELECT COALESCE(SUM(size), 0) FROM studio_assets a WHERE a.job_id = studio_jobs.id) AS bytes FROM studio_jobs ORDER BY created_at DESC LIMIT ?').bind(limit).all();
     const thumbs = results.length ? (await db.prepare(`SELECT job_id, id FROM studio_assets WHERE kind = 'thumb' AND job_id IN (${results.map(() => '?').join(',')})`).bind(...results.map((r) => r.id)).all()).results : [];
     const tmap = Object.fromEntries(thumbs.map((t) => [t.job_id, t.id]));
     return json(results.map((r) => ({ ...r, options: JSON.parse(r.options || '{}'), thumb: tmap[r.id] ? `/studio/a/${tmap[r.id]}` : '' })));
