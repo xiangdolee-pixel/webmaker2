@@ -54,6 +54,14 @@ xim 안의 웹 화면으로 옮기는 계획. 아직 확정 전 초안.
 - 아래 3~9절의 "Claude API / OpenAI 이미지 API" 부분은 이 결정으로 **보류**. 코드(studio.js 의 Workflow 경로)는 남겨 두되 기본 엔진은 Actions.
 - 사용자 확인 대기: 슬라이드 · 썸네일을 웹 템플릿으로 바꾸는 것 OK 인지.
 
+## 2.6 확정 구조 (2026-11-09 밤, 사용자: "퀄리티는 반드시 ChatGPT 수준. GPT 는 정 안 되면 브라우저로.")
+
+- **글**: Claude Code **구독**으로. ① PC 도우미(`xim/runner/runner.mjs --mode pc`, `docs	ools\스튜디오도우미_시작.bat`)가 기본. ② 설정 `cloud_text` 를 켜면 GitHub Actions(`.github/workflows/studio-run.yml`, 비밀값 `CLAUDE_CODE_OAUTH_TOKEN` = `claude setup-token`)가 글 단계를 먼저 돌려 PC 가 꺼져 있어도 원고까지 나온다.
+- **그림(슬라이드 6 · 썸네일)**: PC 도우미가 기존 엔진(`gpt_slide_text.py --with-thumb`, `gpt_thumbnail.py`)을 **엣지 자동화 전용 프로필**(`docs	ools\_edge_profile`, 내 엣지는 안 건드림, 창은 화면 밖)로 돌려 ChatGPT Plus 로 만들고 xim 에 올린다. PC 가 꺼져 있으면 '그림 대기(images)' 로 기다린다.
+- **웹 템플릿 슬라이드 · 썸네일**(`xim/js/slide-template.js`)은 수준 미달 판정 → 자리표시 · 예비로만.
+- API(Claude · OpenAI) 유료 경로는 보류(코드만 남김). 추가 비용 0원.
+- 썸네일 값(제목 · 줄 나누기 · 표정 · 제스처 · 인물 사진 번호 · 명찰)은 Claude 가 `face_catalog`(87장 분류표, `--catalog` 로 한 번 생성)를 보고 고르고, PC 도우미가 6.1 규칙대로 ChatGPT 프롬프트를 써서 그린다.
+
 ## 3. 큰 그림
 
 ```
