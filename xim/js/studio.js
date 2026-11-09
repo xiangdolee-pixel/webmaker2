@@ -7,7 +7,7 @@ let pollTimer = 0;
 let openId = '';            // 보고 있는 작업 id
 let resTab = 'script';      // 결과 탭
 
-const STATUS = { queued: ['대기', 'wait'], running: ['진행 중', 'run'], pick: ['6개 고르기', 'ask'], thumb: ['썸네일 선택', 'ask'], done: ['완료', 'done'], failed: ['실패', 'fail'], stopped: ['멈춤', 'stop'] };
+const STATUS = { queued: ['대기', 'wait'], running: ['진행 중', 'run'], pick: ['6개 고르기', 'ask'], thumb: ['썸네일 선택', 'ask'], images: ['그림 대기 (PC)', 'wait'], done: ['완료', 'done'], failed: ['실패', 'fail'], stopped: ['멈춤', 'stop'] };
 const KIND = { main: '본편', thumb: '썸네일만', phone: '폰UI 쇼츠' };
 const SOURCE = { rss: '웹 뉴스', capture: '캡쳐', text: '글 직접' };
 const STEP_LABEL = (s) => {
@@ -20,6 +20,7 @@ const STEP_LABEL = (s) => {
 const sbadge = (st) => { const [l, c] = STATUS[st] || [st, '']; return `<span class="badge st-${c}">${esc(l)}</span>`; };
 const dur = (a, b) => { if (!a) return ''; const s = Math.round(((b || Date.now()) - a) / 1000); return s < 60 ? `${s}초` : `${Math.floor(s / 60)}분 ${s % 60}초`; };
 const money = (d) => (d ? `$${d.toFixed(2)}` : '');
+const ago = (t) => { const sec = Math.max(0, Math.round((Date.now() - t) / 1000)); return sec < 60 ? `${sec}초 전` : sec < 3600 ? `${Math.floor(sec / 60)}분 전` : sec < 86400 ? `${Math.floor(sec / 3600)}시간 전` : fmtDate(t); };
 const copyBtn = (text) => `<button class="btn sm copy" type="button" data-copy="${esc(text)}">복사</button>`;
 
 export function stopStudio() { clearTimeout(pollTimer); pollTimer = 0; }
@@ -38,8 +39,10 @@ export async function renderStudio(d) {
 async function renderList() {
   const { view, api } = deps;
   const jobs = await api('/studio/jobs?limit=60');
-  const keyWarn = !opts.keys.anthropic || !opts.keys.openai
-    ? `<p class="st-warn">${!opts.keys.anthropic ? 'Anthropic 키가 없어 글 단계를 돌릴 수 없습니다. ' : ''}${!opts.keys.openai ? 'OpenAI 키가 없어 그림(슬라이드 · 썸네일)은 건너뜁니다.' : ''}</p>` : '';
+  const hs = await api('/studio/helper-status').catch(() => ({ online: false, helper_seen: 0 }));
+  const keyWarn = hs.online
+    ? `<p class="st-hint">🟢 PC 도우미 연결됨 (${ago(hs.helper_seen)}) — 글은 Claude Code, 그림은 이 PC 의 ChatGPT 로 만듭니다.</p>`
+    : `<p class="st-warn">PC 도우미가 꺼져 있습니다${hs.helper_seen ? ` (마지막 ${ago(hs.helper_seen)})` : ''}. 작업은 "대기" 로 쌓였다가 PC 에서 <b>스튜디오도우미_시작.bat</b> 을 켜면 이어집니다.${opts.settings.cloud_text === 'on' ? ' 글 단계는 클라우드(GitHub Actions)에서 먼저 돕니다.' : ''}</p>`;
   view.innerHTML = `
     <div class="bar st-bar">
       <h2>스튜디오 <small>유튜브 발표자료</small></h2>
@@ -51,7 +54,7 @@ async function renderList() {
   $('#st-new').addEventListener('click', newJobDialog);
   $('#st-settings').addEventListener('click', settingsDialog);
   $$('.st-card').forEach((c) => c.addEventListener('click', () => { location.hash = `#st-${c.dataset.id}`; renderStudio(deps); }));
-  if (jobs.some((j) => ['queued', 'running', 'pick', 'thumb'].includes(j.status))) pollTimer = setTimeout(() => { if (!openId && document.contains(view)) renderList(); }, 5000);
+  if (jobs.some((j) => ['queued', 'running', 'pick', 'thumb', 'images'].includes(j.status))) pollTimer = setTimeout(() => { if (!openId && document.contains(view)) renderList(); }, 5000);
 }
 function jobCard(j) {
   return `<article class="card st-card" data-id="${j.id}">
@@ -111,7 +114,7 @@ function newJobDialog() {
       e.preventDefault();
       const f = e.currentTarget;
       busy(f.querySelector('[type=submit]'), $('#f-err', dlg), async () => {
-        const data = { kind: st.kind, channel: st.channel, source: st.source, pick: st.pick, thumb: st.thumb, text: f.text.value, captures: uploads.map((u) => u.id) };
+        const data = { kind: st.kind, channel: st.channel, source: st.source, pick: st.pick, thumb: st.thumb, engine: 'cloud', text: f.text.value, captures: uploads.map((u) => u.id) };
         if (st.kind === 'thumb') Object.assign(data, readThumbForm(dlg));
         const r = await api('/studio/jobs', { method: 'POST', data });
         dlg.close();
@@ -182,7 +185,7 @@ async function renderJob() {
   let r;
   try { r = await api(`/studio/jobs/${openId}`); } catch (e) { toast(e.message); location.hash = ''; return renderStudio(deps); }
   const { job, steps, docs, assets } = r;
-  const active = ['queued', 'running', 'pick', 'thumb'].includes(job.status);
+  const active = ['queued', 'running', 'pick', 'thumb', 'images'].includes(job.status);
   const J = (k) => { try { return docs[k] ? JSON.parse(docs[k].body) : null; } catch { return null; } };
   const top15 = J('top15'), fact = J('factcheck'), summary = J('summary'), showTexts = J('show_texts');
   const slides = assets.filter((a) => a.kind === 'slide').sort((a, b) => a.idx - b.idx);
@@ -275,7 +278,7 @@ function scriptPanel(job, blocks, showTexts, fact) {
     <div class="dlg-actions"><button class="btn primary" id="st-save-texts" type="button">대본 저장</button><span class="st-savemsg" id="st-savemsg"></span></div>`;
 }
 function slidesPanel(job, slides, blocks) {
-  const done = !['queued', 'running', 'pick', 'thumb'].includes(job.status);
+  const done = !['queued', 'running', 'pick', 'thumb', 'images'].includes(job.status);
   return `<div class="st-slides">${slides.map((a) => { const rv = a.meta?.review; return `<figure>
     <a href="${a.url}" target="_blank" rel="noopener"><img src="${a.url}" alt="슬라이드 ${a.idx}"></a>
     <figcaption><b>${a.idx}</b> ${esc((blocks[a.idx - 1] || '').split('\n')[0].replace(/^📌/, ''))}
@@ -284,13 +287,13 @@ function slidesPanel(job, slides, blocks) {
     ${rv && !rv.pass ? `<p class="st-reason">${esc(rv.reason)}</p>` : ''}</figure>`; }).join('')}</div>`;
 }
 function thumbPanel(job, thumb, summary) {
-  const done = !['queued', 'running', 'pick', 'thumb'].includes(job.status);
+  const done = !['queued', 'running', 'pick', 'thumb', 'images'].includes(job.status);
   const rv = thumb?.meta?.review, pick = thumb?.meta?.pick;
   return `${thumb ? `<div class="st-thumb-big"><a href="${thumb.url}" target="_blank" rel="noopener"><img src="${thumb.url}" alt="썸네일"></a>
     <p>${rv ? `<span class="badge ${rv.pass ? 'done' : 'suspended'}">${rv.pass ? '검수 합격' : '검수 불합격'}</span> ${esc(rv.reason || '')}` : ''}</p>
     ${pick ? `<p class="st-meta">제목 "${esc(pick.title)}" · 표정 ${esc(pick.emotion || '자동')} · 제스처 ${esc(pick.gesture || '자동')}${pick.badgeName ? ` · 명찰 ${esc(pick.badgeName)}` : ''}</p>` : ''}
     <div class="dlg-actions"><button class="btn sm" type="button" id="st-dl-thumb">16:9 로 내려받기</button></div></div>` : '<p class="empty">썸네일이 없습니다.</p>'}
-    ${done ? `<details class="st-redo"><summary>다시 만들기 (제목 · 표정 · 제스처 · 인물 바꾸기)</summary><form id="st-rethumb">${thumbPickForm(pick || {}, summary?.titles || [], summary?.people || [])}<p class="err" id="rt-err"></p><button class="btn primary" type="submit">다시 만들기</button></form></details>` : ''}`;
+    ${done ? `<details class="st-redo"><summary>다시 만들기 (제목 · 표정 · 제스처 · 인물 바꾸기 → PC 의 ChatGPT 가 다시 그립니다)</summary><form id="st-rethumb">${thumbPickForm(pick || {}, summary?.titles || [], summary?.people || [])}<p class="err" id="rt-err"></p><button class="btn primary" type="submit">다시 만들기</button></form></details>` : ''}`;
 }
 function ytPanel(s) {
   return `<h4>제목 추천</h4><ol class="st-titles-list">${s.titles.map((t) => `<li>${esc(t)} ${copyBtn(t)}</li>`).join('')}</ol>
@@ -320,7 +323,7 @@ function wireRes(job, blocks, thumb, summary) {
     const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `thumbnail-${job.id.slice(0, 6)}.png`; a.click();
   });
   const rf = $('#st-rethumb');
-  if (rf) { setupThumbForm(rf); rf.addEventListener('submit', (e) => { e.preventDefault(); busy(rf.querySelector('[type=submit]'), $('#rt-err'), async () => { const pick = readThumbForm(rf); if (!pick.title) throw new Error('제목을 고르거나 넣어 주세요.'); await api(`/studio/jobs/${job.id}/redo`, { method: 'POST', data: { what: 'thumb', pick } }); toast('다시 만드는 중'); renderJob(); }); }); }
+  if (rf) { setupThumbForm(rf); rf.addEventListener('submit', (e) => { e.preventDefault(); busy(rf.querySelector('[type=submit]'), $('#rt-err'), async () => { const pick = readThumbForm(rf); if (!pick.title) throw new Error('제목을 고르거나 넣어 주세요.'); await api(`/studio/jobs/${job.id}/redo`, { method: 'POST', data: { what: 'thumb', pick } }); await api(`/studio/jobs/${job.id}/rethumb`, { method: 'POST', data: {} }); toast('PC 도우미가 다시 그립니다'); renderJob(); }); }); }
 }
 
 // ───────── 설정 ─────────
@@ -332,8 +335,7 @@ function settingsDialog() {
     ${f('slide_style', '슬라이드 스타일 규칙(ppt1)', 3)}
     ${f('thumb_style_사섬', '썸네일 스타일 · 사섬', 2)}
     ${f('thumb_style_순섬', '썸네일 스타일 · 순섬', 2)}
-    <div class="row2">${f('image_model', '이미지 모델')}${f('image_quality', '이미지 품질 (low · medium · high)')}</div>
-    <div class="row2">${f('daily_limit', '하루 최대 실행 횟수')}</div>
+    <div class="row2">${f('daily_limit', '하루 최대 실행 횟수')}<label class="field"><span>글 단계를 클라우드(GitHub Actions)에서</span><select class="input" name="cloud_text"><option value="off" ${s.cloud_text !== 'on' ? 'selected' : ''}>끔 — PC 도우미가 전부</option><option value="on" ${s.cloud_text === 'on' ? 'selected' : ''}>켬 — PC 꺼져 있어도 원고까지(구독 토큰 필요)</option></select></label></div>
     ${f('greeting_사섬', '인사말 · 사섬', 2)}
     ${f('greeting_순섬', '인사말 · 순섬', 2)}
     <p class="err" id="set-err"></p>

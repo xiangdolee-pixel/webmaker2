@@ -1,0 +1,50 @@
+# xim 스튜디오 — 글 단계를 GitHub Actions 에서 Claude Code(구독 토큰)로 돌린다. xim 이 workflow_dispatch 로 깨운다.
+#   필요한 저장소 비밀값:
+#     STUDIO_HELPER_TOKEN      xim Worker 의 같은 이름 비밀값과 동일 (결과를 xim 에 올릴 때 인증)
+#     CLAUDE_CODE_OAUTH_TOKEN  `claude setup-token` 으로 만든 Claude 구독 토큰 (API 요금 아님)
+#   그림(슬라이드 · 썸네일)은 여기서 만들지 않는다 — 'images' 상태로 두면 PC 도우미가 ChatGPT 로 만든다.
+name: xim 스튜디오 글 단계
+run-name: "스튜디오 ${{ inputs.stage }}: ${{ inputs.job_id }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: 스튜디오 작업 id (20자리)
+        required: true
+        type: string
+      stage:
+        description: run | articles | redo-slide
+        required: false
+        default: run
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-${{ inputs.job_id }}
+  cancel-in-progress: false
+
+jobs:
+  text:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Claude Code 설치
+        run: npm install -g @anthropic-ai/claude-code
+      - name: 글 단계 실행
+        env:
+          XIM_URL: https://xim.xiangdolee.workers.dev
+          STUDIO_HELPER_TOKEN: ${{ secrets.STUDIO_HELPER_TOKEN }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          JOB_ID: ${{ inputs.job_id }}
+          STAGE: ${{ inputs.stage }}
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then echo "::error::저장소 비밀값 CLAUDE_CODE_OAUTH_TOKEN 이 없습니다 (claude setup-token)"; exit 1; fi
+          if ! [[ "$JOB_ID" =~ ^[a-f0-9]{20}$ ]]; then echo "::error::job_id 형식이 아닙니다"; exit 1; fi
+          node xim/runner/runner.mjs --mode cloud --job "$JOB_ID" --stage "$STAGE"

@@ -257,3 +257,33 @@ ${item.scene}
 
 --- 큰 글자(그림에 넣을 유일한 글자) ---
 ${(item.text || '').trim() || '없음'}`;
+
+// ───────── 웹 템플릿 슬라이드 (ChatGPT 그림 대신, 2026-11-09 사용자 결정) ─────────
+//   Claude 는 장별 '구조' 만 뽑고, 그리기는 xim/js/slide-template.js 가 한다.
+export const SLIDE_SPEC_SYSTEM = `너는 유튜브 방송용 발표 슬라이드 기획자다. 📌 블록(방송 대본) 하나당 슬라이드 한 장의 내용을 JSON 으로 뽑는다. 그리기는 템플릿이 한다.
+${KEYWORD_RULE}
+각 슬라이드 필드:
+- kicker: 분류 한두 단어(예 "ETF 자금", "규제", "기관 매수"). 10자 이내.
+- title: 제목. 📌 제목을 그대로 쓰거나 다듬어 2~7단어, 20자 이내.
+- bullets: 3~4개. 한 줄 20자 이내, 명사형 키워드·짧은 구. 서술형 문장 금지. 숫자는 대본에 있는 것만.
+- number: 가장 중요한 숫자 하나 { value: "11억달러", label: "이틀간 ETF 순유출" }. 대본에 숫자가 없으면 value 를 "" 로.
+- chart: 대본에 비교할 수 있는 수치가 2개 이상 있을 때만 { type: "bar"|"line", points: [{label, value(숫자)}], unit: "달러" 등 }, 없으면 type 을 "" 로. 수치를 지어내지 않는다.
+- icon: 주제 상징 하나 — coin | chart-up | chart-down | bank | lock | shield | rocket | alert | gavel | globe | person | whale | building 중에서.
+- banner: 하단 한 줄 카피(15자 이내, 문장 나열 금지).
+- tone: up(호재) | down(악재) | neutral.
+출력은 JSON 하나: { "slides": [ {kicker,title,bullets,number,chart,icon,banner,tone}, ... ] } — 블록 수와 같은 개수, 같은 순서.`;
+
+// ───────── 썸네일 자동 선택 (제목 · 줄 나누기 · 강조 단어 · 인물 사진 · 표정 · 명찰) ─────────
+export const THUMB_PICK_SYSTEM = `너는 유튜브 썸네일 편집자다. 추천 제목 5개와 등장 인물, 인물 사진 목록(번호 · 표정 · 제스처 설명)을 보고 썸네일 값을 정한다.
+- title: 추천 제목 5개 중 클릭률이 가장 높을 것 하나를 그대로.
+- title_lines: 그 제목을 3~4줄로 의미 단위로 끊는다(한 줄 4~8자). 글자를 더하거나 빼지 않는다.
+- accent_words: 제목 안에서 색을 넣어 강조할 핵심 숫자·단어 1~2개(제목에 실제로 있는 글자 그대로).
+- face: 인물 사진 목록에서 제목이 담은 감정에 가장 맞는 사진 번호 하나(세 자리 문자열). 매번 같은 사진으로 수렴하지 말고 감정에 맞게 고른다.
+- emotion · gesture: 고른 사진의 표정 · 제스처 라벨.
+- badge_name · badge_role: 기사 속 실존 인물 중 제목과 가장 관련 깊은 1명의 "한글 이름" 과 "소속·직함". 인물이 없거나 제목과 무관하면 둘 다 "".
+출력은 JSON 하나: { title, title_lines, accent_words, face, emotion, gesture, badge_name, badge_role }.`;
+
+export const FACE_CATALOG_SYSTEM = `첨부한 인물 사진들(진행자 본인, 검은 캡모자·선글라스·검은 옷)의 표정과 손동작을 분류한다. 사진마다 { "n": "번호", "emotion": 표정 라벨, "gesture": 제스처 라벨, "desc": 한 줄 설명(15자 이내) } 을 쓴다.
+표정 라벨은 다음 중 하나: ${THUMB_EMOTIONS.map(([k]) => k).join(' / ')}.
+제스처 라벨은 다음 중 하나 또는 "없음(손 안 보임)": ${THUMB_GESTURES.map(([k]) => k).join(' / ')}.
+출력은 JSON 하나: { "faces": [ {n, emotion, gesture, desc}, ... ] } — 받은 사진 전부, 번호 순.`;
