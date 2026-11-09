@@ -139,7 +139,7 @@ xim Worker (기존 `xim/_worker/index.js` 에 /api/studio/* 추가)
 | 단계 | 지금 | 새 방식 | 예상 |
 |---|---|---|---|
 | 뉴스 후보 | PC python RSS | Worker 가 RSS 9곳 병렬 fetch | 5초 |
-| Top15 + 추천 6 | `claude -p` | Claude API 1회, 구조화 출력(JSON) | 30초 |
+| Top15 + 추천 6 | `claude -p` | Claude 1회 — **최근 7일 회차에서 이미 다룬 기사(제목 · 주소)를 함께 넘겨 같은 사건은 뺀다** (Top15 단계의 목적, 사용자 지시 2026-11-09) | 70~100초 |
 | 6개 확정 | 텔레그램 버튼 | 웹 체크 (완전 오토면 생략) | 사용자 |
 | 기사 6개 | 서브에이전트 6개 | Claude API **6개 동시**, 원문은 서버 web_fetch 도구 | 1분 |
 | 팩트체크 | `claude -p` | Claude API 1회, 고칠 블록만 JSON 으로 | 40초 |
