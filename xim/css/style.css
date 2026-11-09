@@ -533,3 +533,25 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .vc-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .vc-text { margin: 10px 0 0; padding: 12px; border-radius: var(--radius-sm); background: var(--bg); color: var(--sub); font: inherit; font-size: 14px; white-space: pre-wrap; max-height: 260px; overflow: auto; }
 @media (max-width: 767px) { .vc-row time { display: none; } .vc-bar .btn { width: 100%; margin-left: 0; } }
+
+/* 스튜디오 — 단계 지도 · 진행률 */
+.tl-head { font-size: 15px; color: var(--sub); margin: 2px 0 8px; }
+.tl-head b { color: var(--ink); }
+.tl-wait { color: var(--warn); font-weight: 700; }
+.tl-bar { height: 8px; border-radius: 99px; background: var(--bg); overflow: hidden; margin-bottom: 10px; }
+.tl-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--brand), var(--brand-2)); transition: width .6s var(--ease); }
+.tl-bar.sm { height: 5px; margin: 2px 0 6px; }
+.tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.tl li { display: grid; grid-template-columns: 22px 18px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+.tl li:last-child { border-bottom: 0; }
+.tl .tl-no { color: var(--mute); font-size: 12px; font-variant-numeric: tabular-nums; }
+.tl .tl-ic { font-weight: 800; color: var(--mute); }
+.tl .tl-note { grid-column: 3; color: var(--sub); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl .tl-dur { grid-column: 4; grid-row: 1 / span 2; color: var(--mute); font-size: 13px; white-space: nowrap; align-self: start; }
+.tl li.tl-done .tl-ic { color: var(--ok); }
+.tl li.tl-running .tl-ic { color: var(--brand); animation: new-blink 1.2s ease-in-out infinite; }
+.tl li.tl-running b { color: var(--brand); }
+.tl li.tl-wait .tl-ic, .tl li.tl-wait b { color: var(--warn); }
+.tl li.tl-failed .tl-ic { color: var(--danger); }
+.tl li.tl-pending { color: var(--mute); }
+.tl li.tl-pending b { font-weight: 500; color: var(--sub); }

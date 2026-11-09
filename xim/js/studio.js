@@ -17,6 +17,73 @@ const STEP_LABEL = (s) => {
   if ((m = s.match(/^review-(\d+)$/))) return `검수 ${m[1]}`;
   return { rss: '뉴스 후보', top15: 'Top15 선정', pick: '6개 고르기', factcheck: '팩트체크', summary: '유튜브 패키지', thumb: '썸네일', slides: '슬라이드', purge: '정리' }[s] || s;
 };
+// ───── 단계 지도(계획) · 진행률 ─────
+//   작업 종류 · 옵션에 따라 밟을 단계를 미리 그리고, 실제 단계 기록(studio_steps)을 그 위에 얹는다.
+const EXPECT = { rss: 10, top15: 90, pick: 0, articles: 220, factcheck: 160, summary: 60, 'thumb-pick': 40, 'thumb-wait': 0, 'thumb-prompt': 60, slides: 420, review: 90, thumb: 300, claim: 0 };
+function planFor(job) {
+  const o = job.options || {};
+  if (job.kind === 'thumb') return [['thumb-prompt', '썸네일 프롬프트'], ['thumb', '썸네일 (ChatGPT)']];
+  const p = [];
+  if (job.source === 'rss') { p.push(['rss', '뉴스 후보 모으기'], ['top15', 'Top15 선정 (이미 다룬 뉴스 제외)']); if (o.pick === 'manual') p.push(['pick', '6개 고르기 (내가)']); }
+  p.push(['articles', job.source === 'rss' ? '기사 대본 6개' : '대본 쓰기'], ['factcheck', '팩트체크'], ['summary', '유튜브 패키지 (제목 · 인트로 · 더보기)']);
+  p.push(o.thumb === 'manual' ? ['thumb-wait', '썸네일 선택 (내가)'] : ['thumb-pick', '썸네일 값 고르기']);
+  p.push(['thumb-prompt', '썸네일 프롬프트 쓰기'], ['slides', '슬라이드 6장 (ChatGPT)'], ['review', '슬라이드 검수'], ['thumb', '썸네일 (ChatGPT)']);
+  return p;
+}
+const keyOf = (step) => step.replace(/^article-\d+$/, 'articles').replace(/^slide-\d+$/, 'slides').replace(/^review-\d+$/, 'review');
+// 계획 + 실제 기록 → 줄 목록과 요약
+function timeline(job, steps) {
+  const plan = planFor(job);
+  const byKey = {};
+  for (const s of steps) { const k = keyOf(s.step); (byKey[k] ||= []).push(s); }
+  const rows = plan.map(([key, label]) => {
+    const ss = byKey[key] || [];
+    let status = 'pending';
+    if (key === 'pick' && job.status === 'pick') status = 'wait';
+    else if (key === 'thumb-wait' && job.status === 'thumb') status = 'wait';
+    else if (ss.some((x) => x.status === 'running')) status = 'running';
+    else if (ss.length && ss.every((x) => x.status === 'failed')) status = 'failed';
+    else if (ss.some((x) => x.status === 'done')) status = 'done';
+    else if (ss.some((x) => x.status === 'skipped')) status = 'skipped';
+    const start = ss.length ? Math.min(...ss.map((x) => x.started_at)) : 0;
+    const end = ss.length && status !== 'running' ? Math.max(...ss.map((x) => x.finished_at || x.started_at)) : 0;
+    const secs = start ? Math.round(((end || Date.now()) - start) / 1000) : 0;
+    return { key, label, status, start, end, secs, note: ss.filter((x) => x.note).map((x) => x.note).slice(-1)[0] || '' };
+  });
+  for (const r of rows) if ((r.key === 'pick' || r.key === 'thumb-wait') && r.status === 'pending') { const later = rows.slice(rows.indexOf(r) + 1).some((x) => x.status !== 'pending'); if (later) r.status = 'done'; }
+  const total = rows.length, done = rows.filter((r) => ['done', 'skipped'].includes(r.status)).length;
+  const cur = rows.find((r) => r.status === 'running' || r.status === 'wait') || rows.find((r) => r.status === 'pending');
+  const remain = rows.filter((r) => r.status === 'pending').reduce((a, r) => a + (EXPECT[r.key] || 60), 0) + (cur?.status === 'running' ? Math.max(0, (EXPECT[cur.key] || 60) - cur.secs) : 0);
+  const finished = ['done', 'failed', 'stopped'].includes(job.status);
+  const elapsed = Math.round(((finished ? (job.finished_at || job.updated_at) : Date.now()) - job.created_at) / 1000);
+  return { rows, total, done, cur, remain, elapsed, finished };
+}
+const mins = (sec) => (sec < 60 ? `${sec}초` : sec < 3600 ? `${Math.floor(sec / 60)}분${sec % 60 ? ` ${sec % 60}초` : ''}` : `${Math.floor(sec / 3600)}시간 ${Math.floor((sec % 3600) / 60)}분`);
+function timelineHtml(job, steps) {
+  const t = timeline(job, steps);
+  const pct = Math.round((t.done / t.total) * 100);
+  const head = t.finished
+    ? `${job.status === 'done' ? '완료' : STATUS[job.status]?.[0] || job.status} · ${t.total}단계 중 ${t.done}단계 · 총 ${mins(t.elapsed)}`
+    : job.status === 'queued' ? `${t.total}단계 · 시작 대기 (PC 도우미가 집어 갑니다)`
+    : `${t.total}단계 중 ${Math.min(t.total, t.done + 1)}번째 <b>${esc(t.cur?.label || '')}</b> · 경과 ${mins(t.elapsed)}${t.cur?.status === 'wait' ? ' · <span class="tl-wait">내 선택 기다리는 중</span>' : t.remain ? ` · 남은 시간 약 ${mins(Math.round(t.remain / 30) * 30 || 30)}` : ''}`;
+  const icon = { done: '✓', running: '●', wait: '✋', failed: '✕', skipped: '–', pending: '○' };
+  return `<section class="card st-steps">
+    <div class="tl-head">${head}</div>
+    <div class="tl-bar"><i style="width:${pct}%"></i></div>
+    <ol class="tl">${t.rows.map((r, i) => `<li class="tl-${r.status}"><span class="tl-no">${i + 1}</span><span class="tl-ic">${icon[r.status]}</span><b>${esc(r.label)}</b><span class="tl-note">${esc(r.note)}</span><span class="tl-dur">${r.status === 'running' ? `${mins(r.secs)} 진행 중` : r.status === 'wait' ? '기다리는 중' : r.status === 'pending' ? `예상 ${mins(EXPECT[r.key] || 60)}` : r.secs ? mins(r.secs) : ''}</span></li>`).join('')}</ol>
+  </section>`;
+}
+function cardProgress(j) {
+  if (!['queued', 'running', 'pick', 'thumb', 'images'].includes(j.status)) return '';
+  const plan = planFor({ ...j, options: j.options || {} });
+  const k = keyOf(j.step || ''); let i = plan.findIndex(([key]) => key === k);
+  if (j.status === 'pick') i = plan.findIndex(([key]) => key === 'pick');
+  if (j.status === 'thumb') i = plan.findIndex(([key]) => key === 'thumb-wait');
+  if (j.status === 'images' && i < 0) i = plan.findIndex(([key]) => key === 'slides');
+  const n = i < 0 ? 0 : i; const pct = Math.round((n / plan.length) * 100);
+  return `<div class="tl-bar sm"><i style="width:${pct}%"></i></div><p class="st-meta">${plan.length}단계 중 ${n + 1}번째 · ${esc(plan[n]?.[1] || STEP_LABEL(j.step))} · ${mins(Math.round((Date.now() - j.created_at) / 1000))} 경과</p>`;
+}
+
 const sbadge = (st) => { const [l, c] = STATUS[st] || [st, '']; return `<span class="badge st-${c}">${esc(l)}</span>`; };
 const dur = (a, b) => { if (!a) return ''; const s = Math.round(((b || Date.now()) - a) / 1000); return s < 60 ? `${s}초` : `${Math.floor(s / 60)}분 ${s % 60}초`; };
 const money = (d) => (d ? `$${d.toFixed(2)}` : '');
@@ -62,6 +129,7 @@ function jobCard(j) {
     <div class="st-body">
       <div class="st-top">${sbadge(j.status)}<span class="badge ch-${j.channel === '순섬' ? 'lime' : 'orange'}">${esc(j.channel)}</span><span class="st-kind">${esc(KIND[j.kind] || j.kind)} · ${esc(SOURCE[j.source] || j.source)}</span></div>
       <h3>${esc(j.title || (j.status === 'running' ? STEP_LABEL(j.step) + ' 진행 중…' : '제목 없음'))}</h3>
+      ${cardProgress(j)}
       <p class="st-meta">${fmtDate(j.created_at)}${j.finished_at ? ` · ${dur(j.created_at, j.finished_at)}` : ''}${j.cost ? ` · ${money(j.cost)}` : ''}${j.error ? ` · <span class="err-inline">${esc(j.error.slice(0, 80))}</span>` : ''}</p>
     </div></article>`;
 }
@@ -204,10 +272,7 @@ async function renderJob() {
       ${active ? '<button class="btn sm danger" id="st-stop" type="button">멈춤</button>' : '<button class="btn sm danger" id="st-del" type="button">삭제</button>'}
     </div>
     ${job.error ? `<p class="st-warn">${esc(job.error)}</p>` : ''}
-    <section class="card st-steps">
-      <ol>${steps.map((s) => `<li class="s-${s.status}"><b>${esc(STEP_LABEL(s.step))}</b><span class="s-note">${esc(s.note || '')}</span><span class="s-dur">${s.status === 'running' ? '진행 중…' : dur(s.started_at, s.finished_at)}${s.cost ? ` · ${money(s.cost)}` : ''}</span></li>`).join('')}
-      ${job.status === 'queued' ? '<li class="s-running"><b>시작 대기</b><span class="s-note">곧 시작합니다</span></li>' : ''}</ol>
-    </section>
+    ${timelineHtml(job, steps)}
     ${job.status === 'pick' && top15 ? pickPanel(top15) : ''}
     ${job.status === 'thumb' ? `<section class="card st-panel"><h3>썸네일 고르기</h3><form id="st-thumb-form">${thumbPickForm({}, summary?.titles || [], summary?.people || [])}<p class="err" id="tp-err"></p><button class="btn primary" type="submit">이대로 썸네일 만들기</button></form></section>` : ''}
     ${blocks.length || slides.length || thumb || top15 || captures.length ? `<section class="card st-panel">
