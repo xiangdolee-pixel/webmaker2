@@ -607,8 +607,11 @@ export async function studioScheduled(env, gh) {
   const list = await getSchedules(db);
   const today = kstDate(now()), hm = kstHM(now());
   let changed = false;
+  const minutes = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
   for (const s of list) {
     if (!s.on || s.last === today || s.time > hm) continue;
+    // 예약 시각에서 60분 넘게 지났으면 그날은 건너뛴다 (늦은 밤에 아침 예약이 뒤늦게 도는 일 방지 — 2026-11-09 실측)
+    if (minutes(hm) - minutes(s.time) > 60) { s.last = today; changed = true; continue; }
     try {
       const id = await createJob(env, gh, { kind: 'main', channel: s.channel, source: 'rss', pick: 'auto', thumb: 'auto', engine: 'cloud', scheduled: `${s.time} ${s.channel}` });
       await db.prepare("INSERT INTO audit_log (action, target, detail, ip, created_at) VALUES ('STUDIO_JOB', ?, ?, '예약', ?)").bind(`스튜디오 예약 ${s.time}`, `${s.channel} · ${id}`, now()).run().catch(() => {});
@@ -688,6 +691,9 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
       on: !!x.on,
       last: String(x.last || ''),
     }));
+    // 저장 시점에 이미 지난 시각은 오늘은 건너뛴다(저장하자마자 바로 도는 일 방지)
+    const tod = kstDate(now()), nowHM = kstHM(now());
+    for (const x of list) if (x.on && x.time <= nowHM && !x.last) x.last = tod;
     await db.prepare("INSERT INTO studio_settings (key, value) VALUES ('schedules', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(JSON.stringify(list)).run();
     await audit?.('STUDIO_SCHEDULE', '스튜디오 예약', list.filter((x) => x.on).map((x) => `${x.time} ${x.channel}`).join(', ') || '없음');
     return json({ schedules: list });
