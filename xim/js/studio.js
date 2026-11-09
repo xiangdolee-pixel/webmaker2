@@ -409,7 +409,7 @@ async function renderJob() {
       else if (resTab === 'slides') box.innerHTML = slidesPanel(job, slides, blocks);
       else if (resTab === 'show') box.innerHTML = showPanel(r.show_url, slides.length, blocks.length);
       else if (resTab === 'thumb') box.innerHTML = thumbPanel(job, thumb, summary);
-      else if (resTab === 'yt') box.innerHTML = ytPanel(summary);
+      else if (resTab === 'yt') box.innerHTML = ytPanel(summary, (thumb?.meta?.pick?.title) || J('thumb_pick')?.title || '');
       else if (resTab === 'news') box.innerHTML = newsPanel(top15, J('chosen'));
       else if (resTab === 'caps') box.innerHTML = `<div class="st-slides">${captures.map((a) => `<figure><img src="${a.url}" alt=""><figcaption>캡쳐 ${a.idx}</figcaption></figure>`).join('')}</div>`;
       wireRes(job, blocks, thumb, summary);
@@ -475,8 +475,9 @@ function thumbPanel(job, thumb, summary) {
     <div class="dlg-actions st-thumb-actions"><button class="btn sm" type="button" id="st-dl-thumb">16:9 로 내려받기</button>${done ? '<button class="btn sm" type="button" id="st-rethumb-toggle">🔁 썸네일 다시 만들기</button>' : ''}</div></div>` : `<p class="empty">썸네일이 없습니다.</p>${done ? '<div class="dlg-actions"><button class="btn sm" type="button" id="st-rethumb-toggle">🔁 썸네일 만들기</button></div>' : ''}`}
     ${done ? `<div class="st-redo-body" id="st-rethumb-wrap" hidden><p class="st-hint">제목 · 인물 명찰 · 표정 · 제스처 · 인물 사진을 바꿔 저장하면 PC 의 ChatGPT 가 다시 그립니다(3~5분).</p><form id="st-rethumb">${thumbPickForm(pick || {}, summary?.titles || [], summary?.people || [])}<p class="err" id="rt-err"></p><button class="btn primary" type="submit">이대로 다시 만들기</button></form></div>` : ''}`;
 }
-function ytPanel(s) {
-  return `<h4>제목 추천</h4><ol class="st-titles-list">${s.titles.map((t) => `<li>${esc(t)} ${copyBtn(t)}</li>`).join('')}</ol>
+function ytPanel(s, thumbTitle = '') {
+  // 썸네일에 들어간 제목은 굵게 + 표시 (사용자 지시 2026-11-09)
+  return `<h4>제목 추천</h4><ol class="st-titles-list">${s.titles.map((t) => `<li class="${thumbTitle && t === thumbTitle ? 'is-thumb' : ''}">${thumbTitle && t === thumbTitle ? `<b>${esc(t)}</b> <span class="badge st-done">썸네일</span>` : esc(t)} ${copyBtn(t)}</li>`).join('')}${thumbTitle && !s.titles.includes(thumbTitle) ? `<li class="is-thumb"><b>${esc(thumbTitle)}</b> <span class="badge st-done">썸네일 (직접 입력)</span> ${copyBtn(thumbTitle)}</li>` : ''}</ol>
     <h4>인트로 대본 ${copyBtn(s.intro)}</h4><p class="st-pre">${esc(s.intro)}</p>
     <h4>더보기란 ${copyBtn(s.description)}</h4><pre class="st-pre">${esc(s.description)}</pre>
     <h4>등장 인물</h4><ul>${s.people.length ? s.people.map((p) => `<li>${esc(p)}</li>`).join('') : '<li>없음</li>'}</ul>`;
