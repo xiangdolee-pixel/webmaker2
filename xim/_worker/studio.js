@@ -443,8 +443,7 @@ async function recentlyCovered(db, exceptId) {
     const chosen = docJson(await latestDoc(db, j.id, 'chosen')) || top?.picks || [];
     const when = kst(j.created_at).slice(0, 11);
     if (top?.items?.length) for (const n of chosen) { const it = top.items.find((i) => i.n === n); if (it) out.push({ when, title: it.title, url: it.url }); }
-    else { const a = await latestDoc(db, j.id, 'articles'); for (const b of splitBlocks(a?.body)) out.push({ when, title: b.split('
-')[0].replace(/^📌\s*/, ''), url: '' }); }
+    else { const a = await latestDoc(db, j.id, 'articles'); for (const b of splitBlocks(a?.body)) out.push({ when, title: b.split('\n')[0].replace(/^📌\s*/, ''), url: '' }); }
   }
   return out.slice(0, 60);
 }
