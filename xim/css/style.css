@@ -500,3 +500,36 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
   .st-steps li .s-note { grid-column: 1 / -1; white-space: normal; }
   .st-bar .st-h { order: 10; flex-basis: 100%; }
 }
+
+/* 내 목소리 읽기 (voice.js) */
+.vc-panel { padding: 20px; }
+.vc-panel + .vc-panel { margin-top: 16px; }
+.vc-panel h2 { margin: 0 0 8px; font-size: 18px; }
+.vc-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.vc-head h2 { margin: 0; }
+.vc-agent { display: inline-flex; align-items: center; gap: 6px; color: var(--sub); font-size: 13px; }
+.vc-agent i { width: 9px; height: 9px; border-radius: 50%; background: var(--mute); }
+.vc-agent.on i { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+.vc-agent.off i { background: var(--danger); }
+#vc-form { margin-top: 12px; }
+#vc-text { min-height: 170px; line-height: 1.7; resize: vertical; }
+.vc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 10px; }
+.vc-count { color: var(--sub); font-size: 14px; font-variant-numeric: tabular-nums; }
+.vc-count b { color: var(--ink); }
+.vc-count.over b { color: var(--danger); }
+.vc-speed { display: inline-flex; align-items: center; gap: 6px; color: var(--sub); font-size: 14px; }
+.vc-speed select { min-height: 36px; padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; font: inherit; }
+.vc-bar .btn { margin-left: auto; min-width: 120px; }
+.vc-note { margin: 12px 0 0; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--warn-soft); color: var(--warn); font-size: 14px; }
+.vc-jobs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.vc-jobs li { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.vc-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.vc-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.vc-row time { flex: none; color: var(--mute); font-size: 13px; font-variant-numeric: tabular-nums; }
+.vc-jobs audio { display: block; width: 100%; height: 40px; margin-top: 10px; }
+.vc-stats { margin: 6px 0 0; color: var(--sub); font-size: 13px; font-variant-numeric: tabular-nums; }
+.vc-stats b { color: var(--ink); font-weight: 600; }
+.vc-fail { margin: 6px 0 0; color: var(--danger); font-size: 14px; }
+.vc-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.vc-text { margin: 10px 0 0; padding: 12px; border-radius: var(--radius-sm); background: var(--bg); color: var(--sub); font: inherit; font-size: 14px; white-space: pre-wrap; max-height: 260px; overflow: auto; }
+@media (max-width: 767px) { .vc-row time { display: none; } .vc-bar .btn { width: 100%; margin-left: 0; } }

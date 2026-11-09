@@ -235,6 +235,19 @@ async function ximApi(request, env, url, ctx) {
     return json({ ok: true }, 200, { 'Set-Cookie': setCookie(XIM_COOKIE, '', 0) });
   }
   if (path === '/api/me') return json({ ok: true });
+  // 내 목소리 읽기: Worker `clone`(대기열 · 음성 저장)을 서비스 바인딩으로 대신 부른다 — 운영자 로그인은 위에서 확인했으니 처리기 토큰으로 통과
+  //   /api/voice/jobs… → clone /api/jobs…,  /api/voice/audio/<id>.wav → clone /audio/<id>.wav,  /api/voice/me → clone /api/me
+  if (path.startsWith('/api/voice/')) {
+    if (!env.CLONE || !env.CLONE_TOKEN) throw new HttpError(503, '내 목소리 읽기(clone)가 아직 연결되지 않았습니다.');
+    const sub = path.slice('/api/voice'.length);
+    const target = sub.startsWith('/audio/') ? sub : `/api${sub}`;
+    const headers = new Headers({ 'X-Agent-Token': env.CLONE_TOKEN });
+    for (const h of ['Content-Type', 'Range', 'If-None-Match']) if (request.headers.has(h)) headers.set(h, request.headers.get(h));
+    const res = await env.CLONE.fetch(new Request(`https://clone${target}${url.search}`, { method, headers, body: method === 'GET' || method === 'HEAD' ? undefined : request.body }));
+    const out = new Response(res.body, res);
+    out.headers.delete('Set-Cookie');
+    return out;
+  }
   if (path.startsWith('/api/studio/') || path === '/api/studio') return studioApi(request, env, url, ctx, path, method, body, (a, t, d) => audit(db, request, a, t, d), (p, d) => github(env, p, d));
 
   // 구글 OTP 등록 · 해제

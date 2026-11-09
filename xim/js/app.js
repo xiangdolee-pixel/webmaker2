@@ -2,6 +2,7 @@
 import { $, $$, esc, makeApi, fmtDate, badge, toast, pillTabs, slideTabs, formData, openDialog, busy } from './common.js';
 import { qrSvg } from './qr.js';
 import { renderStudio, stopStudio } from './studio.js';
+import { renderVoice, stopVoice } from './voice.js';
 
 const api = makeApi('/api');
 const view = $('#view');
@@ -61,6 +62,7 @@ const NAV_ICON = {
   pricing: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>',
   security: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
   studio: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M10 9l5 2.5-5 2.5zM8 21h8"/></svg>',
+  voice: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>',
 };
 let navReady = false;
 function showApp() {
@@ -68,7 +70,7 @@ function showApp() {
   $('#app').hidden = false;
   if (!navReady) {
     navReady = true;
-    pillTabs($('#nav'), [['sites', '사이트'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['studio', '스튜디오'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제']], tab, (v) => {
+    pillTabs($('#nav'), [['sites', '사이트'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제']], tab, (v) => {
       tab = v;
       if (reqOpen && !(v === 'requests' && /^#req-\d+$/.test(location.hash))) { reqOpen = 0; if (location.hash) history.replaceState(null, '', location.pathname); }
       render();
@@ -159,6 +161,7 @@ function render() {
     if (tab === 'audit') tasks.push(renderAudit());
     if (tab === 'pricing') renderPricing();
     if (tab === 'studio') tasks.push(renderStudio({ view, api, shrinkImage })); else stopStudio();
+    if (tab === 'voice') tasks.push(renderVoice({ view, api })); else stopVoice();
     await Promise.all(tasks);
   });
 }

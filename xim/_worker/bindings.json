@@ -9,6 +9,9 @@
   "r2_buckets": [
     { "binding": "FILES", "bucket_name": "xms-files" }
   ],
+  "services": [
+    { "binding": "CLONE", "service": "clone" }
+  ],
   "workflows": [
     { "name": "xim-studio", "binding": "STUDIO_WF", "class_name": "StudioMain" }
   ]

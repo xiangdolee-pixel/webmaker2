@@ -28,6 +28,9 @@ const cookieOf = (request, name) => (request.headers.get('Cookie') || '').split(
 
 async function sessionToken(env) { return hmac(env.CLONE_PASS, 'clone-session-v1'); }
 async function requireUser(request, env) {
+  // xim 이 서비스 바인딩으로 대신 부를 때는 처리기 토큰(X-Agent-Token)으로 통과 — xim 쪽에서 이미 운영자 로그인을 확인했다
+  const agent = request.headers.get('X-Agent-Token') || '';
+  if (agent && env.AGENT_TOKEN && sameText(agent, env.AGENT_TOKEN)) return;
   if (!env.CLONE_PASS) throw new HttpError(503, '비밀번호(CLONE_PASS)가 아직 설정되지 않았습니다.');
   const tok = cookieOf(request, COOKIE);
   if (!tok || !sameText(tok, await sessionToken(env))) throw new HttpError(401, '로그인이 필요합니다.');
