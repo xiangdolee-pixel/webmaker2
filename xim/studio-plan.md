@@ -153,8 +153,13 @@ D1 `xim` 에 추가:
 - `studio_presets` — key, rules(text), ref_asset_keys
 - `studio_topics` — 폰UI 중복 방지
 
-R2 `xms-files` 에 `studio/<job_id>/…`, 프리셋은 `studio/presets/…`.
+R2 `xms-files` 에 `studio/<job_id>/…`, 프리셋은 `studio/presets/…`, 인물 사진은 `studio/faces/NNN.webp`.
 Worker 비밀값: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (리포에 두지 않음).
+
+**보관 규칙 (사용자 지시 2026-11-09)**: 그림(슬라이드 · 썸네일 · 캡쳐 · 세로 컷 · 결과 html)은 **최근 발표자료 10개 분만** R2 에 둔다.
+새 작업이 끝나면 11번째부터 오래된 작업의 그림을 자동으로 지운다(목록에는 제목 · 원고만 남고 그림 자리는 "지워짐").
+글(원고 · 교정본 · 유튜브 패키지 · 대본)은 용량이 거의 없으므로 계속 보관. 인물 사진 · 프리셋은 지우지 않는다.
+R2 에 올리는 모든 그림은 **webp 로 줄여서** 올린다(인물 사진 최대 1024px · q85, 슬라이드 · 썸네일은 원본 해상도 유지 · q90).
 
 ---
 
@@ -181,9 +186,12 @@ Worker 비밀값: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (리포에 두지 않음
 
 ## 10. 결정이 필요한 것
 
-1. API 키 2개(Anthropic · OpenAI) 발급과 과금 OK 인지.
+1. ~~API 키 2개 과금 OK 인지~~ → OK (2026-11-09). 단 **둘 다 구독과 별개 키가 필요**하다:
+   - Anthropic: Claude Code(Max) 구독 ≠ API. https://console.anthropic.com → API Keys → 키 발급(`sk-ant-…`), 크레딧 충전.
+   - OpenAI: ChatGPT Plus(월 3만원) ≠ API. https://platform.openai.com → 결제 수단 · 크레딧(선불) → API keys → 키 발급(`sk-…`).
+   - 둘 다 프롬프트에 붙여 주면 Claude 가 `node deploy.mjs --wrangler secret put <이름> --name xim` 으로 Worker 비밀값에 넣는다. 리포 · 메모에는 남기지 않는다.
 2. 0단계 시험에서 API 그림이 ChatGPT ppt1 보다 떨어지면: 그래도 API 로 갈지, PC 도우미(내 ChatGPT)를 기본으로 둘지.
 3. 탭 이름(스튜디오?).
-4. ★emoji 인물 사진을 R2(비공개)에 올려도 되는지.
-5. 기록 보관 기간 · 용량(R2 무료 10GB 면 수백 회차).
-6. 유튜브 업로드까지 웹에서 할지(YouTube Data API, 채널 2개 OAuth). 나중 단계로 미뤄도 된다.
+4. ~~★emoji 인물 사진 R2~~ → OK, webp 로 줄여서 (2026-11-09). `studio/faces/001~087.webp`.
+5. ~~기록 보관 기간~~ → 그림은 최근 10개 분만, 나머지 자동 삭제 (2026-11-09). 글은 계속 보관.
+6. ~~유튜브 업로드~~ → 안 한다. 영상은 사용자가 직접 찍는다. 스튜디오는 **발표자료(원고 · 슬라이드 · 슬라이드쇼 · 썸네일 · 쇼츠 페이지)까지만** (2026-11-09).
