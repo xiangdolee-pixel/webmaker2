@@ -491,13 +491,20 @@ export async function studioHelper(request, env, url, path, method) {
             if (v && v.status === 'done' && v.video_status === 'done') {
               const summary = docJson(await latestDoc(db, job.id, 'summary')) || {};
               const pick = docJson(await latestDoc(db, job.id, 'thumb_pick')) || {};
-              jo.yt = { status: 'queued', title: String(pick.title || summary.titles?.[0] || job.title || '').slice(0, 100), visibility: '비공개', at: now(), url: '', error: '', auto: true };
+              jo.yt = { status: 'queued', title: String(pick.title || summary.titles?.[0] || job.title || '').slice(0, 100), visibility: '비공개', publish: true, at: now(), url: '', error: '', auto: true };
               await setJob(db, job.id, { options: JSON.stringify(jo) });
             } else if (v && (v.status === 'failed' || v.video_status === 'failed')) {
               jo.yt = { status: 'failed', error: '영상이 실패해 유튜브에 올리지 못했습니다', at: now(), auto: true }; await setJob(db, job.id, { options: JSON.stringify(jo) });
             }
           } catch { /* 다음 폴링 때 */ }
         }
+      }
+      const prow = await db.prepare("SELECT id FROM studio_jobs WHERE json_extract(options, '$.yt.status') = 'review' AND json_extract(options, '$.yt.next_check') <= ? ORDER BY json_extract(options, '$.yt.next_check') ASC LIMIT 1").bind(now()).first();
+      if (prow) {
+        const job = await getJob(db, prow.id); const jo = JSON.parse(job.options || '{}');
+        jo.yt = { ...jo.yt, next_check: now() + 10 * 60000 };   // 도우미가 죽어도 10분 뒤 다시
+        await setJob(db, job.id, { options: JSON.stringify(jo) });
+        return json({ job: { ...job, options: jo, phase: 'youtube-publish' }, youtube: { video_id: jo.yt.video_id || '', url: jo.yt.url || '', title: jo.yt.title || job.title, channel_name: job.channel === '순섬' ? '순수한크립토' : '사적인자산왕' } });
       }
       const yrow = await db.prepare("SELECT id FROM studio_jobs WHERE json_extract(options, '$.yt.status') = 'queued' ORDER BY json_extract(options, '$.yt.at') ASC LIMIT 1").first();
       if (yrow) {
@@ -564,10 +571,27 @@ export async function studioHelper(request, env, url, path, method) {
       if (row) await stepEnd(db, row.id, job.id, ['done', 'failed', 'skipped'].includes(d.status) ? d.status : 'done', d.note || '', d.usage || null);
       return json({ ok: true });
     }
-    if (sub === 'yt' && method === 'POST') {   // 유튜브 올리기 결과 {status: done|failed|login, url, error}
+    if (sub === 'yt' && method === 'POST') {   // 유튜브 올리기 결과 {status: done|failed|login|published|reviewing, url, error}
       const d = await readJson();
       const jo = JSON.parse(job.options || '{}');
-      jo.yt = { ...(jo.yt || {}), status: ['done', 'failed', 'login'].includes(d.status) ? d.status : 'failed', url: String(d.url || '').slice(0, 200), error: String(d.error || '').slice(0, 400), finished_at: now() };
+      const y = jo.yt || {};
+      const st = String(d.status || '');
+      if (st === 'done') {
+        const url = String(d.url || '').slice(0, 200);
+        const vidm = url.match(/(?:youtu\.be\/|v=|\/video\/)([\w-]{6,})/);
+        const review = (y.visibility || '비공개') === '비공개' && y.publish !== false;   // 비공개로 올렸고 "검토 끝나면 공개" 가 켜져 있으면 검토 단계로
+        jo.yt = { ...y, status: review ? 'review' : 'done', url, video_id: vidm ? vidm[1] : (y.video_id || ''), error: '', uploaded_at: now(), finished_at: review ? null : now(), next_check: review ? now() + 10 * 60000 : null, checks: 0 };
+      } else if (st === 'published') {
+        jo.yt = { ...y, status: 'done', visibility: '공개', error: '', published_at: now(), finished_at: now() };
+      } else if (st === 'reviewing') {
+        const n = (y.checks || 0) + 1;
+        jo.yt = n >= 72 ? { ...y, status: 'done', error: '12시간 동안 검토가 끝나지 않아 비공개로 둡니다', finished_at: now() } : { ...y, status: 'review', checks: n, next_check: now() + 10 * 60000, error: '' };
+      } else if (y.status === 'review' && (st === 'failed' || st === 'login')) {
+        const n = (y.fails || 0) + 1;   // 공개 전환 실패는 3번까지 다시, 그 뒤 포기(비공개로 남음)
+        jo.yt = n >= 3 ? { ...y, status: 'done', error: `공개 전환 실패: ${String(d.error || '').slice(0, 200)} — 유튜브에서 직접 공개로 바꿔 주세요`, finished_at: now() } : { ...y, status: 'review', fails: n, next_check: now() + 10 * 60000, error: String(d.error || '').slice(0, 300) };
+      } else {
+        jo.yt = { ...y, status: ['failed', 'login'].includes(st) ? st : 'failed', error: String(d.error || '').slice(0, 400), finished_at: now() };
+      }
       await setJob(db, job.id, { options: JSON.stringify(jo) });
       return json({ ok: true });
     }
@@ -841,7 +865,7 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
     const summary = docJson(await latestDoc(db, job.id, 'summary')) || {};
     const title = String(d.title || summary.titles?.[0] || job.title || '').slice(0, 100);
     if (!title) throw bad('제목이 없습니다.');
-    jo.yt = { status: 'queued', title, visibility: ['공개', '일부공개', '비공개'].includes(d.visibility) ? d.visibility : '비공개', at: now(), url: '', error: '' };
+    jo.yt = { status: 'queued', title, visibility: ['공개', '일부공개', '비공개'].includes(d.visibility) ? d.visibility : '비공개', publish: d.publish !== false && d.publish !== 'false', at: now(), url: '', error: '' };   // publish: 비공개로 올린 뒤 검토가 끝나면 공개로(기본 켬)
     await setJob(db, job.id, { options: JSON.stringify(jo) });
     await audit?.('STUDIO_YOUTUBE', '유튜브 올리기', `${title} · ${jo.yt.visibility}`);
     return json({ ok: true, yt: jo.yt });

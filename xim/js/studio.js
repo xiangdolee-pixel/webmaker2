@@ -229,8 +229,10 @@ function newJobDialog() {
         <label class="field" id="src-text" hidden><span>글</span><textarea class="input" name="text" rows="6" placeholder="기사 본문이나 메모를 붙여 넣으세요"></textarea></label>
         <fieldset class="choice-set" id="pick-set"><legend>기사 고르기</legend><div class="tabs seg" id="f-pick"></div><small>자동이면 클로드 추천 6개로 바로 진행합니다.</small></fieldset>
         <fieldset class="choice-set"><legend>썸네일</legend><div class="tabs seg" id="f-thumb"></div><small>내가 고르기 = 글이 끝난 뒤 제목 · 인물 · 표정 · 제스처를 웹에서 고릅니다.</small></fieldset>
-        <fieldset class="choice-set"><legend>영상</legend><label class="st-check"><input type="checkbox" name="video" checked> 발표자료가 완성되면 <b>영상도 바로 만들기</b>(사자왕이 슬라이드 전부를 읽는 1280x720 자막 영상, 8분 이상)</label><small>끄면 나중에 카드의 "영상 만들기" 로 만들 수 있습니다.</small>
-        <label class="st-check"><input type="checkbox" name="youtube" checked> 영상이 완성되면 <b>유튜브 채널에 올리기</b>(사섬 = 사적인자산왕, 순섬 = 순수한크립토 · 비공개로 올림 · 제목 = 썸네일 제목 · 더보기란 · 썸네일 자동)</label><small>PC 도우미가 엣지 자동화 프로필에서 그 채널로 계정 전환해 올립니다. 끄면 안 올립니다.</small></fieldset>
+        <fieldset class="choice-set st-after"><legend>완성된 뒤</legend>
+          <label class="st-check"><input type="checkbox" name="video" checked><span><b>영상도 바로 만들기</b><small>사자왕이 슬라이드 전부를 읽는 1280x720 자막 영상(8분 이상). 끄면 나중에 카드의 "영상 만들기"로 만들 수 있어요.</small></span></label>
+          <label class="st-check"><input type="checkbox" name="youtube" checked><span><b>유튜브 채널에 올리기</b><small>사섬 → 사적인자산왕, 순섬 → 순수한크립토. 제목 = 썸네일 제목, 더보기란 · 썸네일 · 재생목록 자동. 비공개로 올리고 검토가 끝나면 공개로 바꿉니다.</small></span></label>
+        </fieldset>
       </div>
       <div id="thumb-opts" hidden>${thumbPickForm({}, [], [])}</div>
       <p class="err" id="f-err"></p>
@@ -522,7 +524,8 @@ function videoPanel(job, summary, thumbTitle = '') {
   const titles = [...new Set([thumbTitle, ...(summary?.titles || []), job.title].filter(Boolean))];
   const ytState = !yt ? '' : yt.status === 'queued' ? '<p class="st-meta">⏳ 유튜브 올리기 대기 중 (PC 도우미가 곧 시작)</p>'
     : yt.status === 'running' ? '<p class="st-meta">📤 유튜브에 올리는 중… (엣지 자동화, 10~20분)</p>'
-    : yt.status === 'done' ? `<p class="st-meta">✅ 유튜브에 올림 (${esc(yt.visibility || '')})${yt.url ? ` · <a href="${esc(yt.url)}" target="_blank" rel="noopener">${esc(yt.url)}</a>` : ' · 유튜브 스튜디오에서 확인'}</p>`
+    : yt.status === 'review' ? `<p class="st-meta">🕒 유튜브에 비공개로 올림${yt.url ? ` · <a href="${esc(yt.url)}" target="_blank" rel="noopener">${esc(yt.url)}</a>` : ''} · <b>검토가 끝나면 자동으로 공개</b>로 바꿉니다 (10분마다 확인${yt.checks ? ` · ${yt.checks}번 확인함` : ''})${yt.error ? ` · <span class="err-inline">${esc(yt.error)}</span>` : ''}</p>`
+    : yt.status === 'done' ? `<p class="st-meta">✅ 유튜브에 올림 (${esc(yt.visibility || '')})${yt.url ? ` · <a href="${esc(yt.url)}" target="_blank" rel="noopener">${esc(yt.url)}</a>` : ' · 유튜브 스튜디오에서 확인'}${yt.error ? ` · <span class="err-inline">${esc(yt.error)}</span>` : ''}</p>`
     : yt.status === 'login' ? `<p class="err-inline">🔑 ${esc(yt.error || '유튜브 로그인이 필요합니다')}</p>`
     : `<p class="err-inline">❌ 유튜브 올리기 실패: ${esc(yt.error || '')}</p>`;
   return `<div class="st-video" data-video-job="${esc(vid)}">
@@ -535,9 +538,9 @@ function videoPanel(job, summary, thumbTitle = '') {
     <h4 style="margin-top:18px">📺 유튜브에 올리기 — ${job.channel === '순섬' ? '순수한크립토' : '사적인자산왕'} 채널</h4>
     <form id="st-yt-form" class="st-yt-form">
       <label>제목 <select name="title">${titles.map((t, i) => `<option value="${esc(t)}"${i === 0 ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
-      <label>공개 상태 <select name="visibility"><option value="비공개" selected>비공개 (올린 뒤 직접 공개)</option><option value="일부공개">일부 공개</option><option value="공개">공개</option></select></label>
+      <label>공개 상태 <select name="visibility"><option value="비공개" selected>비공개로 올리고 검토가 끝나면 공개 (기본)</option><option value="일부공개">일부 공개</option><option value="공개">바로 공개</option></select></label>
       <p class="st-meta">더보기란 · 썸네일 · 재생목록(코인뉴스) · 수익창출 · 광고 적합성은 전처럼 자동으로 채웁니다. PC 의 엣지 자동화 프로필에 사적인자산왕 계정이 로그인돼 있어야 합니다.</p>
-      <button class="btn primary" type="submit" ${yt && ['queued', 'running'].includes(yt.status) ? 'disabled' : ''}>유튜브에 올리기</button>
+      <button class="btn primary" type="submit" ${yt && ['queued', 'running', 'review'].includes(yt.status) ? 'disabled' : ''}>유튜브에 올리기</button>
     </form>
     ${ytState}
   </div>`;
@@ -567,7 +570,7 @@ function wireRes(job, blocks, thumb, summary) {
   $('#st-video-voice')?.addEventListener('click', () => { try { localStorage.setItem('xim.tab', 'voice'); } catch { /* 무시 */ } location.hash = ''; location.reload(); });
   $('#st-yt-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const f = e.currentTarget, d = { title: f.title.value, visibility: f.visibility.value };
+    const f = e.currentTarget, d = { title: f.title.value, visibility: f.visibility.value, publish: f.visibility.value === '비공개' };
     if (!confirm(`유튜브(사적인자산왕)에 올립니다.\n제목: ${d.title}\n공개 상태: ${d.visibility}\n\nPC 도우미가 엣지로 올리며 10~20분 걸립니다. 시작할까요?`)) return;
     busy(f.querySelector('[type=submit]'), null, async () => { await api(`/studio/jobs/${job.id}/youtube`, { method: 'POST', data: d }); toast('유튜브 올리기를 요청했습니다. 진행은 이 탭에서 보입니다.'); renderJob(); });
   });

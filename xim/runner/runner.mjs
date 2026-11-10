@@ -438,12 +438,33 @@ function closeProfileEdge() {
   } catch { /* 없으면 그만 */ }
 }
 
+// 검토가 끝났으면 공개로(2026-11-10): Worker 가 10분마다 'youtube-publish' 로 넘겨 준다 → 콘텐츠 목록의 '알림' 칸을 보고, '검토 중' 이 사라졌으면 편집 화면에서 공개 → 저장
+async function runYoutubePublish(payload, work) {
+  const job = payload.job, y = payload.youtube || {};
+  const report = (status, extra = {}) => api(`/api/studio/helper/jobs/${job.id}/yt`, { method: 'POST', body: { status, ...extra } }).catch((e) => log('(유튜브 보고 실패)', e.message));
+  try {
+    if (!y.video_id) throw new Error('video_id 없음');
+    fs.mkdirSync(work, { recursive: true });
+    const jobJson = path.join(work, 'youtube_publish.json');
+    fs.writeFileSync(jobJson, JSON.stringify({ video_id: y.video_id, title: y.title || job.title, channel_name: y.channel_name || '사적인자산왕' }, null, 2), 'utf8');
+    log(`  유튜브 검토 확인: ${y.video_id} (${y.channel_name || ''})`);
+    const r = await py(['tools\\yt_upload_auto.py', '--publish', jobJson], { cwd: DOCS, timeoutMin: 15, label: '유튜브 공개 전환' });
+    const lines = (r.out || '').trim().split(/\r?\n/).filter(Boolean);
+    let res = null; for (let i = lines.length - 1; i >= 0 && !res; i--) { try { if (lines[i].startsWith('{')) res = JSON.parse(lines[i]); } catch { /* 다음 줄 */ } }
+    if (r.code === 2 || res?.error === 'LOGIN_REQUIRED') { await report('login', { error: '자동화 프로필 로그인 필요' }); return; }
+    if (r.code !== 0 || !res?.ok) { await report('failed', { error: res?.error || lines.slice(-2).join(' | ').slice(0, 200) }); return; }
+    if (res.state === 'published') { log('  유튜브: 공개로 전환 완료'); await report('published'); }
+    else { log(`  유튜브: 아직 ${res.state} → 10분 뒤 다시`); await report('reviewing'); }
+  } catch (e) { log('  유튜브 공개 전환 오류', e.message); await report('failed', { error: String(e.message || e).slice(0, 300) }); }
+}
+
 // ───────── 모드 ─────────
 async function processJob(payload) {
   const job = payload.job, j = J(job.id);
   const work = path.join(WORK_ROOT, job.id);
   log(`▶ ${job.id} ${job.kind} ${job.channel} ${job.source} (${job.phase})`);
   if (job.phase === 'youtube') { await runYoutube(payload, work); return; }
+  if (job.phase === 'youtube-publish') { await runYoutubePublish(payload, work); return; }
   try {
     if (job.phase === 'text') {
       let early = null;
@@ -500,10 +521,10 @@ async function reportEnv(force = false) {
 async function pcLoop() {
   if (!DOCS) { console.error('PC 모드는 DOCS(엔진 폴더) 설정이 필요합니다.'); process.exit(1); }
   log(`PC 도우미 시작 — ${XIM} · 엔진 ${DOCS} · 브라우저 ${path.basename(BROWSER)}`);
-  await reportEnv(true);
+  await reportEnv(true); closeProfileEdge();        // 로그인 점검이 띄운 엣지는 바로 닫는다
   for (;;) {
     try {
-      await reportEnv();
+      const before = lastReport; await reportEnv(); if (lastReport !== before) closeProfileEdge();
       const imagesOk = !loginNeeded && Date.now() - engineFailAt > 120000;
       const r = await api(`/api/studio/helper/next?want=${imagesOk ? 'text,images,youtube' : 'text,youtube'}`, { method: 'POST', body: {} });
       if (r.job) { await processJob(r); closeProfileEdge(); continue; }
