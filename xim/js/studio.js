@@ -508,7 +508,8 @@ function thumbPanel(job, thumb, summary) {
   return `${thumb ? `<div class="st-thumb-big"><a href="${thumb.url}" target="_blank" rel="noopener"><img src="${thumb.url}" alt="썸네일"></a>
     <p>${rv ? `<span class="badge ${rv.pass ? 'done' : 'suspended'}">${rv.pass ? '검수 합격' : '검수 불합격'}</span> ${esc(rv.reason || '')}` : ''}</p>
     ${pick ? `<p class="st-meta">제목 "${esc(pick.title)}" · 표정 ${esc(pick.emotion || '자동')} · 제스처 ${esc(pick.gesture || '자동')}${pick.badgeName ? ` · 명찰 ${esc(pick.badgeName)}` : ''}</p>` : ''}
-    <div class="dlg-actions st-thumb-actions"><button class="btn sm" type="button" id="st-dl-thumb">16:9 로 내려받기</button>${done ? '<button class="btn sm" type="button" id="st-rethumb-toggle">🔁 썸네일 다시 만들기</button>' : ''}</div></div>` : `<p class="empty">썸네일이 없습니다.</p>${done ? '<div class="dlg-actions"><button class="btn sm" type="button" id="st-rethumb-toggle">🔁 썸네일 만들기</button></div>' : ''}`}
+    <div class="dlg-actions st-thumb-actions"><button class="btn sm" type="button" id="st-dl-thumb">16:9 로 내려받기</button>${done ? '<button class="btn sm" type="button" id="st-rethumb-toggle">🔁 썸네일 다시 만들기</button><button class="btn sm" type="button" id="st-upthumb">⬆ 내가 만든 썸네일 올리기</button>' : ''}</div></div>` : `<p class="empty">썸네일이 없습니다.</p>${done ? '<div class="dlg-actions"><button class="btn sm" type="button" id="st-rethumb-toggle">🔁 썸네일 만들기</button><button class="btn sm" type="button" id="st-upthumb">⬆ 내가 만든 썸네일 올리기</button></div>' : ''}`}
+    ${done ? '<input type="file" id="st-upthumb-file" accept="image/png,image/jpeg,image/webp" hidden>' : ''}
     ${done ? `<div class="st-redo-body" id="st-rethumb-wrap" hidden><p class="st-hint">제목 · 인물 명찰 · 표정 · 제스처 · 인물 사진을 바꿔 저장하면 PC 의 ChatGPT 가 다시 그립니다(3~5분).</p><form id="st-rethumb">${thumbPickForm(pick || {}, summary?.titles || [], summary?.people || [])}<p class="err" id="rt-err"></p><button class="btn primary" type="submit">이대로 다시 만들기</button></form></div>` : ''}`;
 }
 function ytPanel(s, thumbTitle = '') {
@@ -586,6 +587,26 @@ function wireRes(job, blocks, thumb, summary) {
     await busy(b, null, async () => { await api(`/studio/jobs/${job.id}/redo`, { method: 'POST', data: { what: 'slide', idx: +b.dataset.redoSlide, note } }); toast('다시 만드는 중'); renderJob(); }, '요청 중…');
   }));
   $('#st-dl-thumb')?.addEventListener('click', () => downloadThumb(thumb.url, job.id));
+  // 내가 만든 썸네일 올리기 (2026-11-11): 1280×720 으로 맞춰(가운데 크롭) 이 작업의 썸네일을 바꾼다 — 유튜브 올리기가 이 그림을 쓴다
+  $('#st-upthumb')?.addEventListener('click', () => $('#st-upthumb-file')?.click());
+  $('#st-upthumb-file')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    try {
+      const img = new Image(); img.src = URL.createObjectURL(file);
+      await img.decode();
+      const R = 16 / 9; let sw = img.width, sh = img.height, sx = 0, sy = 0;
+      if (sw / sh > R) { sw = sh * R; sx = (img.width - sw) / 2; } else { sh = sw / R; sy = (img.height - sh) / 2; }
+      const c = document.createElement('canvas'); c.width = 1280; c.height = 720;
+      c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, 1280, 720);
+      URL.revokeObjectURL(img.src);
+      const blob = await new Promise((res) => c.toBlob(res, 'image/webp', 0.92));
+      const r = await fetch(`/api/studio/jobs/${job.id}/thumb-image`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'image/webp' }, body: blob });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || `업로드 실패 (${r.status})`);
+      toast('썸네일을 바꿨습니다 — 유튜브 올리기도 이 그림을 씁니다');
+      renderJob();
+    } catch (err) { toast('올리지 못했습니다: ' + err.message); }
+    e.target.value = '';
+  });
   $('#st-rethumb-toggle')?.addEventListener('click', (e) => { const w = $('#st-rethumb-wrap'); w.hidden = !w.hidden; e.currentTarget.classList.toggle('on', !w.hidden); if (!w.hidden) w.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   const rf = $('#st-rethumb');
   if (rf) { setupThumbForm(rf); rf.addEventListener('submit', (e) => { e.preventDefault(); busy(rf.querySelector('[type=submit]'), $('#rt-err'), async () => { const pick = readThumbForm(rf); if (!pick.title) throw new Error('제목을 고르거나 넣어 주세요.'); await api(`/studio/jobs/${job.id}/redo`, { method: 'POST', data: { what: 'thumb', pick } }); await api(`/studio/jobs/${job.id}/rethumb`, { method: 'POST', data: {} }); toast('PC 도우미가 다시 그립니다'); renderJob(); }); }); }
