@@ -1,14 +1,20 @@
 ﻿<#
   다른 PC 에서 이어서 작업하기 — 세팅 · 점검 · 동기화 (xim → "다른 PC" 화면이 이 스크립트를 안내한다)
 
+  구조(2026-11-10 개편 — 비공개 ws 저장소를 webmaker2 안 _pc 서브모듈로 옮김):
+    D:\ws\webmaker2        공개 저장소 (xim · 사이트 · Worker)
+    D:\ws\webmaker2\_pc    비공개 ws 저장소(서브모듈) — docs 엔진 · clone 처리기 · Claude 메모리(_claude)
+    D:\ws\docs · D:\ws\clone   옛 경로 호환용 정션(숨김) → _pc\docs · _pc\clone
+                               (모두실행.exe · 예약 작업 · bat 들이 옛 경로를 그대로 쓰므로 지우면 안 된다)
+
   처음 한 번(새 PC):  powershell -ExecutionPolicy Bypass -File setup-pc.ps1 -Setup
-     → D:\ws(비공개 ws) · D:\ws\webmaker2(공개) 저장소를 받고, Claude Code 메모리 폴더를 저장소 안(D:\ws\_claude\memory)에 연결(정션)한 뒤 점검표를 보여 준다.
+     → webmaker2 를 받고(비공개 _pc 서브모듈 포함), 호환 정션과 Claude 메모리 정션을 만든 뒤 점검표를 보여 준다.
   PC 를 옮기기 전 · 옮긴 뒤:  … -Sync
      → 메모리 · clone 코드를 커밋 + 푸시하고 두 저장소를 pull 한다. (webmaker2 의 코드 커밋은 Claude 가 한다 — 안 된 게 있으면 알려만 준다)
   자동 시작 등록:  … -Startup helper   (스튜디오 도우미)   /   … -Startup voice   (내 목소리 처리기, GPU PC)
   인자 없이 실행하면 점검만.
 
-  왜 D:\ws 로 고정하나: 도우미 · 처리기 bat 과 Claude 메모리 폴더 이름(D--ws-webmaker2)이 이 경로를 가정한다. D: 드라이브가 없는 PC 는 Claude 에게 말해 주세요.
+  왜 D:\ws 로 고정하나: 호환 정션 · bat · Claude 메모리 폴더 이름(D--ws-webmaker2)이 이 경로를 가정한다. D: 드라이브가 없는 PC 는 Claude 에게 말해 주세요.
 #>
 param([switch]$Setup, [switch]$Sync, [string]$Startup = '')
 $ErrorActionPreference = 'Continue'
@@ -16,9 +22,9 @@ try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }
 
 $WS = 'D:\ws'
 $WM = "$WS\webmaker2"
-$WS_URL = 'https://github.com/xiangdolee-pixel/ws.git'
+$PCD = "$WM\_pc"                                     # 비공개 작업(서브모듈) — docs · clone · _claude
 $WM_URL = 'https://github.com/xiangdolee-pixel/webmaker2.git'
-$MEM_REPO = "$WS\_claude\memory"
+$MEM_REPO = "$PCD\_claude\memory"
 $MEM_LOCAL = Join-Path $env:USERPROFILE '.claude\projects\D--ws-webmaker2\memory'
 $CF_ACCOUNT = 'f225d506d8cf6ddf97704a36c69f5ce7'   # xiangdolee 의 Cloudflare 계정(배포는 반드시 이 계정)
 
@@ -44,13 +50,19 @@ function Check {
   Row $nodeOk 'Node 20 이상' 'winget install -e --id OpenJS.NodeJS.LTS'
   $ghOk = $false
   if (Has gh) { & gh auth status *> $null; $ghOk = ($LASTEXITCODE -eq 0) }
-  Row $ghOk 'GitHub 로그인(gh) — 비공개 저장소 받기에 필요' 'winget install -e --id GitHub.cli   그 다음   gh auth login'
+  Row $ghOk 'GitHub 로그인(gh) — 비공개 _pc 서브모듈 받기에 필요' 'winget install -e --id GitHub.cli   그 다음   gh auth login'
   Row (Has claude) 'Claude Code' 'npm install -g @anthropic-ai/claude-code   그 다음   claude 를 실행해 구독 계정으로 로그인'
-  Row (Test-Path "$WS\.git") '비공개 저장소 D:\ws (docs 엔진 · clone 코드 · Claude 메모리)' '이 스크립트를 -Setup 으로 실행'
   Row (Test-Path "$WM\.git") '공개 저장소 D:\ws\webmaker2 (xim · 사이트 · Worker)' '이 스크립트를 -Setup 으로 실행'
+  Row (Test-Path "$PCD\.git") '비공개 작업 _pc 서브모듈 (docs 엔진 · clone 코드 · Claude 메모리)' '이 스크립트를 -Setup 으로 실행'
+  $linkOk = $true
+  foreach ($d in @('docs', 'clone')) {
+    $p = Join-Path $WS $d
+    if (-not (Test-Path $p)) { $linkOk = $false }
+  }
+  Row $linkOk '옛 경로 연결 D:\ws\docs · D:\ws\clone (정션)' '이 스크립트를 -Setup 으로 실행'
   $memOk = $false
   if (Test-Path $MEM_LOCAL) { $i = Get-Item $MEM_LOCAL -Force; $memOk = ($i.LinkType -eq 'Junction') -and ("$($i.Target)" -like '*_claude\memory') }
-  Row $memOk 'Claude 메모리가 저장소(D:\ws\_claude\memory)에 연결됨' '이 스크립트를 -Setup 으로 실행'
+  Row $memOk 'Claude 메모리가 저장소(_pc\_claude\memory)에 연결됨' '이 스크립트를 -Setup 으로 실행'
   $cfOk = $false
   if ((Has node) -and (Test-Path "$WM\deploy.mjs")) {
     Write-Host '      (Cloudflare 로그인 확인 중…)' -ForegroundColor DarkGray
@@ -58,8 +70,8 @@ function Check {
   }
   Row $cfOk 'Cloudflare 배포 로그인(xiangdolee 계정)' 'node D:\ws\webmaker2\deploy.mjs --login   (브라우저에서 xiangdolee 계정 고르기)'
   Write-Host '  ── 이 PC 가 맡을 일만 해당 ──' -ForegroundColor DarkGray
-  Row (Test-Path "$WS\docs\tools\_xim_helper.json") '스튜디오 도우미 설정 (그림 · 글 제작 PC)' 'xim → 다른 PC 화면 ② (이 PC 가 안 맡으면 무시)'
-  Row (Test-Path "$WS\clone\.venv") '내 목소리 처리기 (NVIDIA GPU PC)' 'xim → 다른 PC 화면 ③ (이 PC 가 안 맡으면 무시)'
+  Row (Test-Path "$PCD\docs\tools\_xim_helper.json") '스튜디오 도우미 설정 (그림 · 글 제작 PC)' 'xim → 다른 PC 화면 ② (이 PC 가 안 맡으면 무시)'
+  Row (Test-Path "$PCD\clone\.venv") '내 목소리 처리기 (NVIDIA GPU PC)' 'xim → 다른 PC 화면 ③ (이 PC 가 안 맡으면 무시)'
   Write-Host ""
 }
 
@@ -71,7 +83,7 @@ function EnsureRepo($path, $url, $label) {
     return
   }
   if (Test-Path $path) {
-    # 폴더는 있는데 저장소가 아닐 때(예: webmaker2 만 먼저 받아 둔 D:\ws) — 그 자리에서 저장소를 깐다
+    # 폴더는 있는데 저장소가 아닐 때 — 그 자리에서 저장소를 깐다
     Write-Host ("  " + $label + ": 폴더에 저장소 연결 (" + $url + ")")
     RunGit $path @('init') | Out-Null
     RunGit $path @('remote', 'add', 'origin', $url) | Out-Null
@@ -82,20 +94,56 @@ function EnsureRepo($path, $url, $label) {
     Write-Host ("  " + $label + ": 받는 중 (" + $url + ")")
     & git.exe clone $url $path
   }
-  if (-not (Test-Path "$path\.git")) { throw ($label + " 받기 실패 — 비공개 저장소는 먼저 'gh auth login' (브라우저 로그인) 뒤 다시 실행") }
+  if (-not (Test-Path "$path\.git")) { throw ($label + " 받기 실패 — 'gh auth login' (브라우저 로그인) 뒤 다시 실행") }
+}
+
+function EnsurePc {
+  if (Test-Path "$PCD\.git") {
+    Write-Host '  비공개 _pc: 있음 → 최신으로' -ForegroundColor DarkGray
+    RunGit $PCD @('pull', '--ff-only', 'origin', 'main') | Out-Null
+    return
+  }
+  Write-Host '  비공개 _pc: 서브모듈 받는 중 (비공개 — gh 로그인 필요)'
+  RunGit $WM @('submodule', 'update', '--init', '--', '_pc')
+  if (-not (Test-Path "$PCD\.git")) { throw "_pc 받기 실패 — 비공개 저장소는 먼저 'gh auth login' (브라우저 로그인) 뒤 다시 실행" }
+  # 서브모듈은 기록된 커밋에 분리(detached)로 받아지므로 main 최신으로 올린다
+  RunGit $PCD @('checkout', 'main') | Out-Null
+  RunGit $PCD @('pull', '--ff-only', 'origin', 'main') | Out-Null
+}
+
+# ───────── 옛 경로 호환 정션 ─────────
+function LinkCompat {
+  foreach ($d in @('docs', 'clone')) {
+    $link = Join-Path $WS $d; $target = Join-Path $PCD $d
+    if (-not (Test-Path $target)) { continue }
+    if (Test-Path $link) {
+      $i = Get-Item $link -Force
+      if ($i.LinkType -eq 'Junction') { Write-Host ("  정션 " + $link + ": 이미 연결됨") -ForegroundColor DarkGray }
+      else { Write-Host ("  !! " + $link + " 에 진짜 폴더가 있습니다 — 옛 구조 같으니 Claude 에게 '옛 ws 구조를 _pc 로 옮겨 줘' 라고 하세요") -ForegroundColor Yellow }
+      continue
+    }
+    & cmd /c mklink /J "$link" "$target" | Out-Null
+    & attrib +h "$link"
+    Write-Host ("  정션(숨김): " + $link + "  →  " + $target) -ForegroundColor Green
+  }
 }
 
 # ───────── Claude 메모리 ─────────
 function LinkMemory {
-  if (-not (Test-Path $MEM_REPO)) { throw "저장소에 메모리 폴더가 없습니다: $MEM_REPO  (D:\ws 를 먼저 받으세요)" }
+  if (-not (Test-Path $MEM_REPO)) { throw "저장소에 메모리 폴더가 없습니다: $MEM_REPO  (_pc 를 먼저 받으세요)" }
   if (Test-Path $MEM_LOCAL) {
     $i = Get-Item $MEM_LOCAL -Force
-    if ($i.LinkType -eq 'Junction') { Write-Host '  Claude 메모리: 이미 연결됨' -ForegroundColor DarkGray; return }
-    # 이 PC 에만 있던 메모리는 저장소에 없는 파일만 보태고(같은 이름은 저장소 쪽을 믿음), 원래 폴더는 백업으로 남긴다
-    & robocopy $MEM_LOCAL $MEM_REPO /E /XC /XN /XO /NFL /NDL /NJH /NJS | Out-Null
-    $bak = $MEM_LOCAL + '.bak-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
-    Rename-Item $MEM_LOCAL $bak
-    Write-Host ("  Claude 메모리: 이 PC 의 기존 메모리는 " + $bak + " 에 백업") -ForegroundColor DarkGray
+    if ($i.LinkType -eq 'Junction') {
+      if ("$($i.Target)" -like '*_pc\_claude\memory') { Write-Host '  Claude 메모리: 이미 연결됨' -ForegroundColor DarkGray; return }
+      # 옛 위치(D:\ws\_claude\memory)를 가리키는 정션이면 새 위치로 다시 연결
+      & cmd /c rmdir "$MEM_LOCAL" | Out-Null
+    } else {
+      # 이 PC 에만 있던 메모리는 저장소에 없는 파일만 보태고(같은 이름은 저장소 쪽을 믿음), 원래 폴더는 백업으로 남긴다
+      & robocopy $MEM_LOCAL $MEM_REPO /E /XC /XN /XO /NFL /NDL /NJH /NJS | Out-Null
+      $bak = $MEM_LOCAL + '.bak-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
+      Rename-Item $MEM_LOCAL $bak
+      Write-Host ("  Claude 메모리: 이 PC 의 기존 메모리는 " + $bak + " 에 백업") -ForegroundColor DarkGray
+    }
   } else {
     New-Item -ItemType Directory -Force (Split-Path $MEM_LOCAL) | Out-Null
   }
@@ -105,24 +153,24 @@ function LinkMemory {
 
 # ───────── 동기화 ─────────
 function SyncRepos {
-  Write-Host '[동기화] D:\ws — Claude 메모리 · clone 코드' -ForegroundColor Cyan
-  if (-not (Test-Path "$WS\.git")) { throw 'D:\ws 저장소가 없습니다. 먼저 -Setup' }
-  $paths = @('_claude', 'clone') | Where-Object { Test-Path (Join-Path $WS $_) }
+  Write-Host '[동기화] _pc — Claude 메모리 · clone 코드' -ForegroundColor Cyan
+  if (-not (Test-Path "$PCD\.git")) { throw '_pc 저장소가 없습니다. 먼저 -Setup' }
+  $paths = @('_claude', 'clone') | Where-Object { Test-Path (Join-Path $PCD $_) }
   if ($paths.Count) {
-    RunGit $WS (@('add', '-A', '--') + $paths) | Out-Null
-    $st = RunGit $WS (@('status', '--porcelain', '--') + $paths)
+    RunGit $PCD (@('add', '-A', '--') + $paths) | Out-Null
+    $st = RunGit $PCD (@('status', '--porcelain', '--') + $paths)
     if ($st) {
       $msg = 'chore: Claude 메모리 · clone 코드 동기화 (' + $env:COMPUTERNAME + ' ' + (Get-Date -Format 'yyyy-MM-dd HH:mm') + ')'
-      RunGit $WS @('commit', '-q', '-m', $msg) | Out-Null
+      RunGit $PCD @('commit', '-q', '-m', $msg) | Out-Null
       Write-Host ('  커밋: ' + $msg)
     } else { Write-Host '  올릴 변경 없음' -ForegroundColor DarkGray }
   }
-  RunGit $WS @('pull', '--rebase', '--autostash', 'origin', 'main')
-  if ($LASTEXITCODE -ne 0) { Write-Host "  !! pull 중 충돌 — Claude 에게 'D:\ws 리베이스 충돌 풀어 줘' 라고 하세요" -ForegroundColor Red; return }
-  RunGit $WS @('push', 'origin', 'main')
+  RunGit $PCD @('pull', '--rebase', '--autostash', 'origin', 'main')
+  if ($LASTEXITCODE -ne 0) { Write-Host "  !! pull 중 충돌 — Claude 에게 '_pc 리베이스 충돌 풀어 줘' 라고 하세요" -ForegroundColor Red; return }
+  RunGit $PCD @('push', 'origin', 'main')
   Write-Host '[동기화] D:\ws\webmaker2' -ForegroundColor Cyan
   if (Test-Path "$WM\.git") {
-    $dirty = RunGit $WM @('status', '--porcelain')
+    $dirty = RunGit $WM @('status', '--porcelain') | Where-Object { $_ -notmatch '^\s*m?\s*_pc' }
     if ($dirty) { Write-Host "  커밋 안 된 변경이 있습니다 — Claude 에게 '커밋하고 푸시해 줘' 라고 하세요 (공개 저장소라 자동 커밋하지 않음)" -ForegroundColor Yellow }
     RunGit $WM @('pull', '--rebase', '--autostash', 'origin', 'main')
     RunGit $WM @('push', 'origin', 'main')
@@ -134,8 +182,8 @@ function SyncRepos {
 function RegisterStartup($what) {
   $dir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'
   switch ($what) {
-    'helper' { $bat = "$WS\docs\tools\스튜디오도우미_시작.bat"; $name = 'xim-studio-helper.bat'; $label = '스튜디오 도우미' }
-    'voice'  { $bat = "$WS\clone\start_all.bat";            $name = 'clone-voice.bat';       $label = '내 목소리 처리기' }
+    'helper' { $bat = "$PCD\docs\tools\스튜디오도우미_시작.bat"; $name = 'xim-studio-helper.bat'; $label = '스튜디오 도우미' }
+    'voice'  { $bat = "$PCD\clone\start_all.bat";             $name = 'clone-voice.bat';       $label = '내 목소리 처리기' }
     default  { throw '-Startup helper  또는  -Startup voice' }
   }
   if (-not (Test-Path $bat)) { throw ($label + ' 시작 파일이 없습니다: ' + $bat) }
@@ -144,7 +192,7 @@ function RegisterStartup($what) {
   [IO.File]::WriteAllText((Join-Path $dir $name), $content, [Text.Encoding]::GetEncoding(949))
   Write-Host ($label + ' 자동 시작 등록: ' + (Join-Path $dir $name)) -ForegroundColor Green
   # 워치독: 2분마다 도우미 · TTS 서버 · 처리기가 죽어 있으면 다시 켠다(이 PC 에 설정 파일이 있는 것만) — 창을 닫거나 오류로 꺼져도 2분 안에 복구
-  $wd = "$WS\docs\tools\xim_watchdog.ps1"
+  $wd = "$PCD\docs\tools\xim_watchdog.ps1"
   if (Test-Path $wd) {
     & schtasks /Create /TN 'xim_watchdog' /SC MINUTE /MO 2 /F /TR ('powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ' + $wd) | Out-Null
     if ($LASTEXITCODE -eq 0) { Write-Host '워치독 등록: 2분마다 살펴 꺼져 있으면 다시 켭니다 (예약 작업 xim_watchdog)' -ForegroundColor Green }
@@ -161,8 +209,11 @@ if ($Setup) {
   Write-Host '[세팅] 저장소 받기' -ForegroundColor Cyan
   if (-not (Test-Path 'D:\')) { throw 'D: 드라이브가 없습니다. 이 구성은 D:\ws 를 가정합니다 — Claude 에게 말해 주세요.' }
   if (-not (Has git)) { throw 'Git 이 없습니다: winget install -e --id Git.Git  뒤 새 터미널에서 다시' }
-  EnsureRepo $WS $WS_URL '비공개 저장소 D:\ws'
+  if (Test-Path "$WS\.git") { Write-Host '  !! D:\ws 가 옛 구조(ws 저장소)입니다 — Claude 에게 "옛 ws 구조를 _pc 로 옮겨 줘" 라고 하세요' -ForegroundColor Yellow }
   EnsureRepo $WM $WM_URL '공개 저장소 D:\ws\webmaker2'
+  EnsurePc
+  Write-Host '[세팅] 옛 경로 호환 정션' -ForegroundColor Cyan
+  LinkCompat
   Write-Host '[세팅] Claude 메모리 연결' -ForegroundColor Cyan
   LinkMemory
   Check
