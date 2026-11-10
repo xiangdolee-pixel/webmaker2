@@ -43,7 +43,13 @@ function requireAgent(request, env) {
 async function body(request) { try { return (await request.json()) || {}; } catch { throw new HttpError(400, 'JSON 본문이 필요합니다.'); } }
 const titleOf = (text) => text.replace(/\s+/g, ' ').trim().slice(0, 160); // 목록 제목 = 원고 앞부분(전체는 /text)
 const newId = () => { const t = new Date(); const d = `${t.getUTCFullYear()}${String(t.getUTCMonth() + 1).padStart(2, '0')}${String(t.getUTCDate()).padStart(2, '0')}`; return `${d}-${crypto.randomUUID().slice(0, 8)}`; };
-const JOB_COLS = 'id, created_at, started_at, done_at, status, title, chars, speed, seconds, lufs, lra, tp, sentences, engine, error, attempts';
+// 사자왕 영상 1초를 만드는 데 걸린 초(최근 10건 중간값). 기본 6(2026-11-10 GTX 1070 측정 전 어림)
+async function videoPace(db) {
+  const { results } = await db.prepare("SELECT seconds, done_at, video_at FROM jobs WHERE video_status = 'done' AND video_at > done_at AND seconds > 1 ORDER BY video_at DESC LIMIT 10").all();
+  const v = results.map((r) => (r.video_at - r.done_at) / 1000 / r.seconds).filter((x) => x > 0.5 && x < 60).sort((a, b) => a - b);
+  return v.length ? v[Math.floor(v.length / 2)] : 6;
+}
+const JOB_COLS = 'id, created_at, started_at, done_at, status, title, chars, speed, seconds, lufs, lra, tp, sentences, engine, error, attempts, video, video_status, video_at, video_error';
 
 async function agentStatus(db) {
   const row = await db.prepare('SELECT seen_at, info FROM agent WHERE id = ?').bind('pc').first();
@@ -91,10 +97,10 @@ async function handle(request, env, ctx) {
       // 1시간 넘게 running 인 것은 PC 가 중간에 꺼진 것 → 다시 대기열로
       await db.prepare("UPDATE jobs SET status = 'queued', started_at = NULL WHERE status = 'running' AND started_at < ?").bind(now() - STALE_MS).run();
       const job = await db.prepare(`UPDATE jobs SET status = 'running', started_at = ?1, attempts = attempts + 1, error = NULL
-        WHERE id = (SELECT id FROM jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1) RETURNING id, text, speed, attempts`).bind(now()).first();
+        WHERE id = (SELECT id FROM jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1) RETURNING id, text, speed, attempts, video`).bind(now()).first();
       return json({ job: job || null });
     }
-    const m = path.match(/^\/api\/agent\/jobs\/([\w-]+)\/(result|fail|timings)$/);
+    const m = path.match(/^\/api\/agent\/jobs\/([\w-]+)\/(result|fail|timings|video|video-fail)$/);
     if (m && m[2] === 'result' && method === 'PUT') {
       const id = m[1];
       const job = await db.prepare('SELECT id, status FROM jobs WHERE id = ?').bind(id).first();
@@ -121,25 +127,40 @@ async function handle(request, env, ctx) {
       await touchAgent(db, '');
       return json({ ok: true });
     }
+    // 사자왕 영상(립싱크 mp4) — 음성 결과 뒤에 올라온다. R2 video/<id>.mp4
+    if (m && m[2] === 'video' && method === 'PUT') {
+      const bytes = await request.arrayBuffer();
+      if (bytes.byteLength < 10000) throw new HttpError(400, '영상 파일이 비어 있습니다.');
+      await env.AUDIO.put(`video/${m[1]}.mp4`, bytes, { httpMetadata: { contentType: 'video/mp4' } });
+      await db.prepare("UPDATE jobs SET video_status = 'done', video_at = ?, video_error = NULL WHERE id = ?").bind(now(), m[1]).run();
+      await touchAgent(db, '');
+      return json({ ok: true });
+    }
+    if (m && m[2] === 'video-fail' && method === 'POST') {
+      const { error } = await body(request).catch(() => ({}));
+      await db.prepare("UPDATE jobs SET video_status = 'failed', video_error = ? WHERE id = ?").bind(String(error || '알 수 없는 오류').slice(0, 500), m[1]).run();
+      return json({ ok: true });
+    }
     throw new HttpError(404, '없는 주소');
   }
 
   // ───── 화면 API (로그인 필요) ─────
-  if (path.startsWith('/api/') || path.startsWith('/audio/')) await requireUser(request, env);
+  if (path.startsWith('/api/') || path.startsWith('/audio/') || path.startsWith('/video/')) await requireUser(request, env);
 
   if (path === '/api/jobs' && method === 'GET') {
     const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 50));
     const { results } = await db.prepare(`SELECT ${JOB_COLS} FROM jobs ORDER BY created_at DESC LIMIT ?`).bind(limit).all();
-    return json({ jobs: results, agent: await agentStatus(db), sec_per_char: await pace(db) });
+    return json({ jobs: results, agent: await agentStatus(db), sec_per_char: await pace(db), video_sec_per_sec: await videoPace(db) });
   }
   if (path === '/api/jobs' && method === 'POST') {
-    const { text, speed } = await body(request);
+    const { text, speed, video } = await body(request);
     const t = String(text ?? '').replace(/\r\n?/g, '\n').trim();
     if (!t) throw new HttpError(400, '읽을 글을 넣어 주세요.');
     if (t.length > MAX_CHARS) throw new HttpError(400, `한 번에 ${MAX_CHARS.toLocaleString('ko-KR')}자까지만 됩니다. (지금 ${t.length.toLocaleString('ko-KR')}자)`);
     const sp = Math.min(1.3, Math.max(0.8, parseFloat(speed) || 1));
     const id = newId();
-    await db.prepare('INSERT INTO jobs (id, created_at, status, title, text, chars, speed) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(id, now(), 'queued', titleOf(t), t, t.length, sp).run();
+    const wantVideo = video === true || video === 1 || video === '1' || video === 'on' ? 1 : 0;   // 사자왕 영상도 함께(립싱크, 음성 뒤에 만들어짐)
+    await db.prepare('INSERT INTO jobs (id, created_at, status, title, text, chars, speed, video, video_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, now(), 'queued', titleOf(t), t, t.length, sp, wantVideo, wantVideo ? 'pending' : null).run();
     const job = await db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE id = ?`).bind(id).first();
     return json({ job, agent: await agentStatus(db) }, 201);
   }
@@ -148,8 +169,8 @@ async function handle(request, env, ctx) {
     const id = m[1];
     if (!m[2] && method === 'GET') { const job = await db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE id = ?`).bind(id).first(); if (!job) throw new HttpError(404, '없는 작업'); return json({ job }); }
     if (m[2] === 'text' && method === 'GET') { const row = await db.prepare('SELECT text, timings FROM jobs WHERE id = ?').bind(id).first(); if (!row) throw new HttpError(404, '없는 작업'); let timings = null; try { timings = row.timings ? JSON.parse(row.timings) : null; } catch { /* 옛 기록 */ } return json({ text: row.text, timings }); }
-    if (!m[2] && method === 'DELETE') { await db.prepare('DELETE FROM jobs WHERE id = ?').bind(id).run(); ctx.waitUntil(env.AUDIO.delete(`audio/${id}.wav`)); return json({ ok: true }); }
-    if (m[2] === 'retry' && method === 'POST') { await db.prepare("UPDATE jobs SET status = 'queued', started_at = NULL, done_at = NULL, error = NULL WHERE id = ? AND status IN ('failed', 'done', 'running')").bind(id).run(); const job = await db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE id = ?`).bind(id).first(); return json({ job }); }
+    if (!m[2] && method === 'DELETE') { await db.prepare('DELETE FROM jobs WHERE id = ?').bind(id).run(); ctx.waitUntil(Promise.all([env.AUDIO.delete(`audio/${id}.wav`), env.AUDIO.delete(`video/${id}.mp4`)])); return json({ ok: true }); }
+    if (m[2] === 'retry' && method === 'POST') { await db.prepare("UPDATE jobs SET status = 'queued', started_at = NULL, done_at = NULL, error = NULL, video_status = CASE WHEN video = 1 THEN 'pending' ELSE NULL END, video_at = NULL, video_error = NULL WHERE id = ? AND status IN ('failed', 'done', 'running')").bind(id).run(); const job = await db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE id = ?`).bind(id).first(); return json({ job }); }
   }
   m = path.match(/^\/audio\/([\w-]+)\.wav$/);
   if (m && (method === 'GET' || method === 'HEAD')) {
@@ -159,6 +180,23 @@ async function handle(request, env, ctx) {
     if (!obj) throw new HttpError(404, '아직 음성이 없습니다.');
     const h = new Headers({ 'Content-Type': 'audio/wav', 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, max-age=3600', ETag: obj.httpEtag,
       'Content-Disposition': `${url.searchParams.has('dl') ? 'attachment' : 'inline'}; filename="clone-${m[1]}.wav"` });
+    if (range && obj.range) {
+      const r = obj.range; const start = r.offset ?? 0; const len = r.length ?? (obj.size - start);
+      h.set('Content-Range', `bytes ${start}-${start + len - 1}/${obj.size}`); h.set('Content-Length', String(len));
+      return new Response(method === 'HEAD' ? null : obj.body, { status: 206, headers: h });
+    }
+    h.set('Content-Length', String(obj.size));
+    return new Response(method === 'HEAD' ? null : obj.body, { status: 200, headers: h });
+  }
+  // 사자왕 영상(립싱크 mp4) — R2 video/<이름>.mp4, Range 지원(폰 · 브라우저 재생 탐색용). 시험 영상도 여기로 올려 xim 로그인 뒤 본다
+  m = path.match(/^\/video\/([\w-]+)\.mp4$/);
+  if (m && (method === 'GET' || method === 'HEAD')) {
+    const key = `video/${m[1]}.mp4`;
+    const range = request.headers.get('Range');
+    const obj = range ? await env.AUDIO.get(key, { range: request.headers }) : await env.AUDIO.get(key);
+    if (!obj) throw new HttpError(404, '아직 영상이 없습니다.');
+    const h = new Headers({ 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, max-age=3600', ETag: obj.httpEtag,
+      'Content-Disposition': `${url.searchParams.has('dl') ? 'attachment' : 'inline'}; filename="sajawang-${m[1]}.mp4"` });
     if (range && obj.range) {
       const r = obj.range; const start = r.offset ?? 0; const len = r.length ?? (obj.size - start);
       h.set('Content-Range', `bytes ${start}-${start + len - 1}/${obj.size}`); h.set('Content-Length', String(len));

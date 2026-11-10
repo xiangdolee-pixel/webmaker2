@@ -19,7 +19,11 @@ CREATE TABLE IF NOT EXISTS jobs (
   engine     TEXT,                 -- 어떤 모델로 만들었나(예: gsv-v2Pro me_e8)
   error      TEXT,
   attempts   INTEGER NOT NULL DEFAULT 0,
-  timings    TEXT                   -- 문장별 시작 · 끝 시각 JSON [{s, e, t}] (2026-11-10 추가: ALTER TABLE jobs ADD COLUMN timings TEXT)
+  timings    TEXT,                  -- 문장별 시작 · 끝 시각 JSON [{s, e, t}] (2026-11-10 추가: ALTER TABLE jobs ADD COLUMN timings TEXT)
+  video      INTEGER NOT NULL DEFAULT 0,
+  video_status TEXT,
+  video_at   INTEGER,
+  video_error TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created_at DESC);
@@ -28,3 +32,8 @@ CREATE TABLE IF NOT EXISTS agent (
   seen_at INTEGER NOT NULL,
   info    TEXT NOT NULL DEFAULT ''
 );
+-- 2026-11-10 사자왕 영상(립싱크 mp4, R2 video/<id>.mp4). 원격에는 ALTER TABLE 로 추가함
+--   ALTER TABLE jobs ADD COLUMN video INTEGER NOT NULL DEFAULT 0;   -- 1 = 음성 뒤에 사자왕 영상도 만든다
+--   ALTER TABLE jobs ADD COLUMN video_status TEXT;                  -- pending(음성 뒤 만들 예정 · 만드는 중) / done / failed
+--   ALTER TABLE jobs ADD COLUMN video_at INTEGER;
+--   ALTER TABLE jobs ADD COLUMN video_error TEXT;
