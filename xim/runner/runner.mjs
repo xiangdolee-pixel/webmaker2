@@ -63,6 +63,15 @@ async function download(urlPath, dest) {
 
 // ───────── Claude Code (구독) ─────────
 //   프롬프트는 stdin 으로 넘긴다(윈도우 명령줄 길이 제한). --output-format json 의 result 가 답.
+// 파이썬: PATH 의 'python' 은 띄운 환경(시작프로그램 · 워치독 예약 작업)에 따라 playwright 없는 다른 파이썬으로 잡힌다(2026-11-10 "No module named 'playwright'" 로 그림 6장 실패)
+//   → playwright · PIL 이 실제로 import 되는 파이썬을 한 번 찾아 쓴다. 우선순위: 환경변수 XIM_PYTHON → python.org 설치본(사용자) → PATH 의 python
+const PYTHON = (() => {
+  const cands = [process.env.XIM_PYTHON, path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python312', 'python.exe'), path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python311', 'python.exe'), 'python'].filter(Boolean);
+  for (const c of cands) {
+    try { const r = spawnSync(c, ['-c', 'import playwright, PIL'], { encoding: 'utf8', timeout: 30000, windowsHide: true }); if (r.status === 0) return c; } catch { /* 없음 */ }
+  }
+  return 'python';
+})();
 const claudeBin = (() => { const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['claude'], { encoding: 'utf8' }); const l = (r.stdout || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean); return l.find((x) => /\.cmd$/i.test(x)) || l[0] || 'claude'; })();
 async function claude(prompt, { cwd, timeoutMin = 25, label = 'claude', model } = {}) {
   const t0 = Date.now();
@@ -232,7 +241,7 @@ ${P.ARTICLE_FORMAT}
 // ───────── 그림 단계 (PC · ChatGPT) ─────────
 function py(argsArr, { cwd, env = {}, timeoutMin = 30, label = 'python' } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn('python', ['-u', ...argsArr], { cwd, env: { ...process.env, PYTHONIOENCODING: 'utf-8', ...env }, windowsHide: true });
+    const child = spawn(PYTHON, ['-u', ...argsArr], { cwd, env: { ...process.env, PYTHONIOENCODING: 'utf-8', ...env }, windowsHide: true });
     let out = '';
     child.stdout.on('data', (d) => { const s = d.toString(); out += s; process.stdout.write(s); });
     child.stderr.on('data', (d) => { const s = d.toString(); out += s; process.stderr.write(s); });
@@ -245,7 +254,7 @@ const engineEnv = () => ({ BROWSER_EXE: BROWSER, BRAVE_USER_DATA: PROFILE, KEEP_
 
 async function toWebp(src) {
   const dst = src.replace(/\.[a-z]+$/i, '.webp');
-  const r = spawnSync('python', ['-c', `from PIL import Image;import sys;im=Image.open(sys.argv[1]);im.save(sys.argv[2],'WEBP',quality=90,method=4);print(im.size[0],im.size[1])`, src, dst], { encoding: 'utf8' });
+  const r = spawnSync(PYTHON, ['-c', `from PIL import Image;import sys;im=Image.open(sys.argv[1]);im.save(sys.argv[2],'WEBP',quality=90,method=4);print(im.size[0],im.size[1])`, src, dst], { encoding: 'utf8' });
   if (r.status !== 0) throw new Error('webp 변환 실패: ' + r.stderr.slice(0, 200));
   const [w, h] = r.stdout.trim().split(/\s+/).map(Number);
   return { file: dst, w, h };
@@ -433,7 +442,7 @@ async function reportEnv(force = false) {
     info.claude = { loggedIn: !!j.loggedIn, email: j.email || '', plan: j.subscriptionType || '', expires: j.loginExpiresAt || '' };
   } catch (e) { info.claude = { loggedIn: false, error: String(e.message).slice(0, 120) }; }
   try {
-    const p = spawnSync('python', ['-u', 'tools\\chatgpt_login_check.py'], { cwd: DOCS, encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8', ...engineEnv() }, timeout: 150000, windowsHide: true });
+    const p = spawnSync(PYTHON, ['-u', 'tools\\chatgpt_login_check.py'], { cwd: DOCS, encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8', ...engineEnv() }, timeout: 150000, windowsHide: true });
     const line = (p.stdout || '').trim().split(/\r?\n/).reverse().find((l) => l.startsWith('{')) || '{}';
     info.chatgpt = JSON.parse(line);
   } catch (e) { info.chatgpt = { loggedIn: false, error: String(e.message).slice(0, 120) }; }
@@ -496,7 +505,7 @@ async function setup() {
   const which = (c) => { const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', [c], { encoding: 'utf8' }); return r.status === 0 ? r.stdout.split(/\r?\n/)[0].trim() : ''; };
   ok(true, `Node ${process.version}`);
   const py3 = which('python'); ok(!!py3, 'Python', 'python.org 에서 3.10+ 설치 (PATH 추가)');
-  if (py3) { const r = spawnSync('python', ['-c', 'import playwright, PIL; print("ok")'], { encoding: 'utf8' }); ok(/ok/.test(r.stdout), 'Python 패키지 playwright · pillow', `pip install -r "${docs}\\tools\\requirements.txt"`); }
+  if (py3) { const r = spawnSync(PYTHON, ['-c', 'import playwright, PIL; print("ok")'], { encoding: 'utf8' }); ok(/ok/.test(r.stdout), 'Python 패키지 playwright · pillow', `pip install -r "${docs}\\tools\\requirements.txt"`); }
   const cl = which('claude'); ok(!!cl, 'Claude Code (claude)', 'npm install -g @anthropic-ai/claude-code 뒤 claude 실행해서 로그인');
   if (cl) { const r = spawnSync(cl, ['-p', '1+1=? 숫자만', '--output-format', 'json'], { encoding: 'utf8', shell: process.platform === 'win32', timeout: 90000 }); ok(/"result"/.test(r.stdout || ''), 'Claude Code 로그인 상태', 'claude 를 한 번 실행해 로그인'); }
   const exe = browser === 'brave' ? 'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe' : 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
