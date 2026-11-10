@@ -10,6 +10,11 @@
       "binding": "DB",
       "database_name": "lastshot",
       "database_id": "1bff19f5-25b9-4981-bc39-9550e9961787"
+    },
+    {
+      "binding": "XMS_DB",
+      "database_name": "xms",
+      "database_id": "0fd9af7c-f214-4fee-80bb-1e8b94099bda"
     }
   ],
   "routes": [

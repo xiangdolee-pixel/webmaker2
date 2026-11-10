@@ -135,6 +135,16 @@ button:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
 .dice:hover { background: rgba(96, 165, 250, .32); color: #fff; }
 .dice:active { transform: rotate(180deg); }
 .dice svg { width: 20px; height: 20px; }
+/* 비밀번호 눈 버튼: 누르면 입력한 글자가 보인다(aria-pressed=true). 입력칸 오른쪽 안에 얹음 */
+.with-eye { position: relative; display: block; }
+.card .with-eye input { padding-right: 46px; }
+.with-eye input::-ms-reveal, .with-eye input::-ms-clear { display: none; }   /* 엣지가 그리는 자기 눈 버튼은 숨긴다(우리 것과 둘이 된다) */   /* .card input 규칙(패딩 0 12px)보다 뒤 · 같은 세기 */
+.eye { position: absolute; top: 50%; right: 4px; width: 38px; height: 36px; transform: translateY(-50%); border-radius: 10px; display: grid; place-items: center; background: transparent; border: 0; color: var(--muted); cursor: pointer; transition: background .2s, color .2s; }
+.eye:hover, .eye[aria-pressed="true"] { color: #fde68a; background: rgba(255, 255, 255, .06); }
+.eye:focus-visible { outline: 3px solid var(--yellow); outline-offset: -3px; }
+.eye svg { width: 22px; height: 22px; }
+.eye .eye-off, .eye[aria-pressed="true"] .eye-on { display: none; }
+.eye[aria-pressed="true"] .eye-off { display: block; }
 /* 알약 segmented control(난이도 · 랭킹 탭): 떠 있는 배경(.seg-ind) 하나가 고른 칸으로 미끄러진다. 숨겨져 폭을 못 재면(has-ind 없음) 칸 자체 배경 */
 .seg { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 4px; border-radius: var(--pill); background: rgba(11, 18, 40, .85); border: 2px solid #475569; }
 .seg > button { position: relative; z-index: 1; height: 36px; border-radius: var(--pill); font-size: .92rem; font-weight: 800; color: #cbd5e1; transition: color .35s var(--ease); }

@@ -1311,10 +1311,15 @@ function front() {
 const authForm = $('#authForm'), authId = $('#authId'), authNick = $('#authNick'), authPw = $('#authPw'), authMsg = $('#authMsg'), authBtn = $('#authSubmit');
 authNick.value = randName();
 $('#btnDice').addEventListener('click', () => { authNick.value = randName(); });
+// 비밀번호 눈 버튼: 가입 · 로그인 둘 다 — 입력한 글자를 보이게 / 다시 가리게. 끝(로그인 성공 · 모드 바꿈)에는 다시 가린다
+const btnEye = $('#btnEye');
+function showPw(on) { authPw.type = on ? 'text' : 'password'; btnEye.setAttribute('aria-pressed', on ? 'true' : 'false'); btnEye.title = btnEye.ariaLabel = on ? '비밀번호 가리기' : '비밀번호 보이기'; }
+btnEye.addEventListener('mousedown', e => e.preventDefault());   // 누를 때 입력칸 포커스(폰 키보드)가 닫히지 않게
+btnEye.addEventListener('click', () => { const on = authPw.type === 'password'; showPw(on); try { const n = authPw.value.length; authPw.setSelectionRange(n, n); } catch (_) {} });
 function setAuthMode(v) {
   authForm.dataset.mode = v; $('#authNickRow').hidden = v !== 'signup';
   authBtn.textContent = v === 'signup' ? '가입하고 시작' : '로그인'; authMsg.textContent = ''; authMsg.classList.remove('ok');
-  authPw.setAttribute('autocomplete', v === 'signup' ? 'new-password' : 'current-password');
+  authPw.setAttribute('autocomplete', v === 'signup' ? 'new-password' : 'current-password'); showPw(false);
 }
 const authSeg = seg($('#authSeg'), [['signup', '회원가입'], ['login', '로그인']], 'signup', setAuthMode);
 authForm.addEventListener('submit', async e => {
@@ -1330,7 +1335,7 @@ authForm.addEventListener('submit', async e => {
     // 가입: 이 브라우저에서 이미 하던 진행(레벨 · 최고)이 있으면 계정의 시작 진행으로 올린다
     const remember = $('#authKeep').checked, body = mode === 'signup' ? { login_id: id, nickname: nick, password: pw, level, best, diff, remember } : { login_id: id, password: pw, remember };
     const me = await api(mode === 'signup' ? '/api/signup' : '/api/login', 'POST', body);
-    authPw.value = ''; authMsg.textContent = '';
+    authPw.value = ''; showPw(false); authMsg.textContent = '';
     applyMe(me); front();
     if (!touchy()) setTimeout(() => { try { $('#btnStart').focus({ preventScroll: true }); } catch (_) {} }, 50);
   } catch (err) { fail(err.message, err.status === 409 ? authId : err.status === 401 ? authPw : null); }

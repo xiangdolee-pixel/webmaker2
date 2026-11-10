@@ -3,6 +3,7 @@
 --   node deploy.mjs --wrangler d1 execute lastshot --remote --command "\"ALTER TABLE scores ADD COLUMN diff TEXT NOT NULL DEFAULT 'normal'\""
 --   node deploy.mjs --wrangler d1 execute lastshot --remote --command "\"ALTER TABLE scores ADD COLUMN user_id INTEGER\""
 
+-- 가입 · 로그인하면 xms D1 의 members(site = 'lastshot', 등급 9)에도 넣는다(index.js syncXms) → 관리 화면 /xms/ 가입회원.
 -- 계정: 아이디 또는 이메일(소문자) · 닉네임 · 비밀번호(PBKDF2-SHA256 100,000회 + salt 16바이트) · 진행(레벨 · 최고 레벨 · 난이도)
 CREATE TABLE IF NOT EXISTS users (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,

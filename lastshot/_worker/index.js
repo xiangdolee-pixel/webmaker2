@@ -8,6 +8,8 @@
 //   POST /api/rank { score, level, diff }        → { id, rank, diff, top }  (로그인 필수, 이름 = 계정 닉네임)
 //   diff 가 세 값 밖이면 normal. 그 밖(페이지 · /xms 관리 · /member)은 xim 공통 사이트 Worker 가 맡는다.
 //   바인딩: DB(D1 lastshot, 표는 schema.sql). 비밀번호 = PBKDF2(SHA-256, 100,000회, salt 16바이트). 세션 = 랜덤 32바이트 토큰, 180일.
+//   XMS_DB(D1 xms): 가입하면 xms 가입회원(members, site = XIM_SITE, 등급 9)에도 같은 아이디 · 비밀번호(xms 방식 10,000회)로 넣어
+//     관리 화면 /xms/ 회원관리에 보이고 /member/login 으로도 들어갈 수 있다. 전에 가입한 계정은 다음 로그인 때 넣는다. 실패해도 게임 가입 · 로그인은 그대로.
 import site from '../../xim/_worker/site-worker.js';
 
 const TOP = 50;               // 난이도마다 상위 50 만 남긴다
@@ -51,6 +53,23 @@ async function newSession(db, userId, remember) {   // 로그인 유지(기본):
   await db.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(Date.now()).run();   // 지난 세션 정리
   return { 'Set-Cookie': `${COOKIE}=${token}; Path=/;${remember ? ` Max-Age=${SESS_DAYS * 86400};` : ''} HttpOnly; Secure; SameSite=Lax` };
 }
+/* ── xms 가입회원과 맞추기 ── */
+const XMS_ITER = 10000;   // xms/_worker/lib.js PBKDF2_ITER 와 같아야 그쪽 로그인에서 비밀번호가 맞는다
+async function syncXms(env, ctx, id, nickname, password, created) {
+  const db = env.XMS_DB, site = env.XIM_SITE;
+  if (!db || !site) return;
+  const job = (async () => {
+    const has = await db.prepare('SELECT id FROM members WHERE site = ? AND lower(login_id) = ?').bind(site, id).first();
+    if (has) return;
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+    const hash = hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: XMS_ITER }, key, 256));
+    const now = Date.now(), email = id.includes('@') ? id : '';
+    await db.prepare(`INSERT OR IGNORE INTO members (site, login_id, pw_hash, pw_salt, name, nickname, level, email, mobile, phone, extra, last_login_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 9, ?, '', '', '{}', ?, ?)`).bind(site, id, hash, hex(salt), nickname, nickname, email, now, created || now).run();
+  })().catch((e) => console.error('xms 회원 맞추기 실패', e));
+  if (ctx) ctx.waitUntil(job); else await job;
+}
 const rememberOf = (v) => v.remember !== false && v.remember !== 0 && v.remember !== 'false';   // 안 보내면 켜진 것으로
 const clearCookie = { 'Set-Cookie': `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax` };
 
@@ -75,7 +94,7 @@ async function noteFail(db, ip) {
   await db.prepare('INSERT INTO login_fails (ip, at) VALUES (?, ?)').bind(ip, Date.now()).run();
   await db.prepare('DELETE FROM login_fails WHERE at < ?').bind(Date.now() - 3600000).run();
 }
-async function signup(request, env) {
+async function signup(request, env, ctx) {
   const db = env.DB, v = await readJson(request), ip = ipOf(request);
   const { id, error } = checkLoginId(v.login_id);
   if (error) return json({ error }, 400);
@@ -90,10 +109,11 @@ async function signup(request, env) {
   let r;
   try { r = await db.prepare('INSERT INTO users (login_id, nickname, pw_hash, pw_salt, level, best, diff, created_at, last_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, nickname, hash, hex(salt), level, best, diff, now, now).run(); }
   catch (e) { if (/UNIQUE/i.test(String(e))) return json({ error: '이미 쓰고 있는 아이디예요. 로그인 탭에서 들어와 주세요.' }, 409); throw e; }
+  await syncXms(env, null, id, nickname, String(v.password), now);   // 관리 화면 가입회원에 바로 보이게 기다렸다가 답한다
   const headers = await newSession(db, r.meta.last_row_id, rememberOf(v));
   return json(me({ nickname, level, best, diff }), 200, headers);
 }
-async function login(request, env) {
+async function login(request, env, ctx) {
   const db = env.DB, v = await readJson(request), ip = ipOf(request);
   const { id, error } = checkLoginId(v.login_id);
   if (error) return json({ error }, 400);
@@ -102,6 +122,7 @@ async function login(request, env) {
   const ok = u && sameHex(await pbkdf2(String(v.password ?? ''), unhex(u.pw_salt)), u.pw_hash);
   if (!ok) { await noteFail(db, ip); return json({ error: '아이디 또는 비밀번호가 맞지 않아요.' }, 401); }
   await db.prepare('UPDATE users SET last_at = ? WHERE id = ?').bind(Date.now(), u.id).run();
+  await syncXms(env, ctx, id, u.nickname, String(v.password ?? ''), u.created_at);   // 가입회원 표에 없던 옛 계정은 지금 넣는다(답은 기다리지 않음)
   const headers = await newSession(db, u.id, rememberOf(v));
   return json(me(u), 200, headers);
 }
@@ -149,11 +170,11 @@ async function rank(request, env, url, u) {
   return json({ id, rank: now.findIndex((x) => x.id === id) + 1, diff, top: now });
 }
 
-async function api(request, env, url) {
+async function api(request, env, url, ctx) {
   const p = url.pathname, m = request.method;
   if (p === '/api/rank') return rank(request, env, url, m === 'POST' ? await userOf(env.DB, request) : null);
-  if (p === '/api/signup' && m === 'POST') return signup(request, env);
-  if (p === '/api/login' && m === 'POST') return login(request, env);
+  if (p === '/api/signup' && m === 'POST') return signup(request, env, ctx);
+  if (p === '/api/login' && m === 'POST') return login(request, env, ctx);
   if (p === '/api/logout' && m === 'POST') return logout(request, env);
   if (p === '/api/me' || p === '/api/progress') {
     const u = await userOf(env.DB, request);
@@ -168,7 +189,7 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/')) {
-      try { return await api(request, env, url); }
+      try { return await api(request, env, url, ctx); }
       catch (e) { if (e instanceof Response) return e; console.error(e); return json({ error: '서버 오류가 났습니다.' }, 500); }
     }
     return env.XMS ? site.fetch(request, env, ctx) : env.ASSETS.fetch(request);
