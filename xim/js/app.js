@@ -514,7 +514,7 @@ function qrDialog(site) {
   const url = site.url;
   openDialog(`<h2>${esc(site.name)}</h2>
     <p class="meta center">폰 카메라로 아래 QR 을 비추면 바로 접속됩니다</p>
-    <div class="qr qr-big">${qrSvg(url, 320, `${site.name} 접속 QR 코드`)}</div>
+    <div class="qr qr-big">${qrSvg(url, 320, `${esc(site.name)} 접속 QR 코드`)}</div>
     <p class="meta center qr-url"><a href="${esc(url)}" target="_blank" rel="noopener">${esc(url.replace(/^https?:\/\//, ''))}</a></p>
     <div class="dlg-actions"><button class="btn" type="button" data-close>닫기</button><button class="btn" type="button" data-act="copy">주소 복사</button><button class="btn primary" type="button" data-act="png">PNG 저장</button></div>`, (dlg) => {
     dlg.querySelector('[data-act="copy"]').onclick = async () => { try { await navigator.clipboard.writeText(url); toast('주소를 복사했습니다'); } catch { toast('복사하지 못했습니다'); } };
