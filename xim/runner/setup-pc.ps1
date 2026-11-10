@@ -4,17 +4,16 @@
   구조(2026-11-10 개편 — 비공개 ws 저장소를 webmaker2 안 _pc 서브모듈로 옮김):
     D:\ws\webmaker2        공개 저장소 (xim · 사이트 · Worker)
     D:\ws\webmaker2\_pc    비공개 ws 저장소(서브모듈) — docs 엔진 · clone 처리기 · Claude 메모리(_claude)
-    D:\ws\docs · D:\ws\clone   옛 경로 호환용 정션(숨김) → _pc\docs · _pc\clone
-                               (모두실행.exe · 예약 작업 · bat 들이 옛 경로를 그대로 쓰므로 지우면 안 된다)
+    (bat · 예약 작업 · 모두실행.txt 모두 _pc 실제 경로를 쓴다 — 옛 D:\ws\docs · clone 경로는 폐기, 2026-11-10)
 
   처음 한 번(새 PC):  powershell -ExecutionPolicy Bypass -File setup-pc.ps1 -Setup
-     → webmaker2 를 받고(비공개 _pc 서브모듈 포함), 호환 정션과 Claude 메모리 정션을 만든 뒤 점검표를 보여 준다.
+     → webmaker2 를 받고(비공개 _pc 서브모듈 포함), Claude 메모리 정션을 만든 뒤 점검표를 보여 준다.
   PC 를 옮기기 전 · 옮긴 뒤:  … -Sync
      → 메모리 · clone 코드를 커밋 + 푸시하고 두 저장소를 pull 한다. (webmaker2 의 코드 커밋은 Claude 가 한다 — 안 된 게 있으면 알려만 준다)
   자동 시작 등록:  … -Startup helper   (스튜디오 도우미)   /   … -Startup voice   (내 목소리 처리기, GPU PC)
   인자 없이 실행하면 점검만.
 
-  왜 D:\ws 로 고정하나: 호환 정션 · bat · Claude 메모리 폴더 이름(D--ws-webmaker2)이 이 경로를 가정한다. D: 드라이브가 없는 PC 는 Claude 에게 말해 주세요.
+  왜 D:\ws 로 고정하나: bat · Claude 메모리 폴더 이름(D--ws-webmaker2)이 이 경로를 가정한다. D: 드라이브가 없는 PC 는 Claude 에게 말해 주세요.
 #>
 param([switch]$Setup, [switch]$Sync, [string]$Startup = '')
 $ErrorActionPreference = 'Continue'
@@ -54,12 +53,6 @@ function Check {
   Row (Has claude) 'Claude Code' 'npm install -g @anthropic-ai/claude-code   그 다음   claude 를 실행해 구독 계정으로 로그인'
   Row (Test-Path "$WM\.git") '공개 저장소 D:\ws\webmaker2 (xim · 사이트 · Worker)' '이 스크립트를 -Setup 으로 실행'
   Row (Test-Path "$PCD\.git") '비공개 작업 _pc 서브모듈 (docs 엔진 · clone 코드 · Claude 메모리)' '이 스크립트를 -Setup 으로 실행'
-  $linkOk = $true
-  foreach ($d in @('docs', 'clone')) {
-    $p = Join-Path $WS $d
-    if (-not (Test-Path $p)) { $linkOk = $false }
-  }
-  Row $linkOk '옛 경로 연결 D:\ws\docs · D:\ws\clone (정션)' '이 스크립트를 -Setup 으로 실행'
   $memOk = $false
   if (Test-Path $MEM_LOCAL) { $i = Get-Item $MEM_LOCAL -Force; $memOk = ($i.LinkType -eq 'Junction') -and ("$($i.Target)" -like '*_claude\memory') }
   Row $memOk 'Claude 메모리가 저장소(_pc\_claude\memory)에 연결됨' '이 스크립트를 -Setup 으로 실행'
@@ -109,23 +102,6 @@ function EnsurePc {
   # 서브모듈은 기록된 커밋에 분리(detached)로 받아지므로 main 최신으로 올린다
   RunGit $PCD @('checkout', 'main') | Out-Null
   RunGit $PCD @('pull', '--ff-only', 'origin', 'main') | Out-Null
-}
-
-# ───────── 옛 경로 호환 정션 ─────────
-function LinkCompat {
-  foreach ($d in @('docs', 'clone')) {
-    $link = Join-Path $WS $d; $target = Join-Path $PCD $d
-    if (-not (Test-Path $target)) { continue }
-    if (Test-Path $link) {
-      $i = Get-Item $link -Force
-      if ($i.LinkType -eq 'Junction') { Write-Host ("  정션 " + $link + ": 이미 연결됨") -ForegroundColor DarkGray }
-      else { Write-Host ("  !! " + $link + " 에 진짜 폴더가 있습니다 — 옛 구조 같으니 Claude 에게 '옛 ws 구조를 _pc 로 옮겨 줘' 라고 하세요") -ForegroundColor Yellow }
-      continue
-    }
-    & cmd /c mklink /J "$link" "$target" | Out-Null
-    & attrib +h "$link"
-    Write-Host ("  정션(숨김): " + $link + "  →  " + $target) -ForegroundColor Green
-  }
 }
 
 # ───────── Claude 메모리 ─────────
@@ -212,8 +188,6 @@ if ($Setup) {
   if (Test-Path "$WS\.git") { Write-Host '  !! D:\ws 가 옛 구조(ws 저장소)입니다 — Claude 에게 "옛 ws 구조를 _pc 로 옮겨 줘" 라고 하세요' -ForegroundColor Yellow }
   EnsureRepo $WM $WM_URL '공개 저장소 D:\ws\webmaker2'
   EnsurePc
-  Write-Host '[세팅] 옛 경로 호환 정션' -ForegroundColor Cyan
-  LinkCompat
   Write-Host '[세팅] Claude 메모리 연결' -ForegroundColor Cyan
   LinkMemory
   Check

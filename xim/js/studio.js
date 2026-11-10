@@ -609,8 +609,8 @@ async function scheduleDialog() {
       <label class="pf-sw" title="켜면 매일 이 시각에 만듭니다"><input type="checkbox" name="on" ${x.on ? 'checked' : ''}><i aria-hidden="true"></i>${x.on ? '켬' : '끔'}</label>
       <input class="input" type="time" name="time" value="${esc(x.time)}" step="300">
       <select class="input" name="channel"><option value="순섬" ${x.channel === '순섬' ? 'selected' : ''}>순섬 · 순수한 크립토</option><option value="사섬" ${x.channel === '사섬' ? 'selected' : ''}>사섬 · 사적인 자산왕</option></select>
-      <span class="st-meta"><span class="sc-eta" data-eta>${x.on ? `→ 약 ${plusMin(x.time, est)} 완성` : ''}</span>${x.last ? ` · 마지막 ${esc(x.last)}` : ''}</span>
       <button type="button" class="btn sm st-sched-more" data-i="${i}">세부 설정 ▾</button>
+      <span class="st-meta sc-row-meta"><span class="sc-eta" data-eta>${x.on ? `→ 약 ${plusMin(x.time, est)} 완성` : ''}</span>${x.last ? ` · 마지막 ${esc(x.last)}` : ''}</span>
       <input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="last" value="${esc(x.last)}">
     </div>${detail(x, i)}`;
   const d = r.duration || {}; const est = d.n >= 3 ? d.avg_min : 20;   // 기록이 3회 미만이면 기본 20분 (첫 시험 회차는 재시작이 섞여 43분으로 잡힘)

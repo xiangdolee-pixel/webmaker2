@@ -1,6 +1,6 @@
 // xim 다른 PC 에서 이어서 작업하기 — 순서 안내 + 복사용 명령
 //   스크립트: xim/runner/setup-pc.ps1(세팅 · 점검 · 동기화 · 자동 시작) · D:\ws\clone\setup_pc.ps1(내 목소리 처리기, 비공개 _pc 서브모듈)
-//   비공개 작업(docs 엔진 · clone · Claude 메모리)은 webmaker2 안 _pc 서브모듈에 있고, 옛 경로 D:\ws\docs · D:\ws\clone 은 정션(숨김)으로 연결된다(2026-11-10 개편)
+//   비공개 작업(docs 엔진 · clone · Claude 메모리)은 webmaker2 안 _pc 서브모듈에 있다(2026-11-10 개편, 옛 D:\ws\docs · clone 경로는 폐기)
 //   Claude Code 메모리는 _pc\_claude\memory 에 두고 각 PC 의 .claude 폴더에서 정션으로 연결한다 → 어느 PC 에서든 같은 기억으로 이어서 작업
 import { $$, esc, toast } from './common.js';
 
@@ -17,9 +17,9 @@ const CMD = {
   check: `${PS} -File ${SETUP}`,
   sync: `${PS} -File ${SETUP} -Sync`,
   helperLogin: 'node D:\\ws\\webmaker2\\xim\\runner\\runner.mjs --login',
-  helperStart: 'D:\\ws\\docs\\tools\\스튜디오도우미_시작.bat',
+  helperStart: 'D:\\ws\\webmaker2\\_pc\\docs\\tools\\스튜디오도우미_시작.bat',
   helperAuto: `${PS} -File ${SETUP} -Startup helper`,
-  voiceStart: 'D:\\ws\\clone\\start_all.bat',
+  voiceStart: 'D:\\ws\\webmaker2\\_pc\\clone\\start_all.bat',
   voiceAuto: `${PS} -File ${SETUP} -Startup voice`,
 };
 
@@ -35,7 +35,7 @@ export async function renderPc({ view, api }) {
   ]);
   let agent = null; try { agent = (await api('/voice/me')).agent; } catch { /* clone 미연결 */ }
   const helperCmd = helper.token ? `node D:\\ws\\webmaker2\\xim\\runner\\runner.mjs --setup --token ${helper.token}` : '도우미 토큰이 아직 없습니다 (Worker 비밀값 STUDIO_HELPER_TOKEN)';
-  const voiceCmd = voice.token ? `${PS} -File D:\\ws\\clone\\setup_pc.ps1 -Token ${voice.token}` : '처리기 토큰이 아직 없습니다 (Worker 비밀값 CLONE_TOKEN)';
+  const voiceCmd = voice.token ? `${PS} -File D:\\ws\\webmaker2\\_pc\\clone\\setup_pc.ps1 -Token ${voice.token}` : '처리기 토큰이 아직 없습니다 (Worker 비밀값 CLONE_TOKEN)';
   const helperPc = hs.info?.host || hs.info?.pc || '';
 
   view.innerHTML = `
@@ -51,7 +51,7 @@ export async function renderPc({ view, api }) {
         <ol class="pc-steps">
           ${step(1, '프로그램 설치 (없는 것만)', `<p>Git · Node 20 · GitHub CLI · Python 3.12 · Claude Code. 터미널(PowerShell 또는 cmd)에 한 줄씩 붙여 넣습니다. 설치 뒤 <b>터미널을 새로 엽니다.</b></p>${code(CMD.tools)}`)}
           ${step(2, 'GitHub 로그인', `<p>비공개 _pc 서브모듈을 받기 위해 한 번. 브라우저가 열리면 xiangdolee-pixel 계정으로 승인합니다.</p>${code(CMD.gh)}`)}
-          ${step(3, '한 줄 세팅', `<p><code>D:\\ws\\webmaker2</code> 저장소(비공개 _pc 서브모듈 포함)를 받고, 옛 경로 정션(<code>D:\\ws\\docs</code> · <code>clone</code>)과 Claude 메모리 연결까지 한 뒤 점검표를 보여 줍니다. D: 드라이브가 없는 PC 면 Claude 에게 말해 주세요.</p>${code(CMD.boot)}`)}
+          ${step(3, '한 줄 세팅', `<p><code>D:\\ws\\webmaker2</code> 저장소(비공개 _pc 서브모듈 포함)를 받고, Claude 메모리 연결까지 한 뒤 점검표를 보여 줍니다. D: 드라이브가 없는 PC 면 Claude 에게 말해 주세요.</p>${code(CMD.boot)}`)}
           ${step(4, '로그인 2개 (각 한 번)', `<p>Claude Code 는 구독 계정으로, Cloudflare 배포는 브라우저에서 <b>xiangdolee 계정</b>을 고릅니다. 두 번째 줄이 계정 이름을 보여 주면 된 것입니다.</p>${code(CMD.claude)}${code(CMD.cf)}`)}
           ${step(5, '작업 시작', `<p>webmaker2 폴더에서 Claude Code 를 열고 <b>"메모리 보고 이어서 하자"</b> 라고 하면 됩니다. 커밋 · 푸시 · 배포는 Claude 가 합니다.</p>${code(CMD.start)}<p class="pc-sub">점검만 다시 보려면:</p>${code(CMD.check)}`)}
         </ol>
