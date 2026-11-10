@@ -30,7 +30,9 @@ function Row($ok, $name, $hint) {
     if ($hint) { Write-Host ("      -> " + $hint) -ForegroundColor DarkGray }
   }
 }
-function Git($path, [string[]]$args) { & git -C $path @args 2>&1 | ForEach-Object { "$_" } }
+# git 의 경고(stderr)를 PowerShell 5.1 이 오류로 바꿔 스크립트를 멈추게 하므로, git 스스로 합쳐 내보내게 한다(Git for Windows 전용 변수)
+$env:GIT_REDIRECT_STDERR = '2>&1'
+function RunGit($path, [string[]]$gitArgs) { & git.exe -C $path @gitArgs }   # (함수 이름을 Git 으로 하면 & git 이 자기 자신을 불러 무한 재귀 · $args 는 예약 변수)
 
 # ───────── 점검 ─────────
 function Check {
@@ -65,20 +67,20 @@ function Check {
 function EnsureRepo($path, $url, $label) {
   if (Test-Path "$path\.git") {
     Write-Host ("  " + $label + ": 있음 → 최신으로") -ForegroundColor DarkGray
-    Git $path @('pull', '--ff-only', 'origin', 'main') | Out-Null
+    RunGit $path @('pull', '--ff-only', 'origin', 'main') | Out-Null
     return
   }
   if (Test-Path $path) {
     # 폴더는 있는데 저장소가 아닐 때(예: webmaker2 만 먼저 받아 둔 D:\ws) — 그 자리에서 저장소를 깐다
     Write-Host ("  " + $label + ": 폴더에 저장소 연결 (" + $url + ")")
-    Git $path @('init') | Out-Null
-    Git $path @('remote', 'add', 'origin', $url) | Out-Null
-    Git $path @('fetch', 'origin', 'main')
-    Git $path @('checkout', '-B', 'main', 'origin/main')
+    RunGit $path @('init') | Out-Null
+    RunGit $path @('remote', 'add', 'origin', $url) | Out-Null
+    RunGit $path @('fetch', 'origin', 'main')
+    RunGit $path @('checkout', '-B', 'main', 'origin/main')
   } else {
     New-Item -ItemType Directory -Force (Split-Path $path) | Out-Null
     Write-Host ("  " + $label + ": 받는 중 (" + $url + ")")
-    & git clone $url $path
+    & git.exe clone $url $path
   }
   if (-not (Test-Path "$path\.git")) { throw ($label + " 받기 실패 — 비공개 저장소는 먼저 'gh auth login' (브라우저 로그인) 뒤 다시 실행") }
 }
@@ -107,23 +109,23 @@ function SyncRepos {
   if (-not (Test-Path "$WS\.git")) { throw 'D:\ws 저장소가 없습니다. 먼저 -Setup' }
   $paths = @('_claude', 'clone') | Where-Object { Test-Path (Join-Path $WS $_) }
   if ($paths.Count) {
-    Git $WS (@('add', '-A', '--') + $paths) | Out-Null
-    $st = Git $WS (@('status', '--porcelain', '--') + $paths)
+    RunGit $WS (@('add', '-A', '--') + $paths) | Out-Null
+    $st = RunGit $WS (@('status', '--porcelain', '--') + $paths)
     if ($st) {
       $msg = 'chore: Claude 메모리 · clone 코드 동기화 (' + $env:COMPUTERNAME + ' ' + (Get-Date -Format 'yyyy-MM-dd HH:mm') + ')'
-      Git $WS @('commit', '-q', '-m', $msg) | Out-Null
+      RunGit $WS @('commit', '-q', '-m', $msg) | Out-Null
       Write-Host ('  커밋: ' + $msg)
     } else { Write-Host '  올릴 변경 없음' -ForegroundColor DarkGray }
   }
-  Git $WS @('pull', '--rebase', '--autostash', 'origin', 'main')
+  RunGit $WS @('pull', '--rebase', '--autostash', 'origin', 'main')
   if ($LASTEXITCODE -ne 0) { Write-Host "  !! pull 중 충돌 — Claude 에게 'D:\ws 리베이스 충돌 풀어 줘' 라고 하세요" -ForegroundColor Red; return }
-  Git $WS @('push', 'origin', 'main')
+  RunGit $WS @('push', 'origin', 'main')
   Write-Host '[동기화] D:\ws\webmaker2' -ForegroundColor Cyan
   if (Test-Path "$WM\.git") {
-    $dirty = Git $WM @('status', '--porcelain')
+    $dirty = RunGit $WM @('status', '--porcelain')
     if ($dirty) { Write-Host "  커밋 안 된 변경이 있습니다 — Claude 에게 '커밋하고 푸시해 줘' 라고 하세요 (공개 저장소라 자동 커밋하지 않음)" -ForegroundColor Yellow }
-    Git $WM @('pull', '--rebase', '--autostash', 'origin', 'main')
-    Git $WM @('push', 'origin', 'main')
+    RunGit $WM @('pull', '--rebase', '--autostash', 'origin', 'main')
+    RunGit $WM @('push', 'origin', 'main')
   }
   Write-Host '  끝. 다른 PC 에서는 같은 명령(-Sync)을 먼저 실행해 받으세요.' -ForegroundColor Green
 }
