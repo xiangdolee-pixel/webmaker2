@@ -480,6 +480,25 @@ export async function studioHelper(request, env, url, path, method) {
     const want = (url.searchParams.get('want') || 'text,images').split(',');
     // 유튜브 올리기(2026-11-10): 카드의 "유튜브에 올리기" 가 options.yt = {status:'queued', title, visibility} 를 남기면 PC 도우미가 엣지로 올린다
     if (want.includes('youtube')) {
+      // 새 발표자료 "유튜브 채널에 올리기"(yt_auto): 영상(clone)이 끝났는지 보고 끝났으면 유튜브 대기열에 올린다
+      if (env.CLONE && env.CLONE_TOKEN) {
+        const auto = (await db.prepare("SELECT id FROM studio_jobs WHERE status = 'done' AND json_extract(options, '$.yt_auto') = 1 AND json_extract(options, '$.video_job') IS NOT NULL AND json_extract(options, '$.yt') IS NULL ORDER BY created_at DESC LIMIT 3").all()).results;
+        for (const a of auto) {
+          const job = await getJob(db, a.id); const jo = JSON.parse(job.options || '{}');
+          try {
+            const res = await env.CLONE.fetch(new Request(`https://clone/api/jobs/${jo.video_job}`, { headers: { 'X-Agent-Token': env.CLONE_TOKEN } }));
+            const v = (await res.json().catch(() => ({}))).job;
+            if (v && v.status === 'done' && v.video_status === 'done') {
+              const summary = docJson(await latestDoc(db, job.id, 'summary')) || {};
+              const pick = docJson(await latestDoc(db, job.id, 'thumb_pick')) || {};
+              jo.yt = { status: 'queued', title: String(pick.title || summary.titles?.[0] || job.title || '').slice(0, 100), visibility: '비공개', at: now(), url: '', error: '', auto: true };
+              await setJob(db, job.id, { options: JSON.stringify(jo) });
+            } else if (v && (v.status === 'failed' || v.video_status === 'failed')) {
+              jo.yt = { status: 'failed', error: '영상이 실패해 유튜브에 올리지 못했습니다', at: now(), auto: true }; await setJob(db, job.id, { options: JSON.stringify(jo) });
+            }
+          } catch { /* 다음 폴링 때 */ }
+        }
+      }
       const yrow = await db.prepare("SELECT id FROM studio_jobs WHERE json_extract(options, '$.yt.status') = 'queued' ORDER BY json_extract(options, '$.yt.at') ASC LIMIT 1").first();
       if (yrow) {
         const job = await getJob(db, yrow.id);
@@ -488,7 +507,7 @@ export async function studioHelper(request, env, url, path, method) {
         await setJob(db, job.id, { options: JSON.stringify(jo) });
         const summary = docJson(await latestDoc(db, job.id, 'summary')) || {};
         const thumb = (await jobAssets(db, job.id)).filter((a) => a.kind === 'thumb').pop();
-        return json({ job: { ...job, options: jo, phase: 'youtube' }, youtube: { video_job: jo.video_job || '', title: jo.yt.title || summary.titles?.[0] || job.title, more: summary.description || '', visibility: jo.yt.visibility || '비공개', thumb_url: thumb ? `/studio/a/${thumb.id}` : '' } });
+        return json({ job: { ...job, options: jo, phase: 'youtube' }, youtube: { video_job: jo.video_job || '', title: jo.yt.title || summary.titles?.[0] || job.title, more: summary.description || '', visibility: jo.yt.visibility || '비공개', thumb_url: thumb ? `/studio/a/${thumb.id}` : '', channel_name: job.channel === '순섬' ? '순수한크립토' : '사적인자산왕' } });
       }
     }
     const st = [];
@@ -607,7 +626,7 @@ async function createJob(env, gh, d) {
   const engine = ['cloud', 'pc', 'api', 'none'].includes(d.engine) ? d.engine : 'cloud';
   if (['api', 'none'].includes(engine) && !env.ANTHROPIC_API_KEY) throw bad('API 방식은 ANTHROPIC_API_KEY 가 있어야 합니다. 기본(클라우드 · 구독)으로 하세요.');
   if (engine === 'cloud' && !env.STUDIO_HELPER_TOKEN) throw bad('도우미 토큰(STUDIO_HELPER_TOKEN)이 아직 없습니다.');
-  const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000), video_auto: d.video !== false && d.video !== 'false' && d.video !== 0 };   // 완성되면 영상도(기본 켬, 사용자 지시 2026-11-10)
+  const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000), video_auto: d.video !== false && d.video !== 'false' && d.video !== 0, yt_auto: d.youtube !== false && d.youtube !== 'false' && d.youtube !== 0 };   // 완성되면 영상도 · 영상이 되면 유튜브도(기본 켬, 사용자 지시 2026-11-10)
   if (d.scheduled) options.scheduled = String(d.scheduled).slice(0, 40);
   if (kind === 'thumb') Object.assign(options, { title: String(d.title || '').slice(0, 200), emotion: d.emotion || '자동', gesture: d.gesture || '자동', badgeName: String(d.badgeName || '').slice(0, 60), badgeRole: String(d.badgeRole || '').slice(0, 80), face: d.face || 'emoji:auto' });
   if (kind === 'thumb' && !options.title) throw bad('썸네일 제목을 넣어 주세요.');
@@ -774,7 +793,7 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
     const engine = ['cloud', 'pc', 'api', 'none'].includes(d.engine) ? d.engine : 'cloud';
     if (['api', 'none'].includes(engine) && !env.ANTHROPIC_API_KEY) throw bad('API 방식은 ANTHROPIC_API_KEY 가 있어야 합니다. 기본(클라우드 · 구독)으로 하세요.');
     if (engine === 'cloud' && !env.STUDIO_HELPER_TOKEN) throw bad('도우미 토큰(STUDIO_HELPER_TOKEN)이 아직 없습니다.');
-    const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000), video_auto: d.video !== false && d.video !== 'false' && d.video !== 0 };   // 완성되면 영상도(기본 켬, 사용자 지시 2026-11-10)
+    const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000), video_auto: d.video !== false && d.video !== 'false' && d.video !== 0, yt_auto: d.youtube !== false && d.youtube !== 'false' && d.youtube !== 0 };   // 완성되면 영상도 · 영상이 되면 유튜브도(기본 켬, 사용자 지시 2026-11-10)
     if (kind === 'thumb') Object.assign(options, { title: String(d.title || '').slice(0, 200), emotion: d.emotion || '자동', gesture: d.gesture || '자동', badgeName: String(d.badgeName || '').slice(0, 60), badgeRole: String(d.badgeRole || '').slice(0, 80), face: d.face || 'emoji:auto' });
     if (kind === 'thumb' && !options.title) throw bad('썸네일 제목을 넣어 주세요.');
     const id = hex(10);

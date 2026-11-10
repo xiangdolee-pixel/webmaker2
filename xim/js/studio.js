@@ -229,7 +229,8 @@ function newJobDialog() {
         <label class="field" id="src-text" hidden><span>글</span><textarea class="input" name="text" rows="6" placeholder="기사 본문이나 메모를 붙여 넣으세요"></textarea></label>
         <fieldset class="choice-set" id="pick-set"><legend>기사 고르기</legend><div class="tabs seg" id="f-pick"></div><small>자동이면 클로드 추천 6개로 바로 진행합니다.</small></fieldset>
         <fieldset class="choice-set"><legend>썸네일</legend><div class="tabs seg" id="f-thumb"></div><small>내가 고르기 = 글이 끝난 뒤 제목 · 인물 · 표정 · 제스처를 웹에서 고릅니다.</small></fieldset>
-        <fieldset class="choice-set"><legend>영상</legend><label class="st-check"><input type="checkbox" name="video" checked> 발표자료가 완성되면 <b>영상도 바로 만들기</b>(사자왕이 슬라이드 전부를 읽는 1280x720 자막 영상, 8분 이상)</label><small>끄면 나중에 카드의 "영상 만들기" 로 만들 수 있습니다.</small></fieldset>
+        <fieldset class="choice-set"><legend>영상</legend><label class="st-check"><input type="checkbox" name="video" checked> 발표자료가 완성되면 <b>영상도 바로 만들기</b>(사자왕이 슬라이드 전부를 읽는 1280x720 자막 영상, 8분 이상)</label><small>끄면 나중에 카드의 "영상 만들기" 로 만들 수 있습니다.</small>
+        <label class="st-check"><input type="checkbox" name="youtube" checked> 영상이 완성되면 <b>유튜브 채널에 올리기</b>(사섬 = 사적인자산왕, 순섬 = 순수한크립토 · 비공개로 올림 · 제목 = 썸네일 제목 · 더보기란 · 썸네일 자동)</label><small>PC 도우미가 엣지 자동화 프로필에서 그 채널로 계정 전환해 올립니다. 끄면 안 올립니다.</small></fieldset>
       </div>
       <div id="thumb-opts" hidden>${thumbPickForm({}, [], [])}</div>
       <p class="err" id="f-err"></p>
@@ -272,7 +273,7 @@ function newJobDialog() {
       e.preventDefault();
       const f = e.currentTarget;
       busy(f.querySelector('[type=submit]'), $('#f-err', dlg), async () => {
-        const data = { kind: st.kind, channel: st.channel, source: st.source, pick: st.pick, thumb: st.thumb, engine: 'cloud', text: f.text.value, captures: uploads.map((u) => u.id), video: !!f.video?.checked };
+        const data = { kind: st.kind, channel: st.channel, source: st.source, pick: st.pick, thumb: st.thumb, engine: 'cloud', text: f.text.value, captures: uploads.map((u) => u.id), video: !!f.video?.checked, youtube: !!f.video?.checked && !!f.youtube?.checked };
         if (st.kind === 'thumb') Object.assign(data, readThumbForm(dlg));
         const r = await api('/studio/jobs', { method: 'POST', data });
         dlg.close();
@@ -531,7 +532,7 @@ function videoPanel(job, summary, thumbTitle = '') {
       <a class="btn" id="st-video-dl" href="/api/voice/video/${esc(vid)}.mp4?dl=1" download="${esc((job.title || 'video').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 80))}.mp4">⬇ 영상 다운로드</a>
       <button class="btn" type="button" id="st-video-voice">🎙 내 목소리에서 보기</button>
     </div>
-    <h4 style="margin-top:18px">📺 유튜브에 올리기</h4>
+    <h4 style="margin-top:18px">📺 유튜브에 올리기 — ${job.channel === '순섬' ? '순수한크립토' : '사적인자산왕'} 채널</h4>
     <form id="st-yt-form" class="st-yt-form">
       <label>제목 <select name="title">${titles.map((t, i) => `<option value="${esc(t)}"${i === 0 ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
       <label>공개 상태 <select name="visibility"><option value="비공개" selected>비공개 (올린 뒤 직접 공개)</option><option value="일부공개">일부 공개</option><option value="공개">공개</option></select></label>

@@ -414,8 +414,8 @@ async function runYoutube(payload, work) {
       if (r.status === 0) thumb = png;
     }
     const jobJson = path.join(work, 'youtube_job.json');
-    fs.writeFileSync(jobJson, JSON.stringify({ video, thumb, title: y.title || job.title, more: y.more || '', visibility: y.visibility || '비공개', playlist: '코인뉴스' }, null, 2), 'utf8');
-    log(`  유튜브: 업로드 시작 — ${y.title || job.title} (${y.visibility || '비공개'})`);
+    fs.writeFileSync(jobJson, JSON.stringify({ video, thumb, title: y.title || job.title, more: y.more || '', visibility: y.visibility || '비공개', playlist: '코인뉴스', channel_name: y.channel_name || (job.channel === '순섬' ? '순수한크립토' : '사적인자산왕') }, null, 2), 'utf8');
+    log(`  유튜브: 업로드 시작 — ${y.channel_name || ''} · ${y.title || job.title} (${y.visibility || '비공개'})`);
     const r = await py(['tools\\yt_upload_auto.py', jobJson], { cwd: DOCS, timeoutMin: 120, label: '유튜브 업로드' });
     const lines = (r.out || '').trim().split(/\r?\n/).filter(Boolean);
     let res = null; for (let i = lines.length - 1; i >= 0 && !res; i--) { try { if (lines[i].startsWith('{')) res = JSON.parse(lines[i]); } catch { /* 다음 줄 */ } }
