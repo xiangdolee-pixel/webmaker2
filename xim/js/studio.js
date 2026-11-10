@@ -596,13 +596,23 @@ async function scheduleDialog() {
   const { api } = deps;
   const r = await api('/studio/schedules');
   const rows = [...r.schedules]; while (rows.length < 3) rows.push({ id: '', time: ['07:10', '20:00', '12:00'][rows.length], channel: rows.length === 0 ? '순섬' : '사섬', on: false, last: '' });
+  rows.forEach((x) => { if (x.channel !== '순섬' && x.channel !== '사섬') x.channel = '사섬'; });
+  const seg = (name, i, v, items) => `<span class="tabs seg st-sched-seg" data-name="${name}">${items.map(([k, l]) => `<button type="button" class="tab ${(v || items[0][0]) === k ? 'on' : ''}" data-v="${k}">${l}</button>`).join('')}<input type="hidden" name="${name}" value="${esc(v || items[0][0])}"></span>`;
+  // 세부 설정(사용자 지시 2026-11-10): 새 발표자료와 같은 선택지를 예약마다
+  const detail = (x, i) => `<div class="st-sched-detail" data-i="${i}" hidden>
+      <div class="st-sched-opt"><span>기사 고르기</span>${seg('pick', i, x.pick, [['auto', '자동 (추천 6개)'], ['manual', '내가 고르기']])}</div>
+      <div class="st-sched-opt"><span>썸네일</span>${seg('thumb', i, x.thumb, [['auto', '자동'], ['manual', '내가 고르기']])}</div>
+      <label class="st-check"><input type="checkbox" name="video" ${x.video === false ? '' : 'checked'}><span><b>영상도 바로 만들기</b><small>사자왕이 슬라이드 전부를 읽는 자막 영상</small></span></label>
+      <label class="st-check"><input type="checkbox" name="youtube" ${x.youtube === false ? '' : 'checked'}><span><b>유튜브 채널에 올리기</b><small>비공개 업로드 → 검토 뒤 공개 → 텔레그램 공식채널 링크</small></span></label>
+    </div>`;
   const row = (x, i) => `<div class="st-sched-row" data-i="${i}">
       <label class="pf-sw" title="켜면 매일 이 시각에 만듭니다"><input type="checkbox" name="on" ${x.on ? 'checked' : ''}><i aria-hidden="true"></i>${x.on ? '켬' : '끔'}</label>
       <input class="input" type="time" name="time" value="${esc(x.time)}" step="300">
       <select class="input" name="channel"><option value="순섬" ${x.channel === '순섬' ? 'selected' : ''}>순섬 · 순수한 크립토</option><option value="사섬" ${x.channel === '사섬' ? 'selected' : ''}>사섬 · 사적인 자산왕</option></select>
       <span class="st-meta"><span class="sc-eta" data-eta>${x.on ? `→ 약 ${plusMin(x.time, est)} 완성` : ''}</span>${x.last ? ` · 마지막 ${esc(x.last)}` : ''}</span>
+      <button type="button" class="btn sm st-sched-more" data-i="${i}">세부 설정 ▾</button>
       <input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="last" value="${esc(x.last)}">
-    </div>`;
+    </div>${detail(x, i)}`;
   const d = r.duration || {}; const est = d.n >= 3 ? d.avg_min : 20;   // 기록이 3회 미만이면 기본 20분 (첫 시험 회차는 재시작이 섞여 43분으로 잡힘)
   const plusMin = (hhmm, add) => { const [h, m] = hhmm.split(':').map(Number); const t = (h * 60 + m + add) % 1440; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
   openDialog(`<h2>예약 <small class="st-meta">하루 최대 3개 · 한국 시각 · 지금 ${esc(r.now_kst)}</small></h2>
@@ -614,11 +624,14 @@ async function scheduleDialog() {
     $$('.st-sched-row', dlg).forEach((row) => {
       row.querySelector('[name=on]').addEventListener('change', (e) => { e.target.parentElement.lastChild.textContent = e.target.checked ? '켬' : '끔'; refreshEta(row); });
       row.querySelector('[name=time]').addEventListener('input', () => refreshEta(row));
+      row.querySelector('.st-sched-more').addEventListener('click', (e) => { const d = dlg.querySelector(`.st-sched-detail[data-i="${row.dataset.i}"]`); d.hidden = !d.hidden; e.currentTarget.textContent = d.hidden ? '세부 설정 ▾' : '세부 설정 ▴'; });
     });
+    $$('.st-sched-seg', dlg).forEach((sg) => sg.addEventListener('click', (e) => { const b = e.target.closest('.tab'); if (!b) return; $$('.tab', sg).forEach((t) => t.classList.toggle('on', t === b)); sg.querySelector('input[type=hidden]').value = b.dataset.v; }));
     $('#st-sched-form', dlg).addEventListener('submit', (e) => {
       e.preventDefault();
       busy(e.currentTarget.querySelector('[type=submit]'), $('#sc-err', dlg), async () => {
-        const schedules = $$('.st-sched-row', dlg).map((el) => ({ id: el.querySelector('[name=id]').value, time: el.querySelector('[name=time]').value, channel: el.querySelector('[name=channel]').value, on: el.querySelector('[name=on]').checked, last: el.querySelector('[name=last]').value }));
+        const det = (i, n) => dlg.querySelector(`.st-sched-detail[data-i="${i}"] [name=${n}]`);
+        const schedules = $$('.st-sched-row', dlg).map((el) => ({ pick: det(el.dataset.i, 'pick')?.value || 'auto', thumb: det(el.dataset.i, 'thumb')?.value || 'auto', video: !!det(el.dataset.i, 'video')?.checked, youtube: !!det(el.dataset.i, 'video')?.checked && !!det(el.dataset.i, 'youtube')?.checked, id: el.querySelector('[name=id]').value, time: el.querySelector('[name=time]').value, channel: el.querySelector('[name=channel]').value, on: el.querySelector('[name=on]').checked, last: el.querySelector('[name=last]').value }));
         await api('/studio/schedules', { method: 'PUT', data: { schedules } });
         toast('예약을 저장했습니다'); dlg.close();
       });

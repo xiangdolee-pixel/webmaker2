@@ -695,7 +695,7 @@ export async function studioScheduled(env, gh) {
     // 예약 시각에서 60분 넘게 지났으면 그날은 건너뛴다 (늦은 밤에 아침 예약이 뒤늦게 도는 일 방지 — 2026-11-09 실측)
     if (minutes(hm) - minutes(s.time) > 60) { s.last = today; changed = true; continue; }
     try {
-      const id = await createJob(env, gh, { kind: 'main', channel: s.channel, source: 'rss', pick: 'auto', thumb: 'auto', engine: 'cloud', scheduled: `${s.time} ${s.channel}` });
+      const id = await createJob(env, gh, { kind: 'main', channel: s.channel, source: 'rss', pick: s.pick === 'manual' ? 'manual' : 'auto', thumb: s.thumb === 'manual' ? 'manual' : 'auto', engine: 'cloud', scheduled: `${s.time} ${s.channel}`, video: s.video !== false, youtube: s.youtube !== false && s.video !== false });
       await db.prepare("INSERT INTO audit_log (action, target, detail, ip, created_at) VALUES ('STUDIO_JOB', ?, ?, '예약', ?)").bind(`스튜디오 예약 ${s.time}`, `${s.channel} · ${id}`, now()).run().catch(() => {});
     } catch (e) { console.error('예약 작업 실패', s.time, e.message); }
     s.last = today; changed = true;
@@ -799,6 +799,11 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
       channel: x.channel === '순섬' ? '순섬' : '사섬',
       on: !!x.on,
       last: String(x.last || ''),
+      // 세부 설정(2026-11-10 사용자 지시): 새 발표자료와 같은 선택지. 기본 = 자동 선택 · 자동 썸네일 · 영상 만들기 · 유튜브(검토 뒤 공개 · 텔레그램)까지
+      pick: x.pick === 'manual' ? 'manual' : 'auto',
+      thumb: x.thumb === 'manual' ? 'manual' : 'auto',
+      video: x.video !== false && x.video !== 'false' && x.video !== 0,
+      youtube: x.youtube !== false && x.youtube !== 'false' && x.youtube !== 0,
     }));
     // 저장 시점에 이미 지난 시각은 오늘은 건너뛴다(저장하자마자 바로 도는 일 방지)
     const tod = kstDate(now()), nowHM = kstHM(now());
