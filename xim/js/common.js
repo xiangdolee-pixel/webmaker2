@@ -101,11 +101,15 @@ export function openDialog(html, setup) {
 }
 
 // 제출 중에는 버튼을 잠그고, 실패하면 메시지를 보여 준다
-export async function busy(btn, errEl, fn) {
+export async function busy(btn, errEl, fn, label = '진행 중…') {
+  // 버튼을 누르면 서버가 끝날 때까지 "진행 중…" 으로 바꿔 보여 준다(사용자 지시 2026-11-10 "안 그럼 화면이 멈춘 줄 안다")
+  const orig = btn.innerHTML;
   btn.disabled = true;
+  btn.classList.add('is-busy');
+  btn.innerHTML = `<span class="spin" aria-hidden="true"></span>${label}`;
   if (errEl) errEl.textContent = '';
   try { return await fn(); } catch (e) {
     if (errEl) errEl.textContent = e.message; else toast(e.message);
     return undefined;
-  } finally { btn.disabled = false; }
+  } finally { btn.disabled = false; btn.classList.remove('is-busy'); btn.innerHTML = orig; }
 }

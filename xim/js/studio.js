@@ -199,12 +199,11 @@ function jobCard(j) {
 async function makeVideo(id, btn) {
   const { api } = deps;
   if (!confirm('이 발표자료의 슬라이드 전부를 사자왕이 원고대로 읽는 영상(1280x720, 자막)을 만듭니다.\n음성 30분 안팎 걸리고, 진행 상황과 완성 영상은 "내 목소리" 메뉴에서 봅니다. 시작할까요?')) return;
-  btn.disabled = true;
-  try {
+  await busy(btn, null, async () => {
     const r = await api(`/studio/jobs/${id}/video`, { method: 'POST', data: {} });
-    toast?.(`영상 작업 시작 — 슬라이드 ${r.slides}장 · ${r.chars.toLocaleString('ko-KR')}자. "내 목소리" 에서 진행을 볼 수 있어요.`) ?? alert('영상 작업을 시작했습니다. "내 목소리" 메뉴에서 진행을 볼 수 있어요.');
+    toast(`영상 작업 시작 — 슬라이드 ${r.slides}장 · ${r.chars.toLocaleString('ko-KR')}자. 진행은 카드의 "영상 보기" 나 "내 목소리" 에서.`);
     renderList();
-  } catch (e) { alert(e.message || e); btn.disabled = false; }
+  }, '요청 중…');
 }
 
 // ───────── 새 작업 ─────────
@@ -230,6 +229,7 @@ function newJobDialog() {
         <label class="field" id="src-text" hidden><span>글</span><textarea class="input" name="text" rows="6" placeholder="기사 본문이나 메모를 붙여 넣으세요"></textarea></label>
         <fieldset class="choice-set" id="pick-set"><legend>기사 고르기</legend><div class="tabs seg" id="f-pick"></div><small>자동이면 클로드 추천 6개로 바로 진행합니다.</small></fieldset>
         <fieldset class="choice-set"><legend>썸네일</legend><div class="tabs seg" id="f-thumb"></div><small>내가 고르기 = 글이 끝난 뒤 제목 · 인물 · 표정 · 제스처를 웹에서 고릅니다.</small></fieldset>
+        <fieldset class="choice-set"><legend>영상</legend><label class="st-check"><input type="checkbox" name="video" checked> 발표자료가 완성되면 <b>영상도 바로 만들기</b>(사자왕이 슬라이드 전부를 읽는 1280x720 자막 영상, 8분 이상)</label><small>끄면 나중에 카드의 "영상 만들기" 로 만들 수 있습니다.</small></fieldset>
       </div>
       <div id="thumb-opts" hidden>${thumbPickForm({}, [], [])}</div>
       <p class="err" id="f-err"></p>
@@ -272,7 +272,7 @@ function newJobDialog() {
       e.preventDefault();
       const f = e.currentTarget;
       busy(f.querySelector('[type=submit]'), $('#f-err', dlg), async () => {
-        const data = { kind: st.kind, channel: st.channel, source: st.source, pick: st.pick, thumb: st.thumb, engine: 'cloud', text: f.text.value, captures: uploads.map((u) => u.id) };
+        const data = { kind: st.kind, channel: st.channel, source: st.source, pick: st.pick, thumb: st.thumb, engine: 'cloud', text: f.text.value, captures: uploads.map((u) => u.id), video: !!f.video?.checked };
         if (st.kind === 'thumb') Object.assign(data, readThumbForm(dlg));
         const r = await api('/studio/jobs', { method: 'POST', data });
         dlg.close();
@@ -406,8 +406,8 @@ async function renderJob() {
       <div id="st-res"></div>
     </section>` : ''}`;
   $('#st-back').addEventListener('click', () => { location.hash = ''; renderStudio(deps); });
-  $('#st-stop')?.addEventListener('click', async () => { if (!confirm('지금 진행 중인 작업을 멈출까요?')) return; await api(`/studio/jobs/${job.id}/stop`, { method: 'POST', data: {} }); renderJob(); });
-  $('#st-del')?.addEventListener('click', async () => { if (!confirm('이 발표자료와 그림을 모두 지울까요? 되돌릴 수 없습니다.')) return; await api(`/studio/jobs/${job.id}`, { method: 'DELETE' }); location.hash = ''; renderStudio(deps); });
+  $('#st-stop')?.addEventListener('click', (e) => { if (!confirm('지금 진행 중인 작업을 멈출까요?')) return; busy(e.currentTarget, null, async () => { await api(`/studio/jobs/${job.id}/stop`, { method: 'POST', data: {} }); renderJob(); }, '멈추는 중…'); });
+  $('#st-del')?.addEventListener('click', (e) => { if (!confirm('이 발표자료와 그림을 모두 지울까요? 되돌릴 수 없습니다.')) return; busy(e.currentTarget, null, async () => { await api(`/studio/jobs/${job.id}`, { method: 'DELETE' }); toast('지웠습니다'); location.hash = ''; renderStudio(deps); }, '지우는 중…'); });
   $('#st-pick-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const chosen = $$('#st-pick-form input:checked').map((i) => +i.value);
@@ -578,7 +578,7 @@ function wireRes(job, blocks, thumb, summary) {
   $$('[data-redo-slide]').forEach((b) => b.addEventListener('click', async () => {
     const note = prompt(`슬라이드 ${b.dataset.redoSlide} 을 다시 만듭니다. 추가로 요청할 것이 있으면 적어 주세요(없으면 빈 칸).`, '');
     if (note === null) return;
-    await api(`/studio/jobs/${job.id}/redo`, { method: 'POST', data: { what: 'slide', idx: +b.dataset.redoSlide, note } }); toast('다시 만드는 중'); renderJob();
+    await busy(b, null, async () => { await api(`/studio/jobs/${job.id}/redo`, { method: 'POST', data: { what: 'slide', idx: +b.dataset.redoSlide, note } }); toast('다시 만드는 중'); renderJob(); }, '요청 중…');
   }));
   $('#st-dl-thumb')?.addEventListener('click', () => downloadThumb(thumb.url, job.id));
   $('#st-rethumb-toggle')?.addEventListener('click', (e) => { const w = $('#st-rethumb-wrap'); w.hidden = !w.hidden; e.currentTarget.classList.toggle('on', !w.hidden); if (!w.hidden) w.scrollIntoView({ behavior: 'smooth', block: 'start' }); });

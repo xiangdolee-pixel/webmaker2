@@ -252,7 +252,7 @@ export class StudioMain extends WorkflowEntrypoint {
       else if (job.kind === 'main') await this.runMain(S, step, job, opt, settings);
       else if (job.kind === 'thumb') await this.runThumbOnly(S, step, job, opt, settings);
       else throw new NonRetryableError('아직 준비되지 않은 종류입니다: ' + job.kind);
-      if (task !== 'redo') await setJob(db, jobId, { status: 'done', step: '', finished_at: now() });
+      if (task !== 'redo') { await setJob(db, jobId, { status: 'done', step: '', finished_at: now() }); await step.do('auto-video', async () => { await autoVideo(env, db, jobId); }); }
       else await setJob(db, jobId, { status: 'done', step: '' });
       await step.do('purge', async () => { await purgeOld(env); });
     } catch (e) {
@@ -560,7 +560,7 @@ export async function studioHelper(request, env, url, path, method) {
       if (d.clear_redo) { const o = JSON.parse(job.options || '{}'); delete o.redo; f.options = JSON.stringify(o); }
       if (['done', 'failed', 'stopped'].includes(st)) f.finished_at = now();
       await setJob(db, job.id, f);
-      if (st === 'done') await purgeOld(env);
+      if (st === 'done') { await autoVideo(env, db, job.id); await purgeOld(env); }
       return json({ ok: true });
     }
     // 그림 올리기 (PC 도우미): 본문 = webp/png 바이트, ?kind=slide|thumb&idx=N. 같은 자리의 전 그림은 지운다
@@ -607,7 +607,7 @@ async function createJob(env, gh, d) {
   const engine = ['cloud', 'pc', 'api', 'none'].includes(d.engine) ? d.engine : 'cloud';
   if (['api', 'none'].includes(engine) && !env.ANTHROPIC_API_KEY) throw bad('API 방식은 ANTHROPIC_API_KEY 가 있어야 합니다. 기본(클라우드 · 구독)으로 하세요.');
   if (engine === 'cloud' && !env.STUDIO_HELPER_TOKEN) throw bad('도우미 토큰(STUDIO_HELPER_TOKEN)이 아직 없습니다.');
-  const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000) };
+  const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000), video_auto: d.video !== false && d.video !== 'false' && d.video !== 0 };   // 완성되면 영상도(기본 켬, 사용자 지시 2026-11-10)
   if (d.scheduled) options.scheduled = String(d.scheduled).slice(0, 40);
   if (kind === 'thumb') Object.assign(options, { title: String(d.title || '').slice(0, 200), emotion: d.emotion || '자동', gesture: d.gesture || '자동', badgeName: String(d.badgeName || '').slice(0, 60), badgeRole: String(d.badgeRole || '').slice(0, 80), face: d.face || 'emoji:auto' });
   if (kind === 'thumb' && !options.title) throw bad('썸네일 제목을 넣어 주세요.');
@@ -652,6 +652,33 @@ export async function studioScheduled(env, gh) {
 }
 
 // ───────────────────────── 운영자 API ─────────────────────────
+
+// 스튜디오 영상 만들기(2026-11-10): show_texts + 슬라이드 그림 → clone(내 목소리) 스튜디오 작업. 카드 버튼과 "완성되면 자동"(options.video_auto) 둘 다 여기로
+export async function startStudioVideo(env, db, job, speed = 0.95) {
+  if (!env.CLONE || !env.CLONE_TOKEN) throw new HttpError(503, '내 목소리(clone)가 아직 연결되지 않았습니다.');
+  const texts = docJson(await latestDoc(db, job.id, 'show_texts')) || [];
+  const slides = (await jobAssets(db, job.id)).filter((a) => a.kind === 'slide');
+  const origin = 'https://xim.plators.com';
+  const list = texts.map((t, i) => { const a = slides.filter((s) => s.idx === i + 1).pop(); return a ? { idx: i + 1, image: `${origin}/studio/a/${a.id}`, text: String(t || '') } : null; }).filter((x) => x && x.text.trim());
+  if (!list.length) throw bad('슬라이드 그림과 원고가 아직 없습니다.');
+  const res = await env.CLONE.fetch(new Request('https://clone/api/jobs', { method: 'POST', headers: { 'X-Agent-Token': env.CLONE_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ speed, studio: { job_id: job.id, title: job.title || '', slides: list } }) }));
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new HttpError(res.status, out.error || '내 목소리 작업을 만들지 못했습니다.');
+  const jo = JSON.parse(job.options || '{}');
+  await setJob(db, job.id, { options: JSON.stringify({ ...jo, video_job: out.job?.id || '', video_at: now() }) });
+  return { id: out.job?.id || '', slides: list.length, chars: list.reduce((n, x) => n + x.text.length, 0) };
+}
+// 발표자료가 끝났을 때(도우미 보고 · Workflow) — 새 발표자료에서 "영상도 바로 만들기" 를 켰으면(기본) 자동으로 영상 작업을 건다
+async function autoVideo(env, db, jobId) {
+  try {
+    const job = await getJob(db, jobId);
+    const jo = JSON.parse(job?.options || '{}');
+    if (!job || job.kind !== 'main' || jo.video_auto === false || jo.video_job) return;
+    await startStudioVideo(env, db, job);
+  } catch (e) { try { await setJob(db, jobId, { error: `영상 자동 시작 실패: ${String(e.message || e).slice(0, 200)}` }); } catch { /* 무시 */ } }
+}
+
 export async function studioApi(request, env, url, ctx, path, method, bodyFn, audit, gh) {
   const db = env.DB;
   const m = (re) => path.match(re);
@@ -747,7 +774,7 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
     const engine = ['cloud', 'pc', 'api', 'none'].includes(d.engine) ? d.engine : 'cloud';
     if (['api', 'none'].includes(engine) && !env.ANTHROPIC_API_KEY) throw bad('API 방식은 ANTHROPIC_API_KEY 가 있어야 합니다. 기본(클라우드 · 구독)으로 하세요.');
     if (engine === 'cloud' && !env.STUDIO_HELPER_TOKEN) throw bad('도우미 토큰(STUDIO_HELPER_TOKEN)이 아직 없습니다.');
-    const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000) };
+    const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000), video_auto: d.video !== false && d.video !== 'false' && d.video !== 0 };   // 완성되면 영상도(기본 켬, 사용자 지시 2026-11-10)
     if (kind === 'thumb') Object.assign(options, { title: String(d.title || '').slice(0, 200), emotion: d.emotion || '자동', gesture: d.gesture || '자동', badgeName: String(d.badgeName || '').slice(0, 60), badgeRole: String(d.badgeRole || '').slice(0, 80), face: d.face || 'emoji:auto' });
     if (kind === 'thumb' && !options.title) throw bad('썸네일 제목을 넣어 주세요.');
     const id = hex(10);
@@ -804,21 +831,10 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
   if ((mm = m(/^\/api\/studio\/jobs\/([a-f0-9]{20})\/video$/)) && method === 'POST') {
     const job = await getJob(db, mm[1]);
     if (!job) throw new HttpError(404, '작업이 없습니다.');
-    if (!env.CLONE || !env.CLONE_TOKEN) throw new HttpError(503, '내 목소리(clone)가 아직 연결되지 않았습니다.');
-    const texts = docJson(await latestDoc(db, job.id, 'show_texts')) || [];
-    const slides = (await jobAssets(db, job.id)).filter((a) => a.kind === 'slide');
-    const origin = 'https://xim.plators.com';
-    const list = texts.map((t, i) => { const a = slides.filter((s) => s.idx === i + 1).pop(); return a ? { idx: i + 1, image: `${origin}/studio/a/${a.id}`, text: String(t || '') } : null; }).filter((x) => x && x.text.trim());
-    if (!list.length) throw bad('슬라이드 그림과 원고가 아직 없습니다.');
     const d = await bodyFn(request).catch(() => ({}));
-    const res = await env.CLONE.fetch(new Request('https://clone/api/jobs', { method: 'POST', headers: { 'X-Agent-Token': env.CLONE_TOKEN, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ speed: d.speed || 0.95, studio: { job_id: job.id, title: job.title || '', slides: list } }) }));
-    const out = await res.json().catch(() => ({}));
-    if (!res.ok) throw new HttpError(res.status, out.error || '내 목소리 작업을 만들지 못했습니다.');
-    const jo = JSON.parse(job.options || '{}');
-    await setJob(db, job.id, { options: JSON.stringify({ ...jo, video_job: out.job?.id || '', video_at: now() }) });
-    await audit?.('STUDIO_VIDEO', '스튜디오 영상', `${job.title || job.id} → ${out.job?.id || ''}`);
-    return json({ id: out.job?.id || '', slides: list.length, chars: list.reduce((n, x) => n + x.text.length, 0) });
+    const r = await startStudioVideo(env, db, job, d.speed || 0.95);
+    await audit?.('STUDIO_VIDEO', '스튜디오 영상', `${job.title || job.id} → ${r.id}`);
+    return json(r);
   }
   if ((mm = m(/^\/api\/studio\/jobs\/([a-f0-9]{20})\/(pick|thumb|stop|redo)$/)) && method === 'POST') {
     const job = await getJob(db, mm[1]);
