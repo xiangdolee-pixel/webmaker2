@@ -45,3 +45,14 @@ D:\ws\docs\tools\스튜디오도우미_시작.bat
 - 인물 사진 분류표 다시 만들기: `--catalog` (xim 의 사진이 바뀌었을 때만)
 - 작업 폴더: `D:\ws\docs\xim\<작업id>\` — 01/02/03 txt · shot2\1~6.png · 06_thumbnail.png · 04_slideshow.html (예전 result 폴더와 같은 구성)
 - 설정 파일: `D:\ws\docs\tools\_xim_helper.json` `{ url, token, browser, docs }`
+
+## 다른 PC 에서 코드 작업까지 이어가기
+
+도우미만이 아니라 **Claude Code 작업 자체를 다른 PC 에서 이어가는** 순서는 xim → 왼쪽 메뉴 **"다른 PC"** 화면에 복사용 명령과 함께 있다. 스크립트는 `xim/runner/setup-pc.ps1`:
+
+- `-Setup` 새 PC 세팅(저장소 2개 받기 · Claude 메모리를 비공개 ws 리포 `_claude/memory` 에 정션으로 연결 · 점검)
+- `-Sync` PC 를 옮기기 전 · 뒤에 메모리 · clone 코드 커밋 + 푸시, 두 저장소 pull
+- `-Startup helper|voice` 로그인할 때 자동 시작 등록
+- 인자 없음: 점검만
+
+내 목소리 처리기(GPU PC)는 비공개 ws 리포의 `clone/setup_pc.ps1`.

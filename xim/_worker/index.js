@@ -235,6 +235,8 @@ async function ximApi(request, env, url, ctx) {
     return json({ ok: true }, 200, { 'Set-Cookie': setCookie(XIM_COOKIE, '', 0) });
   }
   if (path === '/api/me') return json({ ok: true });
+  // 다른 PC 에 내 목소리 처리기를 깔 때 secrets.json 에 넣을 토큰 (운영자 로그인 뒤에만 — xim "다른 PC" 화면)
+  if (path === '/api/voice-agent-token' && method === 'GET') return json({ token: env.CLONE_TOKEN || '', url: 'https://clone.xiangdolee.workers.dev' });
   // 내 목소리 읽기: Worker `clone`(대기열 · 음성 저장)을 서비스 바인딩으로 대신 부른다 — 운영자 로그인은 위에서 확인했으니 처리기 토큰으로 통과
   //   /api/voice/jobs… → clone /api/jobs…,  /api/voice/audio/<id>.wav → clone /audio/<id>.wav,  /api/voice/me → clone /api/me
   if (path.startsWith('/api/voice/')) {

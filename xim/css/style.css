@@ -648,3 +648,29 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .st-titles-list li.is-thumb b { color: var(--ink); }
 .st-card-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .st-card-pair .btn { padding: 0 8px; }
+
+/* ───────── 다른 PC 에서 이어서 작업하기 (xim/js/pc.js) ───────── */
+.pc-guide .card { margin-bottom: 14px; }
+.pc-guide h3 { margin: 0 0 8px; font-size: 17px; }
+.pc-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pc-head h2 { margin: 0; }
+.pc-status { display: flex; gap: 8px; flex-wrap: wrap; }
+.pc-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--bg); color: var(--sub); font-size: 13px; }
+.pc-chip i { width: 8px; height: 8px; border-radius: 50%; background: #c0c4cf; }
+.pc-chip.on { color: #166534; background: #dcfce7; }
+.pc-chip.on i { background: #22c55e; }
+.pc-desc { margin: 0 0 10px; color: var(--sub); font-size: 14px; line-height: 1.7; }
+.pc-desc code, .pc-notes code { padding: 1px 5px; border-radius: 4px; background: var(--bg); font-size: 13px; }
+.pc-warn { margin: 0 0 10px; padding: 10px 12px; border-radius: var(--radius-sm); background: #fff7ed; color: #9a3412; font-size: 14px; line-height: 1.6; }
+.pc-steps { list-style: none; margin: 0; padding: 0; }
+.pc-step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
+.pc-step > div { min-width: 0; }
+.pc-step .n { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--brand, #4f46e5); color: #fff; font-size: 13px; }
+.pc-step h4 { margin: 3px 0 4px; font-size: 15px; }
+.pc-step p { margin: 0 0 6px; color: var(--sub); font-size: 14px; line-height: 1.6; }
+.pc-sub { margin-top: 8px !important; font-size: 13px !important; }
+.pc-cmd { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; }
+.pc-cmd pre { flex: 1; min-width: 0; margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--bg); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+.pc-notes { margin: 0; padding-left: 18px; color: var(--sub); font-size: 14px; line-height: 1.7; }
+.pc-notes li + li { margin-top: 6px; }
+@media (max-width: 599px) { .pc-cmd { flex-direction: column; } .pc-cmd .btn { align-self: flex-end; } }

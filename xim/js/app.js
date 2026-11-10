@@ -3,12 +3,13 @@ import { $, $$, esc, makeApi, fmtDate, badge, toast, pillTabs, slideTabs, formDa
 import { qrSvg } from './qr.js';
 import { renderStudio, stopStudio } from './studio.js';
 import { renderVoice, stopVoice } from './voice.js';
+import { renderPc } from './pc.js';
 
 const api = makeApi('/api');
 const view = $('#view');
 const TAB_KEY = 'xim.tab';
 let tab = 'sites';
-try { const t = localStorage.getItem(TAB_KEY); if (t && ['sites', 'customers', 'portfolio2', 'requests', 'studio', 'voice', 'monitor', 'security', 'audit', 'pricing'].includes(t)) tab = t; } catch { /* 저장소 못 쓰면 사이트 */ }   // F5 해도 보던 메뉴로 (사용자 지시 2026-11-09)
+try { const t = localStorage.getItem(TAB_KEY); if (t && ['sites', 'customers', 'portfolio2', 'requests', 'studio', 'voice', 'pc', 'monitor', 'security', 'audit', 'pricing'].includes(t)) tab = t; } catch { /* 저장소 못 쓰면 사이트 */ }   // F5 해도 보던 메뉴로 (사용자 지시 2026-11-09)
 let reqFilter = '';
 let reqSite = ''; // 사이트 카드의 '처리할 요청' 을 눌러 들어오면 그 사이트만
 let customers = [];
@@ -65,6 +66,7 @@ const NAV_ICON = {
   security: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
   studio: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M10 9l5 2.5-5 2.5zM8 21h8"/></svg>',
   voice: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>',
+  pc: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M2 20h20M9.5 9L7 11.5 9.5 14M14.5 9l2.5 2.5-2.5 2.5"/></svg>',
 };
 let navReady = false;
 function showApp() {
@@ -72,7 +74,7 @@ function showApp() {
   $('#app').hidden = false;
   if (!navReady) {
     navReady = true;
-    pillTabs($('#nav'), [['sites', '사이트'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리']], tab, (v) => {
+    pillTabs($('#nav'), [['sites', '사이트'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC']], tab, (v) => {
       tab = v;
       try { localStorage.setItem(TAB_KEY, v); } catch { /* 무시 */ }
       if (reqOpen && !(v === 'requests' && /^#req-\d+$/.test(location.hash))) { reqOpen = 0; if (location.hash) history.replaceState(null, '', location.pathname); }
@@ -167,7 +169,7 @@ function meter(name, sub, used, limit, cls) {
 
 function render() {
   guarded(async () => {
-    const noTiles = tab === 'studio' || tab === 'voice';   // 제작 도구 화면에서는 사이트 요약 타일을 숨긴다 (사용자 지시 2026-11-09)
+    const noTiles = tab === 'studio' || tab === 'voice' || tab === 'pc';   // 제작 도구 화면에서는 사이트 요약 타일을 숨긴다 (사용자 지시 2026-11-09)
     $('#tiles').hidden = noTiles;
     const tasks = noTiles ? [] : [renderTiles()];
     if (tab === 'sites') tasks.push(renderSites());
@@ -180,6 +182,7 @@ function render() {
     if (tab === 'pricing') renderPricing();
     if (tab === 'studio') tasks.push(renderStudio({ view, api, shrinkImage })); else stopStudio();
     if (tab === 'voice') tasks.push(renderVoice({ view, api })); else stopVoice();
+    if (tab === 'pc') tasks.push(renderPc({ view, api }));
     await Promise.all(tasks);
   });
 }
