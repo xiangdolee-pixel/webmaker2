@@ -167,7 +167,7 @@ async function runText(payload, work, { stage = 'run', onBlocks } = {}) {
         // 속도: 기사마다 독립 Claude Code 프로세스를 동시에 띄운다(오케스트레이터 1개 + 서브에이전트 6개보다 1~2분 빠름). 실패한 기사만 1회 재시도
         const one = async (it) => {
           const prompt = `${P.ARTICLE_FROM_URL(it.url, `${it.title} — ${it.summary}`)}\n${P.ARTICLE_SELFCHECK}\n\n★ WebFetch 로 URL 을 1회만 읽는다. 결과는 📌 로 시작하는 대본 텍스트만(마지막 줄 [인물] 포함). 설명 · 머리말 · 코드펜스 금지. 사용자에게 묻지 않는다.`;
-          const out = (await claude(prompt, { label: `기사 ${it.n}`, timeoutMin: 8 })).replace(/```[a-z]*\n?/g, '').trim();
+          const out = (await claude(prompt, { label: `기사 ${it.n}`, timeoutMin: 8, model: 'opus' })).replace(/```[a-z]*\n?/g, '').trim();
           const b = splitBlocks(out)[0];
           if (!b) throw new Error(`기사 ${it.n} 대본 형식 아님`);
           return b;
@@ -190,14 +190,14 @@ async function runText(payload, work, { stage = 'run', onBlocks } = {}) {
 각 대본 형식 · 문체:
 ${P.ARTICLE_FORMAT}
 결과: 대본 ${files.length}개를 순서대로, 블록 사이 빈 줄 1개로 이어 붙여 출력. 각 블록은 📌 로 시작. 설명 · 코드펜스 없이 대본만.`;
-        const b = splitBlocks((await claude(prompt, { cwd: work, label: '기사(캡쳐)' })).replace(/```[a-z]*\n?/g, ''));
+        const b = splitBlocks((await claude(prompt, { cwd: work, label: '기사(캡쳐)', model: 'opus' })).replace(/```[a-z]*\n?/g, ''));
         if (!b.length) throw new Error('대본 블록이 없습니다.');
         await j.doc('articles', b.join('\n\n'));
         return b;
       });
     } else {
       blocks = await stepRun(j, 'articles', '글 직접', async () => {
-        const b = splitBlocks((await claude(P.ARTICLE_FROM_TEXT(job.options.text || ''), { label: '기사(글)' })).replace(/```[a-z]*\n?/g, ''));
+        const b = splitBlocks((await claude(P.ARTICLE_FROM_TEXT(job.options.text || ''), { label: '기사(글)', model: 'opus' })).replace(/```[a-z]*\n?/g, ''));
         if (!b.length) throw new Error('대본 블록이 없습니다.');
         await j.doc('articles', b.join('\n\n'));
         return b;
@@ -213,7 +213,7 @@ ${P.ARTICLE_FORMAT}
     const catalog = payload.face_catalog ? JSON.parse(payload.face_catalog) : null;
     const faces = catalog?.faces?.length ? catalog.faces.map((f) => `${f.n}: ${f.emotion} / ${f.gesture} — ${f.desc}`).join('\n') : '(분류표 없음 — face 는 "auto" 로)';
     const out = await stepRun(j, 'package', '', async () => {
-      const o = parseJson(await claude(`${P.PACKAGE_SYSTEM}\n\n채널: ${job.channel} (${job.channel}스타일)\n\n인물 사진 목록(내 사진 87장):\n${faces}\n\n${blocks.map((b, i) => `[블록 ${i + 1}]\n${b}`).join('\n\n')}${JSON_ONLY}`, { label: '패키지', timeoutMin: 15 }), '패키지');
+      const o = parseJson(await claude(`${P.PACKAGE_SYSTEM}\n\n채널: ${job.channel} (${job.channel}스타일)\n\n인물 사진 목록(내 사진 87장):\n${faces}\n\n${blocks.map((b, i) => `[블록 ${i + 1}]\n${b}`).join('\n\n')}${JSON_ONLY}`, { label: '패키지', timeoutMin: 15, model: 'opus' }), '패키지');
       const f = o.factcheck || {};
       if (!Array.isArray(f.fixed_blocks) || f.fixed_blocks.length !== blocks.length) f.fixed_blocks = blocks.map((b) => b.replace(/\n\[인물\][^\n]*$/m, '').trim());
       f.fixed_blocks = f.fixed_blocks.map((b) => String(b).replace(/\n\[인물\][^\n]*$/m, '').trim());
@@ -567,7 +567,7 @@ async function catalog() {
   for (let i = 0; i < nums.length; i += 15) {
     const part = nums.slice(i, i + 15);
     log(`분류 ${part[0]}~${part[part.length - 1]}`);
-    const r = parseJson(await claude(`${P.FACE_CATALOG_SYSTEM}\n\n사진 파일(Read 로 하나씩 본다): ${part.map((n) => `${work}\\${n}.webp`).join(', ')} — n 은 파일 이름 숫자.${JSON_ONLY}`, { cwd: work, label: '분류', timeoutMin: 15 }), '분류');
+    const r = parseJson(await claude(`${P.FACE_CATALOG_SYSTEM}\n\n사진 파일(Read 로 하나씩 본다): ${part.map((n) => `${work}\\${n}.webp`).join(', ')} — n 은 파일 이름 숫자.${JSON_ONLY}`, { cwd: work, label: '분류', timeoutMin: 15, model: 'sonnet' }), '분류');
     all.push(...(r.faces || []));
   }
   await api('/api/studio/helper/settings/face_catalog', { method: 'PUT', body: { value: { faces: all, made_at: Date.now() } } });
