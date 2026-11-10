@@ -9,7 +9,8 @@
 //   diff 가 세 값 밖이면 normal. 그 밖(페이지 · /xms 관리 · /member)은 xim 공통 사이트 Worker 가 맡는다.
 //   바인딩: DB(D1 lastshot, 표는 schema.sql). 비밀번호 = PBKDF2(SHA-256, 100,000회, salt 16바이트). 세션 = 랜덤 32바이트 토큰, 180일.
 //   XMS_DB(D1 xms): 가입하면 xms 가입회원(members, site = XIM_SITE, 등급 9)에도 같은 아이디 · 비밀번호(xms 방식 10,000회)로 넣어
-//     관리 화면 /xms/ 회원관리에 보이고 /member/login 으로도 들어갈 수 있다. 전에 가입한 계정은 다음 로그인 때 넣는다. 실패해도 게임 가입 · 로그인은 그대로.
+//     관리 화면 /xms/ 회원관리에 보이고 /member/login 으로도 들어갈 수 있다. 전에 가입한 계정은 페이지를 열 때(/api/me) 임시 비밀번호로 넣어 두고(extra.pw_pending)
+//     다음에 비밀번호로 로그인하면 그때 맞춘다. 실패해도 게임 가입 · 로그인은 그대로.
 import site from '../../xim/_worker/site-worker.js';
 
 const TOP = 50;               // 난이도마다 상위 50 만 남긴다
@@ -55,18 +56,30 @@ async function newSession(db, userId, remember) {   // 로그인 유지(기본):
 }
 /* ── xms 가입회원과 맞추기 ── */
 const XMS_ITER = 10000;   // xms/_worker/lib.js PBKDF2_ITER 와 같아야 그쪽 로그인에서 비밀번호가 맞는다
+async function xmsHash(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  return { hash: hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: XMS_ITER }, key, 256)), salt: hex(salt) };
+}
+// password 가 없으면(세션으로 이미 들어와 있는 옛 계정) 아무도 모르는 임시 비밀번호로 넣고 extra.pw_pending 표시 → 나중에 비밀번호로 로그인하면 그때 맞춘다
 async function syncXms(env, ctx, id, nickname, password, created) {
   const db = env.XMS_DB, site = env.XIM_SITE;
   if (!db || !site) return;
   const job = (async () => {
-    const has = await db.prepare('SELECT id FROM members WHERE site = ? AND lower(login_id) = ?').bind(site, id).first();
-    if (has) return;
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-    const hash = hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: XMS_ITER }, key, 256));
+    const has = await db.prepare('SELECT id, extra FROM members WHERE site = ? AND lower(login_id) = ?').bind(site, id).first();
+    if (has) {
+      let extra = {}; try { extra = JSON.parse(has.extra || '{}') || {}; } catch {}
+      if (!password || !extra.pw_pending) return;
+      delete extra.pw_pending;
+      const { hash, salt } = await xmsHash(password);
+      await db.prepare('UPDATE members SET pw_hash = ?, pw_salt = ?, extra = ? WHERE id = ?').bind(hash, salt, JSON.stringify(extra), has.id).run();
+      return;
+    }
+    const pending = !password;
+    const { hash, salt } = await xmsHash(password || hex(crypto.getRandomValues(new Uint8Array(32))));
     const now = Date.now(), email = id.includes('@') ? id : '';
     await db.prepare(`INSERT OR IGNORE INTO members (site, login_id, pw_hash, pw_salt, name, nickname, level, email, mobile, phone, extra, last_login_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 9, ?, '', '', '{}', ?, ?)`).bind(site, id, hash, hex(salt), nickname, nickname, email, now, created || now).run();
+      VALUES (?, ?, ?, ?, ?, ?, 9, ?, '', '', ?, ?, ?)`).bind(site, id, hash, salt, nickname, nickname, email, pending ? '{"pw_pending":1}' : '{}', now, created || now).run();
   })().catch((e) => console.error('xms 회원 맞추기 실패', e));
   if (ctx) ctx.waitUntil(job); else await job;
 }
@@ -179,7 +192,7 @@ async function api(request, env, url, ctx) {
   if (p === '/api/me' || p === '/api/progress') {
     const u = await userOf(env.DB, request);
     if (!u) return json({ error: '로그인이 필요해요.' }, 401, cookieToken(request) ? clearCookie : {});
-    if (p === '/api/me' && m === 'GET') return json(me(u));
+    if (p === '/api/me' && m === 'GET') { await syncXms(env, ctx, u.login_id, u.nickname, null, u.created_at); return json(me(u)); }   // 로그인 유지로 들어온 옛 계정도 가입회원 표에
     if (p === '/api/progress' && m === 'PUT') return progress(request, env, u);
   }
   return json({ error: '지원하지 않는 요청입니다.' }, 405);
