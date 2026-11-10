@@ -674,3 +674,5 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .pc-notes { margin: 0; padding-left: 18px; color: var(--sub); font-size: 14px; line-height: 1.7; }
 .pc-notes li + li { margin-top: 6px; }
 @media (max-width: 599px) { .pc-cmd { flex-direction: column; } .pc-cmd .btn { align-self: flex-end; } }
+.qr-big svg { width: min(320px, 78vw); }   /* 사이트 접속 QR — 멀리서도 찍히게 크게 */
+.qr-url a { font-size: 16px; font-weight: 600; }

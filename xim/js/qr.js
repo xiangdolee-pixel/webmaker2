@@ -168,10 +168,10 @@ export function qrMatrix(text) {
 }
 
 // SVG 문자열 (흰 여백 4칸 포함)
-export function qrSvg(text, px = 220) {
+export function qrSvg(text, px = 220, label = "QR 코드") {
   const m = qrMatrix(text);
   const n = m.length + 8;
   let d = '';
   m.forEach((row, y) => row.forEach((dark, x) => { if (dark) d += `M${x + 4},${y + 4}h1v1h-1z`; }));
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" width="${px}" height="${px}" shape-rendering="crispEdges" role="img" aria-label="OTP 등록 QR 코드"><rect width="${n}" height="${n}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" width="${px}" height="${px}" shape-rendering="crispEdges" role="img" aria-label="${label}"><rect width="${n}" height="${n}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
 }

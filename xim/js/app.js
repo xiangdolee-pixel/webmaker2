@@ -221,6 +221,7 @@ async function renderSites() {
   view.querySelectorAll('[data-site]').forEach((el) => {
     const site = sites.find((s) => s.id === +el.dataset.site);
     el.querySelector('[data-act="edit"]').onclick = () => siteDialog(site);
+    el.querySelector('[data-act="qr"]').onclick = () => qrDialog(site);
     el.querySelector('[data-act="admins"]').onclick = () => adminsDialog(site);
     el.querySelector('[data-act="cms"]').onclick = (e) => busy(e.currentTarget, null, async () => {
       // 팝업 차단을 피하려고 먼저 빈 창을 열고 주소를 넣는다
@@ -499,12 +500,43 @@ function siteRow(s) {
     <div class="sr-act">
       <label class="pf-sw" title="켜면 포트폴리오(portfolio.plators.com)에 나옵니다"><input type="checkbox" data-pf${s.portfolio ? ' checked' : ''}><i aria-hidden="true"></i>포트폴리오</label>
       <a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">홈</a>
+      <button class="btn sm" type="button" data-act="qr" title="주소가 담긴 QR 코드 — 폰 카메라로 찍으면 바로 접속">QR</button>
       <button class="btn sm primary" type="button" data-act="cms">xms</button>
       <button class="btn sm" type="button" data-act="edit">수정</button>
       <button class="btn sm" type="button" data-act="admins">관리자</button>
       <button class="btn sm${s.status === 'active' ? ' danger' : ''}" type="button" data-act="toggle">${s.status === 'active' ? '정지' : '다시 운영'}</button>
     </div>
   </article>`;
+}
+
+// 사이트 주소 QR — 사람들이 물어보면 폰 카메라로 찍어 바로 들어가게 (사용자 요청 2026-11-10). 브라우저에서 직접 그린다(외부 QR 서비스 안 씀)
+function qrDialog(site) {
+  const url = site.url;
+  openDialog(`<h2>${esc(site.name)}</h2>
+    <p class="meta center">폰 카메라로 아래 QR 을 비추면 바로 접속됩니다</p>
+    <div class="qr qr-big">${qrSvg(url, 320, `${site.name} 접속 QR 코드`)}</div>
+    <p class="meta center qr-url"><a href="${esc(url)}" target="_blank" rel="noopener">${esc(url.replace(/^https?:\/\//, ''))}</a></p>
+    <div class="dlg-actions"><button class="btn" type="button" data-close>닫기</button><button class="btn" type="button" data-act="copy">주소 복사</button><button class="btn primary" type="button" data-act="png">PNG 저장</button></div>`, (dlg) => {
+    dlg.querySelector('[data-act="copy"]').onclick = async () => { try { await navigator.clipboard.writeText(url); toast('주소를 복사했습니다'); } catch { toast('복사하지 못했습니다'); } };
+    // SVG → PNG(여백 포함 1024px) 로 내려받기 — 인쇄물 · 명함 · 안내문에 붙이기용
+    dlg.querySelector('[data-act="png"]').onclick = () => {
+      const svg = dlg.querySelector('.qr svg');
+      const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' });
+      const img = new Image();
+      img.onload = () => {
+        const size = 1024, pad = 64;
+        const c = Object.assign(document.createElement('canvas'), { width: size, height: size });
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, pad, pad, size - pad * 2, size - pad * 2);
+        URL.revokeObjectURL(img.src);
+        const a = Object.assign(document.createElement('a'), { href: c.toDataURL('image/png'), download: `${site.slug}-qr.png` });
+        a.click();
+      };
+      img.src = URL.createObjectURL(blob);
+    };
+  });
 }
 
 const customerOptions = (selected) => `<option value="">— 고객 없음 —</option>${customers
@@ -1046,7 +1078,7 @@ async function otpOnDialog() {
       <li>아래 QR 코드를 찍습니다</li>
       <li>앱에 생긴 <b>xim</b> 의 6자리 번호를 넣고 등록</li>
     </ol>
-    <div class="qr">${qrSvg(setup.uri)}</div>
+    <div class="qr">${qrSvg(setup.uri, 220, 'OTP 등록 QR 코드')}</div>
     <p class="meta center">QR 을 못 찍으면 앱에서 "설정 키 입력" → <code class="key">${esc(setup.secret.replace(/(.{4})/g, '$1 ').trim())}</code></p>
     <form>
       <label class="field"><span>OTP 번호 6자리</span>
