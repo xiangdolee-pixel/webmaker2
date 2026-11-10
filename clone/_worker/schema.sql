@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   video      INTEGER NOT NULL DEFAULT 0,
   video_status TEXT,
   video_at   INTEGER,
-  video_error TEXT
+  video_error TEXT,
+  studio     TEXT                   -- 스튜디오 영상 작업이면 JSON {job_id, title, slides:[{idx, image, text}]} (2026-11-10 추가: ALTER TABLE jobs ADD COLUMN studio TEXT)
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created_at DESC);

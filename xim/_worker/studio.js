@@ -756,6 +756,26 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
       return json({ ok: true });
     }
   }
+  // 영상 만들기(2026-11-10 사용자 지시): 슬라이드 전부를 사자왕이 읽는 1280x720 자막 영상 — clone(내 목소리) 에 스튜디오 작업으로 넘긴다. 진행 · 결과는 xim "내 목소리" 목록에서 본다
+  if ((mm = m(/^\/api\/studio\/jobs\/([a-f0-9]{20})\/video$/)) && method === 'POST') {
+    const job = await getJob(db, mm[1]);
+    if (!job) throw new HttpError(404, '작업이 없습니다.');
+    if (!env.CLONE || !env.CLONE_TOKEN) throw new HttpError(503, '내 목소리(clone)가 아직 연결되지 않았습니다.');
+    const texts = docJson(await latestDoc(db, job.id, 'show_texts')) || [];
+    const slides = (await jobAssets(db, job.id)).filter((a) => a.kind === 'slide');
+    const origin = 'https://xim.plators.com';
+    const list = texts.map((t, i) => { const a = slides.filter((s) => s.idx === i + 1).pop(); return a ? { idx: i + 1, image: `${origin}/studio/a/${a.id}`, text: String(t || '') } : null; }).filter((x) => x && x.text.trim());
+    if (!list.length) throw bad('슬라이드 그림과 원고가 아직 없습니다.');
+    const d = await bodyFn(request).catch(() => ({}));
+    const res = await env.CLONE.fetch(new Request('https://clone/api/jobs', { method: 'POST', headers: { 'X-Agent-Token': env.CLONE_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ speed: d.speed || 0.95, studio: { job_id: job.id, title: job.title || '', slides: list } }) }));
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new HttpError(res.status, out.error || '내 목소리 작업을 만들지 못했습니다.');
+    const jo = JSON.parse(job.options || '{}');
+    await setJob(db, job.id, { options: JSON.stringify({ ...jo, video_job: out.job?.id || '', video_at: now() }) });
+    await audit?.('STUDIO_VIDEO', '스튜디오 영상', `${job.title || job.id} → ${out.job?.id || ''}`);
+    return json({ id: out.job?.id || '', slides: list.length, chars: list.reduce((n, x) => n + x.text.length, 0) });
+  }
   if ((mm = m(/^\/api\/studio\/jobs\/([a-f0-9]{20})\/(pick|thumb|stop|redo)$/)) && method === 'POST') {
     const job = await getJob(db, mm[1]);
     if (!job) throw new HttpError(404, '작업이 없습니다.');

@@ -168,6 +168,8 @@ async function renderList() {
     if (act) {
       e.stopPropagation();
       if (act.dataset.cardAct === 'show') return;
+      if (act.dataset.cardAct === 'video') { makeVideo(c.dataset.id, act); return; }       // 슬라이드 전부를 사자왕이 읽는 영상(2026-11-10)
+      if (act.dataset.cardAct === 'video-open') { try { localStorage.setItem('xim.tab', 'voice'); } catch { /* 무시 */ } location.hash = ''; location.reload(); return; }
       if (act.dataset.cardAct === 'dl') { const j = jobs.find((x) => x.id === c.dataset.id); if (j?.thumb) downloadThumb(j.thumb, j.id); return; }   // 바로 내려받기
       resTab = act.dataset.cardAct;   // 썸네일 · 유튜브 버튼은 그 탭으로 바로
     }
@@ -188,8 +190,21 @@ function jobCard(j) {
         <a class="btn primary" href="/studio/show/${j.id}" target="_blank" rel="noopener" data-card-act="show">▶ 방송용 슬라이드쇼 새 창으로 열기</a>
         <div class="st-card-pair"><button class="btn" type="button" data-card-act="thumb">🖼 썸네일 메뉴</button><button class="btn" type="button" data-card-act="dl" ${j.thumb ? '' : 'disabled'}>⬇ 썸네일 다운로드</button></div>
         <button class="btn" type="button" data-card-act="yt">📺 유튜브 (제목 · 인트로 · 더보기)</button>
+        <div class="st-card-pair"><button class="btn" type="button" data-card-act="video">🎬 영상 만들기</button>${j.options?.video_job ? `<button class="btn" type="button" data-card-act="video-open">▶ 영상 보기 (내 목소리)</button>` : ''}</div>
       </div>` : ''}
     </div></article>`;
+}
+
+// ───────── 영상 만들기 ─────────
+async function makeVideo(id, btn) {
+  const { api } = deps;
+  if (!confirm('이 발표자료의 슬라이드 전부를 사자왕이 원고대로 읽는 영상(1280x720, 자막)을 만듭니다.\n음성 30분 안팎 걸리고, 진행 상황과 완성 영상은 "내 목소리" 메뉴에서 봅니다. 시작할까요?')) return;
+  btn.disabled = true;
+  try {
+    const r = await api(`/studio/jobs/${id}/video`, { method: 'POST', data: {} });
+    toast?.(`영상 작업 시작 — 슬라이드 ${r.slides}장 · ${r.chars.toLocaleString('ko-KR')}자. "내 목소리" 에서 진행을 볼 수 있어요.`) ?? alert('영상 작업을 시작했습니다. "내 목소리" 메뉴에서 진행을 볼 수 있어요.');
+    renderList();
+  } catch (e) { alert(e.message || e); btn.disabled = false; }
 }
 
 // ───────── 새 작업 ─────────

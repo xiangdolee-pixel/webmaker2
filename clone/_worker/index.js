@@ -98,7 +98,8 @@ async function handle(request, env, ctx) {
       // 1시간 넘게 running 인 것은 PC 가 중간에 꺼진 것 → 다시 대기열로
       await db.prepare("UPDATE jobs SET status = 'queued', started_at = NULL WHERE status = 'running' AND started_at < ?").bind(now() - STALE_MS).run();
       const job = await db.prepare(`UPDATE jobs SET status = 'running', started_at = ?1, attempts = attempts + 1, error = NULL
-        WHERE id = (SELECT id FROM jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1) RETURNING id, text, speed, attempts, video`).bind(now()).first();
+        WHERE id = (SELECT id FROM jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1) RETURNING id, text, speed, attempts, video, studio`).bind(now()).first();
+      if (job && job.studio) { try { job.studio = JSON.parse(job.studio); } catch { job.studio = null; } }
       return json({ job: job || null });
     }
     const m = path.match(/^\/api\/agent\/jobs\/([\w-]+)\/(result|fail|timings|video|video-fail)$/);
@@ -154,14 +155,25 @@ async function handle(request, env, ctx) {
     return json({ jobs: results, agent: await agentStatus(db), sec_per_char: await pace(db), video_sec_per_sec: await videoPace(db) });
   }
   if (path === '/api/jobs' && method === 'POST') {
-    const { text, speed, video } = await body(request);
-    const t = String(text ?? '').replace(/\r\n?/g, '\n').trim();
-    if (!t) throw new HttpError(400, '읽을 글을 넣어 주세요.');
-    if (t.length > MAX_CHARS) throw new HttpError(400, `한 번에 ${MAX_CHARS.toLocaleString('ko-KR')}자까지만 됩니다. (지금 ${t.length.toLocaleString('ko-KR')}자)`);
+    const { text, speed, video, studio } = await body(request);
+    // 스튜디오 영상(2026-11-10): xim 스튜디오 카드 "영상 만들기" → {studio: {job_id, title, slides: [{idx, image, text}]}}. 슬라이드마다 원고를 읽고 1~2초 쉬며 넘어가는 1280x720 자막 영상
+    let st = null, t;
+    if (studio && Array.isArray(studio.slides) && studio.slides.length) {
+      const slides = studio.slides.map((s, i) => ({ idx: +s.idx || i + 1, image: String(s.image || ''), text: String(s.text || '').replace(/\r\n?/g, '\n').trim() })).filter((s) => s.text && /^https?:\/\//.test(s.image));
+      if (!slides.length) throw new HttpError(400, '슬라이드 그림과 원고가 없습니다.');
+      st = { job_id: String(studio.job_id || '').slice(0, 40), title: String(studio.title || '').slice(0, 200), slides };
+      t = slides.map((s) => s.text).join('\n\n');
+      if (t.length > MAX_CHARS * 4) throw new HttpError(400, `원고가 너무 깁니다(${t.length.toLocaleString('ko-KR')}자).`);
+    } else {
+      t = String(text ?? '').replace(/\r\n?/g, '\n').trim();
+      if (!t) throw new HttpError(400, '읽을 글을 넣어 주세요.');
+      if (t.length > MAX_CHARS) throw new HttpError(400, `한 번에 ${MAX_CHARS.toLocaleString('ko-KR')}자까지만 됩니다. (지금 ${t.length.toLocaleString('ko-KR')}자)`);
+    }
     const sp = Math.min(1.3, Math.max(0.8, parseFloat(speed) || 1));
     const id = newId();
-    const wantVideo = video === true || video === 1 || video === '1' || video === 'on' ? 1 : 0;   // 사자왕 영상도 함께(립싱크, 음성 뒤에 만들어짐)
-    await db.prepare('INSERT INTO jobs (id, created_at, status, title, text, chars, speed, video, video_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, now(), 'queued', titleOf(t), t, t.length, sp, wantVideo, wantVideo ? 'pending' : null).run();
+    const wantVideo = st || video === true || video === 1 || video === '1' || video === 'on' ? 1 : 0;   // 사자왕 영상도 함께(음성 뒤에 만들어짐)
+    const title = st ? `[스튜디오 영상] ${st.title || titleOf(t)}` : titleOf(t);
+    await db.prepare('INSERT INTO jobs (id, created_at, status, title, text, chars, speed, video, video_status, studio) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, now(), 'queued', title, t, t.length, sp, wantVideo, wantVideo ? 'pending' : null, st ? JSON.stringify(st) : null).run();
     const job = await db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE id = ?`).bind(id).first();
     return json({ job, agent: await agentStatus(db) }, 201);
   }
