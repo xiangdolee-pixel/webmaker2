@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, DIFFS, diffOf, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile, snapshot, restore, mslGain, moneyMissiles } from './core.js?v=30';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, DIFFS, diffOf, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile, snapshot, restore, mslGain, moneyMissiles } from './core.js?v=31';
 import { SPRITES } from './sprites.js?v=17';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
@@ -315,6 +315,13 @@ const BSTYLE = [
   { c: col('#2f8cff'), head: col('#5cb8ff'), w: .9, l: .75, hs: 1.1 },
   { c: col('#a855f7'), head: col('#f5edff'), w: 1.7, l: 3.2, hs: 1.4 }
 ];
+
+/* ── 보스 탄(피해야 하는 것): 풀 300, 카메라를 보는 원판 3겹 — 어두운 테두리 · 주황/자홍 몸통 · 흰 중심 ── */
+const OCAP = 300, texDisc = radial([[0, 'rgba(255,255,255,1)'], [.78, 'rgba(255,255,255,1)'], [1, 'rgba(255,255,255,0)']]); texDisc.userData.keep = true;
+const orbLayer = (op) => { const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: texDisc, transparent: true, depthWrite: false, opacity: op }), OCAP); m.frustumCulled = false; m.setColorAt(0, new THREE.Color(1, 1, 1)); m.count = 0; scene.add(m); return m; };
+const orbRim = orbLayer(.85), orbBody = orbLayer(1), orbCore = orbLayer(1);
+const ORBC = { o: { body: col('#ff7a1a'), rim: col('#3a1004') }, m: { body: col('#ff2fd0'), rim: col('#3a0431') } };
+const WHITE = new THREE.Color('#fff');
 
 /* ── 불꽃(더하기 빛) · 연기 · 파편 ── */
 function pool(cap, mesh) { mesh.count = 0; mesh.frustumCulled = false; scene.add(mesh); return { mesh, list: [], cap }; }
@@ -1021,6 +1028,18 @@ function render(dt) {
     }
     bullets.count = heads.count = b;
     for (const m of [bullets, heads]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+    // 보스 탄: 3겹 원판, 살짝 맥동
+    let oc = 0; const pulse = 1 + Math.sin(T * 14) * .08;
+    for (const o of (G.orbs || [])) {
+      if (oc >= OCAP) break;
+      const C2 = ORBC[o.c] || ORBC.o, s = o.r * S * 2 * pulse;
+      M4.compose(V.set(wx(o.x), 1.4, wz(o.y)), cq, SC.setScalar(s * 1.5)); orbRim.setMatrixAt(oc, M4); orbRim.setColorAt(oc, C2.rim);
+      M4.compose(V.set(wx(o.x), 1.45, wz(o.y)), cq, SC.setScalar(s * 1.15)); orbBody.setMatrixAt(oc, M4); orbBody.setColorAt(oc, C2.body);
+      M4.compose(V.set(wx(o.x), 1.5, wz(o.y)), cq, SC.setScalar(s * .5)); orbCore.setMatrixAt(oc, M4); orbCore.setColorAt(oc, WHITE);
+      oc++;
+    }
+    orbRim.count = orbBody.count = orbCore.count = oc;
+    for (const m of [orbRim, orbBody, orbCore]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
     // 총구 불꽃 · LV3 레이저 고리
     if (G.flash > .05 && state === 'play') {
       const m = Math.min(pos.length, 10), fc = G.tier === 2 ? '#c4a8ff' : G.tier === 1 ? '#7fd0ff' : '#ffd36a';
@@ -1030,7 +1049,7 @@ function render(dt) {
     syncViews(dt);
     // 보스 등장 알림
     if (G.boss && !bossSeen) { bossSeen = true; bossWarn = 2; SFX.alarm(); buzz([40, 60, 40]); }
-  } else bullets.count = heads.count = 0;
+  } else bullets.count = heads.count = orbRim.count = orbBody.count = orbCore.count = 0;
   flushSoldiers();
   updateFx(dt); updateRings(dt); updateBlasts(dt); updateBolts(dt);
   shake = Math.max(0, shake - dt);
