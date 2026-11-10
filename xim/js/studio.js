@@ -190,7 +190,7 @@ function jobCard(j) {
         <a class="btn primary" href="/studio/show/${j.id}" target="_blank" rel="noopener" data-card-act="show">▶ 방송용 슬라이드쇼 새 창으로 열기</a>
         <div class="st-card-pair"><button class="btn" type="button" data-card-act="thumb">🖼 썸네일 메뉴</button><button class="btn" type="button" data-card-act="dl" ${j.thumb ? '' : 'disabled'}>⬇ 썸네일 다운로드</button></div>
         <button class="btn" type="button" data-card-act="yt">📺 유튜브 (제목 · 인트로 · 더보기)</button>
-        <div class="st-card-pair"><button class="btn" type="button" data-card-act="video">🎬 영상 만들기</button>${j.options?.video_job ? `<button class="btn" type="button" data-card-act="video-open">▶ 영상 보기 (내 목소리)</button>` : ''}</div>
+        <div class="st-card-pair"><button class="btn" type="button" data-card-act="video">🎬 영상 만들기</button>${j.options?.video_job ? `<button class="btn" type="button" data-card-act="video-open">▶ 영상 보기 · 다운로드</button>` : ''}</div>
       </div>` : ''}
     </div></article>`;
 }
