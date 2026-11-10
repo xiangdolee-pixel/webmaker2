@@ -69,7 +69,7 @@ export async function renderPc({ view, api }) {
         <ol class="pc-steps">
           ${step(1, '도우미 설정 점검 (토큰 포함 — 이 줄은 남에게 보여 주지 마세요)', code(helperCmd))}
           ${step(2, 'ChatGPT 로그인 (한 번)', `<p>자동화 전용 프로필 창이 뜨면 chatgpt.com 에 로그인하고 창을 닫습니다.</p>${code(CMD.helperLogin)}`)}
-          ${step(3, '켜기 · 자동 시작', `<p>지금 켜려면 첫 줄, 로그인할 때마다 자동으로 켜지게 하려면 둘째 줄. <b>원래 PC 의 도우미는 꺼 두세요.</b></p>${code(CMD.helperStart)}${code(CMD.helperAuto)}`)}
+          ${step(3, '켜기 · 자동 시작', `<p>지금 켜려면 첫 줄, 로그인할 때마다 자동으로 켜지고 꺼지면 2분 안에 다시 켜지게(워치독) 하려면 둘째 줄. <b>원래 PC 의 도우미는 꺼 두세요</b>(그 PC 에서 시작프로그램의 bat 을 지우고 <code>schtasks /Delete /TN xim_watchdog /F</code>).</p>${code(CMD.helperStart)}${code(CMD.helperAuto)}`)}
         </ol>
       </div>
 
@@ -79,7 +79,7 @@ export async function renderPc({ view, api }) {
         <p class="pc-warn">이 설치 스크립트는 지금 PC 에서 손으로 했던 순서를 옮겨 적은 것이라 새 PC 에서 아직 끝까지 돌려 보지 못했습니다. 막히면 그 화면을 Claude Code 에게 보여 주며 "clone/setup_pc.ps1 돌리다 여기서 막혔어" 라고 하면 됩니다.</p>
         <ol class="pc-steps">
           ${step(1, '설치 + 토큰 (토큰 포함 — 이 줄은 남에게 보여 주지 마세요)', code(voiceCmd))}
-          ${step(2, '켜기 · 자동 시작', `<p>TTS 서버와 처리기 창 두 개가 최소화돼 뜹니다. 내 목소리 화면 오른쪽 위 표시가 켜짐으로 바뀌면 됩니다. <b>원래 PC 의 처리기는 꺼 두세요.</b></p>${code(CMD.voiceStart)}${code(CMD.voiceAuto)}`)}
+          ${step(2, '켜기 · 자동 시작', `<p>TTS 서버와 처리기 창 두 개가 최소화돼 뜹니다. 내 목소리 화면 오른쪽 위 표시가 켜짐으로 바뀌면 됩니다. 둘째 줄은 로그인 때 자동 시작 + 꺼지면 2분 안에 다시 켜는 워치독. <b>원래 PC 의 처리기는 꺼 두세요.</b></p>${code(CMD.voiceStart)}${code(CMD.voiceAuto)}`)}
         </ol>
       </div>
 

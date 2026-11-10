@@ -143,7 +143,15 @@ function RegisterStartup($what) {
   # 한글 경로가 든 bat 은 cp949 로 써야 시작프로그램에서 깨지지 않는다
   [IO.File]::WriteAllText((Join-Path $dir $name), $content, [Text.Encoding]::GetEncoding(949))
   Write-Host ($label + ' 자동 시작 등록: ' + (Join-Path $dir $name)) -ForegroundColor Green
-  Write-Host '  지금 바로 켜려면 그 bat 을 더블클릭. 로그인할 때마다 자동으로 켜집니다.'
+  # 워치독: 2분마다 도우미 · TTS 서버 · 처리기가 죽어 있으면 다시 켠다(이 PC 에 설정 파일이 있는 것만) — 창을 닫거나 오류로 꺼져도 2분 안에 복구
+  $wd = "$WS\docs\tools\xim_watchdog.ps1"
+  if (Test-Path $wd) {
+    & schtasks /Create /TN 'xim_watchdog' /SC MINUTE /MO 2 /F /TR ('powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ' + $wd) | Out-Null
+    if ($LASTEXITCODE -eq 0) { Write-Host '워치독 등록: 2분마다 살펴 꺼져 있으면 다시 켭니다 (예약 작업 xim_watchdog)' -ForegroundColor Green }
+    else { Write-Host '  워치독 예약 작업을 못 만들었습니다(권한) — 로그인 때 자동 시작만 됩니다' -ForegroundColor Yellow }
+  }
+  Write-Host '  지금 바로 켜려면 그 bat 을 더블클릭(워치독이 있으면 2분 안에 저절로 켜짐). 로그인할 때마다 자동으로 켜집니다.'
+  Write-Host '  이 PC 가 그 일을 그만둘 때: 시작프로그램의 bat 을 지우고  schtasks /Delete /TN xim_watchdog /F' -ForegroundColor DarkGray
 }
 
 # ───────── 실행 ─────────
