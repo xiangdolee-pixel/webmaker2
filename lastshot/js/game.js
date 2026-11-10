@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, DIFFS, diffOf, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=28';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, DIFFS, diffOf, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile, snapshot, restore } from './core.js?v=29';
 import { SPRITES } from './sprites.js?v=17';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
@@ -35,7 +35,7 @@ const randName = () => ADJ[Math.floor(Math.random() * ADJ.length)] + ' ' + ANI[M
 let run = load('lastshot_run', 0);
 if (load('lastshot_live', 0) === 1) { run = 0; save('lastshot_run', 0); save('lastshot_live', 0); }   // 판 도중에 나갔으면 이어 온 점수는 끊긴다
 let lastFinal = 0;
-const score = () => state === 'end' && G && G.over === -1 ? lastFinal : run + (G && (state === 'play' || (state === 'dying' && !G.committed)) ? G.score : 0);   // 끝난 뒤에는 run 에 이미 더해져 있다
+const score = () => state === 'end' && G && G.over === -1 ? lastFinal : run + (G && (state === 'play' || state === 'paused' || (state === 'dying' && !G.committed)) ? G.score : 0);   // 끝난 뒤에는 run 에 이미 더해져 있다
 const fmt = n => Math.round(n).toLocaleString('ko-KR');
 const touchy = () => matchMedia('(hover: none)').matches;
 
@@ -994,7 +994,7 @@ const hooks = {
   }
 };
 function render(dt) {
-  T += dt; if (state !== 'menu') walkT += dt * 11;
+  T += dt; if (state !== 'menu' && state !== 'paused') walkT += dt * 11;
   beginSoldiers();
   if (G) {
     // 부대: 늘어난 병사는 톡 튀어나온다
@@ -1053,6 +1053,7 @@ addEventListener('keydown', e => {
   if (LR[e.code] && !(e.target && e.target.tagName === 'INPUT')) { keys[e.code] = true; e.preventDefault(); }
   if (e.target && /^(INPUT|BUTTON)$/.test(e.target.tagName) && state !== 'play') { if (state === 'end' && e.target.tagName === 'BUTTON' && (e.repeat || performance.now() - endAt < 800 || rankLoading)) e.preventDefault(); return; } // 이름 넣는 중 · 버튼 위에서는 그 요소가 받는다
   if ((e.code === 'Space' || e.code === 'KeyM') && state === 'play') { e.preventDefault(); if (!e.repeat) shootMissile(); return; }
+  if ((e.key === 'Enter' || e.code === 'Space') && state === 'paused') { e.preventDefault(); if (!e.repeat) resumeGo(); return; }
   if ((e.key === 'Enter' || e.code === 'Space') && (state === 'menu' || state === 'end')) {
     e.preventDefault();
     if (e.repeat || (state === 'end' && (performance.now() - endAt < 800 || rankLoading))) return;
@@ -1087,6 +1088,7 @@ function loop(t) {
     if (G.over === 1) { state = 'dying'; slow = 1.2; endTimer = 2.2; commitWin(); clearBurst(); }
     else if (G.over === -1) { state = 'dying'; endTimer = .9; }
     syncHud(dt);
+    snapTimer += real; if (snapTimer >= 4) { snapTimer = 0; saveSnap(); }
   } else if (state === 'dying') {
     endTimer -= real; syncHud(dt); if (endTimer <= 0) end(G.over === 1);
   } else if (state === 'menu') moveEnv(4 * dt, dt);
@@ -1101,7 +1103,7 @@ function commitWin() {
   level++; save('lastshot_level', level);
   if (level > best) { best = level; save('lastshot_best', best); }
   save('lastshot_live', 0); G.committed = bonus;
-  pushProgress();
+  clearSnap(); pushProgress({ state: null });
   fxFloat(G.px, -80, '클리어 보너스 +' + fmt(bonus), '#fde047', 26);
 }
 function clearBurst() {   // 보스를 쓰러뜨렸을 때: 꽃가루 · CLEAR 외침
@@ -1113,14 +1115,17 @@ let moneyNext = false;   // 다음 판을 'Show me the money' 로 시작
 function start() {
   audio();
   if (!user && !dbg) { front(); return; }   // 회원가입(로그인)해야 게임이 나온다
-  $('#ovAuth').hidden = true; $('#ovStart').hidden = true; $('#ovEnd').hidden = true; $('#ovRank').hidden = true;
+  if (pending) { showResume(); resumeGo(); return; }   // '이어서 하기' 버튼: 저장된 판을 바로 이어서
+  pushSub();
+  $('#ovAuth').hidden = true; $('#ovStart').hidden = true; $('#ovResume').hidden = true; $('#ovEnd').hidden = true; $('#ovRank').hidden = true;
   clearViews(); texts.length = 0; coins.length = 0; confetti.length = 0; bodies.length = 0; inFlight = 0; shout = null; bossWarn = 0; bossSeen = false;
   born.length = 0; lastN = 3; squadPop = 0; hitstop = 0; dragId = null; dragX = null; scoreAt = null; slow = 0; kick = 0; tint = null; flashW = 0; shake = 0; comboPop = 0;
   save('lastshot_live', 1);   // 판 도중 새로고침 = 쓰러진 것으로(누적 점수를 지키려는 새로고침 막기)
   const fails = load('lastshot_fail_lv', 0) === level ? load('lastshot_fails', 0) : 0;
   const money = moneyNext; moneyNext = false;
   G = newGame(level, hooks, { help: fails, money, diff }); state = 'play'; setTheme((G.L - 1) % 5); banner = bannerL = G.twist ? 2.6 : 1.9; dispScore = score(); syncHud(0);
-  btnMsl.hidden = false;
+  btnMsl.hidden = false; snapTimer = 0;
+  clearSnap(); pushProgress({ state: null });   // 레벨 시작 저장(누적 점수 · 레벨 · 난이도)
   if (G.money) setTimeout(() => { if (G && state === 'play') { shout = { s: 'SHOW ME THE MONEY!', c: '#fde047', t: 1.8, L: 1.8, sub: '병사 ' + G.n + '명 · 유도탄 ' + G.missiles + '발', big: true }; SFX.promote(); addConfetti(60); } }, 2700);
   else if (G.help) setTimeout(() => { if (G && state === 'play') { shout = { s: '지원군 도착!', c: '#86efac', t: 1.6, L: 1.6, sub: '유도탄 ' + G.missiles + '발 · 병사 +' + G.help * 8 + ' · 적이 줄었어요' }; SFX.power(); } }, 2700);
 }
@@ -1130,9 +1135,14 @@ function countUp(el, to, ms = 900) {
   const tick = n => { const a = Math.min(1, (n - t0) / ms), e = 1 - Math.pow(1 - a, 3); el.textContent = fmt(from + (to - from) * e); if (a < 1) requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
 }
+// 졌을 때 장부: 같은 레벨에서 연속으로 진 횟수(지원군) · 누적 점수는 0 부터 · 계정에 저장(스냅샷은 지움)
+function loseBook() {
+  const f = load('lastshot_fail_lv', 0) === G.L ? load('lastshot_fails', 0) : 0; save('lastshot_fail_lv', G.L); save('lastshot_fails', f + 1);
+  lastFinal = run + G.score; run = 0; save('lastshot_run', 0);
+  clearSnap(); pushProgress({ state: null });
+}
 function end(win) {
-  if (win) save('lastshot_fails', 0);
-  else { const f = load('lastshot_fail_lv', 0) === G.L ? load('lastshot_fails', 0) : 0; save('lastshot_fail_lv', G.L); save('lastshot_fails', f + 1); }   // 같은 레벨에서 연속으로 진 횟수
+  if (win) save('lastshot_fails', 0); else loseBook();
   state = 'end'; btnMsl.hidden = true; endAt = performance.now(); save('lastshot_live', 0);
   inFlight = 0; coins.length = 0;
   const btn = $('#btnNext');
@@ -1149,9 +1159,7 @@ function end(win) {
     $('#endSub').innerHTML = [`레벨 ${level} · ${pct}%까지`, G.bestCombo >= 3 ? `최고 콤보 ${G.bestCombo}` : ''].filter(Boolean).map(s => `<span class="nw">${s}</span>`).join(' · ');
     $('#endScoreBox').hidden = true;
     btn.textContent = '다시 도전'; btn.classList.add('red'); SFX.lose(); buzz(200);
-    const final = run + G.score; lastFinal = final;
-    run = 0; save('lastshot_run', 0);
-    showRank(final, level, G.diff);
+    showRank(lastFinal, level, G.diff);
   }
   $('#ovEnd').hidden = false; syncHud(0);
   if (!touchy()) setTimeout(() => { try { btn.focus({ preventScroll: true }); } catch (e) {} }, 50);
@@ -1194,23 +1202,89 @@ async function api(path, method = 'GET', body) {
   if (!r.ok) throw Object.assign(new Error(out.error || '서버 오류가 났어요.'), { status: r.status, out });
   return out;
 }
-const diffSeg = seg($('#diffSeg'), DIFF_ITEMS, diff, v => { diff = v; save('lastshot_diff', v); syncHud(0); pushProgress(); });
+const diffSeg = seg($('#diffSeg'), DIFF_ITEMS, diff, v => { diff = v; save('lastshot_diff', v); if (pending) { run = 0; save('lastshot_run', 0); clearSnap(); pushProgress({ state: null }); } else pushProgress(); syncHud(0); });   // 이어할 판이 있는데 난이도를 바꾸면 그 판은 버리고 새 판(누적 점수 0 부터)
 function applyMe(me) {
-  user = me; level = me.level || 1; best = Math.max(level, me.best || 1); diff = diffOf(me.diff);
-  save('lastshot_level', level); save('lastshot_best', best); save('lastshot_diff', diff); save('lastshot_name', me.nickname);
+  user = me; level = me.level || 1; best = Math.max(level, me.best || 1); diff = diffOf(me.diff); run = me.run || 0;
+  save('lastshot_level', level); save('lastshot_best', best); save('lastshot_diff', diff); save('lastshot_name', me.nickname); save('lastshot_run', run);
+  save('lastshot_fail_lv', me.fail_lv || 0); save('lastshot_fails', me.fails || 0);
+  pending = dbg ? null : pickSnap(me.state); resumeFresh = !!pending; if (pending) { diff = diffOf(pending.diff); run = pending.run || 0; save('lastshot_run', run); } paintStart();
   diffSeg.set(diff, true); $('#whoNick').textContent = me.nickname;
   if (state === 'menu') { G = preview(); lastN = G.n; }
   syncHud(0);
 }
 let pushing = null;
-function pushProgress() {   // 레벨 클리어 · 처음부터 · 난이도 바꿀 때 — 실패해도 게임은 계속(다음 저장 때 같이 올라간다)
+const progBody = () => ({ level, best, diff, run, fail_lv: load('lastshot_fail_lv', 0), fails: load('lastshot_fails', 0) });
+function pushProgress(extra) {   // 레벨 시작 · 클리어 · 패배 · 처음부터 · 난이도 바꿀 때 — 실패해도 게임은 계속(다음 저장 때 같이 올라간다). extra.state = null 이면 스냅샷 지움
   if (!user) return;
-  pushing = api('/api/progress', 'PUT', { level, best, diff }).catch(e => { if (e.status === 401) user = null; });
+  pushing = api('/api/progress', 'PUT', Object.assign(progBody(), extra || {})).catch(e => { if (e.status === 401) user = null; });
+}
+/* ── 판 중간 저장(스냅샷): 로그인한 사람만. 4초마다 · 화면을 떠날 때 localStorage + 서버(state). 다시 열면 둘 중 새것으로 이어서 ── */
+const SNAP_V = 1, SNAP_MAX = 100000;
+let pending = null, snapTimer = 0, resumeFresh = false;   // pending = 이어할 판 { v, L, diff, run, t, G }. resumeFresh = 방금 불러온 것(바로 일시정지 화면으로)
+const makeSnap = () => ({ v: SNAP_V, L: G.L, diff: G.diff, run, t: Date.now(), G: snapshot(G) });
+function saveSnap(leaving) {
+  if (state !== 'play' || !G || G.over || !user || dbg) return null;
+  let snap, js;
+  try { snap = makeSnap(); js = JSON.stringify(snap); } catch (e) { return null; }
+  if (js.length > SNAP_MAX) return null;   // 너무 크면 이번엔 건너뛴다(100KB 상한)
+  try { localStorage.setItem('lastshot_snap', js); } catch (e) {}
+  const body = JSON.stringify(Object.assign(progBody(), { state: js }));
+  try { fetch('/api/progress', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body, credentials: 'same-origin', keepalive: !!leaving && body.length < 60000 }).catch(() => {}); } catch (e) {}
+  return snap;
+}
+function clearSnap() { pending = null; try { localStorage.removeItem('lastshot_snap'); } catch (e) {} paintStart(); }
+function pickSnap(serverState) {   // 서버 · 이 브라우저 중 새것. 레벨이 서버 진행과 다르면(다른 기기에서 깼으면) 버린다
+  const parse = v => { try { const o = typeof v === 'string' ? JSON.parse(v) : null; return o && o.v === SNAP_V && o.G && o.G.L && o.G.over === 0 ? o : null; } catch (e) { return null; } };
+  const a = parse(serverState), b = parse(loadS('lastshot_snap', ''));
+  const p = !a ? b : !b ? a : b.t > a.t ? b : a;
+  return p && p.L === level ? p : null;
+}
+function paintStart() {
+  const p = pending; $('#btnStart').textContent = p ? `이어서 하기 · 레벨 ${p.L} · 점수 ${fmt(p.run + (p.G.score || 0))}` : '시작하기';
+  $('#btnGiveUp').hidden = !p;
+}
+// 저장된 판을 그 상태로 세워 놓고 일시정지 화면(손가락 한 번 = 소리 허가)
+function showResume() {
+  const p = pending; let g;
+  try { g = restore(JSON.parse(JSON.stringify(p.G)), hooks); } catch (e) { clearSnap(); pushProgress({ state: null }); front(); return; }
+  pushSub();
+  clearViews(); texts.length = 0; coins.length = 0; confetti.length = 0; bodies.length = 0; inFlight = 0; shout = null; bossWarn = 0;
+  born.length = 0; squadPop = 0; hitstop = 0; dragId = null; dragX = null; scoreAt = null; slow = 0; kick = 0; tint = null; flashW = 0; shake = 0; comboPop = 0;
+  G = g; run = p.run; save('lastshot_run', run); lastN = G.n; bossSeen = !!G.boss; state = 'paused'; setTheme((G.L - 1) % 5); banner = 0; dispScore = score(); syncHud(0);
+  btnMsl.hidden = true;
+  $('#resumeSub').textContent = `레벨 ${G.L} · 점수 ${fmt(score())} · 진행 ${Math.round(prog() * 100)}%`;
+  for (const id of ['#ovAuth', '#ovStart', '#ovEnd', '#ovRank']) $(id).hidden = true;
+  $('#ovResume').hidden = false;
+  if (!touchy()) setTimeout(() => { try { $('#btnResume').focus({ preventScroll: true }); } catch (e) {} }, 50);
+}
+function resumeGo() {   // 계속: 스냅샷을 지우고 새로 저장 시작
+  if (state !== 'paused') return;
+  audio(); $('#ovResume').hidden = true; state = 'play'; btnMsl.hidden = false; save('lastshot_live', 1); snapTimer = 0;
+  clearSnap(); pushProgress({ state: null });
+}
+function giveUp() {   // 이 판 포기: 누적 점수는 0 부터(판 도중에 그만두면 이어 온 점수는 끊긴다 — 새로고침 꼼수 막기와 같은 규칙)
+  run = 0; save('lastshot_run', 0); clearSnap(); pushProgress({ state: null }); home();
+}
+/* ── 뒤로가기: 하위 화면(게임 · 랭킹 · 끝 · 이어하기)에 들어갈 때 history 를 하나 쌓고, 뒤로가기면 그 화면을 닫고 시작 화면으로. 시작 화면에서 한 번 더면 평소처럼 나간다 ── */
+let sub = false, popping = 0;
+function pushSub() { if (sub || dbg) return; try { history.pushState({ ls: 1 }, ''); sub = true; } catch (e) {} }
+function popSub() { if (!sub) return; sub = false; popping = performance.now(); try { history.back(); } catch (e) { popping = 0; } }
+addEventListener('popstate', () => {
+  if (popping && performance.now() - popping < 1500) { popping = 0; return; }   // 프로그램이 닫은 것
+  popping = 0; if (!sub) return; sub = false; backHome();
+});
+function backHome() {
+  if (state === 'play' && G && !G.over) { const p = saveSnap(true); if (p) pending = p; }   // 판 중간: 스냅샷을 남기고 시작 화면에 '이어서 하기'
+  else if (state === 'dying' && G && G.over === -1) loseBook();   // 지는 연출 중에 나가면 진 것으로
+  else if (state === 'paused') { /* 이어하기 화면에서 뒤로: 그대로 pending 으로 남긴다 */ }
+  home();
 }
 // 첫 화면 고르기: 로그인돼 있으면 시작 화면, 아니면 가입 · 로그인(디버그는 건너뜀)
 function front() {
-  $('#ovEnd').hidden = true; $('#ovRank').hidden = true;
+  $('#ovEnd').hidden = true; $('#ovRank').hidden = true; $('#ovResume').hidden = true;
   const ok = !!user || dbg;
+  if (ok && pending && resumeFresh) { resumeFresh = false; showResume(); return; }   // 로그인 직후(처음 열 때): 저장된 판을 그 자리에서. 뒤로가기로 온 시작 화면에서는 버튼으로만
+  if (ok) { paintStart(); if (pending) diffSeg.set(diff, true); }
   $('#ovStart').hidden = !ok; $('#ovAuth').hidden = ok;
   if (ok) requestAnimationFrame(() => diffSeg.sync(true)); else requestAnimationFrame(() => authSeg.sync(true));
 }
@@ -1245,7 +1319,7 @@ authForm.addEventListener('submit', async e => {
 $('#btnLogout').addEventListener('click', async () => {
   try { if (pushing) await pushing; await api('/api/logout', 'POST'); } catch (e) {}
   // 다음 사람이 같은 폰으로 가입할 때 내 진행이 넘어가지 않게 캐시를 비운다
-  user = null; level = 1; best = 1; run = 0; save('lastshot_level', 1); save('lastshot_best', 1); save('lastshot_run', 0);
+  user = null; level = 1; best = 1; run = 0; save('lastshot_level', 1); save('lastshot_best', 1); save('lastshot_run', 0); clearSnap();
   authSeg.set('login', false); authId.value = ''; authPw.value = '';
   G = preview(); lastN = G.n; syncHud(0); front();
 });
@@ -1303,6 +1377,7 @@ async function showRank(final, lv, d) {
   } finally { rankLoading = false; }
 }
 async function openRank() {
+  pushSub();
   $('#ovStart').hidden = true; $('#ovAuth').hidden = true; $('#ovRank').hidden = false;
   const list = $('#rankAll');
   if (!rankAllSeg) rankAllSeg = seg($('#rankSegAll'), DIFF_ITEMS, diff, v => loadRank(v, list)); else rankAllSeg.set(diff, true);
@@ -1312,7 +1387,7 @@ async function openRank() {
 }
 
 function preview() { setTheme((level - 1) % 5); const g = newGame(level, {}, { diff }); step(g, 0); g.mobs.forEach(m => { m.flash = 0; }); return g; }
-function home() { state = 'menu'; clearViews(); bodies.length = 0; G = preview(); lastN = G.n; btnMsl.hidden = true; front(); syncHud(0); }
+function home() { popSub(); state = 'menu'; clearViews(); bodies.length = 0; G = preview(); lastN = G.n; btnMsl.hidden = true; front(); syncHud(0); }
 const prog = () => G ? Math.max(0, Math.min(1, (G.dist - G.ev[0].d - 680) / (G.length - 680))) : 0;
 let hudPowTxt = '', hudMsl = -1;
 const hudCache = {};
@@ -1346,12 +1421,16 @@ $('#btnNext').addEventListener('click', () => { if (performance.now() - endAt < 
 $('#btnMoneyYes').addEventListener('click', () => { if (performance.now() - endAt < 800) return; moneyNext = true; start(); });
 $('#btnMoneyNo').addEventListener('click', () => { $('#moneyBox').hidden = true; try { $('#btnNext').focus({ preventScroll: true }); } catch (e) {} });
 $('#btnHome').addEventListener('click', home);
-$('#btnReset').addEventListener('click', () => { level = 1; save('lastshot_level', 1); run = 0; save('lastshot_run', 0); pushProgress(); home(); });
+$('#btnReset').addEventListener('click', () => { level = 1; save('lastshot_level', 1); run = 0; save('lastshot_run', 0); clearSnap(); pushProgress({ state: null }); home(); });
+$('#btnGiveUp').addEventListener('click', giveUp);
+$('#btnResume').addEventListener('click', resumeGo);
+$('#btnResumeQuit').addEventListener('click', giveUp);
+addEventListener('pagehide', () => saveSnap(true));
 $('#btnRank').addEventListener('click', openRank);
 $('#btnRankClose').addEventListener('click', home);
 $('#btnMute').addEventListener('click', () => { muted = !muted; save('lastshot_mute', muted ? 1 : 0); paintMute(); if (!muted) audio(); });
 addEventListener('resize', fit);
-document.addEventListener('visibilitychange', () => { last = performance.now(); for (const k in keys) keys[k] = false; if (!document.hidden && AC && AC.state !== 'running' && state === 'play') try { AC.resume(); } catch (e) {} });
+document.addEventListener('visibilitychange', () => { last = performance.now(); for (const k in keys) keys[k] = false; if (document.hidden) saveSnap(true); if (!document.hidden && AC && AC.state !== 'running' && state === 'play') try { AC.resume(); } catch (e) {} });
 if (dbg) window.__ls = { auto: false, start, end, get G() { return G; }, setLevel(l) { level = l; }, setDiff(d) { diff = diffOf(d); diffSeg.set(diff, true); }, get diff() { return diff; }, get user() { return user; }, get state() { return state; }, fireMissile: shootMissile, sfx(n, t) { audio(); muted = false; SFX[n](t); }, setTier(t) { G.tier = t; }, get timers() { return { endTimer, slow, hitstop, over: G && G.over }; } };
 fit(); G = preview(); syncHud(0); paintMute();
 if (dbg) front(); else api('/api/me').then(me => { applyMe(me); front(); }).catch(() => { authSeg.set(loadS('lastshot_name', '') ? 'login' : 'signup', false); front(); });   // 전에 가입한 적 있는 폰이면 로그인 탭부터

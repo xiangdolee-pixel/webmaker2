@@ -13,9 +13,14 @@ CREATE TABLE IF NOT EXISTS users (
   level      INTEGER NOT NULL DEFAULT 1,
   best       INTEGER NOT NULL DEFAULT 1,
   diff       TEXT NOT NULL DEFAULT 'normal',
+  run        INTEGER NOT NULL DEFAULT 0,     -- 레벨 사이 누적 점수(쓰러질 때까지)
+  fail_lv    INTEGER NOT NULL DEFAULT 0,     -- 같은 레벨에서 연속으로 진 횟수(지원군) — 어느 레벨에서
+  fails      INTEGER NOT NULL DEFAULT 0,
+  state      TEXT,                           -- 판 중간 스냅샷 JSON(100KB 상한) — 나갔다 와도 그 자리에서 이어하기
   created_at INTEGER NOT NULL,
   last_at    INTEGER NOT NULL
 );
+--   예전 users 표에 열 더하기: ALTER TABLE users ADD COLUMN run INTEGER NOT NULL DEFAULT 0; … fail_lv · fails 같은 꼴; ALTER TABLE users ADD COLUMN state TEXT
 -- 로그인 세션: 쿠키 ls_sess 의 토큰(32바이트 hex), 180일
 CREATE TABLE IF NOT EXISTS sessions (
   token      TEXT PRIMARY KEY,

@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-title" content="라스트샷">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="css/style.css?v=12">
-<script type="module" src="js/game.js?v=33"></script>
+<link rel="stylesheet" href="css/style.css?v=13">
+<script type="module" src="js/game.js?v=34"></script>
 </head>
 <body>
 <!-- 계정(로그인) 버튼 자리 — 게임 화면을 가리지 않게 숨김 (자리가 없으면 오른쪽 위에 떠서 나오므로 일부러 둔다) -->
@@ -81,7 +81,18 @@
         <div class="seg" id="diffSeg" role="tablist" aria-label="난이도"></div>
       </div>
       <button type="button" class="btn" id="btnStart">시작하기</button>
-      <div class="links"><button type="button" class="link" id="btnRank">랭킹 보기</button><button type="button" class="link" id="btnReset" hidden>레벨 1부터 다시</button></div>
+      <div class="links"><button type="button" class="link" id="btnGiveUp" hidden>이 판 포기하고 레벨 처음부터</button><button type="button" class="link" id="btnRank">랭킹 보기</button><button type="button" class="link" id="btnReset" hidden>레벨 1부터 다시</button></div>
+    </div>
+  </section>
+
+  <!-- 나갔다 돌아왔을 때: 저장된 판을 그 자리에서 이어서(일시정지 화면 — 손가락 한 번이 소리 재생 허가도 된다) -->
+  <section class="ov" id="ovResume" hidden>
+    <div class="card">
+      <p class="kicker">CONTINUE</p>
+      <h2>이어서 합니다</h2>
+      <p class="end-sub" id="resumeSub"></p>
+      <button type="button" class="btn" id="btnResume">계속</button>
+      <button type="button" class="link" id="btnResumeQuit">이 판 포기하고 레벨 처음부터 <small>(누적 점수는 0 부터)</small></button>
     </div>
   </section>
 

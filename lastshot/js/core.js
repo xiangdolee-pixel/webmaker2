@@ -70,12 +70,13 @@ export const MID_NAME = { boar: '돌격멧돼지', golem: '바위 골렘', lich:
 export const bossName = L => { const b = bossLook(L); return ANIMAL_NAME[b.animal] + ' 보스 LV' + (b.evo + 1); };
 // 레벨 → 실제 세기: 6 까지는 가파르게, 그 뒤로는 완만하게(그래도 계속 오른다)
 export const power = L => L <= 6 ? 5.4 + L * .85 : 10.5 + (L - 6) * .5;
-// 난이도(쉬움 · 중간 · 하드): 중간은 모두 1 · 0 — 예전 숫자가 하나도 바뀌지 않는다. 쉬움 · 하드는 여기 배수만 곱한다.
+// 난이도(쉬움 · 중간 · 하드): 배수 1 = 원래 게임. 사용자 지시(2026-11-10) 중간 ≈ 1.3배 · 하드 ≈ 3배 체감 — 자동 조종 승률(skill .75, 16판)로 맞춤:
+//   원래 1~6 ≈95~100% · 7~14 ≈45~90% → 중간 7~14 가 그 2/3 선(≈50~70%), 하드는 3레벨 ≈40~50% · 5 이후 ≈5~20%(skill 1.0 에서 0% 인 레벨 없음)
 //   mobs: 적 수(대군 물결 · 거인 체력에도 같이), hp: 적 체력, boss: 보스 체력, gate: 좋은 문(+) 값, n: 시작 병사 더하기, missiles: 시작 유도탄 더하기
 export const DIFFS = {
   easy:   { name: '쉬움', mobs: .7, hp: .8, boss: .7, gate: 1.25, n: 5, missiles: 2 },
-  normal: { name: '중간', mobs: 1, hp: 1, boss: 1, gate: 1, n: 0, missiles: 0 },
-  hard:   { name: '하드', mobs: 1.25, hp: 1.1, boss: 1.25, gate: .9, n: 0, missiles: 0 }
+  normal: { name: '중간', mobs: 1.15, hp: 1.1, boss: 1.15, gate: 1, n: 0, missiles: 0 },
+  hard:   { name: '하드', mobs: 1.5, hp: 1.3, boss: 1.7, gate: .8, n: 0, missiles: 0 }
 };
 export const diffOf = d => DIFFS[d] ? d : 'normal';
 let DK = DIFFS.normal;   // 지금 돌고 있는 판의 난이도(step 에서 맞춘다 — ARMY · LVK 와 같은 방식)
@@ -131,6 +132,7 @@ export function makeLevel(L) {
   return { ev, length: d + 220 + 1150 - START + 600, stage: stageOf(L), boss: bossOf(L), twist };
 }
 
+const mkHooks = hooks => Object.assign({ burst: NOOP, spark: NOOP, float: NOOP, sfx: NOOP, buzz: NOOP, shake: NOOP, tint: NOOP, ring: NOOP, gateHit: NOOP, smoke: NOOP, blast: NOOP, die: NOOP, pts: NOOP, combo: NOOP, stop: NOOP }, hooks || {});
 export function newGame(L, hooks, opts = {}) {
   const help = Math.min(4, opts.help || 0), money = !!opts.money, diff = diffOf(opts.diff), D = DIFFS[diff];   // money: 졌을 때 'Show me the money?' 에 예 → 병사 100 · 유도탄 10 으로 시작   // 막힌 레벨 지원: 같은 레벨에서 연속으로 진 횟수(최대 4) — 1번마다 유도탄 +3 · 시작 병사 +8 · 적 -10% · 보스 체력 -8%
   const lv = makeLevel(L);
@@ -140,7 +142,7 @@ export function newGame(L, hooks, opts = {}) {
     px: MID, tx: MID, n: (money ? 100 : 3) + help * 8 + D.n, shown: (money ? 100 : 3) + help * 8 + D.n, tier: money ? 1 : 0, missiles: Math.max(money ? 10 : 0, 1 + Math.floor((L - 1) / 5)) + help * 3 + D.missiles, help, money, rockets: [],
     rate: 5, dmg: 1, cd: 0, pow: 0, flash: 0,
     bullets: [], gates: [], mobs: [], groups: [], boxes: [], barrels: [], shells: [], boss: null,
-    h: Object.assign({ burst: NOOP, spark: NOOP, float: NOOP, sfx: NOOP, buzz: NOOP, shake: NOOP, tint: NOOP, ring: NOOP, gateHit: NOOP, smoke: NOOP, blast: NOOP, die: NOOP, pts: NOOP, combo: NOOP, stop: NOOP }, hooks || {}),
+    h: mkHooks(hooks),
     score: 0,        // 이 판 점수: 적 · 거인 · 타이어 · 보스 (레벨이 높을수록 크게, 연속 처치(콤보)면 더 크게)
     combo: 0, comboT: 0, bestCombo: 0,
     stream: null, bolts: 0, boltCd: 0,
@@ -453,6 +455,33 @@ function stepRockets(g, dt) {
       if (K && Math.hypot(K.x - r.x, K.y - r.y) < K.r + 60) { const d = dmg * 2.5; K.hp -= d; K.flash = .12; K.pop = 1; g.h.float(K.x, K.y - 30, '-' + Math.round(d), '#c4b5fd', 36); }
     }
   }
+}
+
+/* ── 판 중간 저장(스냅샷): G 는 순수 데이터지만 서로 가리키는 곳이 있다(병사 → 무리 · 무리 → 거인 · 유도탄 → 표적 · 대군 → 무리). 그것만 번호로 바꿔 JSON 으로 만들고, 복원 때 되살린다.
+   빼는 것: h(훅 — 복원 때 다시 넣음) · bk(충돌 칸 캐시 — step 이 다시 만듦) · 문 칸의 ftx(화면 글자 캐시) ── */
+export function snapshot(G) {
+  const gi = new Map(G.groups.map((q, i) => [q, i])), mi = new Map(G.mobs.map((M, i) => [M, i]));
+  const ref = t => !t ? null : t === G.boss ? { k: 'boss' } : mi.has(t) ? { k: 'mob', i: mi.get(t) } : G.boxes.includes(t) ? { k: 'box', i: G.boxes.indexOf(t) } : null;
+  const o = {};
+  for (const k in G) if (!['h', 'bk', 'groups', 'mobs', 'rockets', 'stream', 'gates'].includes(k)) o[k] = G[k];
+  o.groups = G.groups.map(q => { const c = Object.assign({}, q); if (q.giant) c.giant = mi.has(q.giant) ? mi.get(q.giant) : -1; else delete c.giant; return c; });
+  o.mobs = G.mobs.map(M => { const c = Object.assign({}, M); c.g = gi.has(M.g) ? gi.get(M.g) : -1; if (M.leader) c.leader = gi.has(M.leader) ? gi.get(M.leader) : -1; else delete c.leader; return c; });
+  o.rockets = G.rockets.map(r => Object.assign({}, r, { tg: ref(r.tg) }));
+  o.stream = G.stream ? Object.assign({}, G.stream, { grp: gi.has(G.stream.grp) ? gi.get(G.stream.grp) : -1 }) : null;
+  o.gates = G.gates.map(gt => Object.assign({}, gt, { parts: gt.parts.map(p => { const c = Object.assign({}, p); delete c.ftx; return c; }) }));
+  return o;
+}
+export function restore(o, hooks) {   // o = JSON.parse 한 스냅샷(그대로 고쳐 쓴다)
+  const G = o, groups = G.groups = G.groups || [];
+  const grpAt = (i, M) => groups[i] || (groups[groups.push({ alive: 0, pop: 0, cx: M ? M.x : MID, hw: 10, side: 0 }) - 1]);
+  G.mobs = G.mobs || [];
+  for (const M of G.mobs) { M.g = grpAt(M.g, M); if ('leader' in M) M.leader = groups[M.leader] || M.g; }
+  for (const q of groups) { if ('giant' in q) { q.giant = G.mobs[q.giant]; if (!q.giant) delete q.giant; } }
+  const deref = t => !t ? null : t.k === 'boss' ? G.boss : t.k === 'mob' ? G.mobs[t.i] || null : t.k === 'box' ? G.boxes[t.i] || null : null;
+  G.rockets = (G.rockets || []).map(r => Object.assign(r, { tg: deref(r.tg) }));
+  if (G.stream) G.stream.grp = grpAt(G.stream.grp);
+  G.h = mkHooks(hooks);
+  return G;
 }
 
 /* ── 한 장면 ── */

@@ -101,6 +101,8 @@ button:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
 .link { margin-top: 12px; padding: 6px 10px; font-size: .88rem; font-weight: 700; color: #cbd5e1; text-decoration: underline; text-underline-offset: 3px; }
 .link:hover { color: #fff; }
 .links { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.link small { font-size: .78em; font-weight: 600; color: var(--muted); }
+#ovResume .btn { height: 64px; font-size: 1.4rem; }
 
 /* 가입 · 로그인 카드(첫 화면): 아이디 또는 이메일 · 닉네임(랜덤 기본, 고칠 수 있음) · 비밀번호 */
 .auth-note { margin-top: 8px; font-size: .9rem; font-weight: 700; color: #fde68a; line-height: 1.45; word-break: keep-all; }

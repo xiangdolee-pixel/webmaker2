@@ -2,8 +2,8 @@
 //   POST /api/signup { login_id, nickname, password, remember?, level?, best?, diff? } → me   (level… = 이 브라우저에서 이미 하던 진행을 계정의 시작 진행으로)
 //   POST /api/login  { login_id, password, remember? }                     → me   (remember 기본 켜짐: 쿠키 180일 · 끄면 브라우저 닫을 때까지 + 세션 1일)
 //   POST /api/logout                                                        → { ok }
-//   GET  /api/me                                                            → { nickname, level, best, diff }  (세션 없으면 401)
-//   PUT  /api/progress { level, best, diff }                                → me  (로그인 필수)
+//   GET  /api/me                                                            → { nickname, level, best, diff, run, fail_lv, fails, state }  (세션 없으면 401)
+//   PUT  /api/progress { level, best, diff, run, fail_lv, fails, state }   → me  (로그인 필수. state = 판 중간 스냅샷 JSON 문자열(100KB 상한, 넘으면 그 칸은 저장 안 함) · null 이면 지움 · 안 보내면 그대로)
 //   GET  /api/rank?diff=easy|normal|hard         → { diff, top: [{ id, name, score, level }] }  (공개. 점수 높은 차례, 같으면 먼저 넣은 사람)
 //   POST /api/rank { score, level, diff }        → { id, rank, diff, top }  (로그인 필수, 이름 = 계정 닉네임)
 //   diff 가 세 값 밖이면 normal. 그 밖(페이지 · /xms 관리 · /member)은 xim 공통 사이트 Worker 가 맡는다.
@@ -34,7 +34,8 @@ async function pbkdf2(password, salt) {
   return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: PBKDF2_ITER }, key, 256));
 }
 const sameHex = (a, b) => { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
-const me = (u) => ({ nickname: u.nickname, level: u.level, best: u.best, diff: diffOf(u.diff) });
+const STATE_MAX = 100000;
+const me = (u) => ({ nickname: u.nickname, level: u.level, best: u.best, diff: diffOf(u.diff), run: Math.max(0, u.run | 0), fail_lv: u.fail_lv | 0, fails: u.fails | 0, state: u.state || null });
 
 /* ── 세션 ── */
 const cookieToken = (request) => { const m = (request.headers.get('Cookie') || '').match(/(?:^|;\s*)ls_sess=([a-f0-9]{64})/); return m ? m[1] : ''; };
@@ -112,8 +113,13 @@ async function logout(request, env) {
 async function progress(request, env, u) {
   const v = await readJson(request);
   const level = clampLv(v.level, u.level), best = Math.max(u.best, level, clampLv(v.best, 1)), diff = diffOf(v.diff ?? u.diff);
-  await env.DB.prepare('UPDATE users SET level = ?, best = ?, diff = ?, last_at = ? WHERE id = ?').bind(level, best, diff, Date.now(), u.id).run();
-  return json(me({ nickname: u.nickname, level, best, diff }));
+  const num = (x, d) => (Number.isFinite(Number(x)) ? Math.max(0, Math.min(2147483647, Math.floor(Number(x)))) : d);
+  const run = num(v.run, u.run), fail_lv = num(v.fail_lv, u.fail_lv), fails = Math.min(99, num(v.fails, u.fails));
+  let state = u.state;
+  if (v.state === null) state = null;
+  else if (typeof v.state === 'string' && v.state.length <= STATE_MAX) state = v.state;   // 너무 크면 그 칸은 그대로 둔다
+  await env.DB.prepare('UPDATE users SET level = ?, best = ?, diff = ?, run = ?, fail_lv = ?, fails = ?, state = ?, last_at = ? WHERE id = ?').bind(level, best, diff, run, fail_lv, fails, state, Date.now(), u.id).run();
+  return json(me({ nickname: u.nickname, level, best, diff, run, fail_lv, fails, state }));
 }
 
 /* ── 랭킹 ── */
