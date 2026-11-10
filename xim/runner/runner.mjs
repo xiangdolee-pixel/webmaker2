@@ -404,8 +404,10 @@ async function runYoutube(payload, work) {
     if (!y.video_job) throw new Error('영상(video_job)이 없습니다. 먼저 영상 만들기');
     fs.mkdirSync(work, { recursive: true });
     const video = path.join(work, 'youtube.mp4');
-    log(`  유튜브: 영상 내려받기 ${y.video_job}`);
-    await download(`/api/studio/helper/video/${y.video_job}`, video);
+    // 같은 PC 에 내 목소리 처리기가 있으면 방금 만든 mp4 가 로컬에 있다 → 복사(프록시로 28MB 받으면 2분 넘게 걸린다)
+    const local = path.join(process.env.CLONE_DIR || 'D:\ws\clone', 'out', 'studio', y.video_job, `${y.video_job}.mp4`);
+    if (fs.existsSync(local) && fs.statSync(local).size > 100000) { fs.mkdirSync(work, { recursive: true }); fs.copyFileSync(local, video); log(`  유튜브: 영상 로컬 복사 ${y.video_job}`); }
+    else { log(`  유튜브: 영상 내려받기 ${y.video_job}`); await download(`/api/studio/helper/video/${y.video_job}`, video); }
     let thumb = '';
     if (y.thumb_url) { try { thumb = await download(y.thumb_url, path.join(work, 'youtube_thumb' + (/\.png$/i.test(y.thumb_url) ? '.png' : '.webp'))); } catch (e) { log('  (썸네일 내려받기 실패)', e.message); } }
     if (thumb && /\.webp$/i.test(thumb)) {   // 유튜브는 webp 썸네일을 안 받는 경우가 있어 png 로
