@@ -301,7 +301,7 @@ async function runThumb(j, job, work, pick, premade) {
 1) 인물 원본 ${face} 를 Read 로 직접 보고 외형(머리 · 모자 · 선글라스 · 수염 · 의상)을 파악한다 — 프롬프트에 "이 외형은 그대로 유지" 라고 못 박는 근거다.
 2) 값: title="${pick.title}", title_lines=${JSON.stringify(pick.title_lines || [])} (비어 있으면 3~4줄로 4~8자씩 끊어 직접), channel="${job.channel}스타일", badge_name="${pick.badgeName || ''}", badge_role="${pick.badgeRole || ''}", emotion="${pick.emotion || '자동'}", gesture="${pick.gesture || '자동'}", face_file="${face.replace(/\\/g, '/')}", out="${outPng.replace(/\\/g, '/')}".
 3) prompt 와 pose_fix_prompt 는 6.1 의 5 · 6 · 실행 방법 절 규칙 그대로 쓰되, 표정 · 손동작 · 명찰 · 제목 크기 문구는 직접 쓰지 말고 {FACE_RULE} {HAND_RULE} {BADGE_RULE} {TITLE_RULE} 자리표시를 쓴다. 배경 장면은 제목 내용에 맞게 한두 문장으로 구체적으로. "${job.channel}스타일" 을 한 단어로 붙여 쓴다. 제목 철자 검증 문구를 넣는다. 배경에 제목 · 명찰 외 글자 · 로고 · 워터마크 금지 문구를 넣는다.${JSON_ONLY}`;
-    const jobJson = parseJson(await claude(prompt, { cwd: work, label: '썸네일 프롬프트', timeoutMin: 10 }), '썸네일 잡');
+    const jobJson = parseJson(await claude(prompt, { cwd: work, label: '썸네일 프롬프트', timeoutMin: 10, model: 'sonnet' }), '썸네일 잡');
     jobJson.face_file = face; jobJson.out = outPng; jobJson.title = pick.title; jobJson.channel = `${job.channel}스타일`; jobJson.skip_pose_fix = true;
     fs.writeFileSync(path.join(DOCS, 'tools', '_thumb_job.json'), JSON.stringify(jobJson, null, 2), 'utf8');
     return jobJson.emotion + ' · ' + jobJson.gesture;
@@ -318,7 +318,7 @@ async function reviewSlides(j, work, nums, blocks) {
   await j.step('review', 'running', `${made.length}장`);
   let fails = [];
   try {
-    const rv = parseJson(await claude(`${P.REVIEW_SLIDE_SYSTEM}\n\n슬라이드 이미지 ${made.map((n) => `${work}\\shot2\\${n}.png`).join(', ')} 를 Read 로 각각 보고 판정한다. 각 번호의 원고 블록:\n${made.map((n) => `[${n}]\n${blocks[n - 1]}`).join('\n\n')}\n\n출력: { "results": [ { "n": 번호, "pass": true|false, "reason": "" } ] }${JSON_ONLY}`, { cwd: work, label: '검수', timeoutMin: 10 }), '검수');
+    const rv = parseJson(await claude(`${P.REVIEW_SLIDE_SYSTEM}\n\n슬라이드 이미지 ${made.map((n) => `${work}\\shot2\\${n}.png`).join(', ')} 를 Read 로 각각 보고 판정한다. 각 번호의 원고 블록:\n${made.map((n) => `[${n}]\n${blocks[n - 1]}`).join('\n\n')}\n\n출력: { "results": [ { "n": 번호, "pass": true|false, "reason": "" } ] }${JSON_ONLY}`, { cwd: work, label: '검수', timeoutMin: 10, model: 'sonnet' }), '검수');
     const bad = (rv.results || []).filter((x) => x.pass === false);
     fails = bad.map((x) => x.n);
     await j.step('review', 'done', fails.length ? `불합격 → 재생성: ${bad.map((x) => `${x.n}번(${String(x.reason || '').slice(0, 60)})`).join(' · ')}` : '전부 합격');
@@ -347,7 +347,7 @@ async function finishImages(j, work, docs, nums, pick, withThumb) {
     if (fs.existsSync(png)) {
       let note = '';
       try {
-        const rv = parseJson(await claude(`${P.REVIEW_THUMB_SYSTEM}\n\n썸네일 ${png} 를 Read 로 보고 판정한다. 요구: 제목 "${pick.title}", 표정 ${pick.emotion || '자동'}, 제스처 ${pick.gesture || '자동'}, 명찰 ${pick.badgeName ? `"${pick.badgeName}" / "${pick.badgeRole || ''}"` : '없음'}.${SHAPE(P.REVIEW_SCHEMA)}${JSON_ONLY}`, { cwd: work, label: '썸네일 검수', timeoutMin: 6 }), '썸네일 검수');
+        const rv = parseJson(await claude(`${P.REVIEW_THUMB_SYSTEM}\n\n썸네일 ${png} 를 Read 로 보고 판정한다. 요구: 제목 "${pick.title}", 표정 ${pick.emotion || '자동'}, 제스처 ${pick.gesture || '자동'}, 명찰 ${pick.badgeName ? `"${pick.badgeName}" / "${pick.badgeRole || ''}"` : '없음'}.${SHAPE(P.REVIEW_SCHEMA)}${JSON_ONLY}`, { cwd: work, label: '썸네일 검수', timeoutMin: 6, model: 'sonnet' }), '썸네일 검수');
         if (rv.pass) note = '검수 합격';
         else {
           await j.step('thumb', 'running', `검수 불합격(${String(rv.reason || '').slice(0, 60)}) → 교정`);
