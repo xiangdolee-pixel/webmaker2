@@ -431,6 +431,13 @@ async function runYoutube(payload, work) {
   }
 }
 
+// 다 쓴 자동화 엣지(_edge_profile) 닫기 — 작업이 끝나면 창을 남기지 않는다(사용자 지시 2026-11-10 "다 쓰고 안 쓰는 건 꼭 닫아 줘")
+function closeProfileEdge() {
+  try {
+    spawnSync('powershell', ['-NoProfile', '-Command', `Get-WmiObject Win32_Process -Filter "name='msedge.exe'" | Where-Object { $_.CommandLine -like '*${path.basename(PROFILE)}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { encoding: 'utf8', timeout: 60000, windowsHide: true });
+  } catch { /* 없으면 그만 */ }
+}
+
 // ───────── 모드 ─────────
 async function processJob(payload) {
   const job = payload.job, j = J(job.id);
@@ -499,7 +506,7 @@ async function pcLoop() {
       await reportEnv();
       const imagesOk = !loginNeeded && Date.now() - engineFailAt > 120000;
       const r = await api(`/api/studio/helper/next?want=${imagesOk ? 'text,images,youtube' : 'text,youtube'}`, { method: 'POST', body: {} });
-      if (r.job) { await processJob(r); continue; }
+      if (r.job) { await processJob(r); closeProfileEdge(); continue; }
     } catch (e) { log('(대기 중 오류)', e.message); }
     await sleep(5000);
   }
