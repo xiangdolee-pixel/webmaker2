@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-title" content="라스트샷">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="css/style.css?v=10">
-<script type="module" src="js/game.js?v=31"></script>
+<link rel="stylesheet" href="css/style.css?v=12">
+<script type="module" src="js/game.js?v=33"></script>
 </head>
 <body>
 <!-- 계정(로그인) 버튼 자리 — 게임 화면을 가리지 않게 숨김 (자리가 없으면 오른쪽 위에 떠서 나오므로 일부러 둔다) -->
@@ -31,6 +31,7 @@
       <button type="button" class="pill mute" id="btnMute" aria-pressed="false" aria-label="소리 켜짐 — 눌러서 끄기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="on" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="off" d="M16 9l6 6M22 9l-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
     </div>
     <div class="hud-row sub">
+      <span class="chip diff" id="hudDiff" data-v="normal">중간</span>
       <span class="chip score"><i class="coin" aria-hidden="true"></i><b id="hudScore">0</b></span>
       <span class="chip pow" id="hudPow" hidden></span>
     </div>
@@ -41,10 +42,31 @@
     <span class="msl-t">유도탄</span><b id="mslN">0</b>
   </button>
 
-  <section class="ov" id="ovStart">
+  <!-- 첫 화면: 회원가입 · 로그인(라스트샷 자체 계정). 로그인돼 있으면 건너뛰고 시작 화면 -->
+  <section class="ov" id="ovAuth" hidden>
     <div class="card">
       <p class="kicker">LAST SHOT</p>
       <h1>라스트샷</h1>
+      <p class="auth-note">회원가입을 해야 게임 진행(레벨 · 점수)이 저장됩니다.</p>
+      <div class="seg" id="authSeg" role="tablist" aria-label="회원가입 또는 로그인"></div>
+      <form class="auth-form" id="authForm" data-mode="signup" novalidate>
+        <label class="row"><span>아이디 또는 이메일</span><input type="text" id="authId" maxlength="40" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="email" placeholder="이메일이 없으면 아이디만" required></label>
+        <small class="hint">이메일이 없으면 아이디만 넣어도 돼요 · 3~40자, 영문 · 숫자 · . _ @ + -</small>
+        <label class="row" id="authNickRow"><span>닉네임 <small>(랭킹에 보이는 이름 · 고쳐도 돼요)</small></span><span class="with-dice"><input type="text" id="authNick" maxlength="10" autocomplete="nickname" placeholder="닉네임 (10자까지)"><button type="button" class="dice" id="btnDice" aria-label="다른 닉네임 뽑기" title="다른 닉네임"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.7M20 12a8 8 0 0 1-13.7 5.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M18 3v4h-4M6 21v-4h4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span></label>
+        <label class="row"><span>비밀번호</span><input type="password" id="authPw" minlength="6" maxlength="72" autocomplete="new-password" placeholder="6자 이상" required></label>
+        <label class="keep"><input type="checkbox" id="authKeep" checked><span>로그인 유지 <small>(끄면 브라우저를 닫을 때까지만)</small></span></label>
+        <p class="auth-msg" id="authMsg" role="alert"></p>
+        <button type="submit" class="btn" id="authSubmit">가입하고 시작</button>
+      </form>
+      <div class="links"><button type="button" class="link" id="btnRankAuth">랭킹 보기</button></div>
+    </div>
+  </section>
+
+  <section class="ov" id="ovStart" hidden>
+    <div class="card">
+      <p class="kicker">LAST SHOT</p>
+      <h1>라스트샷</h1>
+      <p class="who"><b id="whoNick"></b>님 <button type="button" class="link who-out" id="btnLogout">로그아웃</button></p>
       <p class="lv-big">레벨 <b id="startLv">1</b> · <span id="startStage"></span></p>
       <p class="stage-sub" id="startSub"></p>
       <p class="boss-tag"><small>BOSS</small><b id="startBoss"></b></p>
@@ -55,7 +77,10 @@
         <li><b>유도탄</b> 오른쪽 아래 버튼<span class="kb"> · 스페이스</span>. 보스와 중간보스를 쫓아가 펑!</li>
         <li><b>콤보</b> 쉬지 않고 쓰러뜨리면 점수가 최대 3배</li>
       </ul>
-      <button type="button" class="btn" id="btnStart">시작</button>
+      <div class="setup">
+        <div class="seg" id="diffSeg" role="tablist" aria-label="난이도"></div>
+      </div>
+      <button type="button" class="btn" id="btnStart">시작하기</button>
       <div class="links"><button type="button" class="link" id="btnRank">랭킹 보기</button><button type="button" class="link" id="btnReset" hidden>레벨 1부터 다시</button></div>
     </div>
   </section>
@@ -63,8 +88,9 @@
   <section class="ov" id="ovRank" hidden>
     <div class="card">
       <p class="kicker">RANKING</p>
-      <h2>랭킹 TOP 10</h2>
-      <p class="end-sub">쓰러질 때까지 이어서 깬 레벨들의 점수예요.</p>
+      <h2>랭킹 TOP 50</h2>
+      <p class="end-sub">난이도마다 따로 · 쓰러질 때까지 이어서 깬 레벨들의 점수예요.</p>
+      <div class="seg rank-seg" id="rankSegAll" role="tablist" aria-label="랭킹 난이도"></div>
       <ol class="rank-list" id="rankAll"></ol>
       <button type="button" class="btn" id="btnRankClose">처음 화면</button>
     </div>
@@ -87,10 +113,7 @@
       <div class="rank" id="rankBox" hidden>
         <p class="rank-score">점수 <b id="rankScore">0</b></p>
         <p class="rank-msg" id="rankMsg" role="status"></p>
-        <form class="rank-form" id="rankForm" hidden>
-          <input type="text" name="name" maxlength="10" placeholder="이름 (10자까지)" aria-label="랭킹에 남길 이름" autocomplete="nickname" enterkeyhint="done" required>
-          <button type="submit">등록</button>
-        </form>
+        <div class="seg rank-seg" id="rankSegEnd" role="tablist" aria-label="랭킹 난이도"></div>
         <ol class="rank-list" id="rankList"></ol>
       </div>
       <button type="button" class="btn" id="btnNext">다음 레벨</button>

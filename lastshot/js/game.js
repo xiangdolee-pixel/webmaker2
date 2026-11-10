@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=27';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, DIFFS, diffOf, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile } from './core.js?v=28';
 import { SPRITES } from './sprites.js?v=17';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
@@ -24,6 +24,13 @@ const NONE = {};
 const load = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : +v || d; } catch (e) { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 let level = load('lastshot_level', 1), best = load('lastshot_best', 1), muted = load('lastshot_mute', 0) === 1;
+const loadS = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } };
+// 난이도(easy · normal · hard): 레벨 진행(lastshot_level · best)은 난이도와 상관없이 하나, 랭킹만 난이도별
+let diff = diffOf(loadS('lastshot_diff', 'normal'));
+// 가입 때 닉네임: 처음엔 랜덤(형용사 + 동물 + 숫자, 10자 안), 고칠 수 있다 — 랭킹에 보이는 이름
+const ADJ = ['날쌘', '용감한', '씩씩한', '재빠른', '든든한', '명랑한', '느긋한', '똑똑한', '조용한', '당찬', '불타는', '우아한', '굳센', '신나는', '꼬마', '대왕', '황금', '무적', '전설의', '작은', '깜찍한', '유쾌한', '수줍은', '멋진', '푸른'];
+const ANI = ['수달', '호랑이', '사자', '토끼', '여우', '늑대', '고양이', '강아지', '펭귄', '돌고래', '다람쥐', '부엉이', '판다', '코알라', '독수리', '거북이', '하마', '기린', '치타', '악어', '고릴라', '코끼리', '햄스터', '참새', '두더지', '오리', '염소', '너구리', '물개', '미어캣'];
+const randName = () => ADJ[Math.floor(Math.random() * ADJ.length)] + ' ' + ANI[Math.floor(Math.random() * ANI.length)] + ' ' + (1 + Math.floor(Math.random() * 99));
 // 점수: 쓰러질 때까지 이어서 깬 레벨들의 점수를 모은다(run). 쓰러지면 그 점수로 랭킹(1~10등)에 이름을 넣고 0 부터
 let run = load('lastshot_run', 0);
 if (load('lastshot_live', 0) === 1) { run = 0; save('lastshot_run', 0); save('lastshot_live', 0); }   // 판 도중에 나갔으면 이어 온 점수는 끊긴다
@@ -1048,7 +1055,7 @@ addEventListener('keydown', e => {
   if ((e.code === 'Space' || e.code === 'KeyM') && state === 'play') { e.preventDefault(); if (!e.repeat) shootMissile(); return; }
   if ((e.key === 'Enter' || e.code === 'Space') && (state === 'menu' || state === 'end')) {
     e.preventDefault();
-    if (e.repeat || (state === 'end' && (performance.now() - endAt < 800 || !$('#rankForm').hidden || rankLoading))) return;
+    if (e.repeat || (state === 'end' && (performance.now() - endAt < 800 || rankLoading))) return;
     start();
   }
 });
@@ -1094,6 +1101,7 @@ function commitWin() {
   level++; save('lastshot_level', level);
   if (level > best) { best = level; save('lastshot_best', best); }
   save('lastshot_live', 0); G.committed = bonus;
+  pushProgress();
   fxFloat(G.px, -80, '클리어 보너스 +' + fmt(bonus), '#fde047', 26);
 }
 function clearBurst() {   // 보스를 쓰러뜨렸을 때: 꽃가루 · CLEAR 외침
@@ -1104,13 +1112,14 @@ function clearBurst() {   // 보스를 쓰러뜨렸을 때: 꽃가루 · CLEAR �
 let moneyNext = false;   // 다음 판을 'Show me the money' 로 시작
 function start() {
   audio();
-  $('#ovStart').hidden = true; $('#ovEnd').hidden = true; $('#ovRank').hidden = true;
+  if (!user && !dbg) { front(); return; }   // 회원가입(로그인)해야 게임이 나온다
+  $('#ovAuth').hidden = true; $('#ovStart').hidden = true; $('#ovEnd').hidden = true; $('#ovRank').hidden = true;
   clearViews(); texts.length = 0; coins.length = 0; confetti.length = 0; bodies.length = 0; inFlight = 0; shout = null; bossWarn = 0; bossSeen = false;
   born.length = 0; lastN = 3; squadPop = 0; hitstop = 0; dragId = null; dragX = null; scoreAt = null; slow = 0; kick = 0; tint = null; flashW = 0; shake = 0; comboPop = 0;
   save('lastshot_live', 1);   // 판 도중 새로고침 = 쓰러진 것으로(누적 점수를 지키려는 새로고침 막기)
   const fails = load('lastshot_fail_lv', 0) === level ? load('lastshot_fails', 0) : 0;
   const money = moneyNext; moneyNext = false;
-  G = newGame(level, hooks, { help: fails, money }); state = 'play'; setTheme((G.L - 1) % 5); banner = bannerL = G.twist ? 2.6 : 1.9; dispScore = score(); syncHud(0);
+  G = newGame(level, hooks, { help: fails, money, diff }); state = 'play'; setTheme((G.L - 1) % 5); banner = bannerL = G.twist ? 2.6 : 1.9; dispScore = score(); syncHud(0);
   btnMsl.hidden = false;
   if (G.money) setTimeout(() => { if (G && state === 'play') { shout = { s: 'SHOW ME THE MONEY!', c: '#fde047', t: 1.8, L: 1.8, sub: '병사 ' + G.n + '명 · 유도탄 ' + G.missiles + '발', big: true }; SFX.promote(); addConfetti(60); } }, 2700);
   else if (G.help) setTimeout(() => { if (G && state === 'play') { shout = { s: '지원군 도착!', c: '#86efac', t: 1.6, L: 1.6, sub: '유도탄 ' + G.missiles + '발 · 병사 +' + G.help * 8 + ' · 적이 줄었어요' }; SFX.power(); } }, 2700);
@@ -1142,70 +1151,168 @@ function end(win) {
     btn.textContent = '다시 도전'; btn.classList.add('red'); SFX.lose(); buzz(200);
     const final = run + G.score; lastFinal = final;
     run = 0; save('lastshot_run', 0);
-    showRank(final, level);
+    showRank(final, level, G.diff);
   }
   $('#ovEnd').hidden = false; syncHud(0);
   if (!touchy()) setTimeout(() => { try { btn.focus({ preventScroll: true }); } catch (e) {} }, 50);
 }
-/* ── 랭킹 1~10등 (서버: /api/rank) ── */
-let rankMine = 0, rankLoading = false;
+/* ── 알약 segmented control(난이도 · 랭킹 탭): 떠 있는 배경 하나가 고른 칸으로 미끄러진다(CLAUDE.md 5번). 한 번 그리고 .on 만 바꾼다 ── */
+function seg(box, items, value, onPick) {
+  box.innerHTML = '<i class="seg-ind" aria-hidden="true"></i>' + items.map(([v, l]) => `<button type="button" role="tab" data-v="${v}" aria-selected="${v === value}" class="${v === value ? 'on' : ''}">${l}</button>`).join('');
+  const ind = box.firstElementChild; let last = null;
+  const sync = jump => {   // 숨겨져 있어 폭을 못 재면 has-ind 를 빼서 칸 자체 배경으로, 보이게 되면 다시 잰다
+    const on = box.querySelector('button.on'), ok = !!(on && on.offsetWidth);
+    box.classList.toggle('has-ind', ok); if (!ok) return;
+    const to = { x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight };
+    const still = jump || !last || reduce;
+    if (still) ind.style.transition = 'none';
+    ind.style.width = to.w + 'px'; ind.style.height = to.h + 'px'; ind.style.transform = `translate(${to.x}px, ${to.y}px)`;
+    if (still) { void ind.offsetWidth; ind.style.transition = ''; }
+    last = to;
+  };
+  const set = (v, silent) => {
+    box.querySelectorAll('button[data-v]').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+    box.dataset.v = v; sync(!!silent);
+    if (!silent) onPick(v);   // 배경이 먼저 움직인 뒤 자료가 뒤따른다
+  };
+  box.dataset.v = value;
+  box.addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b || b.classList.contains('on')) return; set(b.dataset.v); });
+  addEventListener('resize', () => sync(true));
+  if (document.fonts) document.fonts.ready.then(() => sync(true));
+  requestAnimationFrame(() => sync(true));
+  return { set, sync, get value() { return box.dataset.v; } };
+}
+const DIFF_ITEMS = Object.entries(DIFFS).map(([k, d]) => [k, d.name]);
+
+/* ── 계정: 가입 · 로그인(라스트샷 Worker 자체 계정, 쿠키 ls_sess). 로그인하면 진행(레벨 · 최고 · 난이도)은 서버 값, localStorage 는 캐시 ── */
+let user = null;
+async function api(path, method = 'GET', body) {
+  let r;
+  try { r = await fetch(path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, cache: 'no-store', credentials: 'same-origin' }); }
+  catch (e) { throw Object.assign(new Error('서버와 연결하지 못했어요. 인터넷을 확인해 주세요.'), { status: 0 }); }
+  const out = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(out.error || '서버 오류가 났어요.'), { status: r.status, out });
+  return out;
+}
+const diffSeg = seg($('#diffSeg'), DIFF_ITEMS, diff, v => { diff = v; save('lastshot_diff', v); syncHud(0); pushProgress(); });
+function applyMe(me) {
+  user = me; level = me.level || 1; best = Math.max(level, me.best || 1); diff = diffOf(me.diff);
+  save('lastshot_level', level); save('lastshot_best', best); save('lastshot_diff', diff); save('lastshot_name', me.nickname);
+  diffSeg.set(diff, true); $('#whoNick').textContent = me.nickname;
+  if (state === 'menu') { G = preview(); lastN = G.n; }
+  syncHud(0);
+}
+let pushing = null;
+function pushProgress() {   // 레벨 클리어 · 처음부터 · 난이도 바꿀 때 — 실패해도 게임은 계속(다음 저장 때 같이 올라간다)
+  if (!user) return;
+  pushing = api('/api/progress', 'PUT', { level, best, diff }).catch(e => { if (e.status === 401) user = null; });
+}
+// 첫 화면 고르기: 로그인돼 있으면 시작 화면, 아니면 가입 · 로그인(디버그는 건너뜀)
+function front() {
+  $('#ovEnd').hidden = true; $('#ovRank').hidden = true;
+  const ok = !!user || dbg;
+  $('#ovStart').hidden = !ok; $('#ovAuth').hidden = ok;
+  if (ok) requestAnimationFrame(() => diffSeg.sync(true)); else requestAnimationFrame(() => authSeg.sync(true));
+}
+const authForm = $('#authForm'), authId = $('#authId'), authNick = $('#authNick'), authPw = $('#authPw'), authMsg = $('#authMsg'), authBtn = $('#authSubmit');
+authNick.value = randName();
+$('#btnDice').addEventListener('click', () => { authNick.value = randName(); });
+function setAuthMode(v) {
+  authForm.dataset.mode = v; $('#authNickRow').hidden = v !== 'signup';
+  authBtn.textContent = v === 'signup' ? '가입하고 시작' : '로그인'; authMsg.textContent = ''; authMsg.classList.remove('ok');
+  authPw.setAttribute('autocomplete', v === 'signup' ? 'new-password' : 'current-password');
+}
+const authSeg = seg($('#authSeg'), [['signup', '회원가입'], ['login', '로그인']], 'signup', setAuthMode);
+authForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const mode = authForm.dataset.mode, id = authId.value.trim(), nick = authNick.value.replace(/\s+/g, ' ').trim().slice(0, 10), pw = authPw.value;
+  const fail = (m, el) => { authMsg.textContent = m; authMsg.classList.remove('ok'); if (el) try { el.focus(); } catch (_) {} };
+  if (id.length < 3) return fail('아이디(또는 이메일)를 3자 이상 넣어 주세요.', authId);
+  if (!/^[A-Za-z0-9._@+-]+$/.test(id)) return fail('아이디는 영문 · 숫자 · . _ @ + - 만 쓸 수 있어요.', authId);
+  if (mode === 'signup' && !nick) return fail('닉네임을 넣어 주세요(10자까지).', authNick);
+  if (pw.length < 6) return fail('비밀번호는 6자 이상으로 넣어 주세요.', authPw);
+  authBtn.disabled = true; authMsg.classList.add('ok'); authMsg.textContent = mode === 'signup' ? '가입하는 중…' : '로그인하는 중…';
+  try {
+    // 가입: 이 브라우저에서 이미 하던 진행(레벨 · 최고)이 있으면 계정의 시작 진행으로 올린다
+    const remember = $('#authKeep').checked, body = mode === 'signup' ? { login_id: id, nickname: nick, password: pw, level, best, diff, remember } : { login_id: id, password: pw, remember };
+    const me = await api(mode === 'signup' ? '/api/signup' : '/api/login', 'POST', body);
+    authPw.value = ''; authMsg.textContent = '';
+    applyMe(me); front();
+    if (!touchy()) setTimeout(() => { try { $('#btnStart').focus({ preventScroll: true }); } catch (_) {} }, 50);
+  } catch (err) { fail(err.message, err.status === 409 ? authId : err.status === 401 ? authPw : null); }
+  finally { authBtn.disabled = false; }
+});
+$('#btnLogout').addEventListener('click', async () => {
+  try { if (pushing) await pushing; await api('/api/logout', 'POST'); } catch (e) {}
+  // 다음 사람이 같은 폰으로 가입할 때 내 진행이 넘어가지 않게 캐시를 비운다
+  user = null; level = 1; best = 1; run = 0; save('lastshot_level', 1); save('lastshot_best', 1); save('lastshot_run', 0);
+  authSeg.set('login', false); authId.value = ''; authPw.value = '';
+  G = preview(); lastN = G.n; syncHud(0); front();
+});
+$('#btnRankAuth').addEventListener('click', openRank);
+
+/* ── 랭킹: 난이도마다 1~50위 (서버: /api/rank?diff=) ── */
+const TOP = 50;
+let rankMine = 0, rankLoading = false, rankAllSeg = null, rankEndSeg = null, rankReq = 0;
 const escH = s => String(s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
 function rankRows(list, box) {
   box.innerHTML = list.length
     ? list.map((r, i) => `<li${r.id === rankMine ? ' class="me"' : ''}><b>${i + 1}</b><span class="nm">${escH(r.name)}</span><span class="lv">LV ${r.level}</span><span class="sc">${fmt(r.score)}</span></li>`).join('')
     : '<li class="none">아직 기록이 없어요. 첫 주인공이 되어 보세요!</li>';
+  const me = box.querySelector('li.me'); if (me) try { me.scrollIntoView({ block: 'nearest' }); } catch (e) {}
 }
-async function getRank() {
-  const r = await fetch('/api/rank', { cache: 'no-store' });
+async function getRank(d) {
+  const r = await fetch('/api/rank?diff=' + encodeURIComponent(d), { cache: 'no-store' });
   if (!r.ok) throw new Error();
   return (await r.json()).top || [];
 }
-async function showRank(final, lv) {
-  const box = $('#rankBox'), form = $('#rankForm'), list = $('#rankList'), msg = $('#rankMsg');
-  box.hidden = false; form.hidden = true; msg.textContent = '랭킹 불러오는 중…';
-  countUp($('#rankScore'), final); list.innerHTML = '';
-  form.dataset.score = final; form.dataset.level = lv;
-  let top;
-  rankLoading = true;
-  try { top = await getRank(); } catch (e) { msg.textContent = '랭킹을 불러오지 못했어요.'; return; } finally { rankLoading = false; }
-  if (state !== 'end') return;
-  rankRows(top, list);
-  const ok = final > 0 && (top.length < 10 || final > top[top.length - 1].score);
-  if (ok) {
-    const place = top.filter(r => r.score >= final).length + 1;
-    msg.textContent = `${place}등 기록! 이름을 남겨 주세요.`;
-    form.hidden = false;
-    const inp = form.querySelector('input');
-    try { inp.value = localStorage.getItem('lastshot_name') || ''; } catch (e) {}
-    if (!touchy()) setTimeout(() => { try { inp.focus({ preventScroll: true }); inp.select(); } catch (e) {} }, 80);   // 폰에서는 키보드가 카드를 덮지 않게 직접 누를 때만
-  } else msg.textContent = final > 0 ? '10등 안에 들려면 조금 더! 다시 도전해 보세요.' : '';
+// 탭을 누르면 그 난이도 목록만 바꿔 넣는다(늦게 온 옛 응답은 버림)
+async function loadRank(d, list) {
+  list.innerHTML = '<li class="none">불러오는 중…</li>';
+  const my = ++rankReq;
+  try { const top = await getRank(d); if (my === rankReq) rankRows(top, list); }
+  catch (e) { if (my === rankReq) list.innerHTML = '<li class="none">랭킹을 불러오지 못했어요.</li>'; }
 }
-$('#rankForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const form = e.currentTarget, inp = form.querySelector('input'), btn = form.querySelector('button'), msg = $('#rankMsg');
-  const name = inp.value.trim();
-  if (!name) { inp.focus(); return; }
-  btn.disabled = true;
+async function showRank(final, lv, d) {
+  const box = $('#rankBox'), list = $('#rankList'), msg = $('#rankMsg');
+  box.hidden = false; msg.textContent = '랭킹 불러오는 중…';
+  countUp($('#rankScore'), final); list.innerHTML = '';
+  if (!rankEndSeg) rankEndSeg = seg($('#rankSegEnd'), DIFF_ITEMS, d, v => loadRank(v, list)); else rankEndSeg.set(d, true);
+  requestAnimationFrame(() => rankEndSeg.sync(true));
+  let top; const my = ++rankReq;
+  rankLoading = true;
+  try { top = await getRank(d); } catch (e) { msg.textContent = '랭킹을 불러오지 못했어요.'; return; } finally { rankLoading = false; }
+  if (state !== 'end') return;
+  if (my === rankReq) rankRows(top, list);
+  const ok = final > 0 && (top.length < TOP || final > top[top.length - 1].score);
+  if (!ok) { msg.textContent = final > 0 ? `${TOP}위 안에 들려면 조금 더! 다시 도전해 보세요.` : ''; return; }
+  const place = top.filter(r => r.score >= final).length + 1, dn = DIFFS[d].name;
+  if (!user) { msg.textContent = `${dn} ${place}위 기록!` + (dbg ? ' (디버그: 등록 안 함)' : ' 로그인하면 랭킹에 올라가요.'); return; }
+  // 계정 닉네임으로 바로 등록(이름 칸 없음)
+  msg.textContent = `${dn} ${place}위 기록! 올리는 중…`;
+  rankLoading = true;
   try {
-    const r = await fetch('/api/rank', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, score: +form.dataset.score, level: +form.dataset.level }) });
-    const out = await r.json().catch(() => ({}));
-    if (!r.ok) { msg.textContent = out.error || '등록하지 못했어요.'; if (out.top) rankRows(out.top, $('#rankList')); return; }
-    try { localStorage.setItem('lastshot_name', name); } catch (e2) {}
-    rankMine = out.id; rankRows(out.top, $('#rankList'));
-    form.hidden = true; msg.textContent = `${out.rank}등에 이름을 올렸어요!`; SFX.win();
-    setTimeout(() => { try { $('#btnNext').focus({ preventScroll: true }); } catch (e3) {} }, 50);
-  } catch (err) { msg.textContent = '등록하지 못했어요. 잠시 뒤에 다시 해 주세요.'; }
-  finally { btn.disabled = false; }
-});
+    const out = await api('/api/rank', 'POST', { score: final, level: lv, diff: d });
+    if (state !== 'end') return;
+    rankMine = out.id; ++rankReq; rankEndSeg.set(d, true); rankRows(out.top, list);
+    msg.textContent = `${dn} ${out.rank}위에 이름을 올렸어요!`; SFX.win();
+  } catch (err) {
+    if (err.status === 401) user = null;
+    if (err.out && err.out.top && state === 'end') { ++rankReq; rankEndSeg.set(d, true); rankRows(err.out.top, list); }
+    msg.textContent = err.message || '등록하지 못했어요.';
+  } finally { rankLoading = false; }
+}
 async function openRank() {
-  $('#ovStart').hidden = true; $('#ovRank').hidden = false;
-  const list = $('#rankAll'); list.innerHTML = '<li class="none">불러오는 중…</li>';
-  try { rankRows(await getRank(), list); } catch (e) { list.innerHTML = '<li class="none">랭킹을 불러오지 못했어요.</li>'; }
+  $('#ovStart').hidden = true; $('#ovAuth').hidden = true; $('#ovRank').hidden = false;
+  const list = $('#rankAll');
+  if (!rankAllSeg) rankAllSeg = seg($('#rankSegAll'), DIFF_ITEMS, diff, v => loadRank(v, list)); else rankAllSeg.set(diff, true);
+  requestAnimationFrame(() => rankAllSeg.sync(true));
+  loadRank(diff, list);
   if (!touchy()) setTimeout(() => { try { $('#btnRankClose').focus({ preventScroll: true }); } catch (e) {} }, 50);
 }
 
-function preview() { setTheme((level - 1) % 5); const g = newGame(level, {}); step(g, 0); g.mobs.forEach(m => { m.flash = 0; }); return g; }
-function home() { state = 'menu'; clearViews(); bodies.length = 0; G = preview(); lastN = G.n; btnMsl.hidden = true; $('#ovEnd').hidden = true; $('#ovRank').hidden = true; $('#ovStart').hidden = false; syncHud(0); }
+function preview() { setTheme((level - 1) % 5); const g = newGame(level, {}, { diff }); step(g, 0); g.mobs.forEach(m => { m.flash = 0; }); return g; }
+function home() { state = 'menu'; clearViews(); bodies.length = 0; G = preview(); lastN = G.n; btnMsl.hidden = true; front(); syncHud(0); }
 const prog = () => G ? Math.max(0, Math.min(1, (G.dist - G.ev[0].d - 680) / (G.length - 680))) : 0;
 let hudPowTxt = '', hudMsl = -1;
 const hudCache = {};
@@ -1214,6 +1321,7 @@ function syncHud(dt) {
   const playing = G && state !== 'menu';
   setT('#hudLv', String(playing ? G.L : level));
   setT('#hudBest', String(best));
+  const dv = playing ? G.diff : diff; if (hudCache.diff !== dv) { hudCache.diff = dv; const el = $('#hudDiff'); el.textContent = DIFFS[dv].name; el.dataset.v = dv; }
   const target = score() - inFlight;
   dispScore = dt ? dispScore + (target - dispScore) * Math.min(1, dt * 14) : target;
   if (Math.abs(target - dispScore) < 1) dispScore = target;
@@ -1238,23 +1346,25 @@ $('#btnNext').addEventListener('click', () => { if (performance.now() - endAt < 
 $('#btnMoneyYes').addEventListener('click', () => { if (performance.now() - endAt < 800) return; moneyNext = true; start(); });
 $('#btnMoneyNo').addEventListener('click', () => { $('#moneyBox').hidden = true; try { $('#btnNext').focus({ preventScroll: true }); } catch (e) {} });
 $('#btnHome').addEventListener('click', home);
-$('#btnReset').addEventListener('click', () => { level = 1; save('lastshot_level', 1); run = 0; save('lastshot_run', 0); home(); });
+$('#btnReset').addEventListener('click', () => { level = 1; save('lastshot_level', 1); run = 0; save('lastshot_run', 0); pushProgress(); home(); });
 $('#btnRank').addEventListener('click', openRank);
 $('#btnRankClose').addEventListener('click', home);
 $('#btnMute').addEventListener('click', () => { muted = !muted; save('lastshot_mute', muted ? 1 : 0); paintMute(); if (!muted) audio(); });
 addEventListener('resize', fit);
 document.addEventListener('visibilitychange', () => { last = performance.now(); for (const k in keys) keys[k] = false; if (!document.hidden && AC && AC.state !== 'running' && state === 'play') try { AC.resume(); } catch (e) {} });
-if (dbg) window.__ls = { auto: false, start, end, get G() { return G; }, setLevel(l) { level = l; }, get state() { return state; }, fireMissile: shootMissile, sfx(n, t) { audio(); muted = false; SFX[n](t); }, setTier(t) { G.tier = t; }, get timers() { return { endTimer, slow, hitstop, over: G && G.over }; } };
+if (dbg) window.__ls = { auto: false, start, end, get G() { return G; }, setLevel(l) { level = l; }, setDiff(d) { diff = diffOf(d); diffSeg.set(diff, true); }, get diff() { return diff; }, get user() { return user; }, get state() { return state; }, fireMissile: shootMissile, sfx(n, t) { audio(); muted = false; SFX[n](t); }, setTier(t) { G.tier = t; }, get timers() { return { endTimer, slow, hitstop, over: G && G.over }; } };
 fit(); G = preview(); syncHud(0); paintMute();
+if (dbg) front(); else api('/api/me').then(me => { applyMe(me); front(); }).catch(() => { authSeg.set(loadS('lastshot_name', '') ? 'login' : 'signup', false); front(); });   // 전에 가입한 적 있는 폰이면 로그인 탭부터
 try { renderer.compile(scene, camera); } catch (e) {}   // 셰이더를 미리 만들어 첫 진급 · 첫 폭발 때 멈칫하지 않게
 requestAnimationFrame(t => { last = t; loop(t); });
 // 확인용: ?debug&play=레벨 → 자동 조종으로 바로 시작
+if (dbg) { const d = location.search.match(/diff=(easy|normal|hard)/); if (d) { diff = d[1]; diffSeg.set(diff, true); } }
 if (dbg) { const m = location.search.match(/play=(\d+)/); if (m) { level = +m[1]; window.__ls.auto = !/manual/.test(location.search); muted = true; setTimeout(start, 50); } }
 if (dbg) { const w = location.search.match(/[?&]w=(\d+)&h=(\d+)/); if (w) { Object.assign($('#game').style, { width: w[1] + 'px', height: w[2] + 'px', margin: 0 }); fit(); } }
 if (dbg) { const t = location.search.match(/tier=(\d)/); if (t) setTimeout(() => { if (G) G.tier = +t[1]; }, 80); }
 // 확인용: &gal=croc2 · gal=golem · gal=army1 → 보스 · 중간보스 · 병사를 가까이 세워 놓고 보기(게임은 멈춤)
 function gallery(k, n) {
-  $('#ovStart').hidden = true; clearViews(); state = 'menu'; bossSeen = true;
+  $('#ovStart').hidden = true; $('#ovAuth').hidden = true; clearViews(); state = 'menu'; bossSeen = true;
   G = newGame(level, {}); G.n = 30; G.tier = Math.min(2, n); G.gates = []; G.mobs = []; G.groups = []; G.boxes = []; lastN = 30;
   const anim = ['croc', 'gorilla', 'elephant', 'lion', 'tiger'], mids = ['boar', 'golem', 'lich', 'siege', 'drake'];
   if (anim.includes(k)) G.boss = { kind: 'brute', animal: k, evo: Math.min(2, n), x: MID, y: -300, r: 62, hp: 100, max: 100, t: 0, flash: 0, pop: 0, stop: -800, bite: 0, fire: 2, summon: 99 };

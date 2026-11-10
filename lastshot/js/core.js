@@ -70,6 +70,15 @@ export const MID_NAME = { boar: '돌격멧돼지', golem: '바위 골렘', lich:
 export const bossName = L => { const b = bossLook(L); return ANIMAL_NAME[b.animal] + ' 보스 LV' + (b.evo + 1); };
 // 레벨 → 실제 세기: 6 까지는 가파르게, 그 뒤로는 완만하게(그래도 계속 오른다)
 export const power = L => L <= 6 ? 5.4 + L * .85 : 10.5 + (L - 6) * .5;
+// 난이도(쉬움 · 중간 · 하드): 중간은 모두 1 · 0 — 예전 숫자가 하나도 바뀌지 않는다. 쉬움 · 하드는 여기 배수만 곱한다.
+//   mobs: 적 수(대군 물결 · 거인 체력에도 같이), hp: 적 체력, boss: 보스 체력, gate: 좋은 문(+) 값, n: 시작 병사 더하기, missiles: 시작 유도탄 더하기
+export const DIFFS = {
+  easy:   { name: '쉬움', mobs: .7, hp: .8, boss: .7, gate: 1.25, n: 5, missiles: 2 },
+  normal: { name: '중간', mobs: 1, hp: 1, boss: 1, gate: 1, n: 0, missiles: 0 },
+  hard:   { name: '하드', mobs: 1.25, hp: 1.1, boss: 1.25, gate: .9, n: 0, missiles: 0 }
+};
+export const diffOf = d => DIFFS[d] ? d : 'normal';
+let DK = DIFFS.normal;   // 지금 돌고 있는 판의 난이도(step 에서 맞춘다 — ARMY · LVK 와 같은 방식)
 const FORMS = ['snake', 'wedge', 'wall', 'flank', 'ring', 'swarm'];
 export const FORM_NAME = { snake: '뱀 행렬', wedge: '화살촉 돌격', wall: '방패벽', flank: '엇갈려 가로지르기', ring: '원진', swarm: '산개 습격' };
 const speedOf = L => Math.min(176, 142 + L * 3);
@@ -123,12 +132,12 @@ export function makeLevel(L) {
 }
 
 export function newGame(L, hooks, opts = {}) {
-  const help = Math.min(4, opts.help || 0), money = !!opts.money;   // money: 졌을 때 'Show me the money?' 에 예 → 병사 100 · 유도탄 10 으로 시작   // 막힌 레벨 지원: 같은 레벨에서 연속으로 진 횟수(최대 4) — 1번마다 유도탄 +3 · 시작 병사 +8 · 적 -10% · 보스 체력 -8%
+  const help = Math.min(4, opts.help || 0), money = !!opts.money, diff = diffOf(opts.diff), D = DIFFS[diff];   // money: 졌을 때 'Show me the money?' 에 예 → 병사 100 · 유도탄 10 으로 시작   // 막힌 레벨 지원: 같은 레벨에서 연속으로 진 횟수(최대 4) — 1번마다 유도탄 +3 · 시작 병사 +8 · 적 -10% · 보스 체력 -8%
   const lv = makeLevel(L);
   return {
-    L, ev: lv.ev, length: lv.length, stage: lv.stage, bossKind: lv.boss, twist: lv.twist, stormT: 4, dist: START, next: 0, t: 0,
+    L, diff, ev: lv.ev, length: lv.length, stage: lv.stage, bossKind: lv.boss, twist: lv.twist, stormT: 4, dist: START, next: 0, t: 0,
     speed: Math.min(176, 142 + L * 3),
-    px: MID, tx: MID, n: (money ? 100 : 3) + help * 8, shown: (money ? 100 : 3) + help * 8, tier: money ? 1 : 0, missiles: Math.max(money ? 10 : 0, 1 + Math.floor((L - 1) / 5)) + help * 3, help, money, rockets: [],
+    px: MID, tx: MID, n: (money ? 100 : 3) + help * 8 + D.n, shown: (money ? 100 : 3) + help * 8 + D.n, tier: money ? 1 : 0, missiles: Math.max(money ? 10 : 0, 1 + Math.floor((L - 1) / 5)) + help * 3 + D.missiles, help, money, rockets: [],
     rate: 5, dmg: 1, cd: 0, pow: 0, flash: 0,
     bullets: [], gates: [], mobs: [], groups: [], boxes: [], barrels: [], shells: [], boss: null,
     h: Object.assign({ burst: NOOP, spark: NOOP, float: NOOP, sfx: NOOP, buzz: NOOP, shake: NOOP, tint: NOOP, ring: NOOP, gateHit: NOOP, smoke: NOOP, blast: NOOP, die: NOOP, pts: NOOP, combo: NOOP, stop: NOOP }, hooks || {}),
@@ -144,7 +153,7 @@ function gateVal(G, good, p) {
   const L = power(G.L), n = Math.max(1, G.n);
   if (good) {
     if (L >= 6 && Math.random() < .22 && n < 60) return { t: 'x', v: 2 };
-    return { t: '+', v: Math.round((ri(3, 6) + L * .8 + n * .22 + p * 3) * (G.twist === 'supply' ? 1.35 : 1)) };
+    return { t: '+', v: Math.round((ri(3, 6) + L * .8 + n * .22 + p * 3) * (G.twist === 'supply' ? 1.35 : 1) * DK.gate) };
   }
   if (L >= 8 && Math.random() < .2) return { t: '/', v: 2 };
   return { t: '+', v: -(ri(3, 6) + Math.round(L + n * .4 + p * 5)) };
@@ -184,7 +193,7 @@ const STAGE_K = { basic: 1, rush: 1, serpent: 1, maze: 1, armory: .65, assault: 
 const mobCount = (L, p, k = 1) => Math.min(Math.round((4 + L * 1.4 + Math.pow(ARMY, .85) * (.45 + Math.min(LVL, 25) * .022)) * (.75 + p * .6) * rnd(.85, 1.15) * k * LVK), 420);
 // 대군 물결: 초당 나오는 수도 같은 방식
 const streamFlux = (G, full) => (5 + Math.pow(Math.max(1, G.n), .85) * (.22 + Math.min(G.L, 25) * .012)) * (full ? 1.25 : 1) * LVK;
-const mobHp = (L, p) => 1 + Math.floor(L / 4 * (.35 + .65 * Math.min(1, p * 1.6)) + p * (L / 5.5));   // 판 앞쪽은 가볍게 시작해 뒤로 갈수록 단단하게
+const mobHp = (L, p) => Math.max(1, Math.round((1 + Math.floor(L / 4 * (.35 + .65 * Math.min(1, p * 1.6)) + p * (L / 5.5))) * DK.hp));   // 판 앞쪽은 가볍게 시작해 뒤로 갈수록 단단하게
 // 정예병(큰 몸집 · 은 투구 · 방패): 3레벨부터 무리 속에 섞인다 — 체력 4배, 닿으면 3명
 const elitePct = Lv => Lv < 3 ? 0 : Math.min(.24, .03 * (Lv - 2));
 const elitePctG = G => G.twist === 'elite' ? Math.min(.45, elitePct(Math.max(G.L, 4)) * 2 + .08) : elitePct(G.L);
@@ -192,7 +201,7 @@ function elite(M, Lv) { M.hp = M.max = Math.round(M.hp * 4 + Lv * .4); M.size = 
 
 function spawn(G, e, y) {
   const L = power(G.L), p = e.p, k = e.kind;
-  ARMY = Math.max(3, G.n); LVL = G.L; LVK = (STAGE_K[G.stage] || 1) * (G.twist === 'gust' || G.twist === 'elite' ? .8 : 1) * (1 - (G.help || 0) * .1) * (G.L >= 7 ? 1.2 : 1);   // 7레벨부터 1.2배 (사용자 지시 2026-11-08)
+  ARMY = Math.max(3, G.n); LVL = G.L; LVK = (STAGE_K[G.stage] || 1) * (G.twist === 'gust' || G.twist === 'elite' ? .8 : 1) * (1 - (G.help || 0) * .1) * (G.L >= 7 ? 1.2 : 1) * DK.mobs;   // 7레벨부터 1.2배 (사용자 지시 2026-11-08)
   G.p = p;
   if (k === 'gate' || k === 'swap') {
     let A = gateVal(G, true, p), B = gateVal(G, false, p);
@@ -258,7 +267,7 @@ function spawn(G, e, y) {
     const tank = G.bossKind === 'tank';
     // 보스 체력 = 지금 우리 화력(초당 피해) × 버티는 시간(레벨 1 약 5초 → 20 약 10초) — 부대가 아무리 커도 만나자마자 녹지 않게
     const dps = G.rate * G.dmg * TIERS[G.tier].mul * Math.pow(Math.max(1, G.n), .72) * .85;
-    const hp = Math.round(Math.max(60 + L * 55 + L * L * 3, dps * (5 + Math.min(G.L, 20) * .25) * (1 - (G.help || 0) * .08) * (G.L >= 7 ? 1.2 : 1)) * (tank ? .9 : 1));
+    const hp = Math.round(Math.max(60 + L * 55 + L * L * 3, dps * (5 + Math.min(G.L, 20) * .25) * (1 - (G.help || 0) * .08) * (G.L >= 7 ? 1.2 : 1)) * (tank ? .9 : 1) * DK.boss);
     const look = bossLook(G.L);
     G.boss = { kind: G.bossKind, animal: look.animal, evo: look.evo, x: MID, y: y - 40, r: tank ? 70 : 62, hp, max: hp, vy: tank ? 16 + L : 100 + Math.min(L, 20) * 3, stop: tank ? -560 : -800,
       t: 0, flash: 0, pop: 0, acc: 0, accT: 0, summon: 2.5, bite: 0, fire: 1.2, aim: 0 };
@@ -449,6 +458,7 @@ function stepRockets(g, dt) {
 /* ── 한 장면 ── */
 export function step(G, dt) {
   if (G.over) return;
+  DK = DIFFS[G.diff] || DIFFS.normal;
   const g = G, h = g.h;
   g.t += dt;
   g.dist += g.speed * dt;
