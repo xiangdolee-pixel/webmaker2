@@ -458,6 +458,21 @@ async function runYoutubePublish(payload, work) {
   } catch (e) { log('  유튜브 공개 전환 오류', e.message); await report('failed', { error: String(e.message || e).slice(0, 300) }); }
 }
 
+// 공개된 유튜브 링크를 텔레그램 공식채널에(2026-11-10): tools/tg_channel_post.py (봇이 채널 관리자여야 함)
+async function runTelegram(payload) {
+  const job = payload.job, t = payload.telegram || {};
+  const report = (status, extra = {}) => api(`/api/studio/helper/jobs/${job.id}/yt`, { method: 'POST', body: { status, ...extra } }).catch((e) => log('(텔레그램 보고 실패)', e.message));
+  try {
+    if (!t.url) throw new Error('유튜브 주소 없음');
+    log(`  텔레그램: ${t.channel_name || ''} 공식채널에 ${t.url}`);
+    const r = await py(['tools\\tg_channel_post.py', '--channel', t.channel_name || '사적인자산왕', t.url], { cwd: DOCS, timeoutMin: 3, label: '텔레그램' });
+    const lines = (r.out || '').trim().split(/\r?\n/).filter(Boolean);
+    let res = null; for (let i = lines.length - 1; i >= 0 && !res; i--) { try { if (lines[i].startsWith('{')) res = JSON.parse(lines[i]); } catch { /* 다음 줄 */ } }
+    if (r.code !== 0 || !res?.ok) { await report('tg_failed', { error: res?.error || lines.slice(-2).join(' | ').slice(0, 300) }); return; }
+    log('  텔레그램: 올림'); await report('tg_done', { message_id: res.message_id });
+  } catch (e) { await report('tg_failed', { error: String(e.message || e).slice(0, 300) }); }
+}
+
 // ───────── 모드 ─────────
 async function processJob(payload) {
   const job = payload.job, j = J(job.id);
@@ -465,6 +480,7 @@ async function processJob(payload) {
   log(`▶ ${job.id} ${job.kind} ${job.channel} ${job.source} (${job.phase})`);
   if (job.phase === 'youtube') { await runYoutube(payload, work); return; }
   if (job.phase === 'youtube-publish') { await runYoutubePublish(payload, work); return; }
+  if (job.phase === 'telegram') { await runTelegram(payload); return; }
   try {
     if (job.phase === 'text') {
       let early = null;

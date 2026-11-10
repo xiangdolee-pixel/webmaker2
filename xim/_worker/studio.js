@@ -499,6 +499,13 @@ export async function studioHelper(request, env, url, path, method) {
           } catch { /* 다음 폴링 때 */ }
         }
       }
+      const trow = await db.prepare("SELECT id FROM studio_jobs WHERE json_extract(options, '$.yt.tg.status') = 'queued' ORDER BY json_extract(options, '$.yt.tg.at') ASC LIMIT 1").first();
+      if (trow) {
+        const job = await getJob(db, trow.id); const jo = JSON.parse(job.options || '{}');
+        jo.yt.tg = { ...jo.yt.tg, status: 'running', started_at: now() };
+        await setJob(db, job.id, { options: JSON.stringify(jo) });
+        return json({ job: { ...job, options: jo, phase: 'telegram' }, telegram: { url: jo.yt.url || '', title: jo.yt.title || job.title, channel_name: job.channel === '순섬' ? '순수한크립토' : '사적인자산왕' } });
+      }
       const prow = await db.prepare("SELECT id FROM studio_jobs WHERE json_extract(options, '$.yt.status') = 'review' AND json_extract(options, '$.yt.next_check') <= ? ORDER BY json_extract(options, '$.yt.next_check') ASC LIMIT 1").bind(now()).first();
       if (prow) {
         const job = await getJob(db, prow.id); const jo = JSON.parse(job.options || '{}');
@@ -582,7 +589,9 @@ export async function studioHelper(request, env, url, path, method) {
         const review = (y.visibility || '비공개') === '비공개' && y.publish !== false;   // 비공개로 올렸고 "검토 끝나면 공개" 가 켜져 있으면 검토 단계로
         jo.yt = { ...y, status: review ? 'review' : 'done', url, video_id: vidm ? vidm[1] : (y.video_id || ''), error: '', uploaded_at: now(), finished_at: review ? null : now(), next_check: review ? now() + 10 * 60000 : null, checks: 0 };
       } else if (st === 'published') {
-        jo.yt = { ...y, status: 'done', visibility: '공개', error: '', published_at: now(), finished_at: now() };
+        jo.yt = { ...y, status: 'done', visibility: '공개', error: '', published_at: now(), finished_at: now(), tg: (y.telegram !== false && jo.tg_auto !== false) ? { status: 'queued', at: now() } : (y.tg || null) };   // 공개되면 텔레그램 공식채널에 링크(사용자 2026-11-10)
+      } else if (st === 'tg_done' || st === 'tg_failed') {
+        jo.yt = { ...y, tg: { ...(y.tg || {}), status: st === 'tg_done' ? 'done' : 'failed', error: String(d.error || '').slice(0, 300), message_id: d.message_id || null, finished_at: now() } };
       } else if (st === 'reviewing') {
         const n = (y.checks || 0) + 1;
         jo.yt = n >= 72 ? { ...y, status: 'done', error: '12시간 동안 검토가 끝나지 않아 비공개로 둡니다', finished_at: now() } : { ...y, status: 'review', checks: n, next_check: now() + 10 * 60000, error: '' };
@@ -650,7 +659,7 @@ async function createJob(env, gh, d) {
   const engine = ['cloud', 'pc', 'api', 'none'].includes(d.engine) ? d.engine : 'cloud';
   if (['api', 'none'].includes(engine) && !env.ANTHROPIC_API_KEY) throw bad('API 방식은 ANTHROPIC_API_KEY 가 있어야 합니다. 기본(클라우드 · 구독)으로 하세요.');
   if (engine === 'cloud' && !env.STUDIO_HELPER_TOKEN) throw bad('도우미 토큰(STUDIO_HELPER_TOKEN)이 아직 없습니다.');
-  const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000), video_auto: d.video !== false && d.video !== 'false' && d.video !== 0, yt_auto: d.youtube !== false && d.youtube !== 'false' && d.youtube !== 0 };   // 완성되면 영상도 · 영상이 되면 유튜브도(기본 켬, 사용자 지시 2026-11-10)
+  const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000), video_auto: d.video !== false && d.video !== 'false' && d.video !== 0, yt_auto: d.youtube !== false && d.youtube !== 'false' && d.youtube !== 0, tg_auto: d.youtube !== false && d.youtube !== 'false' && d.youtube !== 0 };   // 완성되면 영상도 · 영상이 되면 유튜브도(기본 켬, 사용자 지시 2026-11-10)
   if (d.scheduled) options.scheduled = String(d.scheduled).slice(0, 40);
   if (kind === 'thumb') Object.assign(options, { title: String(d.title || '').slice(0, 200), emotion: d.emotion || '자동', gesture: d.gesture || '자동', badgeName: String(d.badgeName || '').slice(0, 60), badgeRole: String(d.badgeRole || '').slice(0, 80), face: d.face || 'emoji:auto' });
   if (kind === 'thumb' && !options.title) throw bad('썸네일 제목을 넣어 주세요.');
@@ -817,7 +826,7 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
     const engine = ['cloud', 'pc', 'api', 'none'].includes(d.engine) ? d.engine : 'cloud';
     if (['api', 'none'].includes(engine) && !env.ANTHROPIC_API_KEY) throw bad('API 방식은 ANTHROPIC_API_KEY 가 있어야 합니다. 기본(클라우드 · 구독)으로 하세요.');
     if (engine === 'cloud' && !env.STUDIO_HELPER_TOKEN) throw bad('도우미 토큰(STUDIO_HELPER_TOKEN)이 아직 없습니다.');
-    const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000), video_auto: d.video !== false && d.video !== 'false' && d.video !== 0, yt_auto: d.youtube !== false && d.youtube !== 'false' && d.youtube !== 0 };   // 완성되면 영상도 · 영상이 되면 유튜브도(기본 켬, 사용자 지시 2026-11-10)
+    const options = { pick: d.pick === 'manual' ? 'manual' : 'auto', thumb: d.thumb === 'manual' ? 'manual' : 'auto', engine, text: String(d.text || '').slice(0, 20000), video_auto: d.video !== false && d.video !== 'false' && d.video !== 0, yt_auto: d.youtube !== false && d.youtube !== 'false' && d.youtube !== 0, tg_auto: d.youtube !== false && d.youtube !== 'false' && d.youtube !== 0 };   // 완성되면 영상도 · 영상이 되면 유튜브도(기본 켬, 사용자 지시 2026-11-10)
     if (kind === 'thumb') Object.assign(options, { title: String(d.title || '').slice(0, 200), emotion: d.emotion || '자동', gesture: d.gesture || '자동', badgeName: String(d.badgeName || '').slice(0, 60), badgeRole: String(d.badgeRole || '').slice(0, 80), face: d.face || 'emoji:auto' });
     if (kind === 'thumb' && !options.title) throw bad('썸네일 제목을 넣어 주세요.');
     const id = hex(10);
@@ -865,7 +874,7 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
     const summary = docJson(await latestDoc(db, job.id, 'summary')) || {};
     const title = String(d.title || summary.titles?.[0] || job.title || '').slice(0, 100);
     if (!title) throw bad('제목이 없습니다.');
-    jo.yt = { status: 'queued', title, visibility: ['공개', '일부공개', '비공개'].includes(d.visibility) ? d.visibility : '비공개', publish: d.publish !== false && d.publish !== 'false', at: now(), url: '', error: '' };   // publish: 비공개로 올린 뒤 검토가 끝나면 공개로(기본 켬)
+    jo.yt = { status: 'queued', title, visibility: ['공개', '일부공개', '비공개'].includes(d.visibility) ? d.visibility : '비공개', publish: d.publish !== false && d.publish !== 'false', telegram: d.telegram !== false && d.telegram !== 'false', at: now(), url: '', error: '' };   // publish: 비공개로 올린 뒤 검토가 끝나면 공개로 · telegram: 공개되면 공식채널에 링크(둘 다 기본 켬)
     await setJob(db, job.id, { options: JSON.stringify(jo) });
     await audit?.('STUDIO_YOUTUBE', '유튜브 올리기', `${title} · ${jo.yt.visibility}`);
     return json({ ok: true, yt: jo.yt });
