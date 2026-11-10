@@ -242,7 +242,7 @@ async function ximApi(request, env, url, ctx) {
   if (path.startsWith('/api/voice/')) {
     if (!env.CLONE || !env.CLONE_TOKEN) throw new HttpError(503, '내 목소리 읽기(clone)가 아직 연결되지 않았습니다.');
     const sub = path.slice('/api/voice'.length);
-    const target = sub.startsWith('/audio/') ? sub : `/api${sub}`;
+    const target = sub.startsWith('/audio/') || sub.startsWith('/video/') ? sub : `/api${sub}`;
     const headers = new Headers({ 'X-Agent-Token': env.CLONE_TOKEN });
     for (const h of ['Content-Type', 'Range', 'If-None-Match']) if (request.headers.has(h)) headers.set(h, request.headers.get(h));
     const res = await env.CLONE.fetch(new Request(`https://clone${target}${url.search}`, { method, headers, body: method === 'GET' || method === 'HEAD' ? undefined : request.body }));
