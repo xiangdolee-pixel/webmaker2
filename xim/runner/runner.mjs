@@ -23,7 +23,11 @@ const has = (k) => args.includes(k);
 const MODE = has('--setup') ? 'setup' : has('--catalog') ? 'catalog' : has('--login') ? 'login' : opt('--mode', 'pc');
 
 // ───────── 설정 ─────────
-const cfgFile = [process.env.DOCS && path.join(process.env.DOCS, 'tools', '_xim_helper.json'), 'D:\\ws\\docs\\tools\\_xim_helper.json'].filter(Boolean).find((f) => fs.existsSync(f));
+const cfgFile = [
+  process.env.DOCS && path.join(process.env.DOCS, 'tools', '_xim_helper.json'),
+  path.join(path.dirname(process.argv[1] || '.'), '..', '..', '_pc', 'docs', 'tools', '_xim_helper.json'),   // 리포 안 _pc (2026-11-10 개편 기본)
+  'D:\\ws\\docs\\tools\\_xim_helper.json',   // 옛 경로 (다른 PC 호환)
+].filter(Boolean).find((f) => fs.existsSync(f));
 const cfg = cfgFile ? JSON.parse(fs.readFileSync(cfgFile, 'utf8')) : {};
 const XIM = (process.env.XIM_URL || cfg.url || 'https://xim.xiangdolee.workers.dev').replace(/\/$/, '');
 const TOKEN = process.env.STUDIO_HELPER_TOKEN || cfg.token || '';
