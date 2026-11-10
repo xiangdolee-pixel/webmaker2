@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, DIFFS, diffOf, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile, snapshot, restore } from './core.js?v=29';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, DIFFS, diffOf, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile, snapshot, restore, mslGain, moneyMissiles } from './core.js?v=30';
 import { SPRITES } from './sprites.js?v=17';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
@@ -500,7 +500,7 @@ function paintGate(pv, p) {
   x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
   const big = W < 400 ? 100 : 124;
   if (kind === 'trade') {
-    const title = '유도탄 +3';
+    const title = '유도탄 +' + mslGain(G && G.diff);
     x.font = `900 ${big * .36}px Pretendard, sans-serif`; x.lineWidth = 8; x.strokeStyle = K.edge; x.strokeText(title, W / 2, H * .26); x.fillStyle = '#fff'; x.fillText(title, W / 2, H * .26);
     x.font = `900 ${big * .82}px Pretendard, sans-serif`; x.lineWidth = 16; x.strokeText('-' + p.v, W / 2, H * .66); x.fillStyle = '#fff'; x.fillText('-' + p.v, W / 2, H * .66);
   } else {
@@ -770,7 +770,8 @@ function pill(x, y, s, fs, c1, c2) {
   ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 2.5; ctx.stroke();
   text(s, x, y + fs * .04, fs, '#fff', true, 'rgba(0,0,0,.35)');
 }
-const GIFT = { missile: '유도탄 +3', rate: '연사 UP', dmg: '위력 UP', thunder: '천둥번개' };
+const GIFT = { rate: '연사 UP', dmg: '위력 UP', thunder: '천둥번개' };
+const giftLabel = g => g === 'missile' ? '유도탄 +' + mslGain(G && G.diff) : GIFT[g] || '';   // 유도탄 수는 난이도에 따라
 const elastic = a => 1 + .7 * Math.exp(-a * 9) * Math.cos(a * 22);   // 톡 튀었다가 제자리로
 const texts = [];
 function fxFloat(x, y, s, c, size, small, h) {
@@ -826,7 +827,7 @@ function drawOverlay(dt) {
     const p = scr(wx(X.x), 1.25, wz(X.y) + 1.2); if (p.z > 1) continue;
     const near = Math.max(.55, Math.min(1.25, 1 + wz(X.y) / 90));
     text(String(Math.max(0, Math.ceil(X.hp))), p.x, p.y, 38 * k * near * (1 + X.pop * .2), '#fff', true);
-    const q = scr(wx(X.x), 5.2, wz(X.y)); if (q.z < 1) pill(q.x, q.y, GIFT[X.gift] || '', 12 * k * near, '#fde047', '#d97706');   // 무엇을 주는지
+    const q = scr(wx(X.x), 5.2, wz(X.y)); if (q.z < 1) pill(q.x, q.y, giftLabel(X.gift), 12 * k * near, '#fde047', '#d97706');   // 무엇을 주는지
   }
   // 내 부대 숫자
   if (G.n > 0) { const p = scr(wx(G.px), 0, squadR(G.n) * S * .8 + 1.4), py = Math.min(VH - 24, p.y); pill(clamp(p.x, 34, py > VH - 120 && !btnMsl.hidden ? VW - 118 : VW - 34), py, String(Math.round(G.shown)), 18 * k * (1 + squadPop * .25), '#60a5fa', '#1d4ed8'); }
@@ -1146,7 +1147,7 @@ function end(win) {
   state = 'end'; btnMsl.hidden = true; endAt = performance.now(); save('lastshot_live', 0);
   inFlight = 0; coins.length = 0;
   const btn = $('#btnNext');
-  $('#rankBox').hidden = true; $('#moneyBox').hidden = win;
+  $('#rankBox').hidden = true; $('#moneyBox').hidden = win; $('#moneyMsl').textContent = moneyMissiles(G.diff) + '발';
   if (win) {
     const bonus = G.committed || 0;
     $('#endKicker').textContent = 'STAGE CLEAR'; $('#endTitle').textContent = `레벨 ${level - 1} 클리어!`;

@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="라스트샷">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="css/style.css?v=13">
-<script type="module" src="js/game.js?v=34"></script>
+<script type="module" src="js/game.js?v=35"></script>
 </head>
 <body>
 <!-- 계정(로그인) 버튼 자리 — 게임 화면을 가리지 않게 숨김 (자리가 없으면 오른쪽 위에 떠서 나오므로 일부러 둔다) -->
@@ -73,7 +73,7 @@
       <ul class="how">
         <li><b>←→ 끌기</b> 손가락으로 좌우로 움직여요</li>
         <li><b>문 셈</b> ×2 와 +18, 어느 쪽이 클까? 지금 부대 수로 계산! + 숫자는 쏘면 올라가요</li>
-        <li><b>금색 문</b> 병사를 내주고 진급(총이 세짐) 하거나 유도탄 3발</li>
+        <li><b>금색 문</b> 병사를 내주고 유도탄을 얻어요(난이도가 높을수록 적게)</li>
         <li><b>유도탄</b> 오른쪽 아래 버튼<span class="kb"> · 스페이스</span>. 보스와 중간보스를 쫓아가 펑!</li>
         <li><b>콤보</b> 쉬지 않고 쓰러뜨리면 점수가 최대 3배</li>
       </ul>
@@ -115,7 +115,7 @@
       <p class="rank-score" id="endScoreBox" hidden>누적 점수 <b id="endScore">0</b></p>
       <div class="money" id="moneyBox" hidden>
         <p class="money-q">Show me the money?</p>
-        <p class="money-sub">병사 <b>100명</b> · 유도탄 <b>10발</b>로 바로 다시 시작</p>
+        <p class="money-sub">병사 <b>100명</b> · 유도탄 <b id="moneyMsl">10발</b>로 바로 다시 시작</p>
         <div class="money-btns">
           <button type="button" class="btn money-yes" id="btnMoneyYes">예</button>
           <button type="button" class="btn money-no" id="btnMoneyNo">아니요</button>
