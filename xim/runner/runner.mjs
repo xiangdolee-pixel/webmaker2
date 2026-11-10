@@ -394,11 +394,47 @@ async function runImages(payload, work, early = null) {
   await finishImages(j, work, docs, made, pick, withThumb);
 }
 
+// ───────── 유튜브 올리기 (2026-11-10) ─────────
+//   xim 카드 "유튜브에 올리기" → Worker 가 options.yt=queued → 여기서 영상(clone R2) · 썸네일을 받아 tools/yt_upload_auto.py(엣지 자동화 프로필, CDP) 로 올린다.
+//   결과는 /api/studio/helper/jobs/:id/yt 로 보고. 로그인 필요(종료 코드 2)면 status 'login' — 사용자가 docs\tools\유튜브로그인.bat 로 한 번 로그인해야 한다.
+async function runYoutube(payload, work) {
+  const job = payload.job, y = payload.youtube || {};
+  const report = (status, extra = {}) => api(`/api/studio/helper/jobs/${job.id}/yt`, { method: 'POST', body: { status, ...extra } }).catch((e) => log('(유튜브 보고 실패)', e.message));
+  try {
+    if (!y.video_job) throw new Error('영상(video_job)이 없습니다. 먼저 영상 만들기');
+    fs.mkdirSync(work, { recursive: true });
+    const video = path.join(work, 'youtube.mp4');
+    log(`  유튜브: 영상 내려받기 ${y.video_job}`);
+    await download(`/api/studio/helper/video/${y.video_job}`, video);
+    let thumb = '';
+    if (y.thumb_url) { try { thumb = await download(y.thumb_url, path.join(work, 'youtube_thumb' + (/\.png$/i.test(y.thumb_url) ? '.png' : '.webp'))); } catch (e) { log('  (썸네일 내려받기 실패)', e.message); } }
+    if (thumb && /\.webp$/i.test(thumb)) {   // 유튜브는 webp 썸네일을 안 받는 경우가 있어 png 로
+      const png = thumb.replace(/\.webp$/i, '.png');
+      const r = spawnSync(PYTHON, ['-c', 'from PIL import Image;import sys;Image.open(sys.argv[1]).convert("RGB").save(sys.argv[2],"PNG")', thumb, png], { encoding: 'utf8' });
+      if (r.status === 0) thumb = png;
+    }
+    const jobJson = path.join(work, 'youtube_job.json');
+    fs.writeFileSync(jobJson, JSON.stringify({ video, thumb, title: y.title || job.title, more: y.more || '', visibility: y.visibility || '비공개', playlist: '코인뉴스' }, null, 2), 'utf8');
+    log(`  유튜브: 업로드 시작 — ${y.title || job.title} (${y.visibility || '비공개'})`);
+    const r = await py(['tools\\yt_upload_auto.py', jobJson], { cwd: DOCS, timeoutMin: 120, label: '유튜브 업로드' });
+    const lines = (r.out || '').trim().split(/\r?\n/).filter(Boolean);
+    let res = null; for (let i = lines.length - 1; i >= 0 && !res; i--) { try { if (lines[i].startsWith('{')) res = JSON.parse(lines[i]); } catch { /* 다음 줄 */ } }
+    if (r.code === 2 || res?.error === 'LOGIN_REQUIRED') { log('  유튜브: 로그인 필요'); await report('login', { error: '자동화 프로필에 유튜브 로그인이 필요합니다 — PC 에서 docs\\tools\\유튜브로그인.bat 실행 후 다시' }); return; }
+    if (r.code !== 0 || !res?.ok) { const err = res?.error || lines.slice(-3).join(' | ').slice(0, 300) || `exit ${r.code}`; log('  유튜브: 실패', err); await report('failed', { error: err }); return; }
+    log(`  유튜브: 완료 ${res.url || ''} (${res.took || 0}초)`);
+    await report('done', { url: res.url || '' });
+  } catch (e) {
+    log('  유튜브: 오류', e.message);
+    await report('failed', { error: String(e.message || e).slice(0, 300) });
+  }
+}
+
 // ───────── 모드 ─────────
 async function processJob(payload) {
   const job = payload.job, j = J(job.id);
   const work = path.join(WORK_ROOT, job.id);
   log(`▶ ${job.id} ${job.kind} ${job.channel} ${job.source} (${job.phase})`);
+  if (job.phase === 'youtube') { await runYoutube(payload, work); return; }
   try {
     if (job.phase === 'text') {
       let early = null;
@@ -460,7 +496,7 @@ async function pcLoop() {
     try {
       await reportEnv();
       const imagesOk = !loginNeeded && Date.now() - engineFailAt > 120000;
-      const r = await api(`/api/studio/helper/next?want=${imagesOk ? 'text,images' : 'text'}`, { method: 'POST', body: {} });
+      const r = await api(`/api/studio/helper/next?want=${imagesOk ? 'text,images,youtube' : 'text,youtube'}`, { method: 'POST', body: {} });
       if (r.job) { await processJob(r); continue; }
     } catch (e) { log('(대기 중 오류)', e.message); }
     await sleep(5000);

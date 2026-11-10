@@ -169,7 +169,7 @@ async function renderList() {
       e.stopPropagation();
       if (act.dataset.cardAct === 'show') return;
       if (act.dataset.cardAct === 'video') { makeVideo(c.dataset.id, act); return; }       // 슬라이드 전부를 사자왕이 읽는 영상(2026-11-10)
-      if (act.dataset.cardAct === 'video-open') { try { localStorage.setItem('xim.tab', 'voice'); } catch { /* 무시 */ } location.hash = ''; location.reload(); return; }
+      if (act.dataset.cardAct === 'video-open') { resTab = 'video'; location.hash = `#st-${c.dataset.id}`; renderStudio(deps); return; }   // 프로젝트 안 '영상' 탭으로(사용자 지시 2026-11-10)
       if (act.dataset.cardAct === 'dl') { const j = jobs.find((x) => x.id === c.dataset.id); if (j?.thumb) downloadThumb(j.thumb, j.id); return; }   // 바로 내려받기
       resTab = act.dataset.cardAct;   // 썸네일 · 유튜브 버튼은 그 탭으로 바로
     }
@@ -427,6 +427,7 @@ async function renderJob() {
   if (job.kind === 'main' && blocks.length) tabs.push(['show', '슬라이드쇼']);
   if (thumb || (job.status === 'done' && job.kind === 'main')) tabs.push(['thumb', '썸네일']);
   if (summary) tabs.push(['yt', '유튜브']);
+  if (job.options?.video_job) tabs.push(['video', '영상']);
   if (blocks.length) tabs.push(['script', '원고']);
   if (slides.length) tabs.push(['slides', `슬라이드 ${slides.length}`]);
   if (top15) tabs.push(['news', `뉴스 ${top15.items.length}`]);
@@ -441,6 +442,7 @@ async function renderJob() {
       else if (resTab === 'show') box.innerHTML = showPanel(r.show_url, slides.length, blocks.length);
       else if (resTab === 'thumb') box.innerHTML = thumbPanel(job, thumb, summary);
       else if (resTab === 'yt') box.innerHTML = ytPanel(summary, (thumb?.meta?.pick?.title) || J('thumb_pick')?.title || '');
+      else if (resTab === 'video') { box.innerHTML = videoPanel(job, summary, (thumb?.meta?.pick?.title) || J('thumb_pick')?.title || ''); fillVideoStatus(job); }
       else if (resTab === 'news') box.innerHTML = newsPanel(top15, J('chosen'));
       else if (resTab === 'caps') box.innerHTML = `<div class="st-slides">${captures.map((a) => `<figure><img src="${a.url}" alt=""><figcaption>캡쳐 ${a.idx}</figcaption></figure>`).join('')}</div>`;
       wireRes(job, blocks, thumb, summary);
@@ -513,8 +515,61 @@ function ytPanel(s, thumbTitle = '') {
     <h4>더보기란 ${copyBtn(s.description)}</h4><pre class="st-pre">${esc(s.description)}</pre>
     <h4>등장 인물</h4><ul>${s.people.length ? s.people.map((p) => `<li>${esc(p)}</li>`).join('') : '<li>없음</li>'}</ul>`;
 }
+// 영상 탭(2026-11-10): 사자왕이 슬라이드를 읽는 완성 영상 — 재생 · 내려받기 · 유튜브에 올리기(제목 · 더보기란 · 썸네일은 유튜브 탭 그대로)
+function videoPanel(job, summary, thumbTitle = '') {
+  const vid = job.options.video_job, yt = job.options.yt;
+  const titles = [...new Set([thumbTitle, ...(summary?.titles || []), job.title].filter(Boolean))];
+  const ytState = !yt ? '' : yt.status === 'queued' ? '<p class="st-meta">⏳ 유튜브 올리기 대기 중 (PC 도우미가 곧 시작)</p>'
+    : yt.status === 'running' ? '<p class="st-meta">📤 유튜브에 올리는 중… (엣지 자동화, 10~20분)</p>'
+    : yt.status === 'done' ? `<p class="st-meta">✅ 유튜브에 올림 (${esc(yt.visibility || '')})${yt.url ? ` · <a href="${esc(yt.url)}" target="_blank" rel="noopener">${esc(yt.url)}</a>` : ' · 유튜브 스튜디오에서 확인'}</p>`
+    : yt.status === 'login' ? `<p class="err-inline">🔑 ${esc(yt.error || '유튜브 로그인이 필요합니다')}</p>`
+    : `<p class="err-inline">❌ 유튜브 올리기 실패: ${esc(yt.error || '')}</p>`;
+  return `<div class="st-video" data-video-job="${esc(vid)}">
+    <p class="st-meta" id="st-video-status">영상 상태 확인 중…</p>
+    <div id="st-video-box"></div>
+    <div class="st-card-pair" style="margin-top:10px">
+      <a class="btn" id="st-video-dl" href="/api/voice/video/${esc(vid)}.mp4?dl=1" download="${esc((job.title || 'video').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 80))}.mp4">⬇ 영상 다운로드</a>
+      <button class="btn" type="button" id="st-video-voice">🎙 내 목소리에서 보기</button>
+    </div>
+    <h4 style="margin-top:18px">📺 유튜브에 올리기</h4>
+    <form id="st-yt-form" class="st-yt-form">
+      <label>제목 <select name="title">${titles.map((t, i) => `<option value="${esc(t)}"${i === 0 ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+      <label>공개 상태 <select name="visibility"><option value="비공개" selected>비공개 (올린 뒤 직접 공개)</option><option value="일부공개">일부 공개</option><option value="공개">공개</option></select></label>
+      <p class="st-meta">더보기란 · 썸네일 · 재생목록(코인뉴스) · 수익창출 · 광고 적합성은 전처럼 자동으로 채웁니다. PC 의 엣지 자동화 프로필에 사적인자산왕 계정이 로그인돼 있어야 합니다.</p>
+      <button class="btn primary" type="submit" ${yt && ['queued', 'running'].includes(yt.status) ? 'disabled' : ''}>유튜브에 올리기</button>
+    </form>
+    ${ytState}
+  </div>`;
+}
+async function fillVideoStatus(job) {
+  const { api } = deps;
+  const vid = job.options.video_job, st = $('#st-video-status'), box = $('#st-video-box');
+  if (!st) return;
+  try {
+    const r = await api(`/voice/jobs/${vid}`);
+    const j = r.job || r;
+    if (j.status === 'done' && j.video_status === 'done') {
+      st.textContent = `✅ 영상 완성 · ${Math.floor((j.seconds || 0) / 60)}분 ${Math.round((j.seconds || 0) % 60)}초 · ${fmtDate(j.video_at || j.done_at)}`;
+      box.innerHTML = `<video class="st-video-el" controls preload="metadata" playsinline src="/api/voice/video/${esc(vid)}.mp4?v=${j.video_at || 0}"></video>`;
+    } else if (j.status === 'failed' || j.video_status === 'failed') {
+      st.innerHTML = `<span class="err-inline">❌ 영상 실패: ${esc(j.error || j.video_error || '')}</span> — 카드의 "영상 만들기" 로 다시 만들 수 있어요`;
+      $('#st-video-dl')?.setAttribute('aria-disabled', 'true');
+    } else {
+      st.textContent = j.status === 'done' ? '🎬 음성은 끝났고 영상을 합성 · 올리는 중…' : `🎙 음성 만드는 중… (${j.status === 'queued' ? '대기' : '진행'} · 내 목소리에서 자세히)`;
+      $('#st-video-dl')?.classList.add('disabled');
+      setTimeout(() => { if (document.contains(st)) fillVideoStatus(job); }, 10000);
+    }
+  } catch (e) { st.textContent = `영상 상태를 못 읽었습니다: ${e.message}`; }
+}
 function wireRes(job, blocks, thumb, summary) {
   const { api } = deps;
+  $('#st-video-voice')?.addEventListener('click', () => { try { localStorage.setItem('xim.tab', 'voice'); } catch { /* 무시 */ } location.hash = ''; location.reload(); });
+  $('#st-yt-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = e.currentTarget, d = { title: f.title.value, visibility: f.visibility.value };
+    if (!confirm(`유튜브(사적인자산왕)에 올립니다.\n제목: ${d.title}\n공개 상태: ${d.visibility}\n\nPC 도우미가 엣지로 올리며 10~20분 걸립니다. 시작할까요?`)) return;
+    busy(f.querySelector('[type=submit]'), null, async () => { await api(`/studio/jobs/${job.id}/youtube`, { method: 'POST', data: d }); toast('유튜브 올리기를 요청했습니다. 진행은 이 탭에서 보입니다.'); renderJob(); });
+  });
   $$('[data-copy]').forEach((b) => b.addEventListener('click', async () => { try { await navigator.clipboard.writeText(b.dataset.copy); toast('복사했습니다'); } catch { toast('복사하지 못했습니다'); } }));
   $('#st-save-texts')?.addEventListener('click', async (e) => {
     const texts = $$('.st-ta').map((t) => t.value);

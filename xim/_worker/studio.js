@@ -478,6 +478,19 @@ export async function studioHelper(request, env, url, path, method) {
   // 다음 일감 하나를 집어 간다. want=text,images — text: 글부터(queued), images: 그림만(images 상태). 가져가면 running 으로 바꿔 두 번 집지 않게 한다
   if (path === '/api/studio/helper/next' && method === 'POST') {
     const want = (url.searchParams.get('want') || 'text,images').split(',');
+    // 유튜브 올리기(2026-11-10): 카드의 "유튜브에 올리기" 가 options.yt = {status:'queued', title, visibility} 를 남기면 PC 도우미가 엣지로 올린다
+    if (want.includes('youtube')) {
+      const yrow = await db.prepare("SELECT id FROM studio_jobs WHERE json_extract(options, '$.yt.status') = 'queued' ORDER BY json_extract(options, '$.yt.at') ASC LIMIT 1").first();
+      if (yrow) {
+        const job = await getJob(db, yrow.id);
+        const jo = JSON.parse(job.options || '{}');
+        jo.yt = { ...jo.yt, status: 'running', started_at: now(), error: '' };
+        await setJob(db, job.id, { options: JSON.stringify(jo) });
+        const summary = docJson(await latestDoc(db, job.id, 'summary')) || {};
+        const thumb = (await jobAssets(db, job.id)).filter((a) => a.kind === 'thumb').pop();
+        return json({ job: { ...job, options: jo, phase: 'youtube' }, youtube: { video_job: jo.video_job || '', title: jo.yt.title || summary.titles?.[0] || job.title, more: summary.description || '', visibility: jo.yt.visibility || '비공개', thumb_url: thumb ? `/studio/a/${thumb.id}` : '' } });
+      }
+    }
     const st = [];
     if (want.includes('images')) st.push('images');
     if (want.includes('text')) st.push('queued');
@@ -490,6 +503,14 @@ export async function studioHelper(request, env, url, path, method) {
     const caps = (await jobAssets(db, job.id)).filter((a) => a.kind === 'capture').map((a) => ({ idx: a.idx, url: `/studio/a/${a.id}`, mime: a.mime }));
     const have = (await jobAssets(db, job.id)).filter((a) => a.kind !== 'capture').map((a) => ({ kind: a.kind, idx: a.idx }));
     return json({ job: { ...job, options: JSON.parse(job.options || '{}'), phase: row.status === 'images' ? 'images' : 'text' }, docs: Object.fromEntries(docs.map((d) => [d.kind, d.body])), captures: caps, assets: have, settings: await getSettings(db), face_catalog: (await db.prepare("SELECT value FROM studio_settings WHERE key = 'face_catalog'").first())?.value || '' });
+  }
+  // PC 도우미가 올릴 영상 받기 — clone(내 목소리) R2 의 video/<작업id>.mp4 를 그대로 넘겨 준다
+  if ((mm = path.match(/^\/api\/studio\/helper\/video\/([\w-]+)$/)) && method === 'GET') {
+    if (!env.CLONE || !env.CLONE_TOKEN) throw new HttpError(503, '내 목소리(clone)가 연결되지 않았습니다.');
+    const headers = new Headers({ 'X-Agent-Token': env.CLONE_TOKEN });
+    if (request.headers.has('Range')) headers.set('Range', request.headers.get('Range'));
+    const res = await env.CLONE.fetch(new Request(`https://clone/video/${mm[1]}.mp4`, { headers }));
+    return new Response(res.body, { status: res.status, headers: res.headers });
   }
   if ((mm = path.match(/^\/api\/studio\/helper\/face\/(\d{3})$/))) {
     const o = await env.FILES.get(`studio/faces/${mm[1]}.webp`);
@@ -522,6 +543,13 @@ export async function studioHelper(request, env, url, path, method) {
       if (d.status === 'running') { const id = await stepStart(db, job.id, step, String(d.note || '').slice(0, 300)); return json({ id }); }
       const row = await db.prepare("SELECT id FROM studio_steps WHERE job_id = ? AND step = ? AND status = 'running' ORDER BY id DESC LIMIT 1").bind(job.id, step).first();
       if (row) await stepEnd(db, row.id, job.id, ['done', 'failed', 'skipped'].includes(d.status) ? d.status : 'done', d.note || '', d.usage || null);
+      return json({ ok: true });
+    }
+    if (sub === 'yt' && method === 'POST') {   // 유튜브 올리기 결과 {status: done|failed|login, url, error}
+      const d = await readJson();
+      const jo = JSON.parse(job.options || '{}');
+      jo.yt = { ...(jo.yt || {}), status: ['done', 'failed', 'login'].includes(d.status) ? d.status : 'failed', url: String(d.url || '').slice(0, 200), error: String(d.error || '').slice(0, 400), finished_at: now() };
+      await setJob(db, job.id, { options: JSON.stringify(jo) });
       return json({ ok: true });
     }
     if (sub === 'status' && method === 'POST') {
@@ -755,6 +783,22 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
       await audit?.('STUDIO_DELETE', '스튜디오 삭제', job.title || job.id);
       return json({ ok: true });
     }
+  }
+  // 유튜브에 올리기(2026-11-10): 완성된 영상(options.video_job)을 PC 도우미가 엣지(자동화 프로필, 사적인자산왕 로그인)로 올린다. 제목 · 더보기란 · 썸네일은 유튜브 탭 내용 그대로
+  if ((mm = m(/^\/api\/studio\/jobs\/([a-f0-9]{20})\/youtube$/)) && method === 'POST') {
+    const job = await getJob(db, mm[1]);
+    if (!job) throw new HttpError(404, '작업이 없습니다.');
+    const jo = JSON.parse(job.options || '{}');
+    if (!jo.video_job) throw bad('먼저 "영상 만들기" 로 영상을 만들어 주세요.');
+    if (jo.yt && ['queued', 'running'].includes(jo.yt.status)) throw bad('이미 올리는 중입니다.');
+    const d = await bodyFn(request).catch(() => ({}));
+    const summary = docJson(await latestDoc(db, job.id, 'summary')) || {};
+    const title = String(d.title || summary.titles?.[0] || job.title || '').slice(0, 100);
+    if (!title) throw bad('제목이 없습니다.');
+    jo.yt = { status: 'queued', title, visibility: ['공개', '일부공개', '비공개'].includes(d.visibility) ? d.visibility : '비공개', at: now(), url: '', error: '' };
+    await setJob(db, job.id, { options: JSON.stringify(jo) });
+    await audit?.('STUDIO_YOUTUBE', '유튜브 올리기', `${title} · ${jo.yt.visibility}`);
+    return json({ ok: true, yt: jo.yt });
   }
   // 영상 만들기(2026-11-10 사용자 지시): 슬라이드 전부를 사자왕이 읽는 1280x720 자막 영상 — clone(내 목소리) 에 스튜디오 작업으로 넘긴다. 진행 · 결과는 xim "내 목소리" 목록에서 본다
   if ((mm = m(/^\/api\/studio\/jobs\/([a-f0-9]{20})\/video$/)) && method === 'POST') {
