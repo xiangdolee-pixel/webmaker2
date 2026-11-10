@@ -482,9 +482,11 @@ export async function studioHelper(request, env, url, path, method) {
     if (want.includes('youtube')) {
       // 새 발표자료 "유튜브 채널에 올리기"(yt_auto): 영상(clone)이 끝났는지 보고 끝났으면 유튜브 대기열에 올린다
       if (env.CLONE && env.CLONE_TOKEN) {
-        const auto = (await db.prepare("SELECT id FROM studio_jobs WHERE status = 'done' AND json_extract(options, '$.yt_auto') = 1 AND json_extract(options, '$.video_job') IS NOT NULL AND json_extract(options, '$.yt') IS NULL ORDER BY created_at DESC LIMIT 3").all()).results;
+        // yt 가 '영상 실패' 로 적혔어도 영상 작업을 다시 돌려 성공하면 유튜브도 되살린다 (2026-11-11: TTS 실패 → 재시도 성공했는데 업로드가 안 되던 것)
+        const auto = (await db.prepare("SELECT id FROM studio_jobs WHERE status = 'done' AND json_extract(options, '$.yt_auto') = 1 AND json_extract(options, '$.video_job') IS NOT NULL AND (json_extract(options, '$.yt') IS NULL OR (json_extract(options, '$.yt.auto') = 1 AND json_extract(options, '$.yt.status') = 'failed' AND COALESCE(json_extract(options, '$.yt.url'), '') = '')) ORDER BY created_at DESC LIMIT 3").all()).results;
         for (const a of auto) {
           const job = await getJob(db, a.id); const jo = JSON.parse(job.options || '{}');
+          const hadFailed = jo.yt?.status === 'failed';
           try {
             const res = await env.CLONE.fetch(new Request(`https://clone/api/jobs/${jo.video_job}`, { headers: { 'X-Agent-Token': env.CLONE_TOKEN } }));
             const v = (await res.json().catch(() => ({}))).job;
@@ -493,8 +495,8 @@ export async function studioHelper(request, env, url, path, method) {
               const pick = docJson(await latestDoc(db, job.id, 'thumb_pick')) || {};
               jo.yt = { status: 'queued', title: String(pick.title || summary.titles?.[0] || job.title || '').slice(0, 100), visibility: '비공개', publish: true, at: now(), url: '', error: '', auto: true };
               await setJob(db, job.id, { options: JSON.stringify(jo) });
-            } else if (v && (v.status === 'failed' || v.video_status === 'failed')) {
-              jo.yt = { status: 'failed', error: '영상이 실패해 유튜브에 올리지 못했습니다', at: now(), auto: true }; await setJob(db, job.id, { options: JSON.stringify(jo) });
+            } else if (v && (v.status === 'failed' || v.video_status === 'failed') && !hadFailed) {
+              jo.yt = { status: 'failed', error: '영상이 실패해 유튜브에 올리지 못했습니다 — 내 목소리에서 영상을 다시 만들면 자동으로 다시 올립니다', at: now(), auto: true }; await setJob(db, job.id, { options: JSON.stringify(jo) });
             }
           } catch { /* 다음 폴링 때 */ }
         }
