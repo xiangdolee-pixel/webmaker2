@@ -405,7 +405,7 @@ async function runYoutube(payload, work) {
     fs.mkdirSync(work, { recursive: true });
     const video = path.join(work, 'youtube.mp4');
     // 같은 PC 에 내 목소리 처리기가 있으면 방금 만든 mp4 가 로컬에 있다 → 복사(프록시로 28MB 받으면 2분 넘게 걸린다)
-    const local = path.join(process.env.CLONE_DIR || 'D:\ws\clone', 'out', 'studio', y.video_job, `${y.video_job}.mp4`);
+    const local = path.join(process.env.CLONE_DIR || 'D:/ws/clone', 'out', 'studio', y.video_job, `${y.video_job}.mp4`);
     if (fs.existsSync(local) && fs.statSync(local).size > 100000) { fs.mkdirSync(work, { recursive: true }); fs.copyFileSync(local, video); log(`  유튜브: 영상 로컬 복사 ${y.video_job}`); }
     else { log(`  유튜브: 영상 내려받기 ${y.video_job}`); await download(`/api/studio/helper/video/${y.video_job}`, video); }
     let thumb = '';
