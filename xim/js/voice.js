@@ -7,7 +7,7 @@ let timer = 0;
 let tick = 0;        // 1초마다 "지남 · 남음" 글자만 고치는 시계(목록은 다시 그리지 않음 — 재생 중인 소리가 끊기지 않게)
 let pace = 0.3;      // 글자당 걸리는 초(서버가 최근 완료 기록으로 계산)
 let max = 6000;
-let vpace = 6;      // 사자왕 영상 1초를 만드는 데 걸리는 초(서버가 최근 기록으로 계산)
+let vpace = 0.5;    // 사자왕 영상: 음성 1초당 걸리는 초(서버가 최근 기록으로 계산 — 마이크 가림 방식은 몇 초면 끝)
 const STATUS = { queued: ['대기 중', 'new'], running: ['만드는 중', 'doing'], done: ['완료', 'done'], failed: ['실패', 'suspended'] };
 const fmtWhen = (ms) => { const d = new Date(ms); const t = new Date(); const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; return d.toDateString() === t.toDateString() ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`; };
 const fmtSec = (s) => { s = Math.round(s || 0); return s >= 60 ? `${Math.floor(s / 60)}분 ${s % 60}초` : `${s}초`; };
@@ -17,7 +17,7 @@ const n = (v) => Number(v || 0).toLocaleString('ko-KR');
 export function stopVoice() { clearTimeout(timer); timer = 0; clearInterval(tick); tick = 0; }
 const est = (chars) => Math.max(10, Math.round(chars * pace)); // 예상 소요(초)
 const fmtEst = (s) => (s >= 60 ? `약 ${Math.round(s / 60)}분` : `약 ${Math.max(10, Math.round(s / 10) * 10)}초`);
-const vest = (seconds) => Math.round(60 + (seconds || 30) * vpace);   // 사자왕 영상 예상 소요(초): 모델 올리기 1분 + 음성 길이 × 배수
+const vest = (seconds) => Math.round(15 + (seconds || 30) * vpace);   // 사자왕 영상 예상 소요(초): 올리기 15초 + 음성 길이 × 배수
 
 export async function renderVoice(d) {
   deps = d;
@@ -34,7 +34,7 @@ export async function renderVoice(d) {
         <div class="vc-bar">
           <span class="vc-count"><b id="vc-count">0</b> / ${n(max)}자</span>
           <label class="vc-speed">속도 <select id="vc-speed"><option value="0.9">느리게 0.9</option><option value="1" selected>보통 1.0</option><option value="1.1">조금 빠르게 1.1</option><option value="1.2">빠르게 1.2</option></select></label>
-          <label class="vc-video-opt" title="음성이 끝나면 운영자 녹화 얼굴(사자왕)이 그 음성에 맞춰 말하는 영상(mp4)도 만듭니다. 영상은 음성 길이 1초당 몇 초가 더 걸립니다."><input type="checkbox" id="vc-video"> 사자왕 영상도 함께</label>
+          <label class="vc-video-opt" title="음성이 끝나면 운영자 녹화 얼굴(사자왕)이 말하는 영상(mp4)도 만듭니다. 입은 마이크로 가려지고, 음성 뒤 몇 초면 됩니다."><input type="checkbox" id="vc-video"> 사자왕 영상도 함께</label>
           <button class="btn primary" type="submit" id="vc-go" disabled>읽어줘</button>
         </div>
         <p class="err" id="vc-err" role="alert"></p>

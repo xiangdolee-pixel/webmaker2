@@ -46,8 +46,9 @@ const newId = () => { const t = new Date(); const d = `${t.getUTCFullYear()}${St
 // 사자왕 영상 1초를 만드는 데 걸린 초(최근 10건 중간값). 기본 6(2026-11-10 GTX 1070 측정 전 어림)
 async function videoPace(db) {
   const { results } = await db.prepare("SELECT seconds, done_at, video_at FROM jobs WHERE video_status = 'done' AND video_at > done_at AND seconds > 1 ORDER BY video_at DESC LIMIT 10").all();
-  const v = results.map((r) => (r.video_at - r.done_at) / 1000 / r.seconds).filter((x) => x > 0.5 && x < 60).sort((a, b) => a - b);
-  return v.length ? v[Math.floor(v.length / 2)] : 6;
+  // 마이크 가림 방식(2026-11-10)은 음성 1초당 0.1~0.5초면 끝난다(립싱크 때는 6~12초였다)
+  const v = results.map((r) => (r.video_at - r.done_at) / 1000 / r.seconds).filter((x) => x > 0.02 && x < 60).sort((a, b) => a - b);
+  return v.length ? v[Math.floor(v.length / 2)] : 0.5;
 }
 const JOB_COLS = 'id, created_at, started_at, done_at, status, title, chars, speed, seconds, lufs, lra, tp, sentences, engine, error, attempts, video, video_status, video_at, video_error';
 
