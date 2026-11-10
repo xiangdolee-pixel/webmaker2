@@ -598,6 +598,8 @@ export async function studioHelper(request, env, url, path, method) {
       } else if (y.status === 'review' && (st === 'failed' || st === 'login')) {
         const n = (y.fails || 0) + 1;   // 공개 전환 실패는 3번까지 다시, 그 뒤 포기(비공개로 남음)
         jo.yt = n >= 3 ? { ...y, status: 'done', error: `공개 전환 실패: ${String(d.error || '').slice(0, 200)} — 유튜브에서 직접 공개로 바꿔 주세요`, finished_at: now() } : { ...y, status: 'review', fails: n, next_check: now() + 10 * 60000, error: String(d.error || '').slice(0, 300) };
+      } else if (st === 'failed' && !y.retried) {
+        jo.yt = { ...y, status: 'queued', retried: true, at: now(), error: `1차 실패(다시 시도): ${String(d.error || '').slice(0, 200)}` };   // 업로드 중 일시 오류(파일 선택 시간 초과 등)는 한 번 자동으로 다시
       } else {
         jo.yt = { ...y, status: ['failed', 'login'].includes(st) ? st : 'failed', error: String(d.error || '').slice(0, 400), finished_at: now() };
       }
