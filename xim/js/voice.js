@@ -33,7 +33,7 @@ export async function renderVoice(d) {
         <textarea class="input" id="vc-text" rows="7" placeholder="여기에 읽을 글을 넣으세요. (Ctrl+Enter 로 바로 요청)"></textarea>
         <div class="vc-bar">
           <span class="vc-count"><b id="vc-count">0</b> / ${n(max)}자</span>
-          <label class="vc-speed">속도 <select id="vc-speed"><option value="0.9">느리게 0.9</option><option value="1" selected>보통 1.0</option><option value="1.1">조금 빠르게 1.1</option><option value="1.2">빠르게 1.2</option></select></label>
+          <label class="vc-speed">속도 <select id="vc-speed"><option value="0.8">느리게 0.8</option><option value="0.9" selected>보통 0.9</option><option value="1">조금 빠르게 1.0</option><option value="1.1">빠르게 1.1</option></select></label>
           <label class="vc-video-opt" title="음성이 끝나면 운영자 녹화 얼굴(사자왕)이 말하는 영상(mp4)도 만듭니다. 입은 마이크로 가려지고, 음성 뒤 몇 초면 됩니다."><input type="checkbox" id="vc-video"> 사자왕 영상도 함께</label>
           <button class="btn primary" type="submit" id="vc-go" disabled>읽어줘</button>
         </div>
