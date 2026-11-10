@@ -511,7 +511,7 @@ export async function studioHelper(request, env, url, path, method) {
       const prow = await db.prepare("SELECT id FROM studio_jobs WHERE json_extract(options, '$.yt.status') = 'review' AND json_extract(options, '$.yt.next_check') <= ? ORDER BY json_extract(options, '$.yt.next_check') ASC LIMIT 1").bind(now()).first();
       if (prow) {
         const job = await getJob(db, prow.id); const jo = JSON.parse(job.options || '{}');
-        jo.yt = { ...jo.yt, next_check: now() + 10 * 60000 };   // 도우미가 죽어도 10분 뒤 다시
+        jo.yt = { ...jo.yt, next_check: now() + 5 * 60000 };   // 도우미가 죽어도 5분 뒤 다시 (사용자 2026-11-11: 10분 → 5분)
         await setJob(db, job.id, { options: JSON.stringify(jo) });
         return json({ job: { ...job, options: jo, phase: 'youtube-publish' }, youtube: { video_id: jo.yt.video_id || '', url: jo.yt.url || '', title: jo.yt.title || job.title, channel_name: job.channel === '순섬' ? '순수한크립토' : '사적인자산왕' } });
       }
@@ -589,17 +589,17 @@ export async function studioHelper(request, env, url, path, method) {
         const url = String(d.url || '').slice(0, 200);
         const vidm = url.match(/(?:youtu\.be\/|v=|\/video\/)([\w-]{6,})/);
         const review = (y.visibility || '비공개') === '비공개' && y.publish !== false;   // 비공개로 올렸고 "검토 끝나면 공개" 가 켜져 있으면 검토 단계로
-        jo.yt = { ...y, status: review ? 'review' : 'done', url, video_id: vidm ? vidm[1] : (y.video_id || ''), error: '', uploaded_at: now(), finished_at: review ? null : now(), next_check: review ? now() + 10 * 60000 : null, checks: 0 };
+        jo.yt = { ...y, status: review ? 'review' : 'done', url, video_id: vidm ? vidm[1] : (y.video_id || ''), error: '', uploaded_at: now(), finished_at: review ? null : now(), next_check: review ? now() + 5 * 60000 : null, checks: 0 };
       } else if (st === 'published') {
         jo.yt = { ...y, status: 'done', visibility: '공개', error: '', published_at: now(), finished_at: now(), tg: (y.telegram !== false && jo.tg_auto !== false) ? { status: 'queued', at: now() } : (y.tg || null) };   // 공개되면 텔레그램 공식채널에 링크(사용자 2026-11-10)
       } else if (st === 'tg_done' || st === 'tg_failed') {
         jo.yt = { ...y, tg: { ...(y.tg || {}), status: st === 'tg_done' ? 'done' : 'failed', error: String(d.error || '').slice(0, 300), message_id: d.message_id || null, finished_at: now() } };
       } else if (st === 'reviewing') {
         const n = (y.checks || 0) + 1;
-        jo.yt = n >= 72 ? { ...y, status: 'done', error: '12시간 동안 검토가 끝나지 않아 비공개로 둡니다', finished_at: now() } : { ...y, status: 'review', checks: n, next_check: now() + 10 * 60000, error: '' };
+        jo.yt = n >= 144 ? { ...y, status: 'done', error: '12시간 동안 검토가 끝나지 않아 비공개로 둡니다', finished_at: now() } : { ...y, status: 'review', checks: n, next_check: now() + 5 * 60000, error: '' };
       } else if (y.status === 'review' && (st === 'failed' || st === 'login')) {
         const n = (y.fails || 0) + 1;   // 공개 전환 실패는 3번까지 다시, 그 뒤 포기(비공개로 남음)
-        jo.yt = n >= 3 ? { ...y, status: 'done', error: `공개 전환 실패: ${String(d.error || '').slice(0, 200)} — 유튜브에서 직접 공개로 바꿔 주세요`, finished_at: now() } : { ...y, status: 'review', fails: n, next_check: now() + 10 * 60000, error: String(d.error || '').slice(0, 300) };
+        jo.yt = n >= 3 ? { ...y, status: 'done', error: `공개 전환 실패: ${String(d.error || '').slice(0, 200)} — 유튜브에서 직접 공개로 바꿔 주세요`, finished_at: now() } : { ...y, status: 'review', fails: n, next_check: now() + 5 * 60000, error: String(d.error || '').slice(0, 300) };
       } else if (st === 'failed' && !y.retried) {
         jo.yt = { ...y, status: 'queued', retried: true, at: now(), error: `1차 실패(다시 시도): ${String(d.error || '').slice(0, 200)}` };   // 업로드 중 일시 오류(파일 선택 시간 초과 등)는 한 번 자동으로 다시
       } else {

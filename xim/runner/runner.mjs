@@ -442,7 +442,7 @@ function closeProfileEdge() {
   } catch { /* 없으면 그만 */ }
 }
 
-// 검토가 끝났으면 공개로(2026-11-10): Worker 가 10분마다 'youtube-publish' 로 넘겨 준다 → 콘텐츠 목록의 '알림' 칸을 보고, '검토 중' 이 사라졌으면 편집 화면에서 공개 → 저장
+// 검토가 끝났으면 공개로(2026-11-10): Worker 가 5분마다 'youtube-publish' 로 넘겨 준다 → 콘텐츠 목록의 '알림' 칸을 보고, '검토 중' 이 사라졌으면 편집 화면에서 공개 → 저장
 async function runYoutubePublish(payload, work) {
   const job = payload.job, y = payload.youtube || {};
   const report = (status, extra = {}) => api(`/api/studio/helper/jobs/${job.id}/yt`, { method: 'POST', body: { status, ...extra } }).catch((e) => log('(유튜브 보고 실패)', e.message));
@@ -458,7 +458,7 @@ async function runYoutubePublish(payload, work) {
     if (r.code === 2 || res?.error === 'LOGIN_REQUIRED') { await report('login', { error: '자동화 프로필 로그인 필요' }); return; }
     if (r.code !== 0 || !res?.ok) { await report('failed', { error: res?.error || lines.slice(-2).join(' | ').slice(0, 200) }); return; }
     if (res.state === 'published') { log('  유튜브: 공개로 전환 완료'); await report('published'); }
-    else { log(`  유튜브: 아직 ${res.state} → 10분 뒤 다시`); await report('reviewing'); }
+    else { log(`  유튜브: 아직 ${res.state} → 5분 뒤 다시`); await report('reviewing'); }
   } catch (e) { log('  유튜브 공개 전환 오류', e.message); await report('failed', { error: String(e.message || e).slice(0, 300) }); }
 }
 

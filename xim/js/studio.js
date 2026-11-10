@@ -525,7 +525,7 @@ function videoPanel(job, summary, thumbTitle = '') {
   const titles = [...new Set([thumbTitle, ...(summary?.titles || []), job.title].filter(Boolean))];
   const ytState = !yt ? '' : yt.status === 'queued' ? '<p class="st-meta">⏳ 유튜브 올리기 대기 중 (PC 도우미가 곧 시작)</p>'
     : yt.status === 'running' ? '<p class="st-meta">📤 유튜브에 올리는 중… (엣지 자동화, 10~20분)</p>'
-    : yt.status === 'review' ? `<p class="st-meta">🕒 유튜브에 비공개로 올림${yt.url ? ` · <a href="${esc(yt.url)}" target="_blank" rel="noopener">${esc(yt.url)}</a>` : ''} · <b>검토가 끝나면 자동으로 공개</b>로 바꿉니다 (10분마다 확인${yt.checks ? ` · ${yt.checks}번 확인함` : ''})${yt.error ? ` · <span class="err-inline">${esc(yt.error)}</span>` : ''}</p>`
+    : yt.status === 'review' ? `<p class="st-meta">🕒 유튜브에 비공개로 올림${yt.url ? ` · <a href="${esc(yt.url)}" target="_blank" rel="noopener">${esc(yt.url)}</a>` : ''} · <b>검토가 끝나면 자동으로 공개</b>로 바꿉니다 (5분마다 확인${yt.checks ? ` · ${yt.checks}번 확인함` : ''})${yt.error ? ` · <span class="err-inline">${esc(yt.error)}</span>` : ''}</p>`
     : yt.status === 'done' ? `<p class="st-meta">✅ 유튜브에 올림 (${esc(yt.visibility || '')})${yt.url ? ` · <a href="${esc(yt.url)}" target="_blank" rel="noopener">${esc(yt.url)}</a>` : ' · 유튜브 스튜디오에서 확인'}${yt.error ? ` · <span class="err-inline">${esc(yt.error)}</span>` : ''}${yt.tg ? ` · 텔레그램 ${yt.tg.status === 'done' ? '✅ 공식채널에 올림' : yt.tg.status === 'failed' ? `<span class="err-inline">❌ ${esc(yt.tg.error || '실패')}</span>` : '⏳ 공식채널에 올리는 중'}` : ''}</p>`
     : yt.status === 'login' ? `<p class="err-inline">🔑 ${esc(yt.error || '유튜브 로그인이 필요합니다')}</p>`
     : `<p class="err-inline">❌ 유튜브 올리기 실패: ${esc(yt.error || '')}</p>`;
