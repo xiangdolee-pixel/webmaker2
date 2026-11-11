@@ -6,6 +6,20 @@ let opts = null;            // /api/studio/options
 let pollTimer = 0;
 let openId = '';            // 보고 있는 작업 id
 let resTab = 'show';        // 결과 탭 (기본: 슬라이드쇼)
+let vidTimer = 0;           // 카드의 영상 진행 시간 다시 읽기
+// 영상(내 목소리 작업 v) 시간 글 (2026-11-11 사용자 지시: 영상 만들 때도 걸리는 시간 표시 — 카드 · 영상 탭 둘 다)
+//   진행 중이면 <b data-since> 가 1초마다 흐른다(tickSince). 완료면 음성 시작 → 영상 완성까지 + (음성 · 영상) 나눠서
+function videoTime(v) {
+  if (!v) return '';
+  const sec = (a, b) => Math.max(1, Math.round((b - a) / 1000));
+  if (v.status === 'failed' || v.video_status === 'failed') return '<span class="err-inline">🎬 영상 실패</span>';
+  if (v.status === 'done' && v.video_status === 'done' && v.started_at && v.video_at) return `🎬 영상 만드는 데 <b>${mins(sec(v.started_at, v.video_at))}</b> <span class="st-meta">(음성 ${mins(sec(v.started_at, v.done_at || v.video_at))} · 영상 ${mins(sec(v.done_at || v.started_at, v.video_at))})</span>`;
+  if (v.status === 'queued') return `🎬 영상 대기 중 <b data-since="${v.created_at || Date.now()}">${mins(sec(v.created_at || Date.now(), Date.now()))}</b>째`;
+  const what = v.status === 'done' ? '영상 합성 중' : '음성 만드는 중';
+  const t0 = v.started_at || v.created_at || Date.now();
+  return `🎬 ${what} · <b data-since="${t0}">${mins(sec(t0, Date.now()))}</b>째`;
+}
+setInterval(() => { document.querySelectorAll('[data-since]').forEach((b) => { b.textContent = mins(Math.max(1, Math.round((Date.now() - +b.dataset.since) / 1000))); }); }, 1000);
 
 const STATUS = { queued: ['대기', 'wait'], running: ['진행 중', 'run'], pick: ['6개 고르기', 'ask'], thumb: ['썸네일 선택', 'ask'], images: ['그림 대기 (PC)', 'wait'], done: ['완료', 'done'], failed: ['실패', 'fail'], stopped: ['멈춤', 'stop'] };
 const KIND = { main: '본편', thumb: '썸네일만', phone: '폰UI 쇼츠' };
@@ -176,6 +190,23 @@ async function renderList() {
     location.hash = `#st-${c.dataset.id}`; renderStudio(deps);
   }));
   if (jobs.some((j) => ['queued', 'running', 'pick', 'thumb', 'images'].includes(j.status))) pollTimer = setTimeout(() => { if (!openId && document.contains(view)) renderList(); }, 5000);
+  fillCardVideos();
+}
+// 카드의 영상 시간: 내 목소리 목록을 한 번 읽어 카드마다 채운다. 진행 중인 영상이 있으면 15초마다 다시 읽는다
+async function fillCardVideos() {
+  clearTimeout(vidTimer);
+  const els = $$('[data-vtime]');
+  if (!els.length) return;
+  let list = [];
+  try { list = (await deps.api('/voice/jobs?limit=60')).jobs || []; } catch { return; }
+  const map = Object.fromEntries(list.map((v) => [v.id, v]));
+  let pending = false;
+  for (const el of els) {
+    const v = map[el.dataset.vtime];
+    el.innerHTML = videoTime(v);
+    if (v && v.status !== 'failed' && v.video_status !== 'failed' && !(v.status === 'done' && v.video_status === 'done')) pending = true;
+  }
+  if (pending) vidTimer = setTimeout(() => { if (!openId && els[0] && document.contains(els[0])) fillCardVideos(); }, 15000);
 }
 function jobCard(j) {
   return `<article class="card st-card" data-id="${j.id}">
@@ -185,6 +216,7 @@ function jobCard(j) {
       <h3>${esc(j.title || (['running', 'queued', 'images', 'pick', 'thumb'].includes(j.status) ? `${STEP_LABEL(j.step || '') || '시작'} 진행 중…` : '제목 없음'))}</h3>
       ${cardProgress(j)}
       ${j.finished_at ? `<p class="st-time">⏱ 만드는 데 <b>${mins(Math.max(1, Math.round((j.finished_at - (j.started_at || j.created_at)) / 1000)))}</b>${j.started_at && j.started_at - j.created_at > 120000 ? ` <span class="st-meta">(대기 ${mins(Math.round((j.started_at - j.created_at) / 1000))} 제외)</span>` : ''}</p>` : ''}
+      ${j.options?.video_job ? `<p class="st-time" data-vtime="${esc(j.options.video_job)}"></p>` : ''}
       <p class="st-meta">${fmtDate(j.created_at)}${j.bytes ? ` · 그림 ${fmtBytes(j.bytes)}` : j.assets_purged ? ' · 그림 지움' : ''}${j.cost ? ` · ${money(j.cost)}` : ''}${j.error ? ` · <span class="err-inline">${esc(j.error.slice(0, 80))}</span>` : ''}</p>
       ${j.status === 'done' && j.kind === 'main' ? `<div class="st-card-actions">
         <a class="btn primary" href="/studio/show/${j.id}" target="_blank" rel="noopener" data-card-act="show">▶ 방송용 슬라이드쇼 새 창으로 열기</a>
@@ -555,13 +587,13 @@ async function fillVideoStatus(job) {
     const r = await api(`/voice/jobs/${vid}`);
     const j = r.job || r;
     if (j.status === 'done' && j.video_status === 'done') {
-      st.textContent = `✅ 영상 완성 · ${Math.floor((j.seconds || 0) / 60)}분 ${Math.round((j.seconds || 0) % 60)}초 · ${fmtDate(j.video_at || j.done_at)}`;
+      st.innerHTML = `✅ 영상 완성 · 길이 ${Math.floor((j.seconds || 0) / 60)}분 ${Math.round((j.seconds || 0) % 60)}초 · ${fmtDate(j.video_at || j.done_at)}<br>${videoTime(j)}`;
       box.innerHTML = `<video class="st-video-el" controls preload="metadata" playsinline src="/api/voice/video/${esc(vid)}.mp4?v=${j.video_at || 0}"></video>`;
     } else if (j.status === 'failed' || j.video_status === 'failed') {
       st.innerHTML = `<span class="err-inline">❌ 영상 실패: ${esc(j.error || j.video_error || '')}</span> — 카드의 "영상 만들기" 로 다시 만들 수 있어요`;
       $('#st-video-dl')?.setAttribute('aria-disabled', 'true');
     } else {
-      st.textContent = j.status === 'done' ? '🎬 음성은 끝났고 영상을 합성 · 올리는 중…' : `🎙 음성 만드는 중… (${j.status === 'queued' ? '대기' : '진행'} · 내 목소리에서 자세히)`;
+      st.innerHTML = `${j.status === 'done' ? '🎬 음성은 끝났고 영상을 합성 · 올리는 중…' : `🎙 음성 만드는 중… (${j.status === 'queued' ? '대기' : '진행'} · 내 목소리에서 자세히)`} · ⏱ <b data-since="${j.status === 'queued' ? j.created_at : j.started_at || j.created_at}">${mins(Math.max(1, Math.round((Date.now() - (j.status === 'queued' ? j.created_at : j.started_at || j.created_at)) / 1000)))}</b>째`;
       $('#st-video-dl')?.classList.add('disabled');
       setTimeout(() => { if (document.contains(st)) fillVideoStatus(job); }, 10000);
     }
