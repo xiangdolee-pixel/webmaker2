@@ -1784,7 +1784,12 @@ async function roundsPage() {
 
 async function roundPage(id) {
   const { rounds, intro } = await api('/apply/rounds');
-  const r = id ? rounds.find((x) => x.id === id) : { title: rounds[0]?.title || '', starts_on: '', ends_on: '', notice: '', visible: true };
+  // 새 신청 기간: 가장 최근 것을 바탕으로 연도만 하나 올려 채워 둔다 (2026 → 2027, 11-11 → 내년 11-11). 안내 문구도 그대로.
+  const last = rounds[0];
+  const nextYear = (d) => (/^\d{4}-/.test(d || '') ? `${+d.slice(0, 4) + 1}${d.slice(4)}` : '');
+  const r = id ? rounds.find((x) => x.id === id) : last
+    ? { title: last.title.replace(/(19|20)\d{2}/, (y) => String(+y + 1)), starts_on: nextYear(last.starts_on), ends_on: nextYear(last.ends_on), notice: last.notice, visible: true }
+    : { title: '', starts_on: '', ends_on: '', notice: '', visible: true };
   if (!r) throw new Error('없는 신청 기간입니다.');
   main.innerHTML = `${head('장학금 신청 › 신청 기간', id ? '신청 기간 수정' : '신청 기간 만들기', '')}
     <form id="rform"><section class="panel pad">
