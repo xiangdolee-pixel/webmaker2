@@ -278,7 +278,10 @@ async function toWebp(src) {
   return { file: dst, w, h };
 }
 
-const write02 = (work, blocks) => { fs.mkdirSync(path.join(work, 'shot2'), { recursive: true }); fs.writeFileSync(path.join(work, '02_FactChecker.txt'), `${MARKER}\n\n${blocks.join('\n\n')}\n`, 'utf8'); };
+// 슬라이드에 들어갈 글 = 블록에서 [인물] 줄을 뺀 것. 원고 초안에만 있고 팩트체크본엔 없어서, 그대로 비교하면
+// 미리 그린 6장이 매번 "바뀜"으로 잡혀 전부 다시 그려졌다(2026-11-11, 회당 약 4분 낭비). ChatGPT 에도 이 줄은 보내지 않는다.
+const slideText = (b) => String(b || '').split('\n').filter((l) => !/^\s*\[인물\]/.test(l)).join('\n').trim();
+const write02 = (work, blocks) => { fs.mkdirSync(path.join(work, 'shot2'), { recursive: true }); fs.writeFileSync(path.join(work, '02_FactChecker.txt'), `${MARKER}\n\n${blocks.map(slideText).join('\n\n')}\n`, 'utf8'); };
 const engineErr = (r, names, j) => async () => {
   if (r.code === 2 || /LOGIN_REQUIRED/.test(r.out)) { for (const n of names) await j.step(n, 'failed', 'ChatGPT 로그인 필요'); throw new Error('LOGIN_REQUIRED'); }
   const tail = r.out.trim().split(/\r?\n/).filter((l) => !/dbg|Warning/.test(l)).slice(-3).join(' | ');
@@ -293,9 +296,27 @@ async function runSlidesEngine(j, work, nums, label = '슬라이드') {
   if (!nums.some((n) => fs.existsSync(path.join(work, 'shot2', `${n}.png`))) && r.code !== 0) await engineErr(r, names, j)();
   return r;
 }
+// 슬라이드 몇 장 + 썸네일을 한 브라우저에서 동시에(gpt_slide_text.py --with-thumb). 엔진을 두 번 띄우면 뒤에 뜬 쪽이 앞의 브라우저를 정리해 버려 같이 못 돈다.
+async function runSlidesAndThumb(j, work, nums) {
+  const names = [...nums.map((n) => `slide-${n}`), 'thumb'];
+  for (const n of names) await j.step(n, 'running', 'ChatGPT');
+  const r = nums.length   // 번호 없이 --with-thumb 만 주면 엔진이 6장 전부를 다시 그린다 → 썸네일만이면 썸네일 엔진
+    ? await py(['tools\\gpt_slide_text.py', '--result', work, '--with-thumb', ...nums.map(String)], { cwd: DOCS, env: engineEnv(), timeoutMin: 40, label: `슬라이드 ${nums.length}장 + 썸네일` })
+    : await py(['tools\\gpt_thumbnail.py'], { cwd: DOCS, env: engineEnv(), timeoutMin: 15, label: '썸네일' });
+  const any = fs.existsSync(path.join(work, '06_thumbnail.png')) || nums.some((n) => fs.existsSync(path.join(work, 'shot2', `${n}.png`)));
+  if (!any && r.code !== 0) await engineErr(r, names, j)();
+  return r;
+}
 // 썸네일 잡 파일 작성(패키지가 써 둔 프롬프트가 있고 내 사진이면 Claude 호출 없음) → 썸네일 엔진(ChatGPT, 교정 패스 없이)
 async function runThumb(j, job, work, pick, premade) {
-  await stepRun(j, 'thumb-prompt', pick.title, async () => {
+  await thumbPrompt(j, job, work, pick, premade);
+  await j.step('thumb', 'running', 'ChatGPT');
+  const r = await py(['tools\\gpt_thumbnail.py'], { cwd: DOCS, env: engineEnv(), timeoutMin: 15, label: '썸네일' });
+  if (!fs.existsSync(path.join(work, '06_thumbnail.png'))) await engineErr(r, ['thumb'], j)();
+  return r;
+}
+function thumbPrompt(j, job, work, pick, premade) {
+  return stepRun(j, 'thumb-prompt', pick.title, async () => {
     let face = '';
     const usePremade = premade?.prompt && !pick.badgeName && !(pick.face || '').startsWith('person:') && !(pick.face || '').startsWith('asset:');   // 명찰이 있으면 그 인물 사진 경로로
     const outPng = path.join(work, '06_thumbnail.png');
@@ -324,24 +345,21 @@ async function runThumb(j, job, work, pick, premade) {
     fs.writeFileSync(path.join(DOCS, 'tools', '_thumb_job.json'), JSON.stringify(jobJson, null, 2), 'utf8');
     return jobJson.emotion + ' · ' + jobJson.gesture;
   });
-  await j.step('thumb', 'running', 'ChatGPT');
-  const r = await py(['tools\\gpt_thumbnail.py'], { cwd: DOCS, env: engineEnv(), timeoutMin: 15, label: '썸네일' });
-  if (!fs.existsSync(path.join(work, '06_thumbnail.png'))) await engineErr(r, ['thumb'], j)();
-  return r;
 }
-// 검수(03.5 합격 기준) → 불합격 번호만 1회 재생성
-async function reviewSlides(j, work, nums, blocks) {
+// 검수(03.5 합격 기준) → 불합격 번호만 1회 재생성 (regen:false 면 번호만 돌려주고 다시 그리기는 부른 쪽이 썸네일과 묶어서)
+async function reviewSlides(j, work, nums, blocks, { regen = true } = {}) {
   const made = nums.filter((n) => fs.existsSync(path.join(work, 'shot2', `${n}.png`)));
-  if (!made.length) return;
+  if (!made.length) return [];
   await j.step('review', 'running', `${made.length}장`);
   let fails = [];
   try {
-    const rv = parseJson(await claude(`${P.REVIEW_SLIDE_SYSTEM}\n\n슬라이드 이미지 ${made.map((n) => `${work}\\shot2\\${n}.png`).join(', ')} 를 Read 로 각각 보고 판정한다. 각 번호의 원고 블록:\n${made.map((n) => `[${n}]\n${blocks[n - 1]}`).join('\n\n')}\n\n출력: { "results": [ { "n": 번호, "pass": true|false, "reason": "" } ] }${JSON_ONLY}`, { cwd: work, label: '검수', timeoutMin: 10, model: 'sonnet' }), '검수');
+    const rv = parseJson(await claude(`${P.REVIEW_SLIDE_SYSTEM}\n\n슬라이드 이미지 ${made.map((n) => `${work}\\shot2\\${n}.png`).join(', ')} 를 Read 로 각각 보고 판정한다. 각 번호의 원고 블록:\n${made.map((n) => `[${n}]\n${slideText(blocks[n - 1])}`).join('\n\n')}\n\n출력: { "results": [ { "n": 번호, "pass": true|false, "reason": "" } ] }${JSON_ONLY}`, { cwd: work, label: '검수', timeoutMin: 10, model: 'sonnet' }), '검수');
     const bad = (rv.results || []).filter((x) => x.pass === false);
     fails = bad.map((x) => x.n);
     await j.step('review', 'done', fails.length ? `불합격 → 재생성: ${bad.map((x) => `${x.n}번(${String(x.reason || '').slice(0, 60)})`).join(' · ')}` : '전부 합격');
   } catch (e) { await j.step('review', 'failed', e.message); }
-  if (fails.length) await py(['tools\\gpt_slide_text.py', '--result', work, ...fails.map(String)], { cwd: DOCS, env: engineEnv(), timeoutMin: 25, label: '재생성' });
+  if (regen && fails.length) await py(['tools\\gpt_slide_text.py', '--result', work, ...fails.map(String)], { cwd: DOCS, env: engineEnv(), timeoutMin: 25, label: '재생성' });
+  return fails;
 }
 // 산출물 파일(01 · 03 · 04_slideshow) + 올리기 + 썸네일 검수(불합격이면 교정 1회)
 async function finishImages(j, work, docs, nums, pick, withThumb) {
@@ -398,9 +416,19 @@ async function runImages(payload, work, early = null) {
   let made = nums;
   if (early) {
     await early.promise;   // 글 단계와 겹쳐 돌린 슬라이드 (원고 초안 기준)
-    const changed = nums.filter((n) => (early.blocks[n - 1] || '') !== blocks[n - 1]);
     write02(work, blocks);
-    if (changed.length) { log(`  교차 팩트체크로 바뀐 블록 ${changed.join(',')} → 그 장만 다시`); await runSlidesEngine(j, work, changed, '슬라이드(수정분)'); }
+    const changed = nums.filter((n) => slideText(early.blocks[n - 1]) !== slideText(blocks[n - 1]) || !fs.existsSync(path.join(work, 'shot2', `${n}.png`)));
+    if (changed.length) log(`  교차 팩트체크로 바뀐(또는 안 나온) 블록 ${changed.join(',')} → 그 장만 다시`);
+    // 속도(2026-11-11): 이미 그린 장 검수 · 썸네일 프롬프트는 둘 다 Claude(브라우저 안 씀)라 동시에 →
+    // 다시 그릴 장(바뀐 장 + 검수 불합격) · 썸네일을 한 브라우저에서 동시에. 예전엔 썸네일 → 검수 → 재생성이 한 줄로 이어져 약 5분 더 걸렸다.
+    const ready = nums.filter((n) => !changed.includes(n));
+    const [fails] = await Promise.all([reviewSlides(j, work, ready, blocks, { regen: false }), withThumb ? thumbPrompt(j, job, work, pick, premade) : null]);
+    const redo = [...new Set([...changed, ...fails])].sort((a, b) => a - b);
+    if (withThumb) await runSlidesAndThumb(j, work, redo);
+    else if (redo.length) await runSlidesEngine(j, work, redo, '슬라이드(수정 · 재생성)');
+    if (changed.length) await reviewSlides(j, work, changed, blocks);   // 새로 그린 장도 검수 → 불합격이면 1회 재생성 (검수 기준 그대로)
+    await finishImages(j, work, docs, nums, pick, withThumb);
+    return;
   } else {
     write02(work, blocks);
     const need = onlyNums.length ? nums : nums.filter((n) => !haveSlide.has(n) || !fs.existsSync(path.join(work, 'shot2', `${n}.png`)));
