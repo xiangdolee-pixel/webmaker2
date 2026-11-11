@@ -92,7 +92,7 @@ export const DIFFS = {
   hard:   { name: '하드', mobs: 1.3, hp: 2.5, boss: 3, gate: .8, msl: .4, startMsl: 0, n: 0, missiles: 0,
             mobVy: 1.2, zig: .5, bad: 1.25, badP: 1.5, swap: .65, stream: 1.3, helpK: .5, comboK: 1.25, summon: 1.4, eliteK: 1.3, lv: [1, 2],
             // 하드: 많이 쏘되 규칙적으로 — 패턴을 차례로 하나씩, 원형엔 늘 빈 틈, 패턴 사이 쉼
-            bul: { seq: 1, ring: 26, gap: 4, aim: 4, fan: 7, spiral: 1, rest: .7, dash: 1, dashT: 8, spd: 1.12, dmg: 2, phase: 1, giant: 8, giantT: 3 } }
+            bul: { seq: 1, ring: 26, gap: 1, aim: 3, fan: 11, spiral: 1, rest: .8, dash: 1, dashT: 8, spd: 1, dmg: 2, phase: 1, giant: 8, giantT: 3 } }
 };
 export const diffOf = d => DIFFS[d] ? d : 'normal';
 export const mslGain = d => Math.floor(3 * DIFFS[diffOf(d)].msl);        // 문 · 상자에서 얻는 유도탄(원래 3)
@@ -678,7 +678,7 @@ export function step(G, dt) {
   if (DK.bul.giant) for (const M of g.mobs) {
     if (!M.mb || M.y < -760 || M.y > -90) continue;
     M.gt = (M.gt == null ? 1.6 : M.gt) - dt;
-    if (M.gt <= 0) { M.gt = DK.bul.giantT; const sp = 130 * DK.bul.spd; if (DK.bul.giant >= 8) ring(g, M.x, M.y + 10, DK.bul.giant, sp * .85, 'o', 1, Math.random() * 6.28); else fan(g, M.x, M.y + 10, DK.bul.giant, .7, sp, 'o', 1); }
+    if (M.gt <= 0) { M.gt = DK.bul.giantT; const sp = 130 * DK.bul.spd; if (DK.bul.giant >= 8) ring(g, M.x, M.y + 10, DK.bul.giant, sp * .85, 'o', 1, Math.random() * 6.28, Math.atan(safeHW(g) / Math.max(120, -(M.y + 10))), lineAng(M.x, M.y + 10, clamp(g.px + rnd(-.5, .5) * safeHW(g), ROAD_L + safeHW(g), ROAD_R - safeHW(g)))); else fan(g, M.x, M.y + 10, DK.bul.giant, .7, sp, 'o', 1); }
   }
   // 탄: 날아오고, 내 부대에 닿으면 병사가 줄고, 길 밖 · 뒤로 지나가면 사라진다(총알 · 유도탄으로 못 막는다 — 피하는 것)
   for (let i = g.orbs.length - 1; i >= 0; i--) {
@@ -720,15 +720,25 @@ function shoot(g, x, y, ang, spd, c, dmg, r = 9) {   // ang 0 = 내 쪽(+y), 오
   g.orbs.push({ x, y, vx: Math.sin(ang) * spd, vy: Math.cos(ang) * spd, r, c, dmg });
 }
 const aimAng = (g, x, y) => Math.atan2(g.px - x, -y);
-// gap: 내 쪽 근처에 gap 발만큼 빈 틈(gapAt = 틈 가운데 각도) — 그 틈으로 빠져나갈 수 있다
-function ring(g, x, y, n, spd, c, dmg, off = 0, gap = 0, gapAt = 0) {
+// 피할 수 있게(사용자 지시 2026-11-11 "수학적으로 피할 수 있는 수준"): 탄이 내 줄(y=0)에 닿을 때 부대가 지나갈 통로 폭을 계산해 비운다.
+//   맞는 폭 = 부대 반지름 × 0.8 + 탄 반지름(9) (step 의 탄 판정과 같음) + 여유 22 → 부대가 커지면 통로도 넓어진다
+const safeHW = g => squadR(g.n) * .8 + 9 + 22;
+const lineAng = (x, y, tx) => Math.atan2(tx - x, Math.max(120, -y));   // (x, y) 에서 내 줄의 tx 로 가는 각도
+// 원형: gapHalf = 비울 각도 반폭, gapAt = 통로 가운데 각도
+function ring(g, x, y, n, spd, c, dmg, off = 0, gapHalf = 0, gapAt = 0) {
   const step = Math.PI * 2 / n;
   for (let i = 0; i < n; i++) {
     const a = off + i * step;
-    if (gap && Math.abs(Math.atan2(Math.sin(a - gapAt), Math.cos(a - gapAt))) < step * gap / 2) continue;
+    if (gapHalf && Math.abs(Math.atan2(Math.sin(a - gapAt), Math.cos(a - gapAt))) < gapHalf + step * .5) continue;
     shoot(g, x, y, a, spd, c, dmg);
   }
   g.h.sfx('cannon'); g.h.spark(x, y + 30, 'gold', 8);
+}
+// 탄 벽: 길 전체를 가로질러 n 발, 내 줄에서 hx ± hw 자리만 비운다(구멍으로 빠져나간다)
+function wall(g, x, y, n, spd, c, dmg, hx, hw) {
+  const a0 = lineAng(x, y, ROAD_L + 6), a1 = lineAng(x, y, ROAD_R - 6), h0 = lineAng(x, y, hx - hw), h1 = lineAng(x, y, hx + hw);
+  for (let i = 0; i < n; i++) { const a = a0 + (a1 - a0) * i / (n - 1); if (a > h0 && a < h1) continue; shoot(g, x, y, a, spd, c, dmg, 10); }
+  g.h.sfx('cannon');
 }
 function fan(g, x, y, n, spread, spd, c, dmg) { const a0 = aimAng(g, x, y); for (let i = 0; i < n; i++) shoot(g, x, y, a0 + (n > 1 ? (i / (n - 1) - .5) * spread : 0), spd, c, dmg, 10); g.h.sfx('cannon'); }
 function bossFire(g, K, dt, R) {
@@ -740,7 +750,10 @@ function bossFire(g, K, dt, R) {
   if (P.seq == null) { P.seq = 1.4; P.k = 0; P.spLeft = 0; P.side = 1; }   // 예전 판 이어하기(저장된 보스)에도
   const bx = K.x, by = K.y + 24;
   // 원형 틈: 내 자리 쪽에서 왼쪽 · 오른쪽 번갈아 살짝 비켜 난다(가만히 있으면 맞고, 조금 옮기면 피한다)
-  const gapAt = () => { P.side = -P.side; return aimAng(g, bx, by) + P.side * .22; };
+  // 통로: 내 자리에서 왼쪽 · 오른쪽 번갈아 부대 폭의 절반쯤 비켜 난다(가만히 있으면 반쯤 맞고, 조금 옮기면 다 피한다)
+  const hw = safeHW(g), d = Math.max(120, -by), gapHalf = Math.atan(hw / d);
+  const holeX = () => { P.side = -P.side; return clamp(g.px + P.side * hw * .6, ROAD_L + hw, ROAD_R - hw); };
+  const gapAt = () => lineAng(bx, by, holeX());
   const aimBurst = n => { P.aimLeft = n; P.aimGap = 0; };
   const aimTick = () => { if (P.aimLeft > 0) { P.aimGap -= dt; if (P.aimGap <= 0) { P.aimGap = .16; P.aimLeft--; shoot(g, bx, by, aimAng(g, bx, by), spd * 1.1, 'm', dmg, 10); g.h.sfx('hit'); } } };
   if (B.seq) {
@@ -749,22 +762,22 @@ function bossFire(g, K, dt, R) {
     if (P.seq <= 0) {
       const kind = ['ring', 'fan', 'spiral', 'aim'][P.k++ % 4];
       let dur = .4;
-      if (kind === 'ring') ring(g, bx, by, Math.round((B.ring + ph * 3) * lk), spd * .85, 'o', Math.max(1, B.dmg - 1), (P.k * .37) % (Math.PI * 2), B.gap, gapAt());
-      else if (kind === 'fan') fan(g, bx, by, B.fan + ph, .9 + ph * .1, spd, 'm', dmg);
+      if (kind === 'ring') ring(g, bx, by, Math.round((B.ring + ph * 3) * lk), spd * .85, 'o', Math.max(1, B.dmg - 1), (P.k * .37) % (Math.PI * 2), gapHalf, gapAt());
+      else if (kind === 'fan') wall(g, bx, by, B.fan + ph, spd * .9, 'm', dmg, holeX(), hw);   // 부채꼴 대신 '구멍 난 탄 벽'
       else if (kind === 'spiral') { P.spLeft = 1.4 + ph * .3; dur = P.spLeft; }
       else { aimBurst(B.aim + (ph >= 2 ? 1 : 0)); dur = (B.aim + 1) * .16; }
       P.seq = dur + B.rest * (1 - ph * .15) / lk;
     }
     if (P.spLeft > 0) {   // 나선: 정해진 시간 동안만 일정하게 돈다(돌아오는 방향이 보여 피할 수 있다)
       P.spLeft -= dt; K.spin = (K.spin || 0) + dt * 2.4; P.sp -= dt;
-      if (P.sp <= 0) { P.sp = .1 / lk; const arms = ph >= 1 ? 3 : 2; for (let a = 0; a < arms; a++) shoot(g, bx, by, K.spin + a * Math.PI, spd * .7, 'm', dmg, 8); }
+      if (P.sp <= 0) { P.sp = .15 / lk; const arms = ph >= 1 ? 2 : 1; for (let a = 0; a < arms; a++) shoot(g, bx, by, K.spin + a * Math.PI, spd * .7, 'm', dmg, 8); }
     }
     aimTick();
     if (B.dash && K.kind === 'brute' && !K.dashing) { P.dash -= dt; if (P.dash <= 0) { P.dash = B.dashT * q; K.dashing = 1; g.h.float(K.x, K.y - 50, '돌진!', '#fca5a5', 30); g.h.sfx('alarm'); } }
     return;
   }
   // 원형 탄막(중간: 틈이 있는 방사형)
-  if (B.ring) { P.ring -= dt; if (P.ring <= 0) { P.ring = B.ringT * q; ring(g, bx, by, Math.round((B.ring + ph * 3) * lk), spd * .9, 'o', Math.max(1, B.dmg - 1), (P.ring * 7) % (Math.PI * 2), B.gap || 0, gapAt()); P.aim = Math.max(P.aim, 1.2); } }   // 원형 직후엔 조준을 잠깐 쉰다(겹치지 않게)
+  if (B.ring) { P.ring -= dt; if (P.ring <= 0) { P.ring = B.ringT * q; ring(g, bx, by, Math.round((B.ring + ph * 3) * lk), spd * .9, 'o', Math.max(1, B.dmg - 1), (P.ring * 7) % (Math.PI * 2), B.gap ? gapHalf : 0, gapAt()); P.aim = Math.max(P.aim, 1.2); } }   // 원형 직후엔 조준을 잠깐 쉰다(겹치지 않게)
   // 조준 연발(짧은 간격으로 n 발 — 쉬움 1발, 중간 2발)
   if (B.aim) {
     P.aim -= dt; if (P.aim <= 0) { P.aim = B.aimT * q; aimBurst(B.aim + (ph >= 2 ? 1 : 0)); }
