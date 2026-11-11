@@ -24,6 +24,7 @@ export const FORM = {
     '④ 통장 사본',
     '※ 서류가 하나라도 빠지면 지원이 자동으로 취소됩니다.',
     '※ 주민등록번호 뒷자리 7자리는 가리고 올려 주세요.',
+    '※ 신청서를 낸 뒤에는 고칠 수 없습니다. 마지막 단계에서 꼭 확인하고 내 주세요.',
   ],
   sections: [
     { key: 'basic', title: '학생 기본정보', desc: '학생의 기본정보를 적어 주세요.', fields: [
@@ -123,8 +124,11 @@ export async function publicApply(ctx, path = '/apply') {
     answers[f.k] = v;
   }
   if (!raw.agree) throw bad('개인정보 수집 · 이용에 동의해 주세요.');
+  if (!raw.final) throw bad('낸 뒤에는 고칠 수 없다는 안내를 확인해 주세요.');
 
+  // 낸 신청서는 고칠 수 없다 (사용자 지시 2026-11-11)
   const cur = await db.prepare('SELECT * FROM applications WHERE site = ? AND round_id = ? AND member_id = ?').bind(site, round.id, me.member.id).first();
+  if (cur) throw bad('이미 낸 신청서가 있습니다. 낸 신청서는 고칠 수 없습니다.');
   const owner = cur ? APPLY_BASE - cur.id : null;
   const want = {};
   for (const f of FORM.files) want[f.k] = [...new Set((Array.isArray(raw.files?.[f.k]) ? raw.files[f.k] : []).map(String))].slice(0, MAX_FILES);
@@ -160,6 +164,7 @@ async function saveDraft(ctx) {
   const raw = await body(request);
   const round = await openRound(db, site);
   if (!round || round.id !== Number(raw.round)) throw bad('지금은 신청 기간이 아닙니다.');
+  if (await db.prepare('SELECT 1 FROM applications WHERE site = ? AND round_id = ? AND member_id = ?').bind(site, round.id, me.member.id).first()) throw bad('이미 낸 신청서는 고칠 수 없습니다.');
   const a = raw.answers || {};
   const answers = Object.fromEntries(FIELDS.map((f) => [f.k, str(a[f.k], f.type === 'textarea' ? 8000 : 300)]));
   const files = {};
@@ -266,8 +271,7 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
   ${cur ? `<div class="mb-card ap-done" data-done-card>
     <span class="ap-done-ico" aria-hidden="true">${CHECK}</span>
     <div><b>신청서가 접수됐습니다</b><p>${fmtTime(cur.created_at)} 접수${cur.updated_at > cur.created_at + 60000 ? ` · ${fmtTime(cur.updated_at)} 고침` : ''}${cur.status === 'CHECKED' ? ' · 서류 확인 완료' : ''}</p>
-      <p class="ap-sub">신청 기간(${esc(dayLabel(round.ends_on))}까지)에는 신청서를 고칠 수 있습니다.</p></div>
-    <button type="button" class="btn" data-edit>신청서 고치기</button>
+      <p class="ap-sub">낸 신청서는 고칠 수 없습니다. 바꿀 내용이 있으면 장학회에 문의해 주세요.</p></div>
   </div>` : ''}
   <form class="mb-form ap-form" data-form="apply" novalidate${cur ? ' hidden' : ''}>
     <ol class="ap-steps" aria-label="신청 단계">${steps.map((s, i) => `<li data-dot="${i}"><i></i><span>${esc(s)}</span></li>`).join('')}</ol>
@@ -287,21 +291,25 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
       <div class="ap-files">${FORM.files.map(fileBox).join('')}</div>
     </div>
     <div class="mb-card ap-step" data-step="${FORM.sections.length + 2}" hidden>
-      <h2 class="ap-h">마지막으로 확인해 주세요</h2><p class="ap-desc">고칠 곳이 있으면 [고치기]를 누르세요.</p>
+      <h2 class="ap-h">마지막으로 확인해 주세요</h2><p class="ap-desc">고칠 곳이 있으면 [고치기]를 누르세요. <b>신청서를 내면 고칠 수 없습니다.</b></p>
       <div class="ap-review" data-review></div>
       ${tk ? `<div class="ap-bot"><div class="cf-turnstile" data-sitekey="${esc(tk)}" data-language="ko" data-size="flexible"></div></div>
       <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>` : ''}
+      <div class="ap-final">
+        <p><b>신청서를 내면 고칠 수 없습니다.</b> 위 내용과 서류를 한 번 더 확인해 주세요.</p>
+        <label class="check"><input type="checkbox" name="final" value="1"> <span>모두 확인했고, 낸 뒤에는 고칠 수 없다는 것을 알고 있습니다.</span></label>
+      </div>
     </div>
 
     <p class="err" role="alert"></p>
     <div class="ap-nav">
       <button type="button" class="btn" data-prev hidden>이전</button>
       <button type="button" class="btn primary" data-next>다음</button>
-      <button type="submit" class="btn primary" data-submit hidden>${cur ? '고친 내용으로 다시 내기' : '신청서 내기'}</button>
+      <button type="submit" class="btn primary" data-submit hidden>신청서 내기</button>
     </div>
     <p class="ap-save"><span class="ap-save-st" data-save-st aria-live="polite">적는 대로 자동으로 저장됩니다.</span><button type="button" class="btn sm" data-save-now>임시 저장</button></p>
   </form>
-  <script type="application/json" data-apply-draft>${JSON.stringify(draft && (!cur || draft.at > cur.updated_at) ? draft : null).replace(/</g, '\\u003c')}</script>
+  <script type="application/json" data-apply-draft>${JSON.stringify(cur ? null : draft).replace(/</g, '\\u003c')}</script>
   <script type="application/json" data-apply-form>${JSON.stringify({ sections: FORM.sections.map((s) => ({ title: s.title, fields: s.fields.map((f) => ({ k: f.k, label: f.label, type: f.type || 'text', min: f.min, max: f.max })) })), files: FORM.files.map((f) => ({ k: f.k, label: f.label })), max: MAX_FILES }).replace(/</g, '\\u003c')}</script>
 </section>`, { noindex: true });
 }

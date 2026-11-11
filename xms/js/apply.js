@@ -57,7 +57,7 @@ function restore() {
   const srv = JSON.parse($('[data-apply-draft]', root)?.textContent || 'null');
   let loc = null;
   try { loc = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { loc = null; }
-  if ('done' in root.dataset && !srv) return; // 이미 낸 신청서는 서버 값 그대로 (그 뒤 고치던 임시 저장이 있으면 그것)
+  if ('done' in root.dataset) return; // 낸 신청서는 고칠 수 없다
   // 이 기기 것과 서버 것 중 나중 것 (서버가 늦으면 다른 기기에서 쓴 것)
   const d = loc && (!srv || loc.at > srv.at) && !('done' in root.dataset) ? loc : srv;
   if (!d) return;
@@ -76,7 +76,6 @@ function restore() {
   });
   if (d.agree) form.elements.agree.checked = true;
   showSt(`${d === srv ? '서버에' : '이 기기에'} 저장해 둔 내용을 불러왔습니다 · ${hhmm(d.at)}`, 'ok');
-  if ('done' in root.dataset) { $('[data-done-card]', root).hidden = true; form.hidden = false; }
 }
 let restored = 0;
 
@@ -174,7 +173,8 @@ function review() {
     ...SPEC.sections.map((s, i) => `<div class="ap-rv"><h3>${esc(s.title)}<button type="button" class="linkish" data-go="${i + 1}">고치기</button></h3>
       <dl class="ap-kv">${s.fields.map((f) => row(f.label, f.type === 'textarea' ? `<span class="ap-pre">${esc(answers[f.k])}</span><small>${answers[f.k].length}자</small>` : esc(answers[f.k]))).join('')}</dl></div>`),
     `<div class="ap-rv"><h3>서류<button type="button" class="linkish" data-go="${FILE_STEP}">고치기</button></h3>
-      <dl class="ap-kv">${SPEC.files.map((f) => row(f.label, `${(files[f.k] || []).length}개 · ${esc((files[f.k] || []).map((x) => x.name).join(', '))}`)).join('')}</dl></div>`,
+      <div class="ap-rv-docs">${SPEC.files.map((f) => `<div class="ap-rv-doc"><b>${esc(f.label)}<small>${(files[f.k] || []).length}개</small></b>
+        <div class="ap-rv-thumbs">${(files[f.k] || []).map((x) => `<a href="/xms/upload/${esc(x.id)}" target="_blank" rel="noopener" title="${esc(x.name)}">${isImg(x.mime) ? `<img src="/xms/upload/${esc(x.id)}" alt="${esc(f.label)}" loading="lazy">` : '<span class="ap-pdf">PDF</span>'}</a>`).join('') || '<span class="ap-rv-miss">없음</span>'}</div></div>`).join('')}</div></div>`,
   ].join('');
 }
 form.addEventListener('click', (e) => {
@@ -216,11 +216,12 @@ form.addEventListener('submit', (e) => {
       const m = check(i);
       if (m) { show(i); err.textContent = m; return; }
     }
+    if (!form.elements.final.checked) { form.elements.final.focus(); throw new Error('[모두 확인했고, 낸 뒤에는 고칠 수 없다는 것을 알고 있습니다]에 체크해 주세요.'); }
     const d = collect();
     const turnstile = form.querySelector('[name="cf-turnstile-response"]')?.value || '';
     if ($('.cf-turnstile', form) && !turnstile) throw new Error('사람인지 확인하는 칸을 먼저 끝내 주세요.');
     try {
-      await api('/apply', { method: 'POST', data: { round: +root.dataset.round, answers: d.answers, agree: d.agree, files: Object.fromEntries(Object.entries(d.files).map(([k, l]) => [k, l.map((x) => x.id)])), turnstile } });
+      await api('/apply', { method: 'POST', data: { round: +root.dataset.round, answers: d.answers, agree: d.agree, final: true, files: Object.fromEntries(Object.entries(d.files).map(([k, l]) => [k, l.map((x) => x.id)])), turnstile } });
     } catch (e2) {
       if (window.turnstile) try { window.turnstile.reset(); } catch { /* 위젯 없음 */ }
       throw e2;
@@ -230,12 +231,6 @@ form.addEventListener('submit', (e) => {
   });
 });
 
-// 이미 낸 신청서: [신청서 고치기]
-$('[data-edit]', root)?.addEventListener('click', () => {
-  $('[data-done-card]', root).hidden = true;
-  form.hidden = false;
-  show(1);
-});
 if (new URLSearchParams(location.search).get('sent')) {
   toast('신청서를 냈습니다. 감사합니다!');
   history.replaceState(null, '', location.pathname);

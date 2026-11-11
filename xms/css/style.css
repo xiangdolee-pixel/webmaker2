@@ -1235,3 +1235,19 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
   .ap-addr-row .ap-zip { flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .ap-post { animation: none; } }
+/* 신청서 확인 단계: 서류 썸네일 · 낸 뒤 못 고침 안내 */
+.ap-rv-docs { display: grid; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #f6f7f9; }
+.ap-rv-doc { display: grid; gap: 6px; }
+.ap-rv-doc + .ap-rv-doc { padding-top: 10px; border-top: 1px solid #eceef2; }
+.ap-rv-doc > b { display: flex; align-items: center; gap: 6px; color: var(--sub); font-size: 14px; font-weight: 600; }
+.ap-rv-doc > b small { color: var(--mute); font-weight: 500; }
+.ap-rv-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+.ap-rv-thumbs a { display: block; width: 84px; height: 112px; overflow: hidden; border: 1px solid #e3e6ec; border-radius: 10px; background: #fff; }
+.ap-rv-thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ap-rv-thumbs .ap-pdf { width: 100%; height: 100%; border-radius: 0; }
+.ap-rv-miss { color: var(--danger); font-size: 14px; font-weight: 600; }
+.ap-final { display: grid; gap: 10px; margin-top: 18px; padding: 16px 18px; border: 1.5px solid var(--danger); border-radius: 14px; background: var(--danger-soft); }
+.ap-final p { margin: 0; color: var(--danger); font-size: 15px; }
+.ap-final .check { align-items: flex-start; color: var(--ink); font-size: 15px; font-weight: 600; }
+.ap-final .check input { flex: none; margin-top: 3px; accent-color: var(--danger); }
+.ap-desc b { color: var(--danger); }
