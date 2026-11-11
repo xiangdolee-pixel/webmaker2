@@ -1239,16 +1239,24 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 }
 @media (prefers-reduced-motion: reduce) { .ap-post { animation: none; } }
 /* 신청서 확인 단계: 서류 썸네일 · 낸 뒤 못 고침 안내 */
-.ap-rv-docs { display: grid; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #f6f7f9; }
-.ap-rv-doc { display: grid; gap: 6px; }
-.ap-rv-doc + .ap-rv-doc { padding-top: 10px; border-top: 1px solid #eceef2; }
-.ap-rv-doc > b { display: flex; align-items: center; gap: 6px; color: var(--sub); font-size: 14px; font-weight: 600; }
-.ap-rv-doc > b small { color: var(--mute); font-weight: 500; }
-.ap-rv-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
-.ap-rv-thumbs a { display: block; width: 84px; height: 112px; overflow: hidden; border: 1px solid #e3e6ec; border-radius: 10px; background: #fff; }
-.ap-rv-thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.ap-rv-thumbs .ap-pdf { width: 100%; height: 100%; border-radius: 0; }
-.ap-rv-miss { color: var(--danger); font-size: 14px; font-weight: 600; }
+.ap-rv-docs { display: grid; gap: 12px; }
+.ap-rv-doc { display: grid; align-content: start; gap: 10px; padding: 14px; border-radius: 14px; background: #f6f7f9; }
+.ap-rv-doc.miss { background: var(--danger-soft); }
+.ap-rv-doc-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ap-rv-doc-h b { color: var(--ink); font-size: 15px; }
+.ap-rv-doc-h span { flex: none; padding: 2px 10px; border-radius: 99px; background: #fff; color: var(--sub); font-size: 12px; font-weight: 700; }
+.ap-rv-doc.miss .ap-rv-doc-h span { color: var(--danger); }
+.ap-rv-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.ap-rv-tile { display: grid; grid-template-rows: auto auto auto; min-width: 0; overflow: hidden; border: 1px solid #e6e9ee; border-radius: 12px; background: #fff; color: var(--ink); text-decoration: none; transition: border-color .2s, box-shadow .2s; }
+.ap-rv-tile:hover { border-color: var(--brand); box-shadow: 0 8px 20px -14px rgba(20, 26, 40, .4); }
+.ap-rv-thumb { display: grid; place-items: center; aspect-ratio: 4 / 3; overflow: hidden; background: #eef0f3; }
+.ap-rv-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ap-rv-thumb i { padding: 4px 10px; border-radius: 6px; background: var(--danger); color: #fff; font-size: 12px; font-style: normal; font-weight: 800; }
+.ap-rv-name { padding: 8px 10px 0; overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ap-rv-tile small { padding: 0 10px 8px; color: var(--mute); font-size: 12px; }
+.ap-rv-miss { margin: 0; color: var(--danger); font-size: 14px; font-weight: 600; }
+@media (min-width: 640px) { .ap-rv-docs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ap-steps button:focus:not(:focus-visible) { outline: none; }
 .ap-final { display: grid; gap: 10px; margin-top: 18px; padding: 16px 18px; border: 1.5px solid var(--danger); border-radius: 14px; background: var(--danger-soft); }
 .ap-final p { margin: 0; color: var(--danger); font-size: 15px; }
 .ap-final .check { align-items: flex-start; color: var(--ink); font-size: 15px; font-weight: 600; }

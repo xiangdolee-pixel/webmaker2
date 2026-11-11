@@ -173,8 +173,12 @@ function review() {
     ...SPEC.sections.map((s, i) => `<div class="ap-rv"><h3>${esc(s.title)}<button type="button" class="linkish" data-go="${i + 1}">고치기</button></h3>
       <dl class="ap-kv">${s.fields.map((f) => row(f.label, f.type === 'textarea' ? `<span class="ap-pre">${esc(answers[f.k])}</span><small>${answers[f.k].length}자</small>` : esc(answers[f.k]))).join('')}</dl></div>`),
     `<div class="ap-rv"><h3>서류<button type="button" class="linkish" data-go="${FILE_STEP}">고치기</button></h3>
-      <div class="ap-rv-docs">${SPEC.files.map((f) => `<div class="ap-rv-doc"><b>${esc(f.label)}<small>${(files[f.k] || []).length}개</small></b>
-        <div class="ap-rv-thumbs">${(files[f.k] || []).map((x) => `<a href="/xms/upload/${esc(x.id)}" target="_blank" rel="noopener" title="${esc(x.name)}">${isImg(x.mime) ? `<img src="/xms/upload/${esc(x.id)}" alt="${esc(f.label)}" loading="lazy">` : '<span class="ap-pdf">PDF</span>'}</a>`).join('') || '<span class="ap-rv-miss">없음</span>'}</div></div>`).join('')}</div></div>`,
+      <div class="ap-rv-docs">${SPEC.files.map((f) => { const list = files[f.k] || []; return `<div class="ap-rv-doc${list.length ? '' : ' miss'}">
+        <div class="ap-rv-doc-h"><b>${esc(f.label)}</b><span>${list.length ? `${list.length}개` : '없음'}</span></div>
+        ${list.length ? `<div class="ap-rv-tiles">${list.map((x) => `<a class="ap-rv-tile" href="/xms/upload/${esc(x.id)}" target="_blank" rel="noopener">
+          <span class="ap-rv-thumb">${isImg(x.mime) ? `<img src="/xms/upload/${esc(x.id)}" alt="" loading="lazy">` : '<i>PDF</i>'}</span>
+          <span class="ap-rv-name" title="${esc(x.name)}">${esc(x.name)}</span><small>${kb(x.size)}</small></a>`).join('')}</div>` : '<p class="ap-rv-miss">올린 파일이 없습니다.</p>'}
+      </div>`; }).join('')}</div></div>`,
   ].join('');
 }
 form.addEventListener('click', (e) => {
