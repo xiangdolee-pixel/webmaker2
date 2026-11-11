@@ -7,6 +7,7 @@ let pollTimer = 0;
 let openId = '';            // 보고 있는 작업 id
 let resTab = 'show';        // 결과 탭 (기본: 슬라이드쇼)
 let vidTimer = 0;           // 카드의 영상 진행 시간 다시 읽기
+let vidPace = 0;            // 영상 탭 진행 막대용 글자당 소요(초)
 // 영상(내 목소리 작업 v) 시간 글 (2026-11-11 사용자 지시: 영상 만들 때도 걸리는 시간 표시 — 카드 · 영상 탭 둘 다)
 //   진행 중이면 <b data-since> 가 1초마다 흐른다(tickSince). 완료면 음성 시작 → 영상 완성까지 + (음성 · 영상) 나눠서
 function videoTime(v) {
@@ -19,7 +20,39 @@ function videoTime(v) {
   const t0 = v.started_at || v.created_at || Date.now();
   return `🎬 ${what} · <b data-since="${t0}">${mins(sec(t0, Date.now()))}</b>째`;
 }
-setInterval(() => { document.querySelectorAll('[data-since]').forEach((b) => { b.textContent = mins(Math.max(1, Math.round((Date.now() - +b.dataset.since) / 1000))); }); }, 1000);
+setInterval(() => {
+  document.querySelectorAll('[data-since]').forEach((b) => { b.textContent = mins(Math.max(1, Math.round((Date.now() - +b.dataset.since) / 1000))); });
+  document.querySelectorAll('[data-vt0]').forEach(paintVbtn);
+}, 1000);
+// 카드 "영상 만들기" 버튼 진행 막대(2026-11-11 사용자 지시): 차오르는 배경 + 퍼센트 + 경과 시간.
+//   처리기가 진행률을 따로 보고하지 않아 퍼센트는 예상 시간 대비(최근 완성 영상의 글자당 소요) — 끝나기 전엔 97% 에서 멈춘다
+function paintVbtn(btn) {
+  const t0 = +btn.dataset.vt0, est = +btn.dataset.vest || 900;
+  const sec = Math.max(1, Math.round((Date.now() - t0) / 1000));
+  const pct = Math.min(97, Math.max(1, Math.round(sec / est * 100)));
+  btn.style.setProperty('--p', pct + '%');
+  btn.querySelector('.st-vlabel').textContent = btn.classList.contains('st-vbar') ? `🎬 ${btn.dataset.vwhat || '만드는 중'} ${pct}% · ${mins(sec)}째` : `🎬 ${pct}% · ${mins(sec)}`;   // 카드 버튼은 반 칸이라 짧게
+}
+function setVbtn(btn, v, pace) {
+  if (!btn) return;
+  delete btn.dataset.vt0; btn.classList.remove('is-run'); btn.disabled = false; btn.style.removeProperty('--p');
+  const label = btn.querySelector('.st-vlabel');
+  if (!v) { label.textContent = '🎬 영상 만들기'; return; }
+  if (v.status === 'done' && v.video_status === 'done') { label.textContent = '🎬 다시 만들기'; return; }   // 걸린 시간은 카드의 '영상 만드는 데' 줄에
+  if (v.status === 'failed' || v.video_status === 'failed') { label.textContent = '🎬 영상 다시 만들기'; return; }
+  btn.classList.add('is-run'); btn.disabled = true;
+  if (v.status === 'queued') { btn.style.setProperty('--p', '0%'); label.textContent = '🎬 대기 중'; return; }
+  btn.dataset.vt0 = v.started_at || v.created_at || Date.now();
+  btn.dataset.vest = Math.max(120, Math.round((v.chars || 2500) * pace));
+  btn.dataset.vwhat = v.status === 'done' ? '영상 합성' : '만드는 중';
+  paintVbtn(btn);
+}
+// 스튜디오 영상 1건(음성 + 영상)이 글자당 걸린 초 — 최근 완성 영상들의 중간값, 기록 없으면 0.35
+function studioPace(list) {
+  const v = list.filter((x) => x.status === 'done' && x.video_status === 'done' && x.started_at && x.video_at > x.started_at && x.chars > 0)
+    .map((x) => (x.video_at - x.started_at) / 1000 / x.chars).filter((x) => x > 0.02 && x < 5).sort((a, b) => a - b);
+  return v.length ? v[Math.floor(v.length / 2)] : 0.35;
+}
 
 const STATUS = { queued: ['대기', 'wait'], running: ['진행 중', 'run'], pick: ['6개 고르기', 'ask'], thumb: ['썸네일 선택', 'ask'], images: ['그림 대기 (PC)', 'wait'], done: ['완료', 'done'], failed: ['실패', 'fail'], stopped: ['멈춤', 'stop'] };
 const KIND = { main: '본편', thumb: '썸네일만', phone: '폰UI 쇼츠' };
@@ -200,6 +233,8 @@ async function fillCardVideos() {
   let list = [];
   try { list = (await deps.api('/voice/jobs?limit=60')).jobs || []; } catch { return; }
   const map = Object.fromEntries(list.map((v) => [v.id, v]));
+  const pace = studioPace(list);
+  $$('[data-vbtn]').forEach((b) => setVbtn(b, map[b.dataset.vbtn], pace));
   let pending = false;
   for (const el of els) {
     const v = map[el.dataset.vtime];
@@ -222,7 +257,7 @@ function jobCard(j) {
         <a class="btn primary" href="/studio/show/${j.id}" target="_blank" rel="noopener" data-card-act="show">▶ 방송용 슬라이드쇼 새 창으로 열기</a>
         <div class="st-card-pair"><button class="btn" type="button" data-card-act="thumb">🖼 썸네일 메뉴</button><button class="btn" type="button" data-card-act="dl" ${j.thumb ? '' : 'disabled'}>⬇ 썸네일 다운로드</button></div>
         <button class="btn" type="button" data-card-act="yt">📺 유튜브 (제목 · 인트로 · 더보기)</button>
-        <div class="st-card-pair"><button class="btn" type="button" data-card-act="video">🎬 영상 만들기</button>${j.options?.video_job ? `<button class="btn" type="button" data-card-act="video-open">▶ 영상 보기 · 다운로드</button>` : ''}</div>
+        <div class="st-card-pair"><button class="btn st-vbtn" type="button" data-card-act="video"${j.options?.video_job ? ` data-vbtn="${esc(j.options.video_job)}"` : ''}><i class="st-vfill"></i><span class="st-vlabel">🎬 영상 만들기</span></button>${j.options?.video_job ? `<button class="btn" type="button" data-card-act="video-open">▶ 영상 보기 · 다운로드</button>` : ''}</div>
       </div>` : ''}
     </div></article>`;
 }
@@ -593,7 +628,11 @@ async function fillVideoStatus(job) {
       st.innerHTML = `<span class="err-inline">❌ 영상 실패: ${esc(j.error || j.video_error || '')}</span> — 카드의 "영상 만들기" 로 다시 만들 수 있어요`;
       $('#st-video-dl')?.setAttribute('aria-disabled', 'true');
     } else {
-      st.innerHTML = `${j.status === 'done' ? '🎬 음성은 끝났고 영상을 합성 · 올리는 중…' : `🎙 음성 만드는 중… (${j.status === 'queued' ? '대기' : '진행'} · 내 목소리에서 자세히)`} · ⏱ <b data-since="${j.status === 'queued' ? j.created_at : j.started_at || j.created_at}">${mins(Math.max(1, Math.round((Date.now() - (j.status === 'queued' ? j.created_at : j.started_at || j.created_at)) / 1000)))}</b>째`;
+      // 카드 버튼과 같은 진행 막대(퍼센트 · 경과 시간). 한 번 만들고 값만 바꿔야 차오르는 움직임이 끊기지 않는다
+      if (!vidPace) { try { vidPace = studioPace((await api('/voice/jobs?limit=60')).jobs || []); } catch { vidPace = 0.35; } }
+      let bar = $('#st-vbar', st);
+      if (!bar) { st.innerHTML = '<div class="btn st-vbtn st-vbar" id="st-vbar"><i class="st-vfill"></i><span class="st-vlabel"></span></div><span class="st-meta">자세한 진행은 "내 목소리" 에서 · 퍼센트는 최근 영상 속도로 어림한 값</span>'; bar = $('#st-vbar', st); }
+      setVbtn(bar, j, vidPace);
       $('#st-video-dl')?.classList.add('disabled');
       setTimeout(() => { if (document.contains(st)) fillVideoStatus(job); }, 10000);
     }

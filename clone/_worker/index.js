@@ -50,6 +50,16 @@ async function videoPace(db) {
   const v = results.map((r) => (r.video_at - r.done_at) / 1000 / r.seconds).filter((x) => x > 0.02 && x < 60).sort((a, b) => a - b);
   return v.length ? v[Math.floor(v.length / 2)] : 0.5;
 }
+// 보관 규칙(사용자 지시 2026-11-11): 만든 지 3일 지난 작업은 음성 · 영상 파일(R2)과 줄까지 지운다. 대기 · 진행 중은 그대로
+const KEEP_DAYS = 3;
+async function purgeOld(env) {
+  const { results } = await env.DB.prepare("SELECT id FROM jobs WHERE created_at < ? AND status NOT IN ('queued', 'running') AND NOT (video = 1 AND video_status = 'pending' AND status = 'done') ORDER BY created_at ASC LIMIT 30").bind(now() - KEEP_DAYS * 86400000).all();
+  for (const { id } of results) {
+    await Promise.all([env.AUDIO.delete(`audio/${id}.wav`), env.AUDIO.delete(`video/${id}.mp4`)]).catch(() => {});
+    await env.DB.prepare('DELETE FROM jobs WHERE id = ?').bind(id).run();
+  }
+  return results.length;
+}
 const JOB_COLS = 'id, created_at, started_at, done_at, status, title, chars, speed, seconds, lufs, lra, tp, sentences, engine, error, attempts, video, video_status, video_at, video_error';
 
 async function agentStatus(db) {
@@ -151,6 +161,7 @@ async function handle(request, env, ctx) {
 
   if (path === '/api/jobs' && method === 'GET') {
     const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 50));
+    ctx.waitUntil(purgeOld(env).catch((e) => console.error('보관 정리 실패', e.message)));   // 목록을 볼 때마다(화면 · xim 카드) 오래된 것 정리
     const { results } = await db.prepare(`SELECT ${JOB_COLS} FROM jobs ORDER BY created_at DESC LIMIT ?`).bind(limit).all();
     return json({ jobs: results, agent: await agentStatus(db), sec_per_char: await pace(db), video_sec_per_sec: await videoPace(db) });
   }

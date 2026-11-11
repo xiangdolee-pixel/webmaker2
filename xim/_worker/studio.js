@@ -20,6 +20,7 @@ import { slideHtml, SLIDE_CSS } from '../js/slide-template.js';
 const RUN_WORKFLOW = 'studio-run.yml';
 
 const KEEP_JOBS = 10;                      // 그림을 보관할 최근 작업 수
+const KEEP_DAYS = 3;                       // 이 날수가 지난 작업은 그림 · 글 · 기록까지 통째로 지운다 (사용자 지시 2026-11-11: 스튜디오 · 내 목소리 3일치만)
 const NEWS_HOURS = 8;                      // 뉴스 후보 범위: 제작 시각 기준 최근 N시간 (사용자 지시 2026-11-09: 12 → 8)
 const CLAUDE_MODEL = 'claude-opus-5-5';
 const PRICE = { in: 4 / 1e6, out: 20 / 1e6 };   // 달러 / 토큰 (Opus 5.5)
@@ -107,6 +108,22 @@ async function purgeOld(env) {
   for (const j of old) {
     for (const a of await jobAssets(db, j.id)) await dropAsset(env, a);
     await setJob(db, j.id, { assets_purged: 1 });
+  }
+  // 3일 지난 작업은 통째로(그림 R2 · 글 · 단계 기록 · 작업 줄). 다룬 기사 제목만 7일 남겨 Top15 에서 같은 뉴스를 계속 뺀다
+  const cut = now() - KEEP_DAYS * 86400000;
+  const gone = (await db.prepare("SELECT * FROM studio_jobs WHERE status IN ('done','failed','stopped') AND created_at < ? ORDER BY created_at ASC LIMIT 20").bind(cut).all()).results;
+  if (gone.length) {
+    let covered = [];
+    try { covered = JSON.parse((await db.prepare("SELECT value FROM studio_settings WHERE key = 'covered'").first())?.value || '[]'); } catch { covered = []; }
+    for (const j of gone) {
+      const jo = JSON.parse(j.options || '{}');
+      if (['queued', 'running', 'review'].includes(jo.yt?.status) || jo.yt?.tg?.status === 'queued') continue;   // 유튜브 올리기 · 공개 대기 중이면 끝날 때까지 둔다
+      if (j.kind === 'main') covered.push(...(await coveredOf(db, j)).map((c) => ({ ...c, at: j.created_at })));
+      for (const a of await jobAssets(db, j.id)) await dropAsset(env, a);
+      await db.batch([db.prepare('DELETE FROM studio_docs WHERE job_id = ?').bind(j.id), db.prepare('DELETE FROM studio_steps WHERE job_id = ?').bind(j.id), db.prepare('DELETE FROM studio_jobs WHERE id = ?').bind(j.id)]);
+    }
+    covered = covered.filter((c) => c.at > now() - 7 * 86400000).slice(-90);
+    await db.prepare("INSERT INTO studio_settings (key, value) VALUES ('covered', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(JSON.stringify(covered)).run();
   }
   // 작업에 안 붙은 업로드(하루 지난 것) 정리
   for (const a of (await db.prepare("SELECT * FROM studio_assets WHERE job_id = '' AND created_at < ?").bind(now() - 86400000).all()).results) await dropAsset(env, a);
@@ -441,14 +458,22 @@ export class StudioMain extends WorkflowEntrypoint {
 async function recentlyCovered(db, exceptId) {
   const { results } = await db.prepare("SELECT id, created_at FROM studio_jobs WHERE id != ? AND kind = 'main' AND created_at > ? ORDER BY created_at DESC LIMIT 15").bind(exceptId, now() - 7 * 86400000).all();
   const out = [];
-  for (const j of results) {
-    const top = docJson(await latestDoc(db, j.id, 'top15'));
-    const chosen = docJson(await latestDoc(db, j.id, 'chosen')) || top?.picks || [];
-    const when = kst(j.created_at).slice(0, 11);
-    if (top?.items?.length) for (const n of chosen) { const it = top.items.find((i) => i.n === n); if (it) out.push({ when, title: it.title, url: it.url }); }
-    else { const a = await latestDoc(db, j.id, 'articles'); for (const b of splitBlocks(a?.body)) out.push({ when, title: b.split('\n')[0].replace(/^📌\s*/, ''), url: '' }); }
-  }
+  for (const j of results) out.push(...await coveredOf(db, j));
+  // 3일 보관 규칙으로 지운 작업의 기사 제목(7일치, purgeOld 가 남겨 둠)
+  try {
+    const kept = JSON.parse((await db.prepare("SELECT value FROM studio_settings WHERE key = 'covered'").first())?.value || '[]');
+    for (const c of kept.slice().reverse()) if (c.at > now() - 7 * 86400000) out.push({ when: c.when, title: c.title, url: c.url });
+  } catch { /* 무시 */ }
   return out.slice(0, 60);
+}
+async function coveredOf(db, j) {
+  const out = [];
+  const top = docJson(await latestDoc(db, j.id, 'top15'));
+  const chosen = docJson(await latestDoc(db, j.id, 'chosen')) || top?.picks || [];
+  const when = kst(j.created_at).slice(0, 11);
+  if (top?.items?.length) for (const n of chosen) { const it = top.items.find((i) => i.n === n); if (it) out.push({ when, title: it.title, url: it.url }); }
+  else { const a = await latestDoc(db, j.id, 'articles'); for (const b of splitBlocks(a?.body)) out.push({ when, title: b.split('\n')[0].replace(/^📌\s*/, ''), url: '' }); }
+  return out;
 }
 
 // 방송 대본(슬라이드쇼 오른쪽) = 인사말 + 인트로 + 첫 블록, 나머지 블록 그대로
@@ -690,6 +715,7 @@ const kstHM = (ms) => new Date(ms + 9 * 3600000).toISOString().slice(11, 16);
 // Cron(5분마다): 예약 시각이 지났고 오늘 아직 안 만든 예약 → 작업 만들기 (PC 가 꺼져 있어도 '대기' 로 쌓인다)
 export async function studioScheduled(env, gh) {
   const db = env.DB;
+  try { await purgeOld(env); } catch (e) { console.error('보관 정리 실패', e.message); }
   const list = await getSchedules(db);
   const today = kstDate(now()), hm = kstHM(now());
   let changed = false;

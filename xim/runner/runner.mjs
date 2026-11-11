@@ -580,16 +580,29 @@ async function reportEnv(force = false) {
   if (info.chatgpt && info.chatgpt.loggedIn) loginNeeded = false;
 }
 
+// PC 의 작업 폴더도 3일치만 (사용자 지시 2026-11-11: 스튜디오 · 내 목소리 3일 보관, 파일까지). 작업 id(20자리 hex) 폴더만, 마지막으로 손댄 지 3일 지난 것
+function cleanLocal() {
+  try {
+    const cut = Date.now() - 3 * 86400000;
+    for (const d of fs.readdirSync(WORK_ROOT)) {
+      if (!/^[0-9a-f]{20}$/.test(d)) continue;
+      const p = path.join(WORK_ROOT, d);
+      if (fs.statSync(p).mtimeMs < cut) { fs.rmSync(p, { recursive: true, force: true }); log(`  오래된 작업 폴더 지움 ${d}`); }
+    }
+  } catch (e) { log('(작업 폴더 정리 실패)', e.message); }
+}
+
 async function pcLoop() {
   if (!DOCS) { console.error('PC 모드는 DOCS(엔진 폴더) 설정이 필요합니다.'); process.exit(1); }
   log(`PC 도우미 시작 — ${XIM} · 엔진 ${DOCS} · 브라우저 ${path.basename(BROWSER)}`);
+  cleanLocal();
   await reportEnv(true); closeProfileEdge();        // 로그인 점검이 띄운 엣지는 바로 닫는다
   for (;;) {
     try {
       const before = lastReport; await reportEnv(); if (lastReport !== before) closeProfileEdge();
       const imagesOk = !loginNeeded && Date.now() - engineFailAt > 120000;
       const r = await api(`/api/studio/helper/next?want=${imagesOk ? 'text,images,youtube' : 'text,youtube'}`, { method: 'POST', body: {} });
-      if (r.job) { await processJob(r); closeProfileEdge(); continue; }
+      if (r.job) { await processJob(r); closeProfileEdge(); cleanLocal(); continue; }
     } catch (e) { log('(대기 중 오류)', e.message); }
     await sleep(5000);
   }
