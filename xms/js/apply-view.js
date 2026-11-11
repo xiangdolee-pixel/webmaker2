@@ -1,5 +1,5 @@
 // 레벨1 신청자 확인 (/member/apply/list · /member/apply/<번호>) — 찾기 · 상태로 거르기 · 상태 바꾸기 · 서류 크게 보기
-import { $, $$, esc, makeApi, toast, openDialog, busy } from './common.js';
+import { $, $$, esc, makeApi, toast, openDialog, busy, confirmInline } from './common.js';
 
 const admin = makeApi('/xms-api/admin');
 const LABEL = { SUBMITTED: '접수', CHECKED: '서류 확인', SELECTED: '선정', REJECTED: '미선정' };
@@ -63,6 +63,26 @@ if (view) {
       if (!n) clr?.remove();
       toast(n ? `${n}점을 줬습니다. (합계 ${r.sum}점)` : '내 점수를 뺐습니다.');
     });
+  });
+  // 최종 선정 / 선정 취소 (레벨1 누구나)
+  const fin = $('[data-apx-final]', view);
+  fin?.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-final]');
+    if (!b) return;
+    const to = b.dataset.final;
+    const run = () => busy(b, null, async () => {
+      const r = await admin(`/apply/${id}`, { method: 'PUT', data: { status: to } });
+      const on = to === 'SELECTED';
+      fin.classList.toggle('on', on);
+      const t = new Date(r.at || Date.now()); const hm = `${t.getFullYear()}.${String(t.getMonth() + 1).padStart(2, '0')}.${String(t.getDate()).padStart(2, '0')} ${t.toTimeString().slice(0, 5)}`;
+      $('[data-final-note]', fin).innerHTML = on ? `<b>선정됐습니다</b>${r.by ? ` · ${esc(r.by)}` : ''} · ${hm}` : '점수를 보고 레벨1 중 한 분이 정합니다. 여러 명을 선정할 수 있습니다.';
+      b.dataset.final = on ? 'SUBMITTED' : 'SELECTED';
+      b.textContent = on ? '선정 취소' : '선정하기';
+      b.classList.toggle('primary', !on);
+      $('[data-apx-tag]', view).innerHTML = `<span class="apx-tag st-${to.toLowerCase()}">${LABEL[to]}</span>`;
+      toast(on ? '선정했습니다.' : '선정을 취소했습니다.');
+    });
+    if (to === 'SUBMITTED') confirmInline(b, '선정을 취소할까요?', '선정 취소', run); else run();
   });
   $$('[data-zoom]', view).forEach((b) => b.addEventListener('click', () => {
     const u = esc(b.dataset.zoom);

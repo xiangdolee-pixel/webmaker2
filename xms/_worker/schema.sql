@@ -426,3 +426,6 @@ CREATE TABLE IF NOT EXISTS apply_scores (
   PRIMARY KEY (application_id, member_id)
 );
 CREATE INDEX IF NOT EXISTS idx_apply_scores_site ON apply_scores(site, application_id);
+-- 2026-11-11 최종 선정한 사람 · 시각 — 한 번만 실행:
+--   ALTER TABLE applications ADD COLUMN selected_by INTEGER;
+--   ALTER TABLE applications ADD COLUMN selected_at INTEGER;

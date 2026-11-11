@@ -368,7 +368,7 @@ export async function applicantsPage(ctx, { page, msgPage, needLogin }) {
   ]);
   const list = results.map(appRow);
   const cnt = (k) => list.filter((a) => a.status === k).length;
-  const sc = await scoresOf(db, site, list.map((a) => a.id));
+  const [sc, judges] = await Promise.all([scoresOf(db, site, list.map((a) => a.id)), judgesOf(db, site)]);
   const t = kstDay();
   const state = round.starts_on > t ? ['soon', '시작 전'] : round.ends_on < t ? ['closed', '마감'] : ['open', '접수 중'];
   const card = (a) => `<a class="apx-card" href="/member/apply/${a.id}" data-q="${esc([a.name, a.dept, a.student_no, a.mobile, a.role].join(' ').toLowerCase())}" data-st="${a.status}" data-sum="${sumOf(sc.get(a.id))}" data-at="${a.created_at}">
@@ -378,7 +378,7 @@ export async function applicantsPage(ctx, { page, msgPage, needLogin }) {
         <span class="apx-card-l">${esc([a.dept, a.student_no].filter(Boolean).join(' · ') || '-')}</span>
         <span class="apx-card-m"><span>성적 <b>${esc(a.gpa || '-')}</b></span><span>${esc(a.role || '-')}</span>${a.state ? `<span>${esc(a.state)}</span>` : ''}</span>
         <small>${fmtTime(a.created_at)} 접수${a.updated_at > a.created_at + 60000 ? ' · 고침' : ''}</small>
-        <span class="apx-scores">${scoreLine(sc.get(a.id))}</span>
+        <span class="apx-scores">${scoreLine(sc.get(a.id), judges)}</span>
       </span><span class="apx-chev" aria-hidden="true">›</span></a>`;
   return page(ctx, '신청자 확인', `<div class="apx" data-apx-list>
   <a class="apx-back" href="/member/apply">‹ 장학금 신청</a>
@@ -391,6 +391,7 @@ export async function applicantsPage(ctx, { page, msgPage, needLogin }) {
   <div class="apx-stats" role="group" aria-label="상태로 거르기">
     <button type="button" class="apx-stat on" data-f="all" aria-pressed="true"><b>${list.length}</b><span>전체</span></button>
     <button type="button" class="apx-stat" data-f="SUBMITTED" aria-pressed="false"><b>${cnt('SUBMITTED')}</b><span>접수</span></button>
+    <button type="button" class="apx-stat sel" data-f="SELECTED" aria-pressed="false"><b>${cnt('SELECTED')}</b><span>선정</span></button>
   </div>
   ${list.length ? `<div class="apx-tools"><input class="input apx-q" type="search" placeholder="이름 · 학과 · 학번으로 찾기" data-apx-q aria-label="신청자 찾기">
     <select class="input apx-sort" data-apx-sort aria-label="정렬"><option value="at">접수 순</option><option value="sum">합계 높은 순</option></select>
@@ -424,6 +425,9 @@ export async function applicantPage(ctx, id, { page, msgPage, needLogin }) {
   const step = (to, label, cls) => (to ? `<a class="btn ${cls}" href="/member/apply/${to}">${label}</a>` : `<span class="btn ${cls} off" aria-disabled="true">${label}</span>`);
   const docCount = FORM.files.filter((f) => (docs[f.k] || []).length).length;
   const scores = (await scoresOf(db, site, [a.id])).get(a.id);
+  const judges = await judgesOf(db, site);
+  const selBy = a.selected_by ? await db.prepare('SELECT name FROM members WHERE id = ?').bind(a.selected_by).first() : null;
+  const selected = a.status === 'SELECTED';
   const meId = ctx.me.kind === 'member' ? ctx.me.member.id : 0;
   const mine = scores.find((x) => x.member_id === meId)?.score || 0;
   return page(ctx, `${row.name} 신청서`, `<div class="apx" data-apx-view data-id="${a.id}">
@@ -445,7 +449,12 @@ export async function applicantPage(ctx, id, { page, msgPage, needLogin }) {
       <div class="apx-score-h"><span class="apx-judge-l">내 점수</span><small data-my-note>${mine ? `${mine}점을 줬습니다 · 다시 누르면 바뀝니다` : '1~10점 중 하나를 누르세요'}</small></div>
       ${meId ? `<div class="apx-pts" role="group" aria-label="점수 주기">${Array.from({ length: 10 }, (_, n) => n + 1).map((n) => `<button type="button" class="apx-pt${n === mine ? ' on' : ''}" data-pt="${n}" aria-pressed="${n === mine}">${n}</button>`).join('')}</div>
       ${mine ? '<button type="button" class="linkish apx-pt-clear" data-pt="0">내 점수 빼기</button>' : ''}` : '<p class="apx-miss">운영자로 들어온 상태라 점수를 줄 수 없습니다. 관리자 계정으로 로그인해 주세요.</p>'}
-      <div class="apx-scores big" data-apx-scores>${scoreLine(scores)}</div>
+      <div class="apx-scores big" data-apx-scores>${scoreLine(scores, judges)}</div>
+    </div>
+    <div class="apx-final${selected ? ' on' : ''}" data-apx-final>
+      <div><span class="apx-judge-l">최종 선정</span>
+        <p data-final-note>${selected ? `<b>선정됐습니다</b>${selBy ? ` · ${esc(selBy.name)}` : ''}${a.selected_at ? ` · ${fmtTime(a.selected_at)}` : ''}` : '점수를 보고 레벨1 중 한 분이 정합니다. 여러 명을 선정할 수 있습니다.'}</p></div>
+      <button type="button" class="btn ${selected ? '' : 'primary'}" data-final="${selected ? 'SUBMITTED' : 'SELECTED'}">${selected ? '선정 취소' : '선정하기'}</button>
     </div>
   </div>
   ${FORM.sections.map((s) => `<div class="apx-sec"><h2>${esc(s.title)}</h2><dl class="apx-kv">${s.fields.map(kv).join('')}</dl></div>`).join('')}
@@ -496,9 +505,18 @@ export async function scoresOf(db, site, appIds) {
   return map;
 }
 const sumOf = (list) => list.reduce((t, x) => t + x.score, 0);
-const scoreLine = (list) => (list.length
-  ? `<span class="apx-sc-list">${list.map((x) => `<span class="apx-sc"><i>${esc(x.who)}</i><b>${x.score}</b></span>`).join('')}</span><span class="apx-sc-sum">합계 <b>${sumOf(list)}</b><small>${list.length}명</small></span>`
-  : '<span class="apx-sc-none">아직 점수 없음</span>');
+// 심사위원 = 이 사이트의 레벨1 회원 전원 (점수를 안 준 사람도 '–' 로 보여 누가 남았는지 안다). 지금은 없는 사람이 준 점수도 그대로 보인다.
+export async function judgesOf(db, site) {
+  const { results } = await db.prepare("SELECT id, name FROM members WHERE site = ? AND level = 1 AND status = 'ACTIVE' ORDER BY id").bind(site).all();
+  return results;
+}
+const scoreLine = (list, judges = []) => {
+  const rows = [...judges.map((j) => ({ who: j.name, score: list.find((x) => x.member_id === j.id)?.score || 0 })),
+    ...list.filter((x) => !judges.some((j) => j.id === x.member_id))];
+  const given = rows.filter((x) => x.score).length;
+  return `<span class="apx-sc-l">심사</span><span class="apx-sc-list">${rows.map((x) => `<span class="apx-sc${x.score ? '' : ' none'}"><i>${esc(x.who)}</i><b>${x.score ? `${x.score}점` : '–'}</b></span>`).join('')}</span>
+    <span class="apx-sc-sum">합계 <b>${sumOf(list)}</b>점<small>${given}/${rows.length}명 심사</small></span>`;
+};
 
 const appRow = (a) => {
   const v = parse(a.answers, {});
@@ -584,7 +602,7 @@ export async function adminApply(ctx, path, method) {
     }
     await audit(db, site, me, request, 'APPLY_SCORE', parse(a.answers, {}).name || String(a.id), score ? `${score}점` : '점수 뺌');
     const list = (await scoresOf(db, site, [a.id])).get(a.id);
-    return json({ ok: true, mine: score, scores: list, sum: sumOf(list), html: scoreLine(list) });
+    return json({ ok: true, mine: score, scores: list, sum: sumOf(list), html: scoreLine(list, await judgesOf(db, site)) });
   }
 
   // 신청서 하나
@@ -607,9 +625,12 @@ export async function adminApply(ctx, path, method) {
       const status = b.status !== undefined ? String(b.status) : a.status;
       if (!STATUS[status]) throw bad('상태를 알 수 없습니다.');
       const memo = b.memo !== undefined ? str(b.memo, 2000) : a.memo;
-      await db.prepare('UPDATE applications SET status = ?, memo = ? WHERE id = ?').bind(status, memo, a.id).run();
+      const sel = status === 'SELECTED' && a.status !== 'SELECTED';
+      const unsel = status !== 'SELECTED' && a.status === 'SELECTED';
+      await db.prepare(`UPDATE applications SET status = ?, memo = ?${sel ? ', selected_by = ?, selected_at = ?' : unsel ? ', selected_by = NULL, selected_at = NULL' : ''} WHERE id = ?`)
+        .bind(status, memo, ...(sel ? [me.kind === 'member' ? me.member.id : null, now()] : []), a.id).run();
       if (status !== a.status) await audit(db, site, me, request, 'APPLY_STATUS', appRow(a).name, STATUS[status]);
-      return json({ ok: true });
+      return json({ ok: true, status, by: sel ? (me.kind === 'member' ? me.member.name : '운영자') : '', at: sel ? now() : 0 });
     }
     if (method === 'DELETE') {
       await removeUploads(env, site, 'post_id = ?', [APPLY_BASE - a.id]);

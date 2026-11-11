@@ -1283,7 +1283,7 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .apx-pt.on { border-color: var(--brand); background: var(--brand); color: var(--brand-ink); transform: translateY(-1px); }
 .apx-pt-clear { justify-self: start; padding: 0; font-size: 13px; }
 .apx-sort { flex: none; width: auto; min-height: 48px; border-radius: 12px; }
-.apx-stats { grid-template-columns: repeat(2, minmax(0, 180px)); } /* 전체 · 접수 두 칸만 */
+.apx-stats { grid-template-columns: repeat(3, minmax(0, 180px)); } /* 전체 · 접수 · 선정 */
 @media (max-width: 560px) {
   .apx-pts { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .apx-tools { flex-wrap: wrap; }
@@ -1291,3 +1291,16 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
   .apx-sort { flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .apx-pt { transition: none; } }
+/* 최종 선정 (신청서 보기) — 선정되면 초록 바탕 */
+.apx-final { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 14px 16px; border: 1px solid #e3e6ec; border-radius: 14px; background: #f8f9fb; transition: background .25s, border-color .25s; }
+.apx-final p { margin: 4px 0 0; color: var(--sub); font-size: 14px; }
+.apx-final .btn { min-height: 46px; min-width: 120px; border-radius: 12px; font-weight: 700; }
+.apx-final.on { border-color: var(--ok); background: var(--ok-soft); }
+.apx-final.on p, .apx-final.on .apx-judge-l { color: var(--ok); }
+.apx-final.on p b { color: var(--ok); }
+.apx-stat.sel.on { border-color: var(--ok); background: var(--ok); color: #fff; }
+.apx-stat.sel.on span { color: #fff; }
+@media (max-width: 560px) { .apx-final .btn { flex: 1; } }
+.apx-sc-l { color: var(--mute); font-size: 12px; font-weight: 700; }
+.apx-sc.none { background: #f6f7f9; }
+.apx-sc.none b { background: transparent; color: var(--mute); font-weight: 600; }
