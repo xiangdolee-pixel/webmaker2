@@ -39,6 +39,14 @@ Worker `xms` + D1 `xms` (xiangdolee 계정). 업체 구분은 모든 표의 `sit
 - 방문자 API: `GET /xms-api/courses` · `/courses/<id>` · `/lessons/<id>`(영상 · 노트, 마지막 차시 · 공부한 날 기록) · `PUT /lessons/<id>/done` · `/lessons/<id>/note` · `GET /my/courses`(다 본 차시 · 완강 · 연속 학습).
 - 코드: `_worker/courses.js`, 화면 `js/admin.js` (강의 관리). 첫 사이트: sound-build.
 
+## 신청서 (사이트별로 켜는 기능 — 지금은 장학금 신청서, 첫 사이트: sjccc)
+
+- 켜기: `INSERT OR IGNORE INTO site_features (site, feature) VALUES ('<사이트>', 'apply')` → 관리 화면 맨 위에 **신청서 › 신청서 보기 · 신청 기간**. 메뉴는 xms 메뉴에 `/member/apply` 페이지로 붙인다.
+- 방문자 `/member/apply`: 회원만(등급 상관없이 가입만 하면). 신청 기간(시작일 0시 ~ 마감일 밤 12시, 한국 시간)에만 받고, 기간 안에는 고칠 수 있다. 안내(개인정보 동의) → 기본정보 → 학비 부담자 → 가정 환경 → 신청 사유 → 서류 → 확인(Turnstile 봇 확인) 한 단계씩. 적는 대로 기기에 임시 저장.
+- 서류: 화면에서 바로 올린다(`/xms-api/uploads?for=apply`, 서류마다 3개, 사진은 WEBP 로 줄여서 · PDF 10MB). `uploads.kind = 'APPLY'` — 올린 사람 · 관리자만 열린다(캐시 안 함). 신청서에 묶이면 `post_id = -1000000000 − 신청서 번호`.
+- 관리자: 카드 목록(상태별 · 찾기) → 열면 항목별 묶음 · 서류 사진(눌러서 크게) · 상태(접수/서류 확인/선정/미선정) · 메모, 이전/다음, 엑셀. 신청 기간 미리보기 = `/member/apply?preview=1`(관리자만, 내기는 안 됨).
+- 신청 항목은 `_worker/apply.js` `FORM`(구글 폼과 같은 순서). 표: `apply_rounds` · `applications`.
+
 ## 수정 모드 (홈페이지 위에서 글자 고치기)
 
 - 관리자(레벨1)로 로그인 → 계정 메뉴 **수정 모드** → 파란 점선 글자를 눌러 고치고 **저장** (Ctrl+S). 주소에 `?xe=1` 을 붙여도 바로 열린다.

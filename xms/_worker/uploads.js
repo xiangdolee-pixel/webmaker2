@@ -6,12 +6,14 @@
 //         프로필 사진 = AVATAR_BASE − 회원번호 (아주 작은 음수 — 수정 요청 번호와 겹치지 않고, 하루 지난 파일 정리에도 안 걸린다)
 //   지우기(저장 공간 아끼기, 사용자 지시 2026-11-03): 글에서 빼거나 글을 지우면 파일(R2)도 지운다. 저장 안 하고 하루 지난 것도 지운다.
 import { now, bad, forbidden, notFound, json, randomHex, HttpError, canBy, whoAmI } from './lib.js';
+import { applyOn, canSeeApplyFile } from './apply.js';
 
 const D1_MAX = 1400000;
 export const AVATAR_BASE = -2000000000;
 const AVATAR_MAX = 400000; // 프로필 사진은 화면에서 512px WEBP 로 줄여 올린다
 const R2_MAX = 20 * 1024 * 1024;
-const KINDS = ['IMAGE', 'FILE', 'INLINE'];
+const KINDS = ['IMAGE', 'FILE', 'INLINE', 'APPLY']; // APPLY = 신청서 서류 (apply.js — 낸 사람 · 관리자만 열어 봄)
+const APPLY_MAX = 10 * 1024 * 1024;
 const SAFE_INLINE = /^(image\/(png|jpeg|gif|webp)|application\/pdf)$/;
 
 async function usage(env, site) {
@@ -26,6 +28,10 @@ export async function uploadApi(ctx) {
   if (forAvatar) {
     // 프로필 사진 — 로그인한 회원 본인만
     if (me.kind !== 'member') throw new HttpError(401, '로그인한 뒤 프로필 사진을 올릴 수 있습니다.');
+  } else if (url.searchParams.get('for') === 'apply') {
+    // 신청서 서류 — 회원이면 등급 상관없이 (신청은 회원가입만 하면 된다)
+    if (me.kind !== 'member') throw new HttpError(401, '로그인한 뒤 서류를 올릴 수 있습니다.');
+    if (!(await applyOn(env.DB, site))) throw notFound('이 사이트는 신청서를 받지 않습니다.');
   } else if (url.searchParams.get('for') === 'request') {
     // 관리 화면 수정 요청에 붙이는 파일 — 관리자(레벨1) · 운영자만. 그 사이트 몫으로 저장돼 용량에 들어간다.
     if (me.level !== 1) throw forbidden('관리자만 올릴 수 있습니다.');
@@ -35,7 +41,8 @@ export async function uploadApi(ctx) {
     if (!canBy(board.write_levels, board.allow_guest_write, me, true)) throw forbidden('이 게시판에 글을 쓸 수 없습니다.');
   }
   if (me.kind === 'guest') throw new HttpError(401, '사진과 파일은 로그인한 뒤 올릴 수 있습니다.');
-  const kind = KINDS.includes(url.searchParams.get('kind')) ? url.searchParams.get('kind') : 'FILE';
+  const forApply = url.searchParams.get('for') === 'apply';
+  const kind = forApply ? 'APPLY' : KINDS.includes(url.searchParams.get('kind')) && url.searchParams.get('kind') !== 'APPLY' ? url.searchParams.get('kind') : 'FILE';
   const mime = (request.headers.get('Content-Type') || 'application/octet-stream').split(';')[0].trim().toLowerCase();
   let name = '';
   try { name = decodeURIComponent(request.headers.get('X-File-Name') || ''); } catch { name = ''; }
@@ -43,10 +50,10 @@ export async function uploadApi(ctx) {
   if (kind !== 'FILE' && !SAFE_INLINE.test(mime)) throw bad('사진(PNG · JPG · GIF · WEBP) 이나 PDF 만 넣을 수 있습니다.');
   if (forAvatar && !/^image\/(png|jpeg|gif|webp)$/.test(mime)) throw bad('프로필 사진은 PNG · JPG · GIF · WEBP 만 올릴 수 있습니다.');
   const buf = await request.arrayBuffer();
-  const max = forAvatar ? AVATAR_MAX : env.FILES ? R2_MAX : D1_MAX;
+  const max = forAvatar ? AVATAR_MAX : !env.FILES ? D1_MAX : forApply ? APPLY_MAX : R2_MAX;
   if (!buf.byteLength) throw bad('빈 파일입니다.');
   if (buf.byteLength > max) {
-    throw bad(env.FILES ? '파일이 너무 큽니다 (20MB 까지).' : `파일이 너무 큽니다. 지금은 ${(D1_MAX / 1e6).toFixed(1)}MB 까지 올릴 수 있습니다.`);
+    throw bad(env.FILES ? `파일이 너무 큽니다 (${Math.round(max / 1048576)}MB 까지).` : `파일이 너무 큽니다. 지금은 ${(D1_MAX / 1e6).toFixed(1)}MB 까지 올릴 수 있습니다.`);
   }
   const site_ = await env.XIM_DB.prepare('SELECT quota_mb FROM sites WHERE slug = ?').bind(site).first();
   const used = await usage(env, site);
@@ -137,7 +144,13 @@ export async function serveUpload(env, site, id, download, request) {
   const u = await env.DB.prepare('SELECT * FROM uploads WHERE id = ? AND site = ?').bind(id, site).first();
   if (!u) throw notFound();
   let cache = 'public, max-age=86400';
-  if (u.post_id > 0) {
+  if (u.kind === 'APPLY') {
+    // 신청서 서류: 낸 사람 · 관리자만, 어디에도 캐시하지 않는다
+    cache = 'private, no-store';
+    if (!canSeeApplyFile(u, await whoAmI(env.DB, request, site))) {
+      return new Response('볼 수 없는 파일입니다.', { status: 403, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
+    }
+  } else if (u.post_id > 0) {
     const p = await env.DB.prepare(`SELECT p.writer_id, p.is_secret, p.is_hidden, p.published_at, p.deleted_at, b.visible, b.deleted_at AS b_deleted,
       b.list_levels, b.read_levels, b.allow_guest_list, b.allow_guest_read FROM posts p JOIN boards b ON b.id = p.board_id WHERE p.id = ? AND p.site = ?`).bind(u.post_id, site).first();
     if (p) {

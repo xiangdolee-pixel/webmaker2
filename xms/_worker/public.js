@@ -7,6 +7,7 @@ import {
 import { boardOptions } from './admin-api.js';
 import { postAttachments, syncPostFiles, removePostFiles, setAvatar, avatarOf } from './uploads.js';
 import { sendSignupCode, verifySignupCode, takeTicket, turnstileKeys } from './signup.js';
+import { applyPage, publicApply, applyOn, openRound } from './apply.js';
 
 const LOCK_AFTER = 5;
 const LOCK_MS = 15 * 60000;
@@ -231,6 +232,7 @@ async function welcomePage(ctx) {
   if (me.kind !== 'member') return Response.redirect(`${ctx.url.origin}/member/login`, 302);
   const info = await siteInfo(env, site);
   const m = me.member;
+  const applyNow = (await applyOn(env.DB, site)) && (await openRound(env.DB, site)); // 신청 기간이면 가입 뒤 바로 신청서로
   return page(ctx, '가입 완료', `<section class="mb">
   <div class="mb-card center">
     <div class="mb-welcome">${avatarHtml(avatarOf(m), 'xl')}<span class="welcome-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>
@@ -238,7 +240,7 @@ async function welcomePage(ctx) {
     <p class="mb-lede"><b>${esc(m.nickname || m.name)}</b>님, ${esc(info.name)} 회원이 되셨어요.</p>
     <dl class="mb-kv"><div><dt>아이디</dt><dd>${esc(m.login_id)}</dd></div><div><dt>이름</dt><dd>${esc(m.name)}</dd></div><div><dt>가입일</dt><dd>${fmtDate(m.created_at)}</dd></div></dl>
     <p class="mb-note">지금 로그인돼 있어요. 다음부터는 이메일과 비밀번호로 로그인하세요.</p>
-    <div class="mb-acts"><a class="btn primary" href="/">홈으로</a><a class="btn" href="/member/mypage">마이페이지</a></div>
+    <div class="mb-acts">${applyNow ? `<a class="btn primary" href="/member/apply">${esc(applyNow.title.includes('장학') ? '장학금 신청하러 가기' : '신청하러 가기')}</a><a class="btn" href="/">홈으로</a>` : '<a class="btn primary" href="/">홈으로</a><a class="btn" href="/member/mypage">마이페이지</a>'}</div>
   </div>
 </section>`, { noindex: true });
 }
@@ -487,6 +489,7 @@ export async function publicPage(ctx) {
   if (p === '/member/welcome') return welcomePage(ctx);
   if (p === '/member/terms') return docPage(ctx, 'TERMS');
   if (p === '/member/privacy') return docPage(ctx, 'PRIVACY');
+  if (p === '/member/apply') return applyPage(ctx, { page, needLogin, msgPage });
   // 메뉴 권한으로 막힌 페이지 (사이트 Worker 가 이 화면을 그 주소에 끼워 보여 줌)
   if (p === '/member/denied') {
     const back = String(ctx.url.searchParams.get('next') || '/');
@@ -506,7 +509,7 @@ export async function publicPage(ctx) {
 
 // ───────── 라우터: 방문자 API ─────────
 // 로그인 뒤 갈 곳: 기본은 홈. 글쓰기처럼 로그인이 필요했던 화면만 그리로 돌아간다(회원 화면은 홈으로)
-function safeNext(n) { return n && /^\/(?!\/)/.test(n) && !/^\/member\//.test(n) ? n : '/'; }
+function safeNext(n) { return n && /^\/(?!\/)/.test(n) && !/^\/member\/(?!apply$)/.test(n) ? n : '/'; } // 신청서(/member/apply)는 로그인 뒤 돌아간다
 
 export async function publicApi(ctx) {
   const { request, env, site, me, url } = ctx;
@@ -516,6 +519,7 @@ export async function publicApi(ctx) {
   let m;
 
   if (path === '/menu' && method === 'GET') return json(await visibleMenus(db, site, me));
+  if (path === '/apply') return publicApply(ctx); // 신청서 내기 (apply.js)
 
   // 게시판 최신 글 — 사이트 첫 화면 등에서 사이트 디자인 그대로 그릴 때 쓴다 (예: sjccc 홈 "포토")
   // 글 관리 (관리자): 고른 글 숨김 · 보이기 · 삭제(deleted_at — DB 에는 남아 운영자가 되살릴 수 있다)

@@ -375,3 +375,33 @@ CREATE TABLE IF NOT EXISTS site_options (
   updated_at INTEGER NOT NULL,
   PRIMARY KEY (site, k)
 );
+
+-- 2026-11-11 신청서 (사이트 기능 'apply' — apply.js). 지금은 장학금 신청서 하나 (sjccc)
+--   신청 기간(회차): 시작일 ~ 마감일(한국 날짜, 그날 끝까지). 회원 한 명이 회차마다 신청서 하나 — 기간 안에는 고칠 수 있다.
+CREATE TABLE IF NOT EXISTS apply_rounds (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  site       TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  starts_on  TEXT NOT NULL,                  -- YYYY-MM-DD
+  ends_on    TEXT NOT NULL,                  -- YYYY-MM-DD (이날까지)
+  notice     TEXT NOT NULL DEFAULT '',       -- 첫 단계 '꼭 읽어 주세요' (비우면 기본 안내)
+  visible    INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  deleted_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_apply_rounds_site ON apply_rounds(site, starts_on);
+CREATE TABLE IF NOT EXISTS applications (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  site       TEXT NOT NULL,
+  round_id   INTEGER NOT NULL,
+  member_id  INTEGER NOT NULL,
+  answers    TEXT NOT NULL,                  -- { 항목: 값 } (apply.js FORM)
+  files      TEXT NOT NULL,                  -- { 서류: [upload id…] } — uploads.kind 'APPLY', post_id = -1000000000 − 신청서 번호
+  status     TEXT NOT NULL DEFAULT 'SUBMITTED', -- SUBMITTED 접수 | CHECKED 서류 확인 | SELECTED 선정 | REJECTED 미선정
+  memo       TEXT NOT NULL DEFAULT '',       -- 관리자 메모 (신청자에게 안 보임)
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  UNIQUE (round_id, member_id)
+);
+CREATE INDEX IF NOT EXISTS idx_applications_round ON applications(site, round_id, created_at);

@@ -23,7 +23,7 @@ export async function turnstileKeys(env, site) {
   return { sitekey: r?.k || '', secret: r?.s || '' };
 }
 
-async function checkTurnstile(env, request, token, secret) {
+export async function checkTurnstile(env, request, token, secret) {
   if (!secret) return; // 아직 설정 전이면 건너뛴다
   if (!token) throw bad('사람인지 확인하는 칸을 먼저 끝내 주세요.');
   const f = new FormData();

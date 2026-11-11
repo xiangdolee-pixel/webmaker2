@@ -384,3 +384,6 @@ if (pick) {
 
 // 뒤로 가기로 돌아왔을 때 덮개가 남아 있지 않게
 addEventListener('pageshow', (e) => { if (e.persisted) document.querySelectorAll('.wait-cover').forEach((el) => { el.hidden = true; }); });
+
+// 신청서 화면 (/member/apply)
+if ($('[data-apply]')) import('./apply.js');

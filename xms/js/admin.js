@@ -99,6 +99,8 @@ const SIDE_ICON = {
   audit: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>',
   extras: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 16V8M8.5 11.5 12 8l3.5 3.5"/></svg>',
   courses: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="13" rx="2.5"/><path d="M10 9v5l4.5-2.5z"/><path d="M8 21h8"/></svg>',
+  apply: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13l2 2 4-4"/></svg>',
+  rounds: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>',
 };
 // 왼쪽 메뉴: 묶음 이름 아래 같은 모양의 한 단계 목록 (만들기 · 추가는 각 화면 오른쪽 위 버튼)
 const SIDE = [
@@ -110,7 +112,10 @@ const SIDE = [
   ['내 계정', [['#/account', '비밀번호 변경', 'account'], ['#/audit', '관리 로그', 'audit']]],
 ];
 // 강의 기능을 켠 사이트만 '강의' 묶음이 생긴다 (회원 다음)
-const sideGroups = () => (INFO.features?.courses ? [SIDE[0], SIDE[1], ['강의', [['#/courses', '강의 관리', 'courses']]], ...SIDE.slice(2)] : SIDE);
+// 신청서 기능을 켠 사이트만 '신청서' 묶음 (맨 위 — 신청 기간에 가장 많이 본다)
+const sideGroups = () => [
+  ...(INFO.features?.apply ? [['신청서', [['#/apply', '신청서 보기', 'apply'], ['#/apply/rounds', '신청 기간', 'rounds']]]] : []),
+  SIDE[0], SIDE[1], ...(INFO.features?.courses ? [['강의', [['#/courses', '강의 관리', 'courses']]]] : []), ...SIDE.slice(2)];
 // 왼쪽 위 사이트 표시: 파비콘을 올렸으면 그 그림, 없으면 이름 두 글자
 let favVer = Date.now();
 function renderSide() {
@@ -182,6 +187,10 @@ async function route() {
     if (parts[0] === 'courses' && parts[1] === 'new') return await coursePage(null);
     if (parts[0] === 'courses' && parts[1]) return await coursePage(Number(parts[1]));
     if (parts[0] === 'courses') return await coursesPage();
+    if (parts[0] === 'apply' && parts[1] === 'rounds' && parts[2]) return await roundPage(parts[2] === 'new' ? null : Number(parts[2]));
+    if (parts[0] === 'apply' && parts[1] === 'rounds') return await roundsPage();
+    if (parts[0] === 'apply' && parts[1]) return await applyView(Number(parts[1]));
+    if (parts[0] === 'apply') return await applyList(qs);
     if (parts[0] === 'extras') return await extrasPage();
     if (parts[0] === 'favicon') return await faviconPage();
     if (parts[0] === 'seo') return await seoPage(qs);
@@ -1603,3 +1612,136 @@ async function extrasPage() {
 }
 
 start();
+
+// ───────── 신청서 (사이트 기능 'apply') — 폰에서도 카드로 바로 열어 본다 ─────────
+const AP_STATE = { open: ['green', '접수 중'], soon: ['blue', '예정'], closed: ['gray', '마감'], hidden: ['warn', '감춤'] };
+const AP_TAG = { SUBMITTED: 'blue', CHECKED: 'warn', SELECTED: 'green', REJECTED: 'gray' };
+const AP_STATUS = { SUBMITTED: '접수', CHECKED: '서류 확인', SELECTED: '선정', REJECTED: '미선정' };
+const apTag = (st) => `<span class="tag ${AP_TAG[st] || ''}">${AP_STATUS[st] || esc(st)}</span>`;
+const roundTag = (r) => `<span class="tag ${AP_STATE[r.state][0]}">${AP_STATE[r.state][1]}</span>`;
+
+async function applyList(qs) {
+  const { rounds } = await api('/apply/rounds');
+  if (!rounds.length) {
+    main.innerHTML = `${head('신청서', '신청서 보기', '')}<div class="panel">${empty('아직 신청 기간이 없습니다', '신청 기간을 만들면 그 기간에만 홈페이지에서 신청서를 받습니다.', '<a class="btn primary" href="#/apply/rounds/new">신청 기간 만들기</a>')}</div>`;
+    return;
+  }
+  const r = rounds.find((x) => x.id === Number(qs.get('round'))) || rounds.find((x) => x.state === 'open') || rounds[0];
+  let st = qs.get('st') || 'all';
+  const list = await api(`/apply/list?round=${r.id}`);
+  const count = (k) => list.filter((a) => a.status === k).length;
+  main.innerHTML = `${head('신청서', '신청서 보기', `${roundTag(r)} ${esc(r.title)} · ${esc(r.period)}`, list.length ? `<a class="btn green" href="/xms-api/admin/apply/export?round=${r.id}">엑셀로 내려받기</a>` : '')}
+    ${rounds.length > 1 ? `<label class="field apl-round"><span>신청 기간</span><select class="input" id="apl-round">${rounds.map((x) => `<option value="${x.id}"${x.id === r.id ? ' selected' : ''}>${esc(x.title)} (${esc(x.period)}) · ${x.count}명</option>`).join('')}</select></label>` : ''}
+    <div class="apl-bar"><div class="tabs" id="apl-tabs"></div><input class="input apl-q" id="apl-q" type="search" placeholder="이름 · 학과 · 학번 찾기"></div>
+    <div id="apl-list"></div>`;
+  const card = (a) => `<a class="apl-card" href="#/apply/${a.id}">
+      <span class="apl-top"><b>${esc(a.name)}</b>${apTag(a.status)}</span>
+      <span class="apl-line">${esc([a.dept, a.student_no, a.state].filter(Boolean).join(' · '))}</span>
+      <span class="apl-line">성적 <b>${esc(a.gpa)}</b> · ${esc(a.role)}</span>
+      <small>${fmtDate(a.created_at, true)} 접수${a.updated_at > a.created_at + 60000 ? ' · 고침' : ''}</small></a>`;
+  const draw = () => {
+    const q = $('#apl-q').value.trim();
+    const shown = list.filter((a) => (st === 'all' || a.status === st) && (!q || [a.name, a.dept, a.student_no, a.mobile].join(' ').includes(q)));
+    $('#apl-list').innerHTML = shown.length ? `<div class="apl-cards">${shown.map(card).join('')}</div>`
+      : `<div class="panel">${list.length ? empty('조건에 맞는 신청서가 없습니다', '')
+        : empty('아직 들어온 신청서가 없습니다', '홈페이지 <a href="/member/apply" target="_blank" rel="noopener">장학금 신청</a>에서 회원이 신청하면 여기에 바로 나옵니다.')}</div>`;
+  };
+  pillTabs($('#apl-tabs'), [['all', `전체 ${list.length}`], ...Object.entries(AP_STATUS).map(([k, l]) => [k, `${l} ${count(k)}`])], st, (v) => {
+    st = v;
+    history.replaceState(null, '', `#/apply?round=${r.id}&st=${v}`);
+    draw();
+  });
+  $('#apl-q').addEventListener('input', draw);
+  $('#apl-round')?.addEventListener('change', (e) => go(`#/apply?round=${e.target.value}`));
+  draw();
+}
+
+async function applyView(id) {
+  const a = await api(`/apply/${id}`);
+  const v = a.answers;
+  const kv = (label, val, cls = '') => `<div class="${cls}"><dt>${esc(label)}</dt><dd>${val}</dd></div>`;
+  const step = (to, label) => (to ? `<a class="btn" href="#/apply/${to}">${label}</a>` : `<span class="btn off" aria-disabled="true">${label}</span>`);
+  const nav = `<nav class="apv-nav">${step(a.prev, '‹ 이전')}<span>${a.no} / ${a.total}</span>${step(a.next, '다음 ›')}</nav>`;
+  const changed = a.updated_at > a.created_at + 60000 ? ` · ${fmtDate(a.updated_at, true)} 고침` : '';
+  main.innerHTML = `${head('신청서', `${esc(a.name)} <span class="apv-st">${apTag(a.status)}</span>`, `${esc([v.dept, v.student_no, v.status].filter(Boolean).join(' · '))}<br>${fmtDate(a.created_at, true)} 접수${changed} · <a href="#/apply?round=${a.round_id}">목록으로</a>`)}
+    ${nav}
+    <section class="panel pad"><h2>심사</h2>
+      <div class="apv-status" id="apv-status">${Object.entries(a.statuses).map(([k, l]) => `<button type="button" class="btn${k === a.status ? ' on' : ''}" data-st="${k}">${l}</button>`).join('')}</div>
+      <label class="field gap"><span>메모 (관리자만 봅니다)</span><textarea class="input" id="apv-memo" maxlength="2000" rows="3" placeholder="예: 성적증명서 다시 받기로 함">${esc(a.memo)}</textarea></label>
+      <div class="actions"><button type="button" class="btn primary sm" id="apv-memo-save">메모 저장</button></div>
+    </section>
+    <section class="panel pad"><h2>연락처</h2><dl class="apv-kv">
+      ${kv('휴대폰', v.mobile ? `<a href="tel:${esc(String(v.mobile).replace(/[^0-9+]/g, ''))}">${esc(v.mobile)}</a>` : '-')}
+      ${kv('아이디(이메일)', a.login_id ? `<a href="mailto:${esc(a.email || a.login_id)}">${esc(a.login_id)}</a>` : '-')}</dl></section>
+    ${a.form.sections.map((s) => `<section class="panel pad"><h2>${esc(s.title)}</h2><dl class="apv-kv">
+      ${s.fields.map((f) => (f.type === 'textarea'
+        ? kv(`${f.label} · ${String(v[f.k] || '').length}자`, `<span class="apv-long">${esc(v[f.k] || '')}</span>`, 'long')
+        : kv(f.label, esc(v[f.k] || '-')))).join('')}</dl></section>`).join('')}
+    <section class="panel pad"><h2>서류</h2>
+      ${a.form.files.map((f) => `<div class="apv-doc"><h3>${esc(f.label)} <small>${(a.docs[f.k] || []).length}개</small></h3>
+        ${(a.docs[f.k] || []).length ? `<div class="apv-files">${a.docs[f.k].map((u) => (/^image\//.test(u.mime)
+          ? `<button type="button" class="apv-img" data-img="${esc(u.url)}"><img src="${esc(u.url)}" alt="${esc(f.label)}" loading="lazy"></button>`
+          : `<a class="btn apv-pdf" href="${esc(u.url)}" target="_blank" rel="noopener">PDF 열기 · ${esc(u.name)}</a>`)).join('')}</div>` : '<p class="meta">올린 파일이 없습니다.</p>'}</div>`).join('')}
+    </section>
+    ${nav}
+    <div class="actions gap"><button type="button" class="btn sm danger" id="apv-del">이 신청서 지우기</button></div>`;
+  $$('#apv-status [data-st]').forEach((b) => b.addEventListener('click', () => busy(b, null, async () => {
+    await api(`/apply/${id}`, { method: 'PUT', data: { status: b.dataset.st } });
+    $$('#apv-status [data-st]').forEach((x) => x.classList.toggle('on', x === b));
+    $('.apv-st').innerHTML = apTag(b.dataset.st);
+    toast(`'${AP_STATUS[b.dataset.st]}'(으)로 바꿨습니다.`);
+  })));
+  $('#apv-memo-save').addEventListener('click', (e) => busy(e.currentTarget, null, async () => {
+    await api(`/apply/${id}`, { method: 'PUT', data: { memo: $('#apv-memo').value } }); toast('메모를 저장했습니다.');
+  }));
+  $$('[data-img]').forEach((b) => b.addEventListener('click', () => openDialog(`<div class="apv-big"><img src="${esc(b.dataset.img)}" alt=""></div>
+    <div class="actions"><a class="btn" href="${esc(b.dataset.img)}?dl=1">내려받기</a><a class="btn" href="${esc(b.dataset.img)}" target="_blank" rel="noopener">새 창</a><button type="button" class="btn primary" data-close>닫기</button></div>`)));
+  $('#apv-del').addEventListener('click', (e) => confirmInline(e.currentTarget, `${esc(a.name)} 님의 신청서와 올린 서류를 지웁니다. 되돌릴 수 없습니다.`, '신청서 지우기', async () => {
+    await api(`/apply/${id}`, { method: 'DELETE' }); toast('신청서를 지웠습니다.'); go(`#/apply?round=${a.round_id}`);
+  }));
+}
+
+async function roundsPage() {
+  const { rounds } = await api('/apply/rounds');
+  main.innerHTML = `${head('신청서', '신청 기간', '정한 기간에만 홈페이지 [장학금 신청]에서 신청서를 받습니다. 시작일 0시부터 마감일 밤 12시까지(한국 시간).', '<a class="btn primary" href="#/apply/rounds/new">+ 신청 기간 만들기</a>')}
+    <div class="panel">${rounds.length ? `<table class="tbl cardy"><thead><tr><th>제목</th><th>신청 기간</th><th>상태</th><th>신청서</th><th>관리</th></tr></thead><tbody id="rrows">
+      ${rounds.map((r) => `<tr data-id="${r.id}"><td><b>${esc(r.title)}</b></td><td data-l="신청 기간">${esc(r.period)}</td><td data-l="상태">${roundTag(r)}</td>
+        <td data-l="신청서"><a href="#/apply?round=${r.id}">${r.count}명</a></td>
+        <td><div class="mng"><a class="btn sm" href="#/apply/rounds/${r.id}">수정</a>${r.count ? '' : '<button class="btn sm danger" type="button" data-del>삭제</button>'}</div></td></tr>`).join('')}</tbody></table>`
+    : empty('아직 신청 기간이 없습니다', '', '<a class="btn primary" href="#/apply/rounds/new">신청 기간 만들기</a>')}</div>`;
+  $$('#rrows [data-del]').forEach((b) => {
+    const r = rounds.find((x) => x.id === +b.closest('tr').dataset.id);
+    b.onclick = () => confirmInline(b, `"${esc(r.title)}" 신청 기간을 지웁니다.`, '삭제', async () => { await api(`/apply/rounds/${r.id}`, { method: 'DELETE' }); toast('지웠습니다.'); route(); });
+  });
+}
+
+const WD = '일월화수목금토';
+const dayKo = (d) => { if (!/^\d{4}-\d{2}-\d{2}$/.test(d || '')) return ''; const [y, m, dd] = d.split('-').map(Number); return `${y}년 ${m}월 ${dd}일(${WD[new Date(Date.UTC(y, m - 1, dd)).getUTCDay()]})`; };
+async function roundPage(id) {
+  const { rounds, intro } = await api('/apply/rounds');
+  const r = id ? rounds.find((x) => x.id === id) : { title: rounds[0]?.title || '', starts_on: '', ends_on: '', notice: '', visible: true };
+  if (!r) throw new Error('없는 신청 기간입니다.');
+  main.innerHTML = `${head('신청서 › 신청 기간', id ? '신청 기간 수정' : '신청 기간 만들기', '')}
+    <form id="rform"><section class="panel pad">
+      <label class="field"><span>제목</span><input class="input" name="title" required maxlength="100" value="${esc(r.title)}" placeholder="예: 2026 세종대CCC나사렛장학회 장학금 지원서"><small>신청 화면 맨 위에 나옵니다.</small></label>
+      <div class="field"><span>신청 기간</span><div class="apr-dates"><input class="input" type="date" name="starts_on" required value="${esc(r.starts_on)}" aria-label="시작일"><span>~</span><input class="input" type="date" name="ends_on" required value="${esc(r.ends_on)}" aria-label="마감일"></div>
+        <small id="rperiod"></small></div>
+      <fieldset class="field"><legend>홈페이지에</legend><div class="choices"><label class="check"><input type="radio" name="visible" value="1"${r.visible ? ' checked' : ''}> 보이기</label><label class="check"><input type="radio" name="visible" value="0"${r.visible ? '' : ' checked'}> 감추기 (기간이어도 받지 않음)</label></div></fieldset>
+      <label class="field"><span>첫 화면 안내 (꼭 읽어 주세요)</span><textarea class="input" name="notice" rows="7" maxlength="3000" placeholder="${esc(intro)}">${esc(r.notice)}</textarea><small>한 줄이 한 항목입니다. 비워 두면 흐린 글자(기본 안내)가 그대로 나옵니다.</small></label>
+    </section><p class="err" role="alert"></p>
+    ${saveBar(id ? '신청 기간을 고치는 중입니다.' : '새 신청 기간을 만드는 중입니다.', '#/apply/rounds')}</form>`;
+  const form = $('#rform');
+  ctrlS(form);
+  const pv = () => { const f = formData(form); $('#rperiod').textContent = f.starts_on && f.ends_on ? `홈페이지에 "${dayKo(f.starts_on)} ~ ${dayKo(f.ends_on)}" 로 나옵니다. 마감일 밤 12시까지 받습니다.` : '시작일과 마감일을 골라 주세요.'; };
+  form.addEventListener('input', pv); pv();
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    busy(form.querySelector('[type=submit]'), form.querySelector('.err'), async () => {
+      if (!form.reportValidity()) return;
+      const data = { ...formData(form) };
+      data.visible = data.visible !== '0';
+      if (id) await api(`/apply/rounds/${id}`, { method: 'PUT', data }); else await api('/apply/rounds', { method: 'POST', data });
+      dirty = false; toast('신청 기간을 저장했습니다.'); go('#/apply/rounds');
+    });
+  });
+}
