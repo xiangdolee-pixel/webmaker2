@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, DIFFS, diffOf, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile, snapshot, restore, mslGain, moneyMissiles } from './core.js?v=34';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, DIFFS, diffOf, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile, snapshot, restore, mslGain, moneyMissiles } from './core.js?v=35';
 import { SPRITES } from './sprites.js?v=17';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };

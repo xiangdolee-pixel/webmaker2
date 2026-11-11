@@ -78,25 +78,25 @@ export const power = L => L <= 6 ? 5.4 + L * .85 : 10.5 + (L - 6) * .5;
 //   swap 바뀌는 문 주기(작을수록 빨리 바뀜), stream 대군 물결 길이, helpK 지원군 양(병사 · 적 감소 · 보스 감소), comboK 콤보 점수, summon 보스 졸병 소환량, eliteK 정예병 비율
 //   bul = 보스 탄막(1942 식): ring 원형 발수 · ringT 주기, aim 조준 연발 수 · aimT, fan 부채꼴(탱크) · fanT, spiral 나선(근육 대장, 탱크는 3단계), dash 돌진(근육 대장) · dashT,
 //         spd 탄속 배수, dmg 한 발에 줄어드는 병사, phase 체력 70% · 40% 단계마다 격해짐, giant 거인(중간보스) 탄(3 부채꼴 / 8 원형) · giantT
-//         gap 원형탄의 빈 틈(발 수, 그 틈으로 피한다), seq 하드: 패턴을 한 번에 하나씩 차례로(원형 → 부채꼴 → 나선 → 조준) + 사이에 쉼 rest
+//         → 2026-11-11 바뀜: pat = 보스 공격 순서표(한 번에 하나씩, 탱크 포탄 · 근육 대장 돌진도 이 순서에 끼움), rest = 공격 사이 쉼, wall = 구멍 난 탄 벽 발 수
 //   lv = 나오는 적 겉모습 레벨(LV1~3 → 0~2) 범위 (사용자 지시 2026-11-11): 쉬움 LV1 만, 중간 LV1 · LV2, 하드 LV2 · LV3
 export const DIFFS = {
   easy:   { name: '쉬움', mobs: .7, hp: .8, boss: .7, gate: 1.25, msl: 1, startMsl: 1, n: 5, missiles: 2,
             mobVy: .9, zig: 0, bad: .8, badP: .7, swap: 1.3, stream: .85, helpK: 1, comboK: 1, summon: .7, eliteK: 0, lv: [0, 0],
             // 쉬움: 보스는 조준 미사일 한 발씩만
-            bul: { ring: 0, ringT: 0, aim: 1, aimT: 3.4, fan: 0, fanT: 0, spiral: 0, dash: 0, dashT: 0, spd: .8, dmg: 1, phase: 0, giant: 0, giantT: 0 } },
+            bul: { pat: ['aim'], aim: 1, ring: 0, wall: 0, dash: 0, rest: 2.2, spd: .8, dmg: 1, phase: 0, giant: 0, giantT: 0 } },
   normal: { name: '중간', mobs: 1.1, hp: 1.55, boss: 1.5, gate: 1, msl: .7, startMsl: .7, n: 0, missiles: 0,
-            mobVy: 1.05, zig: .25, bad: 1, badP: 1.15, swap: .9, stream: 1.1, helpK: .8, comboK: 1, summon: 1, eliteK: 1, lv: [0, 1],
+            mobVy: 1.05, zig: .25, bad: 1, badP: 1.15, swap: .9, stream: 1.1, helpK: .8, comboK: 1, summon: 1, eliteK: .6, lv: [0, 1],
             // 중간: 두 발 연속 조준(쉬움의 2배) + 틈 있는 원형(방사형)을 번갈아
-            bul: { ring: 12, ringT: 5, gap: 3, aim: 2, aimT: 3, fan: 0, fanT: 0, spiral: 0, dash: 1, dashT: 10, spd: .95, dmg: 1, phase: 1, giant: 3, giantT: 3.4 } },
+            bul: { pat: ['aim', 'ring'], aim: 2, ring: 12, wall: 0, dash: 1, rest: 1.4, spd: .95, dmg: 1, phase: 1, giant: 3, giantT: 3.4 } },
   hard:   { name: '하드', mobs: 1.3, hp: 2.5, boss: 3, gate: .8, msl: .4, startMsl: 0, n: 0, missiles: 0,
-            mobVy: 1.2, zig: .5, bad: 1.25, badP: 1.5, swap: .65, stream: 1.3, helpK: .5, comboK: 1.25, summon: 1.4, eliteK: 1.3, lv: [1, 2],
+            mobVy: 1.2, zig: .5, bad: 1.25, badP: 1.5, swap: .65, stream: 1.3, helpK: .5, comboK: 1.25, summon: 1.4, eliteK: .8, lv: [1, 2],
             // 하드: 많이 쏘되 규칙적으로 — 패턴을 차례로 하나씩, 원형엔 늘 빈 틈, 패턴 사이 쉼
-            bul: { seq: 1, ring: 26, gap: 1, aim: 3, fan: 11, spiral: 1, rest: .8, dash: 1, dashT: 8, spd: 1, dmg: 2, phase: 1, giant: 8, giantT: 3 } }
+            bul: { pat: ['ring', 'wall', 'aim', 'spiral'], ring: 22, wall: 11, aim: 3, rest: 1, dash: 1, spd: 1, dmg: 2, phase: 1, giant: 8, giantT: 3 } }
 };
 export const diffOf = d => DIFFS[d] ? d : 'normal';
 export const mslGain = d => Math.floor(3 * DIFFS[diffOf(d)].msl);        // 문 · 상자에서 얻는 유도탄(원래 3)
-export const moneyMissiles = d => Math.floor(10 * DIFFS[diffOf(d)].msl);  // 'Show me the money' 유도탄(원래 10)
+export const moneyMissiles = () => 20;  // 'Show me the money' 유도탄 — 난이도 상관없이 20발 (사용자 지시 2026-11-11)
 let DK = DIFFS.normal, LVLK = 1;   // 지금 돌고 있는 판의 난이도(step 에서 맞춘다 — ARMY · LVK 와 같은 방식). LVLK: 1~2레벨은 난이도 배수를 덜(0.7 · 0.85), 3레벨부터 1
 const FORMS = ['snake', 'wedge', 'wall', 'flank', 'ring', 'swarm'];
 export const FORM_NAME = { snake: '뱀 행렬', wedge: '화살촉 돌격', wall: '방패벽', flank: '엇갈려 가로지르기', ring: '원진', swarm: '산개 습격' };
@@ -222,7 +222,7 @@ const elitePctG = G => Math.min(.6, (G.twist === 'elite' ? Math.min(.45, elitePc
 function elite(M, Lv) { M.hp = M.max = Math.round(M.hp * 4 + Lv * .4); M.size = 1.25; M.lv = DK.lv[1]; M.hurt = 3; M.elite = true; }   // 정예병은 그 난이도의 가장 높은 겉모습
 // 적 겉모습 레벨(LV1~3 → 0~2)은 난이도 범위 안에서만 (사용자 지시 2026-11-11). 범위가 둘이면 판 뒤로 · 레벨이 오를수록 높은 쪽이 많아진다
 const lvClamp = v => clamp(v, DK.lv[0], DK.lv[1]);
-const lvPick = G => { const [a, b] = DK.lv; return a === b || Math.random() > clamp(.18 + (G.p || 0) * .4 + Math.min(G.L, 10) * .02, .18, .65) ? a : b; };
+const lvPick = G => { const [a, b] = DK.lv; return a === b || Math.random() > clamp(.12 + (G.p || 0) * .25 + Math.min(G.L, 10) * .01, .12, .4) ? a : b; };   // 높은 쪽은 12% → 판 끝 · 높은 레벨에서도 40% 까지 (사용자 지시 2026-11-11 "레벨3 너무 많다")
 
 function spawn(G, e, y) {
   const L = power(G.L), p = e.p, k = e.kind;
@@ -646,11 +646,8 @@ export function step(G, dt) {
       K.aim = Math.atan2(g.px - K.x, -K.y);
       if (K.y > K.stop) {
         K.fire -= dt;
-        if (K.fire <= 0) {
+        if (K.fire <= 0) {   // 졸병 부르기만 (포탄은 bossFire 순서표 — 한 번에 공격 하나)
           K.fire = Math.max(1.4, 2.6 - PL * .07);
-          const tx = clamp(g.px + rnd(-20, 20), ROAD_L + 30, ROAD_R - 30);
-          g.shells.push({ x: tx, y: -6, sx: K.x, sy: K.y + 30, t: 0, T: 1.2, r: 50 });
-          h.sfx('cannon'); h.shake(.12); h.spark(K.x, K.y + 40, 'gold', 6);
           if (Math.random() < Math.min(.9, .5 * DK.summon)) { const c = Math.min(3 + Math.floor(PL), 24); mobGroup(g, K.y + 40, c, hpK(1 + Math.floor(PL / 5)), K.x + rnd(-60, 60), { vy: 40 + PL * 2, side: 60 + PL * 3 }); }
         }
       }
@@ -742,56 +739,41 @@ function wall(g, x, y, n, spd, c, dmg, hx, hw) {
 }
 function fan(g, x, y, n, spread, spd, c, dmg) { const a0 = aimAng(g, x, y); for (let i = 0; i < n; i++) shoot(g, x, y, a0 + (n > 1 ? (i / (n - 1) - .5) * spread : 0), spd, c, dmg, 10); g.h.sfx('cannon'); }
 function bossFire(g, K, dt, R) {
-  // 레벨 1~2 는 조금 덜 퍼붓고(패턴을 익히는 구간) 3레벨부터 100%: 발수 × lk, 주기 ÷ lk, 탄속도 조금
-  const B = DK.bul, f = K.hp / K.max, ph = B.phase ? (f > .7 ? 0 : f > .4 ? 1 : 2) : 0, lk = Math.min(1, .55 + g.L * .15), q = (1 - ph * .18) / lk, spd = 150 * B.spd * (1 + ph * .1) * (.85 + .15 * lk), dmg = lk < 1 && !ph ? 1 : B.dmg;   // 1~2레벨 1단계는 한 발 피해 1
+  // 보스 공격은 한 번에 한 가지만 (사용자 지시 2026-11-11 "한번에 2종류 이상의 공격을 못하게"):
+  //   탄막 · 포탄(탱크) · 돌진(근육 대장)을 순서표(B.pat + 보스 특기) 하나로 돌리고, 한 공격이 끝나 그 탄이 거의 지나간 뒤에 다음 공격.
+  //   레벨 1~2 는 조금 덜(lk): 발 수 × lk, 쉼 ÷ lk. 보스 체력 70% · 40% 단계(phase)마다 발 수 · 빠르기만 조금 오른다
+  const B = DK.bul, f = K.hp / K.max, ph = B.phase ? (f > .7 ? 0 : f > .4 ? 1 : 2) : 0, lk = Math.min(1, .55 + g.L * .15), spd = 150 * B.spd * (1 + ph * .08) * (.85 + .15 * lk), dmg = lk < 1 && !ph ? 1 : B.dmg;   // 1~2레벨 1단계는 한 발 피해 1
+  const P = K.pt && K.pt.v2 ? K.pt : (K.pt = { v2: 1, seq: 1.4, k: 0, sp: 0, spLeft: 0, aimLeft: 0, aimGap: 0, side: 1 });   // 예전 판 이어하기(저장된 보스)는 새로
   if (K.ph == null) K.ph = ph;
-  if (ph !== K.ph) { K.ph = ph; g.h.float(K.x, K.y - 60, ph === 1 ? '보스가 화났어요!' : '보스 최후의 발악!', '#fca5a5', 32); g.h.ring(K.x, K.y, 'gold'); g.h.shake(.4); g.h.sfx('alarm'); K.pt.ring = Math.min(K.pt.ring, .6); K.pt.fan = Math.min(K.pt.fan, 1); if (K.pt.seq != null) K.pt.seq = Math.min(K.pt.seq, .6); }   // 단계가 바뀌면 바로 한 번 퍼붓는다
-  const P = K.pt || (K.pt = { ring: 1.6, aim: 2.2, fan: 2.8, sp: 0, dash: 5, aimLeft: 0, aimGap: 0, seq: 1.4, k: 0, spLeft: 0, side: 1 });
-  if (P.seq == null) { P.seq = 1.4; P.k = 0; P.spLeft = 0; P.side = 1; }   // 예전 판 이어하기(저장된 보스)에도
+  if (ph !== K.ph) { K.ph = ph; g.h.float(K.x, K.y - 60, ph === 1 ? '보스가 화났어요!' : '보스 최후의 발악!', '#fca5a5', 32); g.h.ring(K.x, K.y, 'gold'); g.h.shake(.4); g.h.sfx('alarm'); }
   const bx = K.x, by = K.y + 24;
-  // 원형 틈: 내 자리 쪽에서 왼쪽 · 오른쪽 번갈아 살짝 비켜 난다(가만히 있으면 맞고, 조금 옮기면 피한다)
   // 통로: 내 자리에서 왼쪽 · 오른쪽 번갈아 부대 폭의 절반쯤 비켜 난다(가만히 있으면 반쯤 맞고, 조금 옮기면 다 피한다)
   const hw = safeHW(g), d = Math.max(120, -by), gapHalf = Math.atan(hw / d);
   const holeX = () => { P.side = -P.side; return clamp(g.px + P.side * hw * .6, ROAD_L + hw, ROAD_R - hw); };
-  const gapAt = () => lineAng(bx, by, holeX());
-  const aimBurst = n => { P.aimLeft = n; P.aimGap = 0; };
-  const aimTick = () => { if (P.aimLeft > 0) { P.aimGap -= dt; if (P.aimGap <= 0) { P.aimGap = .16; P.aimLeft--; shoot(g, bx, by, aimAng(g, bx, by), spd * 1.1, 'm', dmg, 10); g.h.sfx('hit'); } } };
-  if (B.seq) {
-    // 하드: 패턴을 한 번에 하나씩 차례로 — 원형(틈) → 부채꼴 → 나선 → 조준 연발 → … 사이에 쉼(rest). 화날수록(phase) 발 수 · 빠르기만 조금 오른다
-    P.seq -= dt;
-    if (P.seq <= 0) {
-      const kind = ['ring', 'fan', 'spiral', 'aim'][P.k++ % 4];
-      let dur = .4;
-      if (kind === 'ring') ring(g, bx, by, Math.round((B.ring + ph * 3) * lk), spd * .85, 'o', Math.max(1, B.dmg - 1), (P.k * .37) % (Math.PI * 2), gapHalf, gapAt());
-      else if (kind === 'fan') wall(g, bx, by, B.fan + ph, spd * .9, 'm', dmg, holeX(), hw);   // 부채꼴 대신 '구멍 난 탄 벽'
-      else if (kind === 'spiral') { P.spLeft = 1.4 + ph * .3; dur = P.spLeft; }
-      else { aimBurst(B.aim + (ph >= 2 ? 1 : 0)); dur = (B.aim + 1) * .16; }
-      P.seq = dur + B.rest * (1 - ph * .15) / lk;
-    }
-    if (P.spLeft > 0) {   // 나선: 정해진 시간 동안만 일정하게 돈다(돌아오는 방향이 보여 피할 수 있다)
-      P.spLeft -= dt; K.spin = (K.spin || 0) + dt * 2.4; P.sp -= dt;
-      if (P.sp <= 0) { P.sp = .15 / lk; const arms = ph >= 1 ? 2 : 1; for (let a = 0; a < arms; a++) shoot(g, bx, by, K.spin + a * Math.PI, spd * .7, 'm', dmg, 8); }
-    }
-    aimTick();
-    if (B.dash && K.kind === 'brute' && !K.dashing) { P.dash -= dt; if (P.dash <= 0) { P.dash = B.dashT * q; K.dashing = 1; g.h.float(K.x, K.y - 50, '돌진!', '#fca5a5', 30); g.h.sfx('alarm'); } }
-    return;
+  const travel = d / spd * .6;   // 탄이 내 줄 근처까지 가는 시간(의 60%) — 이만큼 지나야 다음 공격
+  // 진행 중인 공격(나선 · 조준 연발)은 끝까지
+  if (P.spLeft > 0) {
+    P.spLeft -= dt; K.spin = (K.spin || 0) + dt * 2.4; P.sp -= dt;
+    if (P.sp <= 0) { P.sp = .15 / lk; const arms = ph >= 1 ? 2 : 1; for (let a = 0; a < arms; a++) shoot(g, bx, by, K.spin + a * Math.PI, spd * .7, 'm', dmg, 8); }
   }
-  // 원형 탄막(중간: 틈이 있는 방사형)
-  if (B.ring) { P.ring -= dt; if (P.ring <= 0) { P.ring = B.ringT * q; ring(g, bx, by, Math.round((B.ring + ph * 3) * lk), spd * .9, 'o', Math.max(1, B.dmg - 1), (P.ring * 7) % (Math.PI * 2), B.gap ? gapHalf : 0, gapAt()); P.aim = Math.max(P.aim, 1.2); } }   // 원형 직후엔 조준을 잠깐 쉰다(겹치지 않게)
-  // 조준 연발(짧은 간격으로 n 발 — 쉬움 1발, 중간 2발)
-  if (B.aim) {
-    P.aim -= dt; if (P.aim <= 0) { P.aim = B.aimT * q; aimBurst(B.aim + (ph >= 2 ? 1 : 0)); }
-    aimTick();
-  }
-  // 부채꼴(탱크)
-  if (B.fan && K.kind === 'tank') { P.fan -= dt; if (P.fan <= 0) { P.fan = B.fanT * q; fan(g, bx, by, B.fan + ph, .95 + ph * .15, spd * 1.05, 'm', dmg); } }
-  // 나선 회전탄(근육 대장은 하드 처음부터, 탱크는 하드 3단계)
-  if (B.spiral && (K.kind === 'brute' || ph >= 2)) {
-    K.spin = (K.spin || 0) + dt * (2.6 + ph * .7); P.sp -= dt;
-    if (P.sp <= 0) { P.sp = .11 / lk; const arms = ph >= 1 ? 2 : 1; for (let a = 0; a < arms; a++) shoot(g, bx, by, K.spin + a * Math.PI, spd * .7, 'm', dmg, 8); }
-  }
-  // 돌진(근육 대장)
-  if (B.dash && K.kind === 'brute' && !K.dashing) { P.dash -= dt; if (P.dash <= 0) { P.dash = B.dashT * q; K.dashing = 1; g.h.float(K.x, K.y - 50, '돌진!', '#fca5a5', 30); g.h.sfx('alarm'); } }
+  if (P.aimLeft > 0) { P.aimGap -= dt; if (P.aimGap <= 0) { P.aimGap = .2; P.aimLeft--; shoot(g, bx, by, aimAng(g, bx, by), spd * 1.05, 'm', dmg, 10); g.h.sfx('hit'); } }
+  if (K.dashing || g.shells.length) return;   // 돌진 중 · 포탄이 떨어지는 중에는 다른 공격 없음
+  P.seq -= dt; if (P.seq > 0) return;
+  // 순서표: 난이도 패턴 + 보스 특기(탱크 = 포탄, 근육 대장 = 돌진 — 돌진은 B.dash 일 때) 를 두 패턴마다 하나씩
+  const special = K.kind === 'tank' ? 'shell' : B.dash ? 'dash' : null;
+  const list = special ? B.pat.flatMap((x, i) => (i % 2 === 1 || B.pat.length === 1 ? [x, special] : [x])) : B.pat;
+  const kind = list[P.k++ % list.length];
+  let dur = .3, wait = travel;
+  if (kind === 'ring') ring(g, bx, by, Math.max(6, Math.round((B.ring + ph * 2) * lk)), spd * .85, 'o', Math.max(1, B.dmg - 1), (P.k * .37) % (Math.PI * 2), gapHalf, lineAng(bx, by, holeX()));
+  else if (kind === 'wall') wall(g, bx, by, B.wall + ph, spd * .9, 'm', dmg, holeX(), hw);
+  else if (kind === 'spiral') { P.spLeft = 1.3 + ph * .3; dur = P.spLeft; }
+  else if (kind === 'aim') { P.aimLeft = B.aim + (ph >= 2 ? 1 : 0); P.aimGap = 0; dur = P.aimLeft * .2; }
+  else if (kind === 'shell') {   // 탱크 포탄: 내 자리에 빨간 원 → 피하기
+    const tx = clamp(g.px + rnd(-20, 20), ROAD_L + 30, ROAD_R - 30);
+    g.shells.push({ x: tx, y: -6, sx: K.x, sy: K.y + 30, t: 0, T: 1.2, r: 50 });
+    g.h.sfx('cannon'); g.h.shake(.12); g.h.spark(K.x, K.y + 40, 'gold', 6); wait = .2;
+  } else if (kind === 'dash') { K.dashing = 1; g.h.float(K.x, K.y - 50, '돌진!', '#fca5a5', 30); g.h.sfx('alarm'); wait = .3; }
+  P.seq = dur + wait + B.rest * (1 - ph * .12) / lk;
 }
 // 문 한 칸을 고르면 부대가 어떻게 되는지(자동 조종 어림값)
 export function partValue(G, p) {
