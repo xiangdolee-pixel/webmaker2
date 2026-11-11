@@ -517,6 +517,8 @@ tr.dragging td { background: var(--surface); }
 .ap .input.ap-long { min-height: 440px; padding: 16px 18px; line-height: 1.8; resize: vertical; } /* .mb .input(50px) 보다 세게 — A4 반 페이지를 넉넉히 */
 .ap-count { font-weight: 600; }
 .ap-count.ok { color: var(--ok) !important; }
+.ap-count.over { color: var(--warn) !important; }
+.ap-count b { font-weight: 800; }
 .ap-notice { display: grid; gap: 6px; margin: 14px 0 20px; padding: 18px 20px; border-radius: 14px; background: #f6f7f9; font-size: 15px; line-height: 1.65; }
 .ap-notice p { margin: 0; }
 .ap-docs { display: grid; gap: 6px; margin: 4px 0 8px; padding: 12px 14px; border-radius: 12px; background: #fff; list-style: none; }

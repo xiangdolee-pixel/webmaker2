@@ -51,8 +51,8 @@ export const FORM = {
       { k: 'housing', label: '주거 형태', type: 'radio', options: ['자가', '전세', '월세'] },
       { k: 'housing_detail', label: '세부 주거 형태', ph: '예: 자가 32평, 전세 2억, 월세 100만 원' },
     ] },
-    { key: 'reason', title: '장학금 신청 사유', desc: 'A4 반 페이지(약 600자) 이상 구체적으로 적어 주세요. 분량이 모자라면 지원하지 않은 것으로 봅니다.', fields: [
-      { k: 'reason', label: '지원 사유', type: 'textarea', target: 600, wide: true },
+    { key: 'reason', title: '장학금 신청 사유', desc: '600자 이상 2,000자 미만으로 구체적으로 적어 주세요.', fields: [
+      { k: 'reason', label: '지원 사유', type: 'textarea', min: 600, max: 1999, wide: true }, // 600자 이상 2,000자 미만 (사용자 지시 2026-11-11)
     ] },
   ],
   files: [
@@ -117,6 +117,8 @@ export async function publicApply(ctx, path = '/apply') {
   for (const f of FIELDS) {
     const v = str(a[f.k], f.type === 'textarea' ? 8000 : 300);
     if (!v) throw bad(`'${f.label}' 을(를) 적어 주세요.`);
+    if (f.min && v.length < f.min) throw bad(`'${f.label}' 은(는) ${f.min.toLocaleString()}자 이상 적어 주세요. (지금 ${v.length.toLocaleString()}자)`);
+    if (f.max && v.length > f.max) throw bad(`'${f.label}' 은(는) ${(f.max + 1).toLocaleString()}자 미만으로 줄여 주세요. (지금 ${v.length.toLocaleString()}자)`);
     if (f.type === 'radio' && !f.options.includes(v)) throw bad(`'${f.label}' 을(를) 골라 주세요.`);
     answers[f.k] = v;
   }
@@ -233,7 +235,7 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
         <div class="ap-seg">${f.options.map((o) => `<label><input type="radio" name="${f.k}" value="${esc(o)}"${val(f) === o ? ' checked' : ''} required><span>${esc(o)}</span></label>`).join('')}</div>${hint}</fieldset>`;
     }
     if (f.type === 'textarea') {
-      return `<label class="field wide">${head}<textarea class="input ap-long" name="${f.k}" required maxlength="8000" data-target="${f.target}" placeholder="신청 사유를 자세히 적어 주세요.">${esc(val(f))}</textarea>
+      return `<label class="field wide">${head}<textarea class="input ap-long" name="${f.k}" required maxlength="${f.max}" data-min="${f.min}" data-max="${f.max}" placeholder="신청 사유를 600자 이상 2,000자 미만으로 자세히 적어 주세요.">${esc(val(f))}</textarea>
         <small class="ap-count" data-count-for="${f.k}"></small>${hint}</label>`;
     }
     // 주소: [주소 찾기](다음 우편번호) → 우편번호 · 기본 주소가 채워지고 상세 주소만 적는다. 실제 값은 숨은 칸 "(우편번호) 기본 주소 / 상세 주소"
@@ -300,7 +302,7 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
     <p class="ap-save"><span class="ap-save-st" data-save-st aria-live="polite">적는 대로 자동으로 저장됩니다.</span><button type="button" class="btn sm" data-save-now>임시 저장</button></p>
   </form>
   <script type="application/json" data-apply-draft>${JSON.stringify(draft && (!cur || draft.at > cur.updated_at) ? draft : null).replace(/</g, '\\u003c')}</script>
-  <script type="application/json" data-apply-form>${JSON.stringify({ sections: FORM.sections.map((s) => ({ title: s.title, fields: s.fields.map((f) => ({ k: f.k, label: f.label, type: f.type || 'text', target: f.target })) })), files: FORM.files.map((f) => ({ k: f.k, label: f.label })), max: MAX_FILES }).replace(/</g, '\\u003c')}</script>
+  <script type="application/json" data-apply-form>${JSON.stringify({ sections: FORM.sections.map((s) => ({ title: s.title, fields: s.fields.map((f) => ({ k: f.k, label: f.label, type: f.type || 'text', min: f.min, max: f.max })) })), files: FORM.files.map((f) => ({ k: f.k, label: f.label })), max: MAX_FILES }).replace(/</g, '\\u003c')}</script>
 </section>`, { noindex: true });
 }
 

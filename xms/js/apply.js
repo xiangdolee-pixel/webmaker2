@@ -14,7 +14,6 @@ const FILE_STEP = LAST - 1;
 const KEY = `xms-apply-${'preview' in root.dataset ? 'pv-' : ''}${root.dataset.round}-${root.dataset.user}`;
 const err = $('.err', form);
 let at = 0;
-let shortOk = false; // 신청 사유가 짧아도 한 번 더 누르면 넘어간다
 
 const kb = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`);
 const isImg = (mime) => /^image\//.test(mime);
@@ -139,7 +138,7 @@ function show(n, scroll = true) {
   $('[data-submit]', form).hidden = at !== LAST;
   err.textContent = '';
   if (at === LAST) review();
-  $$('textarea[data-target]', cards[at]).forEach((t) => t._grow?.()); // 보이게 된 뒤 높이를 잰다
+  $$('textarea[data-min]', cards[at]).forEach((t) => t._grow?.()); // 보이게 된 뒤 높이를 잰다
   if (scroll) root.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
 }
 function check(n) {
@@ -154,10 +153,12 @@ function check(n) {
       if (!form.elements[el.name].value) { el.focus(); return `'${el.closest('fieldset').querySelector('legend').textContent.replace('*', '').trim()}' 을(를) 골라 주세요.`; }
     } else if (!el.value.trim()) { el.focus(); return `'${el.closest('label').querySelector('span').textContent.replace('*', '').trim()}' 을(를) 적어 주세요. 해당 사항이 없으면 '없음'이라고 적어 주세요.`; }
   }
-  const long = $('textarea[data-target]', card);
-  if (long && long.value.trim().length < +long.dataset.target && !shortOk) {
-    shortOk = true;
-    return `신청 사유가 ${long.value.trim().length}자입니다. A4 반 페이지(약 ${long.dataset.target}자)보다 짧으면 지원하지 않은 것으로 볼 수 있어요. 그대로 넘어가려면 [다음]을 한 번 더 누르세요.`;
+  // 신청 사유: 600자 이상 2,000자 미만
+  const long = $('textarea[data-min]', card);
+  if (long) {
+    const n = long.value.trim().length;
+    if (n < +long.dataset.min) { long.focus(); return `신청 사유를 ${(+long.dataset.min).toLocaleString()}자 이상 적어 주세요. 지금 ${n.toLocaleString()}자 — ${(+long.dataset.min - n).toLocaleString()}자 더 필요합니다.`; }
+    if (n > +long.dataset.max) { long.focus(); return `신청 사유는 ${(+long.dataset.max + 1).toLocaleString()}자 미만이어야 합니다. 지금 ${n.toLocaleString()}자 — ${(n - +long.dataset.max).toLocaleString()}자 줄여 주세요.`; }
   }
   if (n === FILE_STEP) {
     if ($('li.busy', card)) return '파일을 올리는 중입니다. 잠깐만 기다려 주세요.';
@@ -183,17 +184,23 @@ form.addEventListener('click', (e) => {
 $('[data-next]', form).addEventListener('click', () => {
   const m = check(at);
   if (m) { err.textContent = m; return; }
-  shortOk = false; show(at + 1); save();
+  show(at + 1); save();
 });
 $('[data-prev]', form).addEventListener('click', () => show(at - 1));
 
 // 신청 사유 글자 수
-$$('textarea[data-target]', form).forEach((t) => {
+$$('textarea[data-min]', form).forEach((t) => {
   const out = $(`[data-count-for="${t.name}"]`, form);
-  const upd = () => { const n = t.value.trim().length; out.textContent = `${n.toLocaleString()}자 / 약 ${(+t.dataset.target).toLocaleString()}자 이상`; out.classList.toggle('ok', n >= +t.dataset.target); };
+  const lo = +t.dataset.min; const hi = +t.dataset.max;
+  const upd = () => {
+    const n = t.value.trim().length;
+    out.innerHTML = `<b>${n.toLocaleString()}자</b> · ${lo.toLocaleString()}자 이상 ${(hi + 1).toLocaleString()}자 미만${n < lo ? ` <span>(${(lo - n).toLocaleString()}자 더)</span>` : n > hi ? ' <span>(너무 깁니다)</span>' : ' <span>✓</span>'}`;
+    out.classList.toggle('ok', n >= lo && n <= hi);
+    out.classList.toggle('over', n > hi || (n >= hi - 50 && n <= hi)); // 끝에 가까우면 미리 알림
+  };
   // 적을수록 칸이 늘어난다 (넘치면 스크롤 대신 아래로 길어짐)
   const grow = () => { if (t.offsetParent === null) return; t.style.height = 'auto'; t.style.height = `${Math.max(t.scrollHeight + 2, parseFloat(getComputedStyle(t).minHeight) || 0)}px`; };
-  t.addEventListener('input', () => { upd(); grow(); shortOk = false; });
+  t.addEventListener('input', () => { upd(); grow(); });
   t._grow = grow;
   upd();
 });
@@ -206,8 +213,7 @@ form.addEventListener('submit', (e) => {
   busy($('[data-submit]', form), err, async () => {
     if ('preview' in root.dataset) throw new Error('관리자 미리보기에서는 낼 수 없습니다. 신청 기간에 다시 해 주세요.');
     for (let i = 0; i < LAST; i++) {
-      const prevShort = shortOk; shortOk = true; // 짧은 사유는 이미 알렸다
-      const m = check(i); shortOk = prevShort;
+      const m = check(i);
       if (m) { show(i); err.textContent = m; return; }
     }
     const d = collect();
