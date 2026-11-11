@@ -627,6 +627,10 @@ export async function studioHelper(request, env, url, path, method) {
         jo.yt = { ...y, status: review ? 'review' : 'done', url, video_id: vidm ? vidm[1] : (y.video_id || ''), error: '', uploaded_at: now(), finished_at: review ? null : now(), next_check: review ? now() + 5 * 60000 : null, checks: 0 };
       } else if (st === 'published') {
         jo.yt = { ...y, status: 'done', visibility: '공개', error: '', published_at: now(), finished_at: now(), tg: (y.telegram !== false && jo.tg_auto !== false) ? { status: 'queued', at: now() } : (y.tg || null) };   // 공개되면 텔레그램 공식채널에 링크(사용자 2026-11-10)
+      } else if (st === 'tg_not_public') {   // 텔레그램 올리기 직전 확인에서 영상이 밖에서 안 보임(2026-11-12 사고) → 공개 전환 단계로 되돌린다(실패 3번 규칙 그대로)
+        const n = (y.fails || 0) + 1;
+        jo.yt = n >= 3 ? { ...y, status: 'done', visibility: '비공개', tg: null, error: `공개 확인 안 됨: ${String(d.error || '').slice(0, 200)} — 유튜브에서 직접 공개로 바꿔 주세요`, finished_at: now() }
+          : { ...y, status: 'review', visibility: '비공개', fails: n, tg: null, published_at: null, finished_at: null, next_check: now() + 60000, error: String(d.error || '').slice(0, 300) };
       } else if (st === 'tg_done' || st === 'tg_failed') {
         jo.yt = { ...y, tg: { ...(y.tg || {}), status: st === 'tg_done' ? 'done' : 'failed', error: String(d.error || '').slice(0, 300), message_id: d.message_id || null, finished_at: now() } };
       } else if (st === 'reviewing') {

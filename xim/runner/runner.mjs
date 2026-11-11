@@ -542,7 +542,8 @@ async function runTelegram(payload) {
     const r = await py(['tools\\tg_channel_post.py', '--channel', t.channel_name || '사적인자산왕', t.url], { cwd: DOCS, timeoutMin: 3, label: '텔레그램' });
     const lines = (r.out || '').trim().split(/\r?\n/).filter(Boolean);
     let res = null; for (let i = lines.length - 1; i >= 0 && !res; i--) { try { if (lines[i].startsWith('{')) res = JSON.parse(lines[i]); } catch { /* 다음 줄 */ } }
-    if (r.code !== 0 || !res?.ok) { await report('tg_failed', { error: res?.error || lines.slice(-2).join(' | ').slice(0, 300) }); return; }
+    if (res?.not_public || r.code === 4) { log(`  텔레그램: 안 올림 — ${res?.error || '영상이 공개가 아님'} → 공개 전환부터 다시`); await report('tg_not_public', { error: res?.error || '' }); return; }   // 2026-11-12 사고: 비공개 링크는 절대 안 올린다
+    if (r.code !== 0 || !res?.ok) { await report('tg_failed',{ error: res?.error || lines.slice(-2).join(' | ').slice(0, 300) }); return; }
     log('  텔레그램: 올림'); await report('tg_done', { message_id: res.message_id });
   } catch (e) { await report('tg_failed', { error: String(e.message || e).slice(0, 300) }); }
 }
