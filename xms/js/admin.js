@@ -114,7 +114,7 @@ const SIDE = [
 // 강의 기능을 켠 사이트만 '강의' 묶음이 생긴다 (회원 다음)
 // 신청서 기능을 켠 사이트만 '신청서' 묶음 (맨 위 — 신청 기간에 가장 많이 본다)
 const sideGroups = () => [
-  ...(INFO.features?.apply ? [['신청서', [['#/apply', '신청서 보기', 'apply'], ['#/apply/rounds', '신청 기간', 'rounds']]]] : []),
+  ...(INFO.features?.apply ? [['장학금 신청', [['#/apply/rounds', '신청 기간 · 켜고 끄기', 'rounds'], ['#/apply', '신청서 보기', 'apply']]]] : []),
   SIDE[0], SIDE[1], ...(INFO.features?.courses ? [['강의', [['#/courses', '강의 관리', 'courses']]]] : []), ...SIDE.slice(2)];
 // 왼쪽 위 사이트 표시: 파비콘을 올렸으면 그 그림, 없으면 이름 두 글자
 let favVer = Date.now();
@@ -668,7 +668,7 @@ async function menuPage(id) {
     <form class="panel pad" id="mform">
       <label class="field"><span>메뉴 이름</span><input class="input" name="title" required maxlength="40" value="${esc(v.title)}"></label>
       <fieldset class="field"><legend>종류</legend><div class="choices">${Object.entries(TYPE_TAG).map(([k, l]) => `<label class="check"><input type="radio" name="menu_type" value="${k}"${v.menu_type === k ? ' checked' : ''}> ${l}</label>`).join('')}</div></fieldset>
-      <label class="field" data-for="PAGE"><span>사이트 안 주소</span><input class="input" name="page_path" value="${esc(v.menu_type === 'PAGE' ? v.path : '')}" placeholder="/about.html"><small>비워 두면 하위 메뉴를 묶는 대분류가 됩니다.</small></label>
+      <label class="field" data-for="PAGE"><span>사이트 안 주소</span><input class="input" name="page_path" value="${esc(v.menu_type === 'PAGE' ? v.path : '')}" placeholder="/about.html"><small>비워 두면 하위 메뉴를 묶는 대분류가 됩니다.</small>${INFO.features?.apply && v.path === '/member/apply' ? '<small class="apr-hint">장학금 신청 화면입니다. 신청 기간 · 켜고 끄기는 <a href="#/apply/rounds">장학금 신청 › 신청 기간</a>에서 합니다.</small>' : ''}</label>
       <label class="field" data-for="BOARD"><span>게시판</span><select class="input" name="board_id"><option value="">게시판을 고르세요</option>${bd.boards.map((b) => `<option value="${b.id}"${b.id === v.board_id ? ' selected' : ''}>${esc(b.name)} (/board/${esc(b.slug)})</option>`).join('')}</select>
         <small>게시판의 주소와 권한을 그대로 씁니다.</small></label>
       <label class="field" data-for="LINK"><span>외부 주소</span><input class="input" name="link_path" value="${esc(v.menu_type === 'LINK' ? v.path : '')}" placeholder="https://"><small>새 창으로 열립니다.</small></label>
@@ -1623,14 +1623,14 @@ const roundTag = (r) => `<span class="tag ${AP_STATE[r.state][0]}">${AP_STATE[r.
 async function applyList(qs) {
   const { rounds } = await api('/apply/rounds');
   if (!rounds.length) {
-    main.innerHTML = `${head('신청서', '신청서 보기', '')}<div class="panel">${empty('아직 신청 기간이 없습니다', '신청 기간을 만들면 그 기간에만 홈페이지에서 신청서를 받습니다.', '<a class="btn primary" href="#/apply/rounds/new">신청 기간 만들기</a>')}</div>`;
+    main.innerHTML = `${head('장학금 신청', '신청서 보기', '')}<div class="panel">${empty('아직 신청 기간이 없습니다', '신청 기간을 만들면 그 기간에만 홈페이지에서 신청서를 받습니다.', '<a class="btn primary" href="#/apply/rounds/new">신청 기간 만들기</a>')}</div>`;
     return;
   }
   const r = rounds.find((x) => x.id === Number(qs.get('round'))) || rounds.find((x) => x.state === 'open') || rounds[0];
   let st = qs.get('st') || 'all';
   const list = await api(`/apply/list?round=${r.id}`);
   const count = (k) => list.filter((a) => a.status === k).length;
-  main.innerHTML = `${head('신청서', '신청서 보기', `${roundTag(r)} ${esc(r.title)} · ${esc(r.period)}`, list.length ? `<a class="btn green" href="/xms-api/admin/apply/export?round=${r.id}">엑셀로 내려받기</a>` : '')}
+  main.innerHTML = `${head('장학금 신청', '신청서 보기', `${roundTag(r)} ${esc(r.title)} · ${esc(r.period)}`, list.length ? `<a class="btn green" href="/xms-api/admin/apply/export?round=${r.id}">엑셀로 내려받기</a>` : '')}
     ${rounds.length > 1 ? `<label class="field apl-round"><span>신청 기간</span><select class="input" id="apl-round">${rounds.map((x) => `<option value="${x.id}"${x.id === r.id ? ' selected' : ''}>${esc(x.title)} (${esc(x.period)}) · ${x.count}명</option>`).join('')}</select></label>` : ''}
     <div class="apl-bar"><div class="tabs" id="apl-tabs"></div><input class="input apl-q" id="apl-q" type="search" placeholder="이름 · 학과 · 학번 찾기"></div>
     <div id="apl-list"></div>`;
@@ -1701,27 +1701,91 @@ async function applyView(id) {
   }));
 }
 
+const WD = '일월화수목금토';
+const dayKo = (d) => { if (!/^\d{4}-\d{2}-\d{2}$/.test(d || '')) return ''; const [y, m, dd] = d.split('-').map(Number); return `${y}년 ${m}월 ${dd}일(${WD[new Date(Date.UTC(y, m - 1, dd)).getUTCDay()]})`; };
+// 신청 받기 설정: 맨 위 카드에서 켜기/끄기 · 기간을 바로 바꾸고, 아래는 모든 신청 기간 (줄마다 켜기/끄기)
+const roundNote = (r, today) => {
+  if (!r.visible) return ['off', '꺼져 있습니다 — 홈페이지에서 신청을 받지 않습니다.'];
+  if (r.starts_on > today) return ['soon', `켜져 있습니다 — ${dayKo(r.starts_on)} 0시부터 신청을 받습니다.`];
+  if (r.ends_on < today) return ['closed', '켜져 있지만 마감일이 지났습니다 — 기간을 늘리면 다시 받습니다.'];
+  return ['open', `지금 신청을 받고 있습니다 — ${dayKo(r.ends_on)} 밤 12시까지.`];
+};
+const roundBody = (r) => ({ title: r.title, starts_on: r.starts_on, ends_on: r.ends_on, notice: r.notice, visible: r.visible });
 async function roundsPage() {
-  const { rounds } = await api('/apply/rounds');
-  main.innerHTML = `${head('신청서', '신청 기간', '정한 기간에만 홈페이지 [장학금 신청]에서 신청서를 받습니다. 시작일 0시부터 마감일 밤 12시까지(한국 시간).', '<a class="btn primary" href="#/apply/rounds/new">+ 신청 기간 만들기</a>')}
-    <div class="panel">${rounds.length ? `<table class="tbl cardy"><thead><tr><th>제목</th><th>신청 기간</th><th>상태</th><th>신청서</th><th>관리</th></tr></thead><tbody id="rrows">
-      ${rounds.map((r) => `<tr data-id="${r.id}"><td><b>${esc(r.title)}</b></td><td data-l="신청 기간">${esc(r.period)}</td><td data-l="상태">${roundTag(r)}</td>
+  const { rounds, today } = await api('/apply/rounds');
+  const cur = rounds.find((r) => r.state === 'open') || rounds.find((r) => r.state === 'soon') || rounds[0];
+  const sw = (on, attr) => `<label class="sw"><input type="checkbox" ${attr}${on ? ' checked' : ''}><i aria-hidden="true"></i><span class="sr">신청 받기</span></label>`;
+  main.innerHTML = `${head('장학금 신청', '신청 기간 · 켜고 끄기', '정한 기간에만 홈페이지 [장학금 신청]에서 신청서를 받습니다. 시작일 0시부터 마감일 밤 12시까지(한국 시간).', '<a class="btn" href="#/apply/rounds/new">+ 새 신청 기간</a>')}
+    ${cur ? `<section class="panel pad apr-now" id="apr-now">
+      <div class="apr-now-h">
+        <div><small>지금 쓰는 신청 기간</small><h2>${esc(cur.title)}</h2></div>
+        <div class="apr-sw">${sw(cur.visible, 'data-now-sw')}<b data-now-lbl>${cur.visible ? '신청 받기 켜짐' : '신청 받기 꺼짐'}</b></div>
+      </div>
+      <p class="apr-note" data-now-note></p>
+      <form class="apr-dates-f" id="apr-dates">
+        <label class="field"><span>시작일</span><input class="input" type="date" name="starts_on" required value="${esc(cur.starts_on)}"></label>
+        <label class="field"><span>마감일</span><input class="input" type="date" name="ends_on" required value="${esc(cur.ends_on)}"></label>
+        <div class="apr-quick"><button type="button" class="btn sm" data-q="today">오늘부터 시작</button><button type="button" class="btn sm" data-q="end">오늘 마감</button></div>
+        <button class="btn primary" type="submit">기간 저장</button>
+      </form>
+      <p class="err" role="alert"></p>
+      <div class="apr-links"><a href="#/apply?round=${cur.id}">신청서 ${cur.count}명 보기 →</a><a href="#/apply/rounds/${cur.id}">제목 · 안내 문구 고치기 →</a><a href="/member/apply" target="_blank" rel="noopener">홈페이지에서 보기 ↗</a></div>
+    </section>` : ''}
+    <h2 class="apr-all">모든 신청 기간</h2>
+    <div class="panel">${rounds.length ? `<table class="tbl cardy"><thead><tr><th>제목</th><th>신청 기간</th><th>상태</th><th>신청 받기</th><th>신청서</th><th>관리</th></tr></thead><tbody id="rrows">
+      ${rounds.map((r) => `<tr data-id="${r.id}"><td><b>${esc(r.title)}</b></td><td data-l="신청 기간">${esc(r.period)}</td><td data-l="상태" data-tag>${roundTag(r)}</td>
+        <td data-l="신청 받기">${sw(r.visible, 'data-row-sw')}</td>
         <td data-l="신청서"><a href="#/apply?round=${r.id}">${r.count}명</a></td>
-        <td><div class="mng"><a class="btn sm" href="#/apply/rounds/${r.id}">수정</a>${r.count ? '' : '<button class="btn sm danger" type="button" data-del>삭제</button>'}</div></td></tr>`).join('')}</tbody></table>`
-    : empty('아직 신청 기간이 없습니다', '', '<a class="btn primary" href="#/apply/rounds/new">신청 기간 만들기</a>')}</div>`;
+        <td><div class="mng"><a class="btn sm" href="#/apply/rounds/${r.id}">수정</a>${r.count || r.state === 'open' ? '' : '<button class="btn sm danger" type="button" data-del>삭제</button>'}</div></td></tr>`).join('')}</tbody></table>`
+    : empty('아직 신청 기간이 없습니다', '신청 기간을 만들고 켜 두면 그 기간에만 홈페이지에서 신청서를 받습니다.', '<a class="btn primary" href="#/apply/rounds/new">신청 기간 만들기</a>')}</div>`;
+
+  const put = (r) => api(`/apply/rounds/${r.id}`, { method: 'PUT', data: roundBody(r) });
+  const stateOf = (r) => (!r.visible ? 'hidden' : r.starts_on > today ? 'soon' : r.ends_on < today ? 'closed' : 'open');
+  const paintRow = (r) => { const tr = $(`#rrows tr[data-id="${r.id}"]`); if (!tr) return; r.state = stateOf(r); tr.querySelector('[data-tag]').innerHTML = roundTag(r); tr.querySelector('[data-row-sw]').checked = r.visible; };
+  const paintNow = () => {
+    if (!cur) return;
+    const [k, txt] = roundNote(cur, today);
+    const note = $('[data-now-note]');
+    note.textContent = txt; note.className = `apr-note n-${k}`;
+    $('[data-now-sw]').checked = cur.visible;
+    $('[data-now-lbl]').textContent = cur.visible ? '신청 받기 켜짐' : '신청 받기 꺼짐';
+  };
+  const toggle = (r, on, input) => busy(null, null, async () => {
+    const was = r.visible; r.visible = on;
+    try { await put(r); } catch (e) { r.visible = was; input.checked = was; throw e; }
+    paintRow(r); if (r === cur) paintNow();
+    toast(on ? '신청 받기를 켰습니다.' : '신청 받기를 껐습니다. 홈페이지에서 신청을 받지 않습니다.');
+  });
+  if (cur) {
+    paintNow();
+    $('[data-now-sw]').addEventListener('change', (e) => toggle(cur, e.target.checked, e.target));
+    const f = $('#apr-dates');
+    $$('[data-q]', f).forEach((b) => b.addEventListener('click', () => { f.elements[b.dataset.q === 'today' ? 'starts_on' : 'ends_on'].value = today; }));
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      busy(f.querySelector('[type=submit]'), $('#apr-now .err'), async () => {
+        const s = f.elements.starts_on.value; const en = f.elements.ends_on.value;
+        if (!s || !en) throw new Error('시작일과 마감일을 골라 주세요.');
+        await api(`/apply/rounds/${cur.id}`, { method: 'PUT', data: { ...roundBody(cur), starts_on: s, ends_on: en } });
+        toast(`신청 기간을 ${dayKo(s)} ~ ${dayKo(en)} 로 저장했습니다.`); route();
+      });
+    });
+  }
+  $$('#rrows [data-row-sw]').forEach((input) => {
+    const r = rounds.find((x) => x.id === +input.closest('tr').dataset.id);
+    input.addEventListener('change', () => toggle(r, input.checked, input));
+  });
   $$('#rrows [data-del]').forEach((b) => {
     const r = rounds.find((x) => x.id === +b.closest('tr').dataset.id);
     b.onclick = () => confirmInline(b, `"${esc(r.title)}" 신청 기간을 지웁니다.`, '삭제', async () => { await api(`/apply/rounds/${r.id}`, { method: 'DELETE' }); toast('지웠습니다.'); route(); });
   });
 }
 
-const WD = '일월화수목금토';
-const dayKo = (d) => { if (!/^\d{4}-\d{2}-\d{2}$/.test(d || '')) return ''; const [y, m, dd] = d.split('-').map(Number); return `${y}년 ${m}월 ${dd}일(${WD[new Date(Date.UTC(y, m - 1, dd)).getUTCDay()]})`; };
 async function roundPage(id) {
   const { rounds, intro } = await api('/apply/rounds');
   const r = id ? rounds.find((x) => x.id === id) : { title: rounds[0]?.title || '', starts_on: '', ends_on: '', notice: '', visible: true };
   if (!r) throw new Error('없는 신청 기간입니다.');
-  main.innerHTML = `${head('신청서 › 신청 기간', id ? '신청 기간 수정' : '신청 기간 만들기', '')}
+  main.innerHTML = `${head('장학금 신청 › 신청 기간', id ? '신청 기간 수정' : '신청 기간 만들기', '')}
     <form id="rform"><section class="panel pad">
       <label class="field"><span>제목</span><input class="input" name="title" required maxlength="100" value="${esc(r.title)}" placeholder="예: 2026 세종대CCC나사렛장학회 장학금 지원서"><small>신청 화면 맨 위에 나옵니다.</small></label>
       <div class="field"><span>신청 기간</span><div class="apr-dates"><input class="input" type="date" name="starts_on" required value="${esc(r.starts_on)}" aria-label="시작일"><span>~</span><input class="input" type="date" name="ends_on" required value="${esc(r.ends_on)}" aria-label="마감일"></div>
