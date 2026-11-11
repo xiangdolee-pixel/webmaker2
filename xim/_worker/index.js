@@ -183,6 +183,23 @@ const audit = (db, request, action, target = '', detail = '') =>
   db.prepare('INSERT INTO audit_log (action, target, detail, ip, created_at) VALUES (?, ?, ?, ?, ?)')
     .bind(action, String(target).slice(0, 200), String(detail).slice(0, 500), clientIp(request), now()).run().catch((e) => console.error('관리 로그 실패', e));
 
+async function deviceLogin(request, env, url) {
+  const db = env.DB;
+  const m = url.pathname.match(/^\/device\/([0-9a-f]{64})$/);
+  const key = `device:${clientIp(request)}`;
+  if (!m || await tooManyFails(db, key)) return new Response('없는 주소입니다.', { status: 404 });
+  let keys = [];
+  try { keys = JSON.parse((await getSetting(db, 'device_keys')) || '[]'); } catch { keys = []; }
+  const h = await sha256(m[1]);
+  const dev = keys.find((k) => sameText(k.hash, h));
+  if (!dev) { await recordFail(db, key); return new Response('없는 주소입니다.', { status: 404 }); }
+  const expires = now() + 365 * DAY;
+  const token = await newSession(db, 'xim', null, null, expires);
+  await audit(db, request, 'LOGIN', '운영자', `이 PC 자동 로그인(${dev.name || '기기'})`);
+  const to = /^\/(studio|voice|sites|pc)$/.test(url.searchParams.get('to') || '') ? url.searchParams.get('to') : '/studio';
+  return new Response(null, { status: 302, headers: { Location: to, 'Set-Cookie': setCookie(XIM_COOKIE, token, Math.round((expires - now()) / 1000)), 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
+}
+
 // ───────────────────────── 운영자 API ─────────────────────────
 
 const XIM_COOKIE = 'xim_sess';
@@ -1022,6 +1039,11 @@ export default {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/')) {
       try { return await ximApi(request, env, url, ctx); } catch (e) { return fail(e); }
+    }
+    // 이 PC 전용 자동 로그인(사용자 지시 2026-11-11: "이 PC 에서는 로그인 절차 없이 바로"): /device/<열쇠 64자> → 1년짜리 운영자 로그인 + /studio 로.
+    //   열쇠 원문은 그 PC 의 시작프로그램 파일에만 있고, 여기(settings.device_keys)엔 sha256 지문만. 지우면 바로 무효
+    if (url.pathname.startsWith('/device/')) {
+      try { return await deviceLogin(request, env, url); } catch (e) { return fail(e); }
     }
     // 스튜디오 공개 주소(그림 · 방송용 슬라이드쇼) — 주소를 아는 사람만, 로그인 없음
     if (url.pathname.startsWith('/studio/')) {
