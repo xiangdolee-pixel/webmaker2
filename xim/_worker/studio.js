@@ -715,7 +715,9 @@ export async function startStudioVideo(env, db, job, speed = 0.95) {
   const texts = docJson(await latestDoc(db, job.id, 'show_texts')) || [];
   const slides = (await jobAssets(db, job.id)).filter((a) => a.kind === 'slide');
   const origin = 'https://xim.plators.com';
-  const list = texts.map((t, i) => { const a = slides.filter((s) => s.idx === i + 1).pop(); return a ? { idx: i + 1, image: `${origin}/studio/a/${a.id}`, text: String(t || '') } : null; }).filter((x) => x && x.text.trim());
+  // 읽을 글 = 원고에서 '📌 제목' 줄 · [인물] 줄을 뺀 것 (사용자 지시 2026-11-11: 📌 제목은 자막에도 영상 음성에도 넣지 않는다. 원고 자체는 그대로 둔다)
+  const speak = (t) => String(t || '').split('\n').filter((l) => !/^\s*(📌|\[인물\])/u.test(l)).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  const list = texts.map((t, i) => { const a = slides.filter((s) => s.idx === i + 1).pop(); return a ? { idx: i + 1, image: `${origin}/studio/a/${a.id}`, text: speak(t) } : null; }).filter((x) => x && x.text.trim());
   if (!list.length) throw bad('슬라이드 그림과 원고가 아직 없습니다.');
   const res = await env.CLONE.fetch(new Request('https://clone/api/jobs', { method: 'POST', headers: { 'X-Agent-Token': env.CLONE_TOKEN, 'Content-Type': 'application/json' },
     body: JSON.stringify({ speed, studio: { job_id: job.id, title: job.title || '', slides: list } }) }));
