@@ -1627,7 +1627,7 @@ async function applyList(qs) {
     return;
   }
   const r = rounds.find((x) => x.id === Number(qs.get('round'))) || rounds.find((x) => x.state === 'open') || rounds[0];
-  let st = qs.get('st') || 'all';
+  let st = qs.get('st') === 'SUBMITTED' ? 'SUBMITTED' : 'all';
   const list = await api(`/apply/list?round=${r.id}`);
   const count = (k) => list.filter((a) => a.status === k).length;
   main.innerHTML = `${head('장학금 신청', '신청서 보기', `${roundTag(r)} ${esc(r.title)} · ${esc(r.period)}`, list.length ? `<a class="btn green" href="/xms-api/admin/apply/export?round=${r.id}">엑셀로 내려받기</a>` : '')}
@@ -1638,6 +1638,7 @@ async function applyList(qs) {
       <span class="apl-top"><b>${esc(a.name)}</b>${apTag(a.status)}</span>
       <span class="apl-line">${esc([a.dept, a.student_no, a.state].filter(Boolean).join(' · '))}</span>
       <span class="apl-line">성적 <b>${esc(a.gpa)}</b> · ${esc(a.role)}</span>
+      ${a.scores?.length ? `<span class="apl-line">점수 ${a.scores.map((x) => `${esc(x.who)} <b>${x.score}</b>`).join(' · ')} · 합계 <b>${a.sum}</b></span>` : ''}
       <small>${fmtDate(a.created_at, true)} 접수${a.updated_at > a.created_at + 60000 ? ' · 고침' : ''}</small></a>`;
   const draw = () => {
     const q = $('#apl-q').value.trim();
@@ -1646,7 +1647,7 @@ async function applyList(qs) {
       : `<div class="panel">${list.length ? empty('조건에 맞는 신청서가 없습니다', '')
         : empty('아직 들어온 신청서가 없습니다', '홈페이지 <a href="/member/apply" target="_blank" rel="noopener">장학금 신청</a>에서 회원이 신청하면 여기에 바로 나옵니다.')}</div>`;
   };
-  pillTabs($('#apl-tabs'), [['all', `전체 ${list.length}`], ...Object.entries(AP_STATUS).map(([k, l]) => [k, `${l} ${count(k)}`])], st, (v) => {
+  pillTabs($('#apl-tabs'), [['all', `전체 ${list.length}`], ['SUBMITTED', `접수 ${count('SUBMITTED')}`]], st, (v) => { // 전체 · 접수만 (홈페이지 신청자 확인과 같게)
     st = v;
     history.replaceState(null, '', `#/apply?round=${r.id}&st=${v}`);
     draw();

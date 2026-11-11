@@ -550,7 +550,10 @@ export async function adminApply(ctx, path, method) {
     const round = Number(url.searchParams.get('round')) || 0;
     const { results } = await db.prepare(`SELECT a.*, mb.name AS m_name, mb.login_id FROM applications a LEFT JOIN members mb ON mb.id = a.member_id
       WHERE a.site = ? AND a.round_id = ? ORDER BY a.created_at DESC`).bind(site, round).all();
-    if (path === '/apply/list') return json(results.map(appRow));
+    if (path === '/apply/list') {
+      const sc = await scoresOf(db, site, results.map((a) => a.id));
+      return json(results.map((a) => ({ ...appRow(a), scores: sc.get(a.id), sum: sumOf(sc.get(a.id)) })));
+    }
     const r = await db.prepare('SELECT title FROM apply_rounds WHERE id = ? AND site = ?').bind(round, site).first();
     const sc = await scoresOf(db, site, results.map((a) => a.id));
     const judges = [...new Map([...sc.values()].flat().map((x) => [x.member_id, x.who])).entries()]; // 점수 준 사람마다 한 칸
