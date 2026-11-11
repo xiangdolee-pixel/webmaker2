@@ -1090,7 +1090,7 @@ input[type="date"], input[type="datetime-local"], input[type="time"], input[type
 .apx-dot.st-soon { background: var(--brand); }
 .apx-sub { margin: 0; color: var(--sub); font-size: 15px; }
 .apx-round { max-width: 420px; margin-top: 8px; }
-.apx-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.apx-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .apx-stat { display: grid; gap: 0; padding: 12px 6px; border: 1px solid rgba(20, 26, 40, .08); border-radius: 14px; background: #fff; color: var(--ink); text-align: center; cursor: pointer; transition: background .2s, color .2s, border-color .2s; }
 .apx-stat b { font-size: 22px; font-weight: 800; line-height: 1.2; }
 .apx-stat span { color: var(--sub); font-size: 13px; white-space: nowrap; transition: color .2s; }
@@ -1167,7 +1167,7 @@ input[type="date"], input[type="datetime-local"], input[type="time"], input[type
 .apx-big-acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 @media (max-width: 560px) {
   .apx-head h1 { font-size: 24px; }
-  .apx-stats { grid-template-columns: repeat(5, minmax(56px, 1fr)); overflow-x: auto; scrollbar-width: none; }
+  .apx-stats { gap: 6px; }
   .apx-stat { padding: 10px 4px; }
   .apx-stat b { font-size: 19px; }
   .apx-stat span { font-size: 12px; }
@@ -1283,7 +1283,6 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .apx-pt.on { border-color: var(--brand); background: var(--brand); color: var(--brand-ink); transform: translateY(-1px); }
 .apx-pt-clear { justify-self: start; padding: 0; font-size: 13px; }
 .apx-sort { flex: none; width: auto; min-height: 48px; border-radius: 12px; }
-.apx-stats { grid-template-columns: repeat(3, minmax(0, 180px)); } /* 전체 · 접수 · 선정 */
 @media (max-width: 560px) {
   .apx-pts { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .apx-tools { flex-wrap: wrap; }
