@@ -78,16 +78,21 @@ export const power = L => L <= 6 ? 5.4 + L * .85 : 10.5 + (L - 6) * .5;
 //   swap 바뀌는 문 주기(작을수록 빨리 바뀜), stream 대군 물결 길이, helpK 지원군 양(병사 · 적 감소 · 보스 감소), comboK 콤보 점수, summon 보스 졸병 소환량, eliteK 정예병 비율
 //   bul = 보스 탄막(1942 식): ring 원형 발수 · ringT 주기, aim 조준 연발 수 · aimT, fan 부채꼴(탱크) · fanT, spiral 나선(근육 대장, 탱크는 3단계), dash 돌진(근육 대장) · dashT,
 //         spd 탄속 배수, dmg 한 발에 줄어드는 병사, phase 체력 70% · 40% 단계마다 격해짐, giant 거인(중간보스) 탄(3 부채꼴 / 8 원형) · giantT
+//         gap 원형탄의 빈 틈(발 수, 그 틈으로 피한다), seq 하드: 패턴을 한 번에 하나씩 차례로(원형 → 부채꼴 → 나선 → 조준) + 사이에 쉼 rest
+//   lv = 나오는 적 겉모습 레벨(LV1~3 → 0~2) 범위 (사용자 지시 2026-11-11): 쉬움 LV1 만, 중간 LV1 · LV2, 하드 LV2 · LV3
 export const DIFFS = {
   easy:   { name: '쉬움', mobs: .7, hp: .8, boss: .7, gate: 1.25, msl: 1, startMsl: 1, n: 5, missiles: 2,
-            mobVy: .9, zig: 0, bad: .8, badP: .7, swap: 1.3, stream: .85, helpK: 1, comboK: 1, summon: .7, eliteK: .8,
-            bul: { ring: 0, ringT: 0, aim: 1, aimT: 3.6, fan: 0, fanT: 0, spiral: 0, dash: 0, dashT: 0, spd: .8, dmg: 1, phase: 0, giant: 0, giantT: 0 } },
+            mobVy: .9, zig: 0, bad: .8, badP: .7, swap: 1.3, stream: .85, helpK: 1, comboK: 1, summon: .7, eliteK: 0, lv: [0, 0],
+            // 쉬움: 보스는 조준 미사일 한 발씩만
+            bul: { ring: 0, ringT: 0, aim: 1, aimT: 3.4, fan: 0, fanT: 0, spiral: 0, dash: 0, dashT: 0, spd: .8, dmg: 1, phase: 0, giant: 0, giantT: 0 } },
   normal: { name: '중간', mobs: 1.1, hp: 1.55, boss: 1.5, gate: 1, msl: .7, startMsl: .7, n: 0, missiles: 0,
-            mobVy: 1.05, zig: .25, bad: 1, badP: 1.15, swap: .9, stream: 1.1, helpK: .8, comboK: 1, summon: 1, eliteK: 1,
-            bul: { ring: 14, ringT: 4.6, aim: 3, aimT: 3.2, fan: 0, fanT: 0, spiral: 0, dash: 1, dashT: 9, spd: 1, dmg: 1, phase: 1, giant: 3, giantT: 3.2 } },
+            mobVy: 1.05, zig: .25, bad: 1, badP: 1.15, swap: .9, stream: 1.1, helpK: .8, comboK: 1, summon: 1, eliteK: 1, lv: [0, 1],
+            // 중간: 두 발 연속 조준(쉬움의 2배) + 틈 있는 원형(방사형)을 번갈아
+            bul: { ring: 12, ringT: 5, gap: 3, aim: 2, aimT: 3, fan: 0, fanT: 0, spiral: 0, dash: 1, dashT: 10, spd: .95, dmg: 1, phase: 1, giant: 3, giantT: 3.4 } },
   hard:   { name: '하드', mobs: 1.3, hp: 2.5, boss: 3, gate: .8, msl: .4, startMsl: 0, n: 0, missiles: 0,
-            mobVy: 1.2, zig: .5, bad: 1.25, badP: 1.5, swap: .65, stream: 1.3, helpK: .5, comboK: 1.25, summon: 1.4, eliteK: 1.3,
-            bul: { ring: 24, ringT: 3.2, aim: 3, aimT: 2.3, fan: 5, fanT: 2.4, spiral: 1, dash: 1, dashT: 7, spd: 1.3, dmg: 2, phase: 1, giant: 8, giantT: 2.8 } }
+            mobVy: 1.2, zig: .5, bad: 1.25, badP: 1.5, swap: .65, stream: 1.3, helpK: .5, comboK: 1.25, summon: 1.4, eliteK: 1.3, lv: [1, 2],
+            // 하드: 많이 쏘되 규칙적으로 — 패턴을 차례로 하나씩, 원형엔 늘 빈 틈, 패턴 사이 쉼
+            bul: { seq: 1, ring: 26, gap: 4, aim: 4, fan: 7, spiral: 1, rest: .7, dash: 1, dashT: 8, spd: 1.12, dmg: 2, phase: 1, giant: 8, giantT: 3 } }
 };
 export const diffOf = d => DIFFS[d] ? d : 'normal';
 export const mslGain = d => Math.floor(3 * DIFFS[diffOf(d)].msl);        // 문 · 상자에서 얻는 유도탄(원래 3)
@@ -186,11 +191,11 @@ function mobGroup(G, y, c, hp, cx, opt = {}) {
   cx = clamp(cx, ROAD_L + 14 + w / 2, ROAD_R - 14 - w / 2);
   const side = opt.side != null ? opt.side : 40 + Math.min(L, 30) * 2.5;
   const grp = { alive: c, pop: 0, cx, hw: w / 2 + 6, side };   // 무리는 대형을 유지한 채 가운데(cx)만 내 쪽으로 옮겨 간다
-  // 겉모습 등급(LV1~3): 레벨이 오를수록 · 한 판 뒤로 갈수록 높아짐 (세기와는 상관없음)
-  const lv = opt.lv != null ? opt.lv : Math.min(2, Math.floor((G.L - 1) / 3 + (G.p || 0) * 1.5));
+  // 겉모습 등급(LV1~3): 난이도 범위 안에서 병사마다 (세기와는 상관없음). 따로 정한 무리(돌격대 LV1 · 정예 줄 LV3 등)도 범위 안으로
+  const lv0 = opt.lv != null ? lvClamp(opt.lv) : null;
   G.groups.push(grp);
   for (let i = 0; i < c; i++) {
-    const col = i % cols, row = Math.floor(i / cols), ox = -w / 2 + col * sp + rnd(-4, 4);
+    const col = i % cols, row = Math.floor(i / cols), ox = -w / 2 + col * sp + rnd(-4, 4), lv = lv0 != null ? lv0 : lvPick(G);
     G.mobs.push({
       ox, x: clamp(cx + ox, ROAD_L + 8, ROAD_R - 8), y: y - row * 16 + rnd(-4, 4), hp, max: hp,
       vy: (opt.vy != null ? opt.vy : 14 + Math.min(L, 30) * 1.3) * (G.twist === 'gust' ? 1.45 : 1) * (1 + (DK.mobVy - 1) * LVLK), side,
@@ -214,7 +219,10 @@ const mobHp = (L, p) => hpK(1 + Math.floor(L / 4 * (.35 + .65 * Math.min(1, p * 
 // 정예병(큰 몸집 · 은 투구 · 방패): 3레벨부터 무리 속에 섞인다 — 체력 4배, 닿으면 3명
 const elitePct = Lv => Lv < 3 ? 0 : Math.min(.24, .03 * (Lv - 2));
 const elitePctG = G => Math.min(.6, (G.twist === 'elite' ? Math.min(.45, elitePct(Math.max(G.L, 4)) * 2 + .08) : elitePct(G.L)) * DK.eliteK);
-function elite(M, Lv) { M.hp = M.max = Math.round(M.hp * 4 + Lv * .4); M.size = 1.25; M.lv = 2; M.hurt = 3; M.elite = true; }
+function elite(M, Lv) { M.hp = M.max = Math.round(M.hp * 4 + Lv * .4); M.size = 1.25; M.lv = DK.lv[1]; M.hurt = 3; M.elite = true; }   // 정예병은 그 난이도의 가장 높은 겉모습
+// 적 겉모습 레벨(LV1~3 → 0~2)은 난이도 범위 안에서만 (사용자 지시 2026-11-11). 범위가 둘이면 판 뒤로 · 레벨이 오를수록 높은 쪽이 많아진다
+const lvClamp = v => clamp(v, DK.lv[0], DK.lv[1]);
+const lvPick = G => { const [a, b] = DK.lv; return a === b || Math.random() > clamp(.18 + (G.p || 0) * .4 + Math.min(G.L, 10) * .02, .18, .65) ? a : b; };
 
 function spawn(G, e, y) {
   const L = power(G.L), p = e.p, k = e.kind;
@@ -335,11 +343,11 @@ function formation(G, k, y, L, p) {
 // 대군 한 줄: 띠(x0 ~ cols) 안을 fill 만큼 채운다(빈자리가 조금씩 있어 덩어리가 아니라 사람 물결처럼)
 function streamRow(G, S, y) {
   if (G.mobs.length > MAXMOBS) return;
-  const lv = Math.min(2, Math.floor((G.L - 1) / 3 + S.p * 1.5)), grp = S.grp;
+  const grp = S.grp;
   for (let c = 0; c < S.cols; c++) {
     if (Math.random() > S.fill) continue;
     const x = S.x0 + c * S.sp + rnd(-3, 3);
-    const M = { ox: x - MID, x, y: y + rnd(-4, 4), hp: S.hp, max: S.hp, vy: S.vy, side: 0, step: Math.random() * 6, g: grp, flash: 0, kb: 0, size: 1, hurt: 1, lv };
+    const M = { ox: x - MID, x, y: y + rnd(-4, 4), hp: S.hp, max: S.hp, vy: S.vy, side: 0, step: Math.random() * 6, g: grp, flash: 0, kb: 0, size: 1, hurt: 1, lv: lvPick(G) };
     if (Math.random() < elitePctG(G) * .5) elite(M, G.L);
     G.mobs.push(M); grp.alive++;
   }
@@ -712,21 +720,55 @@ function shoot(g, x, y, ang, spd, c, dmg, r = 9) {   // ang 0 = 내 쪽(+y), 오
   g.orbs.push({ x, y, vx: Math.sin(ang) * spd, vy: Math.cos(ang) * spd, r, c, dmg });
 }
 const aimAng = (g, x, y) => Math.atan2(g.px - x, -y);
-function ring(g, x, y, n, spd, c, dmg, off = 0) { for (let i = 0; i < n; i++) shoot(g, x, y, off + i / n * Math.PI * 2, spd, c, dmg); g.h.sfx('cannon'); g.h.spark(x, y + 30, 'gold', 8); }
+// gap: 내 쪽 근처에 gap 발만큼 빈 틈(gapAt = 틈 가운데 각도) — 그 틈으로 빠져나갈 수 있다
+function ring(g, x, y, n, spd, c, dmg, off = 0, gap = 0, gapAt = 0) {
+  const step = Math.PI * 2 / n;
+  for (let i = 0; i < n; i++) {
+    const a = off + i * step;
+    if (gap && Math.abs(Math.atan2(Math.sin(a - gapAt), Math.cos(a - gapAt))) < step * gap / 2) continue;
+    shoot(g, x, y, a, spd, c, dmg);
+  }
+  g.h.sfx('cannon'); g.h.spark(x, y + 30, 'gold', 8);
+}
 function fan(g, x, y, n, spread, spd, c, dmg) { const a0 = aimAng(g, x, y); for (let i = 0; i < n; i++) shoot(g, x, y, a0 + (n > 1 ? (i / (n - 1) - .5) * spread : 0), spd, c, dmg, 10); g.h.sfx('cannon'); }
 function bossFire(g, K, dt, R) {
   // 레벨 1~2 는 조금 덜 퍼붓고(패턴을 익히는 구간) 3레벨부터 100%: 발수 × lk, 주기 ÷ lk, 탄속도 조금
   const B = DK.bul, f = K.hp / K.max, ph = B.phase ? (f > .7 ? 0 : f > .4 ? 1 : 2) : 0, lk = Math.min(1, .55 + g.L * .15), q = (1 - ph * .18) / lk, spd = 150 * B.spd * (1 + ph * .1) * (.85 + .15 * lk), dmg = lk < 1 && !ph ? 1 : B.dmg;   // 1~2레벨 1단계는 한 발 피해 1
   if (K.ph == null) K.ph = ph;
-  if (ph !== K.ph) { K.ph = ph; g.h.float(K.x, K.y - 60, ph === 1 ? '보스가 화났어요!' : '보스 최후의 발악!', '#fca5a5', 32); g.h.ring(K.x, K.y, 'gold'); g.h.shake(.4); g.h.sfx('alarm'); K.pt.ring = Math.min(K.pt.ring, .6); K.pt.fan = Math.min(K.pt.fan, 1); }   // 단계가 바뀌면 바로 한 번 퍼붓는다
-  const P = K.pt || (K.pt = { ring: 1.6, aim: 2.2, fan: 2.8, sp: 0, dash: 5, aimLeft: 0, aimGap: 0 });
+  if (ph !== K.ph) { K.ph = ph; g.h.float(K.x, K.y - 60, ph === 1 ? '보스가 화났어요!' : '보스 최후의 발악!', '#fca5a5', 32); g.h.ring(K.x, K.y, 'gold'); g.h.shake(.4); g.h.sfx('alarm'); K.pt.ring = Math.min(K.pt.ring, .6); K.pt.fan = Math.min(K.pt.fan, 1); if (K.pt.seq != null) K.pt.seq = Math.min(K.pt.seq, .6); }   // 단계가 바뀌면 바로 한 번 퍼붓는다
+  const P = K.pt || (K.pt = { ring: 1.6, aim: 2.2, fan: 2.8, sp: 0, dash: 5, aimLeft: 0, aimGap: 0, seq: 1.4, k: 0, spLeft: 0, side: 1 });
+  if (P.seq == null) { P.seq = 1.4; P.k = 0; P.spLeft = 0; P.side = 1; }   // 예전 판 이어하기(저장된 보스)에도
   const bx = K.x, by = K.y + 24;
-  // 원형 탄막
-  if (B.ring) { P.ring -= dt; if (P.ring <= 0) { P.ring = B.ringT * q; ring(g, bx, by, Math.round((B.ring + ph * 4) * lk), spd * .9, 'o', Math.max(1, B.dmg - 1), Math.random() * Math.PI); } }   // 원형은 촘촘한 대신 한 발 피해는 1
-  // 조준 연발(짧은 간격으로 n 발)
+  // 원형 틈: 내 자리 쪽에서 왼쪽 · 오른쪽 번갈아 살짝 비켜 난다(가만히 있으면 맞고, 조금 옮기면 피한다)
+  const gapAt = () => { P.side = -P.side; return aimAng(g, bx, by) + P.side * .22; };
+  const aimBurst = n => { P.aimLeft = n; P.aimGap = 0; };
+  const aimTick = () => { if (P.aimLeft > 0) { P.aimGap -= dt; if (P.aimGap <= 0) { P.aimGap = .16; P.aimLeft--; shoot(g, bx, by, aimAng(g, bx, by), spd * 1.1, 'm', dmg, 10); g.h.sfx('hit'); } } };
+  if (B.seq) {
+    // 하드: 패턴을 한 번에 하나씩 차례로 — 원형(틈) → 부채꼴 → 나선 → 조준 연발 → … 사이에 쉼(rest). 화날수록(phase) 발 수 · 빠르기만 조금 오른다
+    P.seq -= dt;
+    if (P.seq <= 0) {
+      const kind = ['ring', 'fan', 'spiral', 'aim'][P.k++ % 4];
+      let dur = .4;
+      if (kind === 'ring') ring(g, bx, by, Math.round((B.ring + ph * 3) * lk), spd * .85, 'o', Math.max(1, B.dmg - 1), (P.k * .37) % (Math.PI * 2), B.gap, gapAt());
+      else if (kind === 'fan') fan(g, bx, by, B.fan + ph, .9 + ph * .1, spd, 'm', dmg);
+      else if (kind === 'spiral') { P.spLeft = 1.4 + ph * .3; dur = P.spLeft; }
+      else { aimBurst(B.aim + (ph >= 2 ? 1 : 0)); dur = (B.aim + 1) * .16; }
+      P.seq = dur + B.rest * (1 - ph * .15) / lk;
+    }
+    if (P.spLeft > 0) {   // 나선: 정해진 시간 동안만 일정하게 돈다(돌아오는 방향이 보여 피할 수 있다)
+      P.spLeft -= dt; K.spin = (K.spin || 0) + dt * 2.4; P.sp -= dt;
+      if (P.sp <= 0) { P.sp = .1 / lk; const arms = ph >= 1 ? 3 : 2; for (let a = 0; a < arms; a++) shoot(g, bx, by, K.spin + a * Math.PI, spd * .7, 'm', dmg, 8); }
+    }
+    aimTick();
+    if (B.dash && K.kind === 'brute' && !K.dashing) { P.dash -= dt; if (P.dash <= 0) { P.dash = B.dashT * q; K.dashing = 1; g.h.float(K.x, K.y - 50, '돌진!', '#fca5a5', 30); g.h.sfx('alarm'); } }
+    return;
+  }
+  // 원형 탄막(중간: 틈이 있는 방사형)
+  if (B.ring) { P.ring -= dt; if (P.ring <= 0) { P.ring = B.ringT * q; ring(g, bx, by, Math.round((B.ring + ph * 3) * lk), spd * .9, 'o', Math.max(1, B.dmg - 1), (P.ring * 7) % (Math.PI * 2), B.gap || 0, gapAt()); P.aim = Math.max(P.aim, 1.2); } }   // 원형 직후엔 조준을 잠깐 쉰다(겹치지 않게)
+  // 조준 연발(짧은 간격으로 n 발 — 쉬움 1발, 중간 2발)
   if (B.aim) {
-    P.aim -= dt; if (P.aim <= 0) { P.aim = B.aimT * q; P.aimLeft = B.aim + (ph ? 1 : 0); P.aimGap = 0; }
-    if (P.aimLeft > 0) { P.aimGap -= dt; if (P.aimGap <= 0) { P.aimGap = .13; P.aimLeft--; shoot(g, bx, by, aimAng(g, bx, by) + rnd(-.04, .04), spd * 1.15, 'm', dmg, 10); g.h.sfx('hit'); } }
+    P.aim -= dt; if (P.aim <= 0) { P.aim = B.aimT * q; aimBurst(B.aim + (ph >= 2 ? 1 : 0)); }
+    aimTick();
   }
   // 부채꼴(탱크)
   if (B.fan && K.kind === 'tank') { P.fan -= dt; if (P.fan <= 0) { P.fan = B.fanT * q; fan(g, bx, by, B.fan + ph, .95 + ph * .15, spd * 1.05, 'm', dmg); } }
@@ -804,8 +846,11 @@ function hitAny(g, B) {
       if (B.x >= p.x0 && B.x <= p.x1) {
         // 처음엔 한 발에 +1, 많이 올릴수록 조금씩 더 맞혀야 오른다(무한정 커지지 않게)
         if (p.t === '+' && gt.y > -820 && !(p.cap != null && p.v >= p.cap)) { p.acc += 1; const need = 1 + Math.floor((p.gain || 0) / 3); if (p.acc >= need) { p.acc = 0; p.v++; p.gain = (p.gain || 0) + 1; p.hit = 1; h.gateHit(gt, p, B.x); } }
-        else if ((p.t === 'x' && p.v < 3) || (p.t === '/' && p.v > 1)) {
-          p.acc += 1; const need = 4 + Math.floor((p.gain || 0) / 2);
+        // 유도탄 문: 쏘면 내줄 병사(마이너스)가 줄어든다 — 많이 줄일수록 조금씩 더 맞혀야 (사용자 지시 2026-11-11 "쏘는 맛")
+        else if (p.t === 'M' && p.v > 1 && gt.y > -820) { p.acc += 1; const need = 1 + Math.floor((p.gain || 0) / 4); if (p.acc >= need) { p.acc = 0; p.v--; p.gain = (p.gain || 0) + 1; p.hit = 1; h.gateHit(gt, p, B.x); } }
+        // × 문: 3배에서 멈추지 않는다(최대 ×9). 대신 3배를 넘으면 0.1 올릴 때마다 맞혀야 할 수가 더 빨리 는다 — 열심히 맞힐수록 올라간다
+        else if ((p.t === 'x' && p.v < 9) || (p.t === '/' && p.v > 1)) {
+          p.acc += 1; const need = 4 + Math.floor((p.gain || 0) / 2) + (p.t === 'x' ? Math.max(0, Math.round((p.v - 3) * 10)) : 0);
           if (p.acc >= need && gt.y > -820) { p.acc = 0; p.v = Math.round((p.v + (p.t === 'x' ? .1 : -.1)) * 10) / 10; p.gain = (p.gain || 0) + 1; p.hit = 1; h.gateHit(gt, p, B.x); }
         }
         h.spark(B.x, gt.y + gt.h / 2, 'cool', 1);

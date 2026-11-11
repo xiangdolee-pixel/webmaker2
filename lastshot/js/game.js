@@ -3,7 +3,7 @@
    오려 낸 그림(img/*.webp, 크기는 sprites.js)을 카메라를 바라보는 판으로 세워 그린다(병사는 InstancedMesh 로 수백 명).
    숫자 · 글자 · 콤보 · 동전은 위 2D 캔버스에 3D 위치를 투영해 그린다. */
 import * as THREE from './vendor/three.module.min.js';
-import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, DIFFS, diffOf, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile, snapshot, restore, mslGain, moneyMissiles } from './core.js?v=31';
+import { ROAD_L, ROAD_R, MID, SPAWN, TIERS, STAGES, MID_NAME, DIFFS, diffOf, stageOf, bossName, TWISTS, squadPos, squadR, newGame, step, autoAim, fireMissile, snapshot, restore, mslGain, moneyMissiles } from './core.js?v=33';
 import { SPRITES } from './sprites.js?v=17';
 // 보스 · 중간보스 둘레 빛 · 던지는 것 색
 const AURA = { croc: '#46ff6a', gorilla: '#c65bff', elephant: '#4fb6ff', lion: '#ffc23a', tiger: '#ff6a1f' };
@@ -965,8 +965,9 @@ const hooks = {
     SFX.gateTick(p.gain);
     for (let i = 0; i < 3; i++) addSpark(wx(x) + rnd(-.4, .4), rnd(1.5, 4), wz(gt.y) + .3, i ? '#bfefff' : '#ffffff', rnd(.7, 1.3), .14, rnd(-5, 5), rnd(1, 6), rnd(2, 6));
     if (p.t !== '+') {   // × · ÷ 문: 바뀐 값(×2.3 · ÷1.8)이 톡
-      if (p.ftx && p.ftx.t > 0 && texts.includes(p.ftx)) { p.ftx.s = gateLabel(p); p.ftx.t = p.ftx.L = .6; p.ftx.pop = 1; p.ftx.z = wz(gt.y); }
-      else { p.ftx = { x: wx((p.x0 + p.x1) / 2), z: wz(gt.y), h: 5.4, s: gateLabel(p), c: p.t === 'x' ? '#e0f7ff' : '#ffe4e6', size: 18, t: .6, L: .6, small: true, dy: 0, pop: 1 }; texts.push(p.ftx); }
+      const ls = p.t === 'M' ? '-' + p.v : gateLabel(p);   // 유도탄 문은 줄어든 마이너스
+      if (p.ftx && p.ftx.t > 0 && texts.includes(p.ftx)) { p.ftx.s = ls; p.ftx.t = p.ftx.L = .6; p.ftx.pop = 1; p.ftx.z = wz(gt.y); }
+      else { p.ftx = { x: wx((p.x0 + p.x1) / 2), z: wz(gt.y), h: 5.4, s: ls, c: p.t === 'x' ? '#e0f7ff' : p.t === 'M' ? '#fef08a' : '#ffe4e6', size: 18, t: .6, L: .6, small: true, dy: 0, pop: 1 }; texts.push(p.ftx); }
       return;
     }
     // 칸마다 숫자 하나가 '+1 → +2 → +3' 으로 누적되며 톡 튄다(새 글자를 계속 만들지 않음)
@@ -1166,7 +1167,9 @@ function end(win) {
   state = 'end'; btnMsl.hidden = true; endAt = performance.now(); save('lastshot_live', 0);
   inFlight = 0; coins.length = 0;
   const btn = $('#btnNext');
-  $('#rankBox').hidden = true; $('#moneyBox').hidden = win; $('#moneyMsl').textContent = moneyMissiles(G.diff) + '발';
+  $('#rankBox').hidden = true; $('#moneyBox').hidden = win; $('#moneyMsl').textContent = moneyMissiles(diff) + '발';
+  // 'Show me the money' 다시 시작할 난이도 — 끝 화면의 랭킹 탭(목록만 바꿈)을 난이도로 알고 누르는 일이 있어 여기서 직접 고르게 (사용자 지시 2026-11-11)
+  if (!win) { if (!moneySeg) moneySeg = seg($('#moneySeg'), DIFF_ITEMS, diff, pickDiff); else moneySeg.set(diff, true); }
   if (win) {
     const bonus = G.committed || 0;
     $('#endKicker').textContent = 'STAGE CLEAR'; $('#endTitle').textContent = `레벨 ${level - 1} 클리어!`;
@@ -1222,7 +1225,9 @@ async function api(path, method = 'GET', body) {
   if (!r.ok) throw Object.assign(new Error(out.error || '서버 오류가 났어요.'), { status: r.status, out });
   return out;
 }
-const diffSeg = seg($('#diffSeg'), DIFF_ITEMS, diff, v => { diff = v; save('lastshot_diff', v); if (pending) { run = 0; save('lastshot_run', 0); clearSnap(); pushProgress({ state: null }); } else pushProgress(); syncHud(0); });   // 이어할 판이 있는데 난이도를 바꾸면 그 판은 버리고 새 판(누적 점수 0 부터)
+const diffSeg = seg($('#diffSeg'), DIFF_ITEMS, diff, v => { diff = v; save('lastshot_diff', v); if (pending) { run = 0; save('lastshot_run', 0); clearSnap(); pushProgress({ state: null }); } else pushProgress(); syncHud(0); });
+let moneySeg = null;
+function pickDiff(v) { diff = v; save('lastshot_diff', v); diffSeg.set(v, true); $('#moneyMsl').textContent = moneyMissiles(v) + '발'; pushProgress(); }   // 끝 화면(머니)에서 고른 난이도 = 시작 화면 난이도와 같은 값   // 이어할 판이 있는데 난이도를 바꾸면 그 판은 버리고 새 판(누적 점수 0 부터)
 function applyMe(me) {
   user = me; level = me.level || 1; best = Math.max(level, me.best || 1); diff = diffOf(me.diff); run = me.run || 0;
   save('lastshot_level', level); save('lastshot_best', best); save('lastshot_diff', diff); save('lastshot_name', me.nickname); save('lastshot_run', run);

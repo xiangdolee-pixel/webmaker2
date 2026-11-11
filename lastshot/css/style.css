@@ -170,6 +170,11 @@ button:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
 .money-q { font-size: 1.35rem; font-weight: 900; color: #fde047; letter-spacing: -.01em; text-shadow: 0 2px 0 #14532d, 0 0 14px rgba(253, 224, 71, .45); }
 .money-sub { margin-top: 4px; font-size: .88rem; font-weight: 700; color: #dcfce7; }
 .money-sub b { color: #fff; }
+.money-diff { margin-top: 10px; font-size: .82rem; font-weight: 800; color: #bbf7d0; }
+.money-seg { margin-top: 6px; }
+.money-seg > button { height: 34px; font-size: .88rem; }
+.rank-cap { margin-top: 12px; font-size: .8rem; font-weight: 800; color: #94a3b8; }
+.rank-cap + .rank-seg { margin-top: 6px; }
 .money-btns { display: flex; gap: 10px; }
 .money-btns .btn { height: 50px; margin-top: 12px; font-size: 1.1rem; }
 .money-btns .money-no { flex: 0 0 38%; background: linear-gradient(180deg, #475569, #334155); color: #e2e8f0; border-color: #94a3b8; box-shadow: 0 6px 0 #1e293b, 0 10px 20px rgba(0, 0, 0, .3); text-shadow: var(--stroke); }
