@@ -99,11 +99,25 @@ async function claude(prompt, { cwd, timeoutMin = 25, label = 'claude', model } 
     child.stdin.end(prompt);
   });
 }
+// 응답에서 JSON 객체 하나를 꺼낸다. 첫 '{' ~ 마지막 '}' 로 자르면 JSON 뒤에 설명 · 두 번째 객체가 붙었을 때
+// "Unexpected non-whitespace character after JSON" 으로 깨진다(2026-11-11 패키지 단계 실패) → 따옴표를 따라가며 짝이 맞는 객체를 찾는다.
 function parseJson(text, label = '응답') {
-  let s = String(text).replace(/```[a-z]*\n?/g, '').trim();
-  const a = s.indexOf('{'), b = s.lastIndexOf('}');
-  if (a < 0 || b < 0) throw new Error(`${label}이 JSON 이 아닙니다: ${s.slice(0, 200)}`);
-  return JSON.parse(s.slice(a, b + 1));
+  const s = String(text).replace(/```[a-z]*\n?/g, '').trim();
+  let lastErr = null;
+  for (let a = s.indexOf('{'); a >= 0; a = s.indexOf('{', a + 1)) {
+    let depth = 0, inStr = false, esc = false, end = -1;
+    for (let i = a; i < s.length; i++) {
+      const c = s[i];
+      if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true;
+      else if (c === '{') depth++;
+      else if (c === '}' && --depth === 0) { end = i; break; }
+    }
+    if (end < 0) continue;
+    try { return JSON.parse(s.slice(a, end + 1)); } catch (e) { lastErr = e; }
+  }
+  if (lastErr) throw new Error(`${label} JSON 읽기 실패: ${lastErr.message}`);
+  throw new Error(`${label}이 JSON 이 아닙니다: ${s.slice(0, 200)}`);
 }
 // JSON 스키마 → 모양 예시 (claude -p 는 output_config 가 없어 모양을 글로 못 박는다)
 function shape(schema) {
