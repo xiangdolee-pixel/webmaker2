@@ -139,12 +139,17 @@ function show(n, scroll = true) {
   $('[data-submit]', form).hidden = at !== LAST;
   err.textContent = '';
   if (at === LAST) review();
+  $$('textarea[data-target]', cards[at]).forEach((t) => t._grow?.()); // 보이게 된 뒤 높이를 잰다
   if (scroll) root.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
 }
 function check(n) {
   const card = cards[n];
   if (n === 0 && !form.elements.agree.checked) return '개인정보 수집 · 이용에 동의해 주세요.';
   for (const el of $$('input[required], textarea[required]', card)) {
+    if (el.type === 'hidden') { // 주소
+      if (!el.value.trim() || !$('[data-part=base]', el.parentElement).value.trim()) { const b = $('[data-part=base]', el.parentElement); b.focus(); return `'${el.parentElement.querySelector('span').firstChild.textContent.trim()}' 를 [주소 찾기]로 넣어 주세요.`; }
+      continue;
+    }
     if (el.type === 'radio') {
       if (!form.elements[el.name].value) { el.focus(); return `'${el.closest('fieldset').querySelector('legend').textContent.replace('*', '').trim()}' 을(를) 골라 주세요.`; }
     } else if (!el.value.trim()) { el.focus(); return `'${el.closest('label').querySelector('span').textContent.replace('*', '').trim()}' 을(를) 적어 주세요. 해당 사항이 없으면 '없음'이라고 적어 주세요.`; }
@@ -186,7 +191,10 @@ $('[data-prev]', form).addEventListener('click', () => show(at - 1));
 $$('textarea[data-target]', form).forEach((t) => {
   const out = $(`[data-count-for="${t.name}"]`, form);
   const upd = () => { const n = t.value.trim().length; out.textContent = `${n.toLocaleString()}자 / 약 ${(+t.dataset.target).toLocaleString()}자 이상`; out.classList.toggle('ok', n >= +t.dataset.target); };
-  t.addEventListener('input', () => { upd(); shortOk = false; });
+  // 적을수록 칸이 늘어난다 (넘치면 스크롤 대신 아래로 길어짐)
+  const grow = () => { if (t.offsetParent === null) return; t.style.height = 'auto'; t.style.height = `${Math.max(t.scrollHeight + 2, parseFloat(getComputedStyle(t).minHeight) || 0)}px`; };
+  t.addEventListener('input', () => { upd(); grow(); shortOk = false; });
+  t._grow = grow;
   upd();
 });
 let saveT = 0;
@@ -227,8 +235,63 @@ if (new URLSearchParams(location.search).get('sent')) {
   history.replaceState(null, '', location.pathname);
 }
 
+// ───── 주소: 다음(카카오) 우편번호 — 처음 누를 때 불러온다. 폰은 전체 화면, PC 는 가운데 창 ─────
+const ADDR_JS = 'https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+let addrLoad = null;
+const loadPostcode = () => addrLoad || (addrLoad = new Promise((ok, no) => {
+  const sc = document.createElement('script'); sc.src = ADDR_JS; sc.onload = ok; sc.onerror = () => { addrLoad = null; no(new Error('주소 찾기를 불러오지 못했습니다. 주소를 직접 적어 주세요.')); };
+  document.head.append(sc);
+}));
+const part = (box, p) => $(`[data-part=${p}]`, box);
+function addrJoin(box) { // 칸 셋 → 숨은 칸 하나
+  const z = part(box, 'zip').value.trim(); const b = part(box, 'base').value.trim(); const d = part(box, 'detail').value.trim();
+  $('input[type=hidden]', box).value = b ? `${z ? `(${z}) ` : ''}${b}${d ? ` / ${d}` : ''}` : '';
+}
+function addrSplit(box) { // 숨은 칸 → 칸 셋 (예전에 한 줄로 적은 주소는 기본 주소 칸에)
+  const v = $('input[type=hidden]', box).value.trim();
+  const m = v.match(/^(?:\((\d{5,6})\)\s*)?(.*?)(?:\s\/\s(.*))?$/);
+  part(box, 'zip').value = m?.[1] || ''; part(box, 'base').value = m?.[2] || v; part(box, 'detail').value = m?.[3] || '';
+}
+function openPostcode(box) {
+  loadPostcode().then(() => {
+    const layer = document.createElement('div');
+    layer.className = 'ap-post';
+    layer.innerHTML = '<div class="ap-post-box" role="dialog" aria-label="주소 찾기"><div class="ap-post-h"><b>주소 찾기</b><button type="button" class="ap-post-x" aria-label="닫기">✕</button></div><div class="ap-post-in"></div></div>';
+    (root.closest('.xms-c') || document.body).append(layer);
+    const close = () => { layer.remove(); document.documentElement.classList.remove('ap-lock'); };
+    document.documentElement.classList.add('ap-lock');
+    layer.addEventListener('click', (e) => { if (e.target === layer || e.target.closest('.ap-post-x')) close(); });
+    new window.daum.Postcode({
+      width: '100%', height: '100%',
+      oncomplete(d) {
+        let base = d.userSelectedType === 'J' ? d.jibunAddress : d.roadAddress;
+        if (d.userSelectedType !== 'J') {
+          const extra = [/[동로가]$/.test(d.bname) ? d.bname : '', d.buildingName && d.apartment === 'Y' ? d.buildingName : ''].filter(Boolean).join(', ');
+          if (extra) base += ` (${extra})`;
+        }
+        part(box, 'zip').value = d.zonecode; part(box, 'base').value = base;
+        addrJoin(box); save(); close();
+        setTimeout(() => part(box, 'detail').focus(), 50);
+      },
+    }).embed($('.ap-post-in', layer));
+  }).catch((e) => { toast(e.message); part(box, 'base').focus(); });
+}
+$$('[data-addr]', form).forEach((box) => {
+  ['zip', 'base', 'detail'].forEach((p) => part(box, p).addEventListener('input', () => addrJoin(box)));
+  $('[data-find]', box).addEventListener('click', () => openPostcode(box));
+  // 기본 주소 칸이 비어 있으면 눌렀을 때 바로 찾기
+  part(box, 'base').addEventListener('click', () => { if (!part(box, 'base').value) openPostcode(box); });
+  part(box, 'zip').addEventListener('click', () => { if (!part(box, 'zip').value) openPostcode(box); });
+  $('[data-same]', box.parentElement)?.addEventListener('click', () => {
+    const from = $(`[data-addr="${$('[data-same]', box).dataset.same}"]`, form);
+    if (!from || !$('input[type=hidden]', from).value) { toast('현재 거주지 주소를 먼저 넣어 주세요.'); return; }
+    $('input[type=hidden]', box).value = $('input[type=hidden]', from).value; addrSplit(box); save(); toast('현재 거주지 주소를 넣었습니다.');
+  });
+});
+
 $$('[data-list] li[data-id]', form).forEach((li) => li.replaceWith(fileItem({ ...li.dataset, size: +li.dataset.size }))); // 이미 낸 서류
 restore();
+$$('[data-addr]', form).forEach(addrSplit); // 저장해 둔 주소를 칸 셋으로
 refreshFiles();
 show(Math.min(restored, LAST - 1), false);
 if (dirtyAt) saveServer();

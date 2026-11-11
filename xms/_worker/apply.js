@@ -37,14 +37,14 @@ export const FORM = {
       { k: 'church', label: '소속 교회', hint: '교단까지 정확히 적어 주세요.', ph: '예: 대한예수교장로회(합동) ○○교회' },
       { k: 'training', label: '사랑방 훈련 기간', ph: '예: 없음, 2015.04~현재' },
       { k: 'mobile', label: '휴대폰', type: 'tel', prefill: 'mobile', ph: '010-0000-0000' },
-      { k: 'address', label: '현재 거주지 주소', wide: true },
+      { k: 'address', label: '현재 거주지 주소', type: 'addr', wide: true },
     ] },
     { key: 'payer', title: '학비 부담자 정보', desc: '학비를 부담하는 분의 정보를 적어 주세요.', fields: [
       { k: 'payer_name', label: '학비 부담자 성명' },
       { k: 'payer_relation', label: '지원자와의 관계', ph: '예: 부, 모, 본인' },
       { k: 'payer_job', label: '학비 부담자 직업' },
       { k: 'payer_work', label: '학비 부담자 근무처' },
-      { k: 'payer_address', label: '자택 주소', wide: true },
+      { k: 'payer_address', label: '자택 주소', type: 'addr', same: 'address', wide: true },
     ] },
     { key: 'family', title: '가정 환경 정보', desc: '가정 환경을 적어 주세요.', fields: [
       { k: 'family', label: '가족 관계', ph: '예: 1부, 1모, 2남 1녀 중 1째', wide: true },
@@ -235,6 +235,15 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
     if (f.type === 'textarea') {
       return `<label class="field wide">${head}<textarea class="input ap-long" name="${f.k}" required maxlength="8000" data-target="${f.target}" placeholder="신청 사유를 자세히 적어 주세요.">${esc(val(f))}</textarea>
         <small class="ap-count" data-count-for="${f.k}"></small>${hint}</label>`;
+    }
+    // 주소: [주소 찾기](다음 우편번호) → 우편번호 · 기본 주소가 채워지고 상세 주소만 적는다. 실제 값은 숨은 칸 "(우편번호) 기본 주소 / 상세 주소"
+    if (f.type === 'addr') {
+      return `<div class="field wide ap-addr" data-addr="${f.k}"><span>${esc(f.label)} <em class="req">*</em>${f.same ? `<button type="button" class="linkish ap-same" data-same="${f.same}">현재 거주지와 같음</button>` : ''}</span>
+        <input type="hidden" name="${f.k}" value="${esc(val(f))}" required>
+        <div class="ap-addr-row"><input class="input ap-zip" data-part="zip" placeholder="우편번호" inputmode="numeric" maxlength="7" aria-label="${esc(f.label)} 우편번호" autocomplete="off"><button type="button" class="btn primary ap-find" data-find>주소 찾기</button></div>
+        <input class="input" data-part="base" placeholder="[주소 찾기]를 누르면 채워집니다" maxlength="200" aria-label="${esc(f.label)} 기본 주소" autocomplete="off">
+        <input class="input" data-part="detail" placeholder="상세 주소 (동 · 호수 등)" maxlength="100" aria-label="${esc(f.label)} 상세 주소" autocomplete="off">
+      </div>`;
     }
     const type = f.type === 'tel' ? 'tel' : 'text';
     return `<label class="field${f.wide ? ' wide' : ''}">${head}<input class="input" type="${type}" name="${f.k}" value="${esc(val(f))}" required maxlength="300"${f.mode ? ` inputmode="${f.mode}"` : ''}${f.ph ? ` placeholder="${esc(f.ph)}"` : ''}${f.k === 'name' ? ' autocomplete="name"' : f.k === 'mobile' ? ' autocomplete="tel"' : ' autocomplete="off"'}>${hint}</label>`;
