@@ -279,7 +279,7 @@ export class StudioMain extends WorkflowEntrypoint {
     }
   }
 
-  // 본편: 뉴스 후보 → Top15 → (6개 고르기) → 기사 6 → 팩트체크 → 유튜브 패키지 → 슬라이드 → 검수 → 썸네일
+  // 본편: 뉴스 후보 → Top15 → (8개 고르기) → 기사 8 → 팩트체크 → 유튜브 패키지 → 슬라이드 → 검수 → 썸네일
   async runMain(S, step, job, opt, settings) {
     const env = this.env, db = env.DB, jobId = job.id;
     let blocks;
@@ -288,15 +288,15 @@ export class StudioMain extends WorkflowEntrypoint {
       const top = await S('top15', async () => {
         const list = cands.map((c) => `[${c.n}] ${c.title}\n    ${c.label} | ${c.published_kst}\n    ${c.url}\n    ${c.summary}`).join('\n');
         const r = await claude(env, { system: P.TOP15_SYSTEM, schema: P.TOP15_SCHEMA, messages: [{ role: 'user', content: `기준 시각: ${kst(now())} (최근 ${NEWS_HOURS}시간)\n\n후보 목록:\n${list}` }] });
-        const t = r.json; t.items = t.items.slice(0, 12);
+        const t = r.json; t.items = t.items.slice(0, 15);
         await saveDoc(db, jobId, 'top15', t);
         return { out: t, usage: r.usage, note: `${t.items.length}개 · 추천 ${t.picks.join(',')}` };
       });
-      let chosen = top.picks.slice(0, 6);
+      let chosen = top.picks.slice(0, 8);
       if (opt.pick === 'manual') {
         await setJob(db, jobId, { status: 'pick', step: 'pick' });
         const ev = await step.waitForEvent('pick', { type: 'pick', timeout: '3 days' });
-        chosen = (ev.payload?.chosen || []).map(Number).filter((n) => top.items.some((i) => i.n === n)).slice(0, 6);
+        chosen = (ev.payload?.chosen || []).map(Number).filter((n) => top.items.some((i) => i.n === n)).slice(0, 8);
         if (!chosen.length) throw new NonRetryableError('고른 기사가 없습니다.');
         await saveDoc(db, jobId, 'chosen', chosen);
       }
@@ -945,7 +945,7 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
     }
     if (mm[2] === 'pick') {
       if (job.status !== 'pick') throw bad('지금은 고르기 단계가 아닙니다.');
-      const chosen = (d.chosen || []).map(Number).filter(Boolean).slice(0, 6);
+      const chosen = (d.chosen || []).map(Number).filter(Boolean).slice(0, 8);
       if (chosen.length < 1) throw bad('기사를 골라 주세요.');
       await saveDoc(db, job.id, 'chosen', chosen);
       if (inst) await inst.sendEvent({ type: 'pick', payload: { chosen } });

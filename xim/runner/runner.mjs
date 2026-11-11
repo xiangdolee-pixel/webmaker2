@@ -171,8 +171,8 @@ async function runText(payload, work, { stage = 'run', onBlocks } = {}) {
         const cands = await stepRun(j, 'rss', '', async () => { const r = await j.rss(); covered = r.covered || []; hours = r.hours || 8; if (r.candidates.length < 3) throw new Error(`RSS 후보가 ${r.candidates.length}건뿐입니다.`); return r.candidates; });
         top = await stepRun(j, 'top15', '', async () => {
           const list = cands.map((c) => `[${c.n}] ${c.title}\n    ${c.label} | ${c.published_kst}\n    ${c.url}\n    ${c.summary}`).join('\n');
-          const t = parseJson(await claude(`${P.TOP15_SYSTEM}\n\n기준 시각: ${kstNow()} (최근 ${hours}시간 — 제작 시각 기준)\n\n후보 목록:\n${list}${covered.length ? `\n\n★ 이미 다룬 뉴스(최근 회차) — 아래와 같은 사건 · 같은 소재의 후속 재보도는 Top15 와 추천에서 모두 뺀다(수치만 갱신된 같은 이야기도 같은 사건으로 본다). 정말 새로운 전개(새 결정 · 큰 변화)일 때만 예외:\n${covered.map((c) => `- [${c.when}] ${c.title}${c.url ? ` (${c.url})` : ''}`).join('\n')}` : ''}\n\n★ items[].n 과 picks 의 숫자는 후보 목록의 [n] 번호를 그대로 쓴다(새로 매기지 않는다). items 는 고른 12개 전부.${SHAPE(P.TOP15_SCHEMA)}${JSON_ONLY}`, { label: 'Top15', model: 'sonnet' }), 'Top15');
-          t.items = (t.items || []).slice(0, 12);   // Top12 (사용자 지시 2026-11-10: 15 → 12)
+          const t = parseJson(await claude(`${P.TOP15_SYSTEM}\n\n기준 시각: ${kstNow()} (최근 ${hours}시간 — 제작 시각 기준)\n\n후보 목록:\n${list}${covered.length ? `\n\n★ 이미 다룬 뉴스(최근 회차) — 아래와 같은 사건 · 같은 소재의 후속 재보도는 Top15 와 추천에서 모두 뺀다(수치만 갱신된 같은 이야기도 같은 사건으로 본다). 정말 새로운 전개(새 결정 · 큰 변화)일 때만 예외:\n${covered.map((c) => `- [${c.when}] ${c.title}${c.url ? ` (${c.url})` : ''}`).join('\n')}` : ''}\n\n★ items[].n 과 picks 의 숫자는 후보 목록의 [n] 번호를 그대로 쓴다(새로 매기지 않는다). items 는 고른 15개 전부, picks 는 8개.${SHAPE(P.TOP15_SCHEMA)}${JSON_ONLY}`, { label: 'Top15', model: 'sonnet' }), 'Top15');
+          t.items = (t.items || []).slice(0, 15);   // Top15 · 추천 8 (사용자 지시 2026-11-11: 12 → 15, 6 → 8 — 영상 8분 넘기기)
           t.picks = (t.picks || []).map((x) => (typeof x === 'object' && x ? (x.n ?? x.candidate ?? x.no) : x)).map(Number).filter(Boolean);
           if (!t.items.length) throw new Error('Top15 결과에 items 가 없습니다.');
           await j.doc('top15', t);
@@ -180,8 +180,8 @@ async function runText(payload, work, { stage = 'run', onBlocks } = {}) {
         });
         await j.step('top15', 'done', `${top.items.length}개 · 추천 ${(top.picks || []).join(',')}`);
       }
-      if (job.options.pick === 'manual' && !chosen) { await j.status('pick', 'pick'); log('  6개 고르기 대기 → 사용자가 고르면 다시 이어진다'); return 'wait'; }
-      const picks = (chosen || top.picks || []).slice(0, 6);
+      if (job.options.pick === 'manual' && !chosen) { await j.status('pick', 'pick'); log('  8개 고르기 대기 → 사용자가 고르면 다시 이어진다'); return 'wait'; }
+      const picks = (chosen || top.picks || []).slice(0, 8);
       const items = picks.map((n) => top.items.find((i) => i.n === n)).filter(Boolean);
       if (!items.length) throw new Error('고른 기사가 없습니다.');
       await assertAlive(j);
@@ -201,11 +201,11 @@ async function runText(payload, work, { stage = 'run', onBlocks } = {}) {
         const total = () => results.filter(Boolean).reduce((a, x) => a + bodyLen(x), 0);
         if (results.some(Boolean) && total() < MIN_CHARS) {
           const order = items.map((it, i) => ({ it, i })).filter(({ i }) => results[i]).sort((a, z) => bodyLen(results[a.i]) - bodyLen(results[z.i]));
-          const need = order.filter(({ i }) => bodyLen(results[i]) < 600);
+          const need = order.filter(({ i }) => bodyLen(results[i]) < 430);
           log(`  원고가 짧음(${total()}자 < ${MIN_CHARS}자 ≈ 8분) → 짧은 기사 ${need.length || 2}개 늘려 다시`);
           await Promise.all((need.length ? need : order.slice(0, 2)).map(async ({ it, i }) => {
             const len = bodyLen(results[i]);
-            try { const nb = await one(it, `\n\n★ 분량: 직전 대본 본문이 ${len}자로 짧았다. 본문을 640~680자(문단 4개)로 늘려 다시 쓴다. 기사 안의 배경 · 수치 · 맥락으로 채우고 같은 말 되풀이나 없는 사실은 금지.`); if (bodyLen(nb) > len) results[i] = nb; } catch (e) { log(`  기사 ${it.n} 늘리기 실패 — 그대로(${e.message.slice(0, 60)})`); }
+            try { const nb = await one(it, `\n\n★ 분량: 직전 대본 본문이 ${len}자로 짧았다. 본문을 480~520자(문단 3개)로 늘려 다시 쓴다. 기사 안의 배경 · 수치 · 맥락으로 채우고 같은 말 되풀이나 없는 사실은 금지.`); if (bodyLen(nb) > len) results[i] = nb; } catch (e) { log(`  기사 ${it.n} 늘리기 실패 — 그대로(${e.message.slice(0, 60)})`); }
           }));
           log(`  늘린 뒤 ${total()}자`);
         }

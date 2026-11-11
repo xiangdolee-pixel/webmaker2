@@ -54,7 +54,7 @@ function studioPace(list) {
   return v.length ? v[Math.floor(v.length / 2)] : 0.35;
 }
 
-const STATUS = { queued: ['대기', 'wait'], running: ['진행 중', 'run'], pick: ['6개 고르기', 'ask'], thumb: ['썸네일 선택', 'ask'], images: ['그림 대기 (PC)', 'wait'], done: ['완료', 'done'], failed: ['실패', 'fail'], stopped: ['멈춤', 'stop'] };
+const STATUS = { queued: ['대기', 'wait'], running: ['진행 중', 'run'], pick: ['8개 고르기', 'ask'], thumb: ['썸네일 선택', 'ask'], images: ['그림 대기 (PC)', 'wait'], done: ['완료', 'done'], failed: ['실패', 'fail'], stopped: ['멈춤', 'stop'] };
 const KIND = { main: '본편', thumb: '썸네일만', phone: '폰UI 쇼츠' };
 const SOURCE = { rss: '웹 뉴스', capture: '캡쳐', text: '글 직접' };
 const STEP_LABEL = (s) => {
@@ -62,7 +62,7 @@ const STEP_LABEL = (s) => {
   if ((m = s.match(/^article-(\d+)$/))) return `기사 ${m[1]}`;
   if ((m = s.match(/^slide-(\d+)$/))) return `슬라이드 ${m[1]}`;
   if ((m = s.match(/^review-(\d+)$/))) return `검수 ${m[1]}`;
-  return { rss: '뉴스 후보', top15: 'Top12 선정', pick: '6개 고르기', factcheck: '팩트체크', summary: '유튜브 패키지', package: '패키지(팩트체크 · 제목 · 썸네일 값)', 'thumb-prompt': '썸네일 프롬프트', thumb: '썸네일', slides: '슬라이드', review: '검수', purge: '정리' }[s] || s;
+  return { rss: '뉴스 후보', top15: 'Top15 선정', pick: '8개 고르기', factcheck: '팩트체크', summary: '유튜브 패키지', package: '패키지(팩트체크 · 제목 · 썸네일 값)', 'thumb-prompt': '썸네일 프롬프트', thumb: '썸네일', slides: '슬라이드', review: '검수', purge: '정리' }[s] || s;
 };
 // ───── 단계 지도(계획) · 진행률 ─────
 //   작업 종류 · 옵션에 따라 밟을 단계를 미리 그리고, 실제 단계 기록(studio_steps)을 그 위에 얹는다.
@@ -71,10 +71,10 @@ function planFor(job) {
   const o = job.options || {};
   if (job.kind === 'thumb') return [['thumb-prompt', '썸네일 프롬프트'], ['thumb', '썸네일 (ChatGPT)']];
   const p = [];
-  if (job.source === 'rss') { p.push(['rss', '뉴스 후보 모으기'], ['top15', 'Top12 선정 (이미 다룬 뉴스 제외)']); if (o.pick === 'manual') p.push(['pick', '6개 고르기 (내가)']); }
-  p.push(['articles', job.source === 'rss' ? '기사 대본 6개 (원문 대조 포함)' : '대본 쓰기 (원문 대조 포함)'], ['package', '패키지 — 교차 팩트체크 · 제목 · 인트로 · 더보기 · 썸네일 값 (슬라이드와 동시)']);
+  if (job.source === 'rss') { p.push(['rss', '뉴스 후보 모으기'], ['top15', 'Top15 선정 (이미 다룬 뉴스 제외)']); if (o.pick === 'manual') p.push(['pick', '8개 고르기 (내가)']); }
+  p.push(['articles', job.source === 'rss' ? '기사 대본 8개 (원문 대조 포함)' : '대본 쓰기 (원문 대조 포함)'], ['package', '패키지 — 교차 팩트체크 · 제목 · 인트로 · 더보기 · 썸네일 값 (슬라이드와 동시)']);
   if (o.thumb === 'manual') p.push(['thumb-wait', '썸네일 선택 (내가)']);
-  p.push(['slides', '슬라이드 6장 → 썸네일 (ChatGPT)'], ['review', '슬라이드 검수 · 썸네일 검수']);
+  p.push(['slides', `슬라이드 ${job.source === 'rss' ? 8 : '6'}장 → 썸네일 (ChatGPT)`], ['review', '슬라이드 검수 · 썸네일 검수']);
   return p;
 }
 const keyOf = (step) => step.replace(/^article-\d+$/, 'articles').replace(/^slide-\d+$/, 'slides').replace(/^review-\d+$/, 'review').replace(/^(thumb|thumb-prompt)$/, 'slides').replace(/^(factcheck|summary|thumb-pick)$/, 'package');
@@ -348,7 +348,7 @@ function newJobDialog() {
           </div>
         </div>
         <label class="field" id="src-text" hidden><span>글</span><textarea class="input" name="text" rows="6" placeholder="기사 본문이나 메모를 붙여 넣으세요"></textarea></label>
-        <fieldset class="choice-set" id="pick-set"><legend>기사 고르기</legend><div class="tabs seg" id="f-pick"></div><small>자동이면 클로드 추천 6개로 바로 진행합니다.</small></fieldset>
+        <fieldset class="choice-set" id="pick-set"><legend>기사 고르기</legend><div class="tabs seg" id="f-pick"></div><small>자동이면 클로드 추천 8개로 바로 진행합니다.</small></fieldset>
         <fieldset class="choice-set"><legend>썸네일</legend><div class="tabs seg" id="f-thumb"></div><small>내가 고르기 = 글이 끝난 뒤 제목 · 인물 · 표정 · 제스처를 웹에서 고릅니다.</small></fieldset>
         <fieldset class="choice-set st-after"><legend>완성된 뒤</legend>
           <label class="st-check"><input type="checkbox" name="video" checked><span><b>영상도 바로 만들기</b><small>사자왕이 슬라이드 전부를 읽는 1280x720 자막 영상(8분 이상). 끄면 나중에 카드의 "영상 만들기"로 만들 수 있어요.</small></span></label>
@@ -363,7 +363,7 @@ function newJobDialog() {
     pillTabs($('#f-kind', dlg), [['main', '본편'], ['thumb', '썸네일만'], ['phone', '폰UI 쇼츠 (준비 중)']], st.kind, (v) => { if (v === 'phone') { toast('폰UI 쇼츠는 다음 단계에서 열립니다.'); return; } st.kind = v; $('#main-opts', dlg).hidden = v !== 'main'; $('#thumb-opts', dlg).hidden = v !== 'thumb'; });
     pillTabs($('#f-channel', dlg), [['사섬', '사섬'], ['순섬', '순섬']], st.channel, (v) => { st.channel = v; });
     pillTabs($('#f-source', dlg), [['rss', '웹 뉴스 (최근 8시간)'], ['capture', '캡쳐 올리기'], ['text', '글 직접']], st.source, (v) => { st.source = v; $('#src-capture', dlg).hidden = v !== 'capture'; $('#src-text', dlg).hidden = v !== 'text'; $('#pick-set', dlg).hidden = v !== 'rss'; });
-    pillTabs($('#f-pick', dlg), [['auto', '자동 (추천 6개)'], ['manual', '내가 고르기']], st.pick, (v) => { st.pick = v; });
+    pillTabs($('#f-pick', dlg), [['auto', '자동 (추천 8개)'], ['manual', '내가 고르기']], st.pick, (v) => { st.pick = v; });
     pillTabs($('#f-thumb', dlg), [['auto', '자동'], ['manual', '내가 고르기']], st.thumb, (v) => { st.thumb = v; });
     setupThumbForm(dlg);
     // 캡쳐 올리기: 끌어다 놓기 · 눌러서 고르기 · 붙여넣기(Ctrl+V) 모두 같은 함수로
@@ -537,11 +537,11 @@ async function renderJob() {
     e.preventDefault();
     const chosen = $$('#st-pick-form input:checked').map((i) => +i.value);
     busy(e.currentTarget.querySelector('[type=submit]'), $('#pk-err'), async () => {
-      if (chosen.length !== 6 && !confirm(`${chosen.length}개를 골랐습니다. 6개가 아니어도 진행할까요?`)) return;
+      if (chosen.length !== 8 && !confirm(`${chosen.length}개를 골랐습니다. 8개가 아니어도 진행할까요?`)) return;
       await api(`/studio/jobs/${job.id}/pick`, { method: 'POST', data: { chosen } }); renderJob();
     });
   });
-  $$('#st-pick-form input[type=checkbox]').forEach((c) => c.addEventListener('change', () => { $('#pk-count').textContent = `${$$('#st-pick-form input:checked').length} / 6`; }));
+  $$('#st-pick-form input[type=checkbox]').forEach((c) => c.addEventListener('change', () => { $('#pk-count').textContent = `${$$('#st-pick-form input:checked').length} / 8`; }));
   if (job.status === 'thumb') {
     setupThumbForm($('#st-thumb-form'));
     $('#st-thumb-form').addEventListener('submit', (e) => { e.preventDefault(); busy(e.currentTarget.querySelector('[type=submit]'), $('#tp-err'), async () => { const d = readThumbForm(e.currentTarget); if (!d.title) throw new Error('제목을 고르거나 넣어 주세요.'); await api(`/studio/jobs/${job.id}/thumb`, { method: 'POST', data: d }); renderJob(); }); });
@@ -582,7 +582,7 @@ async function renderJob() {
 function pickPanel(top) {
   const rec = new Set(top.picks);
   const reason = Object.fromEntries(top.pick_reasons.map((p) => [p.n, p.reason]));
-  return `<section class="card st-panel"><h3>기사 6개 고르기 <small id="pk-count">0 / 6</small></h3>
+  return `<section class="card st-panel"><h3>기사 8개 고르기 <small id="pk-count">0 / 8</small></h3>
     <p class="st-hint">클로드 추천은 ★ 로 표시됩니다. 처음엔 아무것도 체크돼 있지 않습니다.</p>
     <form id="st-pick-form"><ul class="st-news">${top.items.map((it) => `<li><label><input type="checkbox" value="${it.n}">
       <div><div class="n-top"><b>${it.n}.</b> ${esc(it.title)} ${rec.has(it.n) ? `<span class="n-rec" title="${esc(reason[it.n] || '')}">★ 추천</span>` : ''}</div>
@@ -767,7 +767,7 @@ async function scheduleDialog() {
   const seg = (name, i, v, items) => `<span class="tabs seg st-sched-seg" data-name="${name}">${items.map(([k, l]) => `<button type="button" class="tab ${(v || items[0][0]) === k ? 'on' : ''}" data-v="${k}">${l}</button>`).join('')}<input type="hidden" name="${name}" value="${esc(v || items[0][0])}"></span>`;
   // 세부 설정(사용자 지시 2026-11-10): 새 발표자료와 같은 선택지를 예약마다
   const detail = (x, i) => `<div class="st-sched-detail" data-i="${i}" hidden>
-      <div class="st-sched-opt"><span>기사 고르기</span>${seg('pick', i, x.pick, [['auto', '자동 (추천 6개)'], ['manual', '내가 고르기']])}</div>
+      <div class="st-sched-opt"><span>기사 고르기</span>${seg('pick', i, x.pick, [['auto', '자동 (추천 8개)'], ['manual', '내가 고르기']])}</div>
       <div class="st-sched-opt"><span>썸네일</span>${seg('thumb', i, x.thumb, [['auto', '자동'], ['manual', '내가 고르기']])}</div>
       <label class="st-check"><input type="checkbox" name="video" ${x.video === false ? '' : 'checked'}><span><b>영상도 바로 만들기</b><small>사자왕이 슬라이드 전부를 읽는 자막 영상</small></span></label>
       <label class="st-check"><input type="checkbox" name="youtube" ${x.youtube === false ? '' : 'checked'}><span><b>유튜브 채널에 올리기</b><small>비공개 업로드 → 검토 뒤 공개 → 텔레그램 공식채널 링크</small></span></label>
@@ -784,7 +784,7 @@ async function scheduleDialog() {
   const plusMin = (hhmm, add) => { const [h, m] = hhmm.split(':').map(Number); const t = (h * 60 + m + add) % 1440; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
   openDialog(`<h2>예약 <small class="st-meta">하루 최대 3개 · 한국 시각 · 지금 ${esc(r.now_kst)}</small></h2>
     <p class="st-hint">예약 시각이 되면 그 시각 기준 최근 8시간 웹 뉴스로 자동 선택 · 자동 썸네일 본편을 만듭니다. PC 도우미가 꺼져 있으면 "대기" 로 쌓였다가 켤 때 이어집니다.</p>
-    <p class="st-dur"><b>한 번 만드는 데 약 ${est}분</b> <span class="st-meta">${d.n >= 3 ? `최근 ${d.n}회 평균 ${d.avg_min}분 · 마지막 ${d.last_min}분` : `기록이 ${d.n || 0}회뿐이라 기본값 20분으로 계산${d.n ? ` (마지막 ${d.last_min}분)` : ''}`} · 글 단계 ≈ 10분, 슬라이드 6장 + 썸네일 ≈ 7~10분, 검수 · 재생성 ≈ 2~3분</span></p>
+    <p class="st-dur"><b>한 번 만드는 데 약 ${est}분</b> <span class="st-meta">${d.n >= 3 ? `최근 ${d.n}회 평균 ${d.avg_min}분 · 마지막 ${d.last_min}분` : `기록이 ${d.n || 0}회뿐이라 기본값 20분으로 계산${d.n ? ` (마지막 ${d.last_min}분)` : ''}`} · 글 단계 ≈ 10분, 슬라이드 8장 + 썸네일 ≈ 9~12분, 검수 · 재생성 ≈ 2~3분</span></p>
     <form id="st-sched-form">${rows.map(row).join('')}<p class="err" id="sc-err"></p>
     <div class="dlg-actions"><button class="btn" type="button" data-close>닫기</button><button class="btn primary" type="submit">저장</button></div></form>`, (dlg) => {
     const refreshEta = (row) => { const on = row.querySelector('[name=on]').checked, tm = row.querySelector('[name=time]').value; row.querySelector('[data-eta]').textContent = on && tm ? `→ 약 ${plusMin(tm, est)} 완성` : ''; };
