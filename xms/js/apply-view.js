@@ -25,6 +25,12 @@ if (list) {
     draw();
   }));
   q?.addEventListener('input', draw);
+  // 정렬: 접수 순(최근 먼저) · 합계 높은 순 — 카드만 다시 놓는다
+  $('[data-apx-sort]', list)?.addEventListener('change', (e) => {
+    const box = $('.apx-list', list);
+    const key = e.target.value === 'sum' ? (c) => +c.dataset.sum * 1e13 + +c.dataset.at : (c) => +c.dataset.at;
+    $$('.apx-card', box).sort((x, y) => key(y) - key(x)).forEach((c) => box.append(c));
+  });
   $('[data-apx-round]', list)?.addEventListener('change', (e) => { location.href = `/member/apply/list?round=${e.target.value}`; });
 }
 
@@ -41,6 +47,23 @@ if (view) {
       toast(`'${LABEL[b.dataset.st]}'(으)로 바꿨습니다.`);
     });
   }));
+  // 내 점수 1~10 (다시 누르면 바뀜, [내 점수 빼기])
+  const sbox = $('[data-apx-score]', view);
+  sbox?.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pt]');
+    if (!b) return;
+    const n = +b.dataset.pt;
+    busy(b, null, async () => {
+      const r = await admin(`/apply/${id}/score`, { method: 'PUT', data: { score: n } });
+      $$('.apx-pt', sbox).forEach((x) => { const on = +x.dataset.pt === n; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); });
+      $('[data-apx-scores]', sbox).innerHTML = r.html;
+      $('[data-my-note]', sbox).textContent = n ? `${n}점을 줬습니다 · 다시 누르면 바뀝니다` : '1~10점 중 하나를 누르세요';
+      let clr = $('.apx-pt-clear', sbox);
+      if (n && !clr) { clr = document.createElement('button'); clr.type = 'button'; clr.className = 'linkish apx-pt-clear'; clr.dataset.pt = '0'; clr.textContent = '내 점수 빼기'; $('.apx-pts', sbox).after(clr); }
+      if (!n) clr?.remove();
+      toast(n ? `${n}점을 줬습니다. (합계 ${r.sum}점)` : '내 점수를 뺐습니다.');
+    });
+  });
   $$('[data-zoom]', view).forEach((b) => b.addEventListener('click', () => {
     const u = esc(b.dataset.zoom);
     openDialog(`<div class="apx-big"><img src="${u}" alt=""></div>

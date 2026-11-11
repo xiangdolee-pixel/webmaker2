@@ -414,3 +414,15 @@ CREATE TABLE IF NOT EXISTS apply_drafts (
   updated_at INTEGER NOT NULL,
   PRIMARY KEY (site, round_id, member_id)
 );
+
+-- 2026-11-11 신청서 심사 점수 — 레벨1(관리자 회원)이 신청서마다 1~10점, 한 사람당 하나
+CREATE TABLE IF NOT EXISTS apply_scores (
+  site           TEXT NOT NULL,
+  application_id INTEGER NOT NULL,
+  member_id      INTEGER NOT NULL,
+  score          INTEGER NOT NULL,
+  created_at     INTEGER NOT NULL,
+  updated_at     INTEGER NOT NULL,
+  PRIMARY KEY (application_id, member_id)
+);
+CREATE INDEX IF NOT EXISTS idx_apply_scores_site ON apply_scores(site, application_id);

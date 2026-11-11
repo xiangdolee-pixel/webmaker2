@@ -368,15 +368,17 @@ export async function applicantsPage(ctx, { page, msgPage, needLogin }) {
   ]);
   const list = results.map(appRow);
   const cnt = (k) => list.filter((a) => a.status === k).length;
+  const sc = await scoresOf(db, site, list.map((a) => a.id));
   const t = kstDay();
   const state = round.starts_on > t ? ['soon', '시작 전'] : round.ends_on < t ? ['closed', '마감'] : ['open', '접수 중'];
-  const card = (a) => `<a class="apx-card" href="/member/apply/${a.id}" data-q="${esc([a.name, a.dept, a.student_no, a.mobile, a.role].join(' ').toLowerCase())}" data-st="${a.status}">
+  const card = (a) => `<a class="apx-card" href="/member/apply/${a.id}" data-q="${esc([a.name, a.dept, a.student_no, a.mobile, a.role].join(' ').toLowerCase())}" data-st="${a.status}" data-sum="${sumOf(sc.get(a.id))}" data-at="${a.created_at}">
       <span class="apx-av">${initial(a.name)}</span>
       <span class="apx-card-b">
         <span class="apx-card-t"><b>${esc(a.name)}</b>${statusTag(a.status)}</span>
         <span class="apx-card-l">${esc([a.dept, a.student_no].filter(Boolean).join(' · ') || '-')}</span>
         <span class="apx-card-m"><span>성적 <b>${esc(a.gpa || '-')}</b></span><span>${esc(a.role || '-')}</span>${a.state ? `<span>${esc(a.state)}</span>` : ''}</span>
         <small>${fmtTime(a.created_at)} 접수${a.updated_at > a.created_at + 60000 ? ' · 고침' : ''}</small>
+        <span class="apx-scores">${scoreLine(sc.get(a.id))}</span>
       </span><span class="apx-chev" aria-hidden="true">›</span></a>`;
   return page(ctx, '신청자 확인', `<div class="apx" data-apx-list>
   <a class="apx-back" href="/member/apply">‹ 장학금 신청</a>
@@ -388,9 +390,10 @@ export async function applicantsPage(ctx, { page, msgPage, needLogin }) {
   </header>
   <div class="apx-stats" role="group" aria-label="상태로 거르기">
     <button type="button" class="apx-stat on" data-f="all" aria-pressed="true"><b>${list.length}</b><span>전체</span></button>
-    ${Object.entries(STATUS).map(([k, l]) => `<button type="button" class="apx-stat" data-f="${k}" aria-pressed="false"><b>${cnt(k)}</b><span>${l}</span></button>`).join('')}
+    <button type="button" class="apx-stat" data-f="SUBMITTED" aria-pressed="false"><b>${cnt('SUBMITTED')}</b><span>접수</span></button>
   </div>
   ${list.length ? `<div class="apx-tools"><input class="input apx-q" type="search" placeholder="이름 · 학과 · 학번으로 찾기" data-apx-q aria-label="신청자 찾기">
+    <select class="input apx-sort" data-apx-sort aria-label="정렬"><option value="at">접수 순</option><option value="sum">합계 높은 순</option></select>
     <a class="btn apx-xls" href="/xms-api/admin/apply/export?round=${round.id}">엑셀</a></div>
   <div class="apx-list">${list.map(card).join('')}</div>
   <p class="apx-none" data-apx-none hidden>조건에 맞는 신청자가 없습니다.</p>`
@@ -420,6 +423,9 @@ export async function applicantPage(ctx, id, { page, msgPage, needLogin }) {
     : `<div><dt>${esc(f.label)}</dt><dd>${esc(v[f.k] || '-')}</dd></div>`);
   const step = (to, label, cls) => (to ? `<a class="btn ${cls}" href="/member/apply/${to}">${label}</a>` : `<span class="btn ${cls} off" aria-disabled="true">${label}</span>`);
   const docCount = FORM.files.filter((f) => (docs[f.k] || []).length).length;
+  const scores = (await scoresOf(db, site, [a.id])).get(a.id);
+  const meId = ctx.me.kind === 'member' ? ctx.me.member.id : 0;
+  const mine = scores.find((x) => x.member_id === meId)?.score || 0;
   return page(ctx, `${row.name} 신청서`, `<div class="apx" data-apx-view data-id="${a.id}">
   <div class="apx-topnav"><a class="apx-back" href="/member/apply/list?round=${a.round_id}">‹ 신청자 목록</a><span>${i + 1} / ${ids.length}</span></div>
   <div class="apx-hero">
@@ -435,8 +441,11 @@ export async function applicantPage(ctx, id, { page, msgPage, needLogin }) {
       ${tel ? `<a class="apx-act" href="tel:${esc(tel)}">${PHONE}<span>전화</span></a><a class="apx-act" href="sms:${esc(tel)}">${CHAT}<span>문자</span></a>` : ''}
       ${mail ? `<a class="apx-act" href="mailto:${esc(mail)}">${MAIL}<span>메일</span></a>` : ''}
     </div>
-    <div class="apx-judge"><span class="apx-judge-l">심사</span>
-      <div class="apx-chips" role="group" aria-label="상태 바꾸기">${Object.entries(STATUS).map(([k, l]) => `<button type="button" class="apx-chip${k === a.status ? ' on' : ''}" data-st="${k}" aria-pressed="${k === a.status}">${l}</button>`).join('')}</div>
+    <div class="apx-score" data-apx-score>
+      <div class="apx-score-h"><span class="apx-judge-l">내 점수</span><small data-my-note>${mine ? `${mine}점을 줬습니다 · 다시 누르면 바뀝니다` : '1~10점 중 하나를 누르세요'}</small></div>
+      ${meId ? `<div class="apx-pts" role="group" aria-label="점수 주기">${Array.from({ length: 10 }, (_, n) => n + 1).map((n) => `<button type="button" class="apx-pt${n === mine ? ' on' : ''}" data-pt="${n}" aria-pressed="${n === mine}">${n}</button>`).join('')}</div>
+      ${mine ? '<button type="button" class="linkish apx-pt-clear" data-pt="0">내 점수 빼기</button>' : ''}` : '<p class="apx-miss">운영자로 들어온 상태라 점수를 줄 수 없습니다. 관리자 계정으로 로그인해 주세요.</p>'}
+      <div class="apx-scores big" data-apx-scores>${scoreLine(scores)}</div>
     </div>
   </div>
   ${FORM.sections.map((s) => `<div class="apx-sec"><h2>${esc(s.title)}</h2><dl class="apx-kv">${s.fields.map(kv).join('')}</dl></div>`).join('')}
@@ -474,6 +483,23 @@ function roundValues(b) {
   if (s > e) throw bad('마감일이 시작일보다 앞설 수 없습니다.');
   return { title, s, e, notice: str(b.notice, 3000), visible: b.visible === false || b.visible === '0' ? 0 : 1 };
 }
+// 심사 점수: 레벨1 이 신청서마다 1~10점 (한 사람당 하나, 다시 누르면 바뀜). 목록에 사람별 점수 + 합계 (사용자 지시 2026-11-11)
+export async function scoresOf(db, site, appIds) {
+  const map = new Map(appIds.map((id) => [id, []]));
+  if (!appIds.length) return map;
+  for (let i = 0; i < appIds.length; i += 90) {
+    const part = appIds.slice(i, i + 90);
+    const { results } = await db.prepare(`SELECT s.application_id AS a, s.member_id AS m, s.score, s.updated_at, COALESCE(NULLIF(mb.name, ''), mb.nickname, '관리자') AS who
+      FROM apply_scores s LEFT JOIN members mb ON mb.id = s.member_id WHERE s.site = ? AND s.application_id IN (${part.map(() => '?').join(',')}) ORDER BY s.created_at, s.member_id`).bind(site, ...part).all();
+    for (const r of results) map.get(r.a)?.push({ member_id: r.m, who: r.who, score: r.score, at: r.updated_at });
+  }
+  return map;
+}
+const sumOf = (list) => list.reduce((t, x) => t + x.score, 0);
+const scoreLine = (list) => (list.length
+  ? `<span class="apx-sc-list">${list.map((x) => `<span class="apx-sc"><i>${esc(x.who)}</i><b>${x.score}</b></span>`).join('')}</span><span class="apx-sc-sum">합계 <b>${sumOf(list)}</b><small>${list.length}명</small></span>`
+  : '<span class="apx-sc-none">아직 점수 없음</span>');
+
 const appRow = (a) => {
   const v = parse(a.answers, {});
   return { id: a.id, round_id: a.round_id, name: v.name || a.m_name || '', dept: v.dept || '', student_no: v.student_no || '', gpa: v.gpa || '', state: v.status || '',
@@ -526,15 +552,36 @@ export async function adminApply(ctx, path, method) {
       WHERE a.site = ? AND a.round_id = ? ORDER BY a.created_at DESC`).bind(site, round).all();
     if (path === '/apply/list') return json(results.map(appRow));
     const r = await db.prepare('SELECT title FROM apply_rounds WHERE id = ? AND site = ?').bind(round, site).first();
-    const head = ['번호', '상태', '접수 시각', '고친 시각', '아이디', ...FIELDS.map((f) => f.label), ...FORM.files.map((f) => `${f.label} (파일 수)`), '메모'];
+    const sc = await scoresOf(db, site, results.map((a) => a.id));
+    const judges = [...new Map([...sc.values()].flat().map((x) => [x.member_id, x.who])).entries()]; // 점수 준 사람마다 한 칸
+    const head = ['번호', '상태', '접수 시각', '고친 시각', '아이디', ...judges.map(([, w]) => `점수 · ${w}`), '점수 합계', ...FIELDS.map((f) => f.label), ...FORM.files.map((f) => `${f.label} (파일 수)`), '메모'];
     const lines = results.map((a) => {
-      const v = parse(a.answers, {}); const fl = parse(a.files, {});
-      return [a.id, STATUS[a.status] || a.status, fmtTime(a.created_at), fmtTime(a.updated_at), a.login_id || '', ...FIELDS.map((f) => v[f.k] || ''), ...FORM.files.map((f) => (fl[f.k] || []).length), a.memo || ''];
+      const v = parse(a.answers, {}); const fl = parse(a.files, {}); const s = sc.get(a.id);
+      return [a.id, STATUS[a.status] || a.status, fmtTime(a.created_at), fmtTime(a.updated_at), a.login_id || '', ...judges.map(([id]) => s.find((x) => x.member_id === id)?.score ?? ''), sumOf(s),
+        ...FIELDS.map((f) => v[f.k] || ''), ...FORM.files.map((f) => (fl[f.k] || []).length), a.memo || ''];
     });
     const cell = (x) => { const s = String(x ?? ''); return /[",\r\n]/.test(s) || /^[=+\-@]/.test(s) ? `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"` : s; };
     const csv = `\ufeff${[head, ...lines].map((l) => l.map(cell).join(',')).join('\r\n')}`;
     await audit(db, site, me, request, 'APPLY_EXPORT', r?.title || '', `${results.length}건`);
     return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="applications-${round}-${kstDay()}.csv"`, 'Cache-Control': 'no-store' } });
+  }
+
+  // 심사 점수 주기 (레벨1 회원 본인 몫): PUT /apply/<번호>/score { score: 1~10 | 0(빼기) }
+  if ((m = path.match(/^\/apply\/(\d+)\/score$/)) && method === 'PUT') {
+    if (me.kind !== 'member') throw bad('관리자 계정으로 로그인해야 점수를 줄 수 있습니다.');
+    const a = await db.prepare('SELECT id, answers FROM applications WHERE id = ? AND site = ?').bind(+m[1], site).first();
+    if (!a) throw notFound('없는 신청서입니다.');
+    const score = Number((await body(request)).score);
+    if (!(Number.isInteger(score) && score >= 0 && score <= 10)) throw bad('점수는 1~10점입니다.');
+    const t = now();
+    if (score === 0) await db.prepare('DELETE FROM apply_scores WHERE site = ? AND application_id = ? AND member_id = ?').bind(site, a.id, me.member.id).run();
+    else {
+      await db.prepare(`INSERT INTO apply_scores (site, application_id, member_id, score, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(application_id, member_id) DO UPDATE SET score = excluded.score, updated_at = excluded.updated_at`).bind(site, a.id, me.member.id, score, t, t).run();
+    }
+    await audit(db, site, me, request, 'APPLY_SCORE', parse(a.answers, {}).name || String(a.id), score ? `${score}점` : '점수 뺌');
+    const list = (await scoresOf(db, site, [a.id])).get(a.id);
+    return json({ ok: true, mine: score, scores: list, sum: sumOf(list), html: scoreLine(list) });
   }
 
   // 신청서 하나
@@ -563,7 +610,7 @@ export async function adminApply(ctx, path, method) {
     }
     if (method === 'DELETE') {
       await removeUploads(env, site, 'post_id = ?', [APPLY_BASE - a.id]);
-      await db.prepare('DELETE FROM applications WHERE id = ?').bind(a.id).run();
+      await db.batch([db.prepare('DELETE FROM applications WHERE id = ?').bind(a.id), db.prepare('DELETE FROM apply_scores WHERE application_id = ?').bind(a.id)]);
       await audit(db, site, me, request, 'APPLY_DELETE', appRow(a).name);
       return json({ ok: true });
     }
