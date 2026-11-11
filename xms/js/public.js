@@ -387,3 +387,4 @@ addEventListener('pageshow', (e) => { if (e.persisted) document.querySelectorAll
 
 // 신청서 화면 (/member/apply)
 if ($('[data-apply]')) import('./apply.js');
+if ($('[data-apx-list], [data-apx-view]')) import('./apply-view.js'); // 레벨1 신청자 확인

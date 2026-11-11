@@ -7,7 +7,7 @@ import {
 import { boardOptions } from './admin-api.js';
 import { postAttachments, syncPostFiles, removePostFiles, setAvatar, avatarOf } from './uploads.js';
 import { sendSignupCode, verifySignupCode, takeTicket, turnstileKeys } from './signup.js';
-import { applyPage, publicApply, applyOn, openRound } from './apply.js';
+import { applyPage, applicantsPage, applicantPage, publicApply, applyOn, openRound } from './apply.js';
 
 const LOCK_AFTER = 5;
 const LOCK_MS = 15 * 60000;
@@ -490,6 +490,9 @@ export async function publicPage(ctx) {
   if (p === '/member/terms') return docPage(ctx, 'TERMS');
   if (p === '/member/privacy') return docPage(ctx, 'PRIVACY');
   if (p === '/member/apply') return applyPage(ctx, { page, needLogin, msgPage });
+  if (p === '/member/apply/list') return applicantsPage(ctx, { page, needLogin, msgPage }); // 레벨1: 신청자 확인
+  const ap = p.match(/^\/member\/apply\/(\d+)$/);
+  if (ap) return applicantPage(ctx, Number(ap[1]), { page, needLogin, msgPage });
   // 메뉴 권한으로 막힌 페이지 (사이트 Worker 가 이 화면을 그 주소에 끼워 보여 줌)
   if (p === '/member/denied') {
     const back = String(ctx.url.searchParams.get('next') || '/');
@@ -509,7 +512,7 @@ export async function publicPage(ctx) {
 
 // ───────── 라우터: 방문자 API ─────────
 // 로그인 뒤 갈 곳: 기본은 홈. 글쓰기처럼 로그인이 필요했던 화면만 그리로 돌아간다(회원 화면은 홈으로)
-function safeNext(n) { return n && /^\/(?!\/)/.test(n) && !/^\/member\/(?!apply$)/.test(n) ? n : '/'; } // 신청서(/member/apply)는 로그인 뒤 돌아간다
+function safeNext(n) { return n && /^\/(?!\/)/.test(n) && !/^\/member\/(?!apply(?:\/(?:list|\d+))?$)/.test(n) ? n : '/'; } // 신청서(/member/apply)는 로그인 뒤 돌아간다
 
 export async function publicApi(ctx) {
   const { request, env, site, me, url } = ctx;
@@ -519,7 +522,7 @@ export async function publicApi(ctx) {
   let m;
 
   if (path === '/menu' && method === 'GET') return json(await visibleMenus(db, site, me));
-  if (path === '/apply') return publicApply(ctx); // 신청서 내기 (apply.js)
+  if (path === '/apply' || path === '/apply/draft') return publicApply(ctx, path); // 신청서 내기 · 임시 저장 (apply.js)
 
   // 게시판 최신 글 — 사이트 첫 화면 등에서 사이트 디자인 그대로 그릴 때 쓴다 (예: sjccc 홈 "포토")
   // 글 관리 (관리자): 고른 글 숨김 · 보이기 · 삭제(deleted_at — DB 에는 남아 운영자가 되살릴 수 있다)

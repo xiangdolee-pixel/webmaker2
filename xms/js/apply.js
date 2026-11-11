@@ -30,12 +30,40 @@ function collect() {
   $$('[data-file]', form).forEach((box) => { files[box.dataset.file] = $$('li[data-id]', box).map((li) => ({ id: li.dataset.id, name: li.dataset.name, mime: li.dataset.mime, size: +li.dataset.size })); });
   return { answers, files, agree: form.elements.agree.checked };
 }
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ ...collect(), at: Date.now() })); } catch { /* 저장 못 해도 계속 */ } };
+// 저장: 이 기기(localStorage)에 바로 + 서버에 1.2초 뒤(임시 저장). 서버에 못 보내면(인터넷 끊김) 이 기기에 두었다가 다시 연결되면 보낸다.
+const PREVIEW = 'preview' in root.dataset;
+const st = $('[data-save-st]', form);
+let dirtyAt = 0; let sentAt = 0; let sending = null; let srvT = 0;
+const hhmm = (t) => new Date(t).toTimeString().slice(0, 5);
+const showSt = (txt, cls = '') => { st.textContent = txt; st.className = `ap-save-st ${cls}`; };
+function saveLocal() { try { localStorage.setItem(KEY, JSON.stringify({ ...collect(), step: at, at: Date.now() })); } catch { /* 저장 못 해도 계속 */ } }
+async function saveServer() {
+  if (PREVIEW) { showSt('미리보기라 저장하지 않습니다.'); return; }
+  if (sending) return sending;
+  const mark = dirtyAt;
+  const d = collect();
+  showSt('저장 중…', 'busy');
+  sending = api('/apply/draft', { method: 'PUT', data: { round: +root.dataset.round, answers: d.answers, agree: d.agree, step: at, files: Object.fromEntries(Object.entries(d.files).map(([k, l]) => [k, l.map((x) => x.id)])) } })
+    .then(() => { sentAt = mark; showSt(`서버에 저장됨 · ${hhmm(Date.now())}`, 'ok'); })
+    .catch((e) => { showSt(navigator.onLine === false || !e.status ? '인터넷이 끊겼습니다 — 이 기기에 저장해 두고, 다시 연결되면 자동으로 저장합니다.' : e.message, 'warn'); })
+    .finally(() => { sending = null; if (dirtyAt > sentAt && navigator.onLine !== false) { clearTimeout(srvT); srvT = setTimeout(saveServer, 3000); } });
+  return sending;
+}
+const save = () => { dirtyAt = Date.now(); saveLocal(); clearTimeout(srvT); srvT = setTimeout(saveServer, 1200); };
+addEventListener('online', () => { if (dirtyAt > sentAt) saveServer(); });
+// 창을 닫거나 다른 앱으로 넘어갈 때 아직 못 보낸 게 있으면 바로 보낸다
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && dirtyAt > sentAt) { clearTimeout(srvT); saveServer(); } });
+$('[data-save-now]', form).addEventListener('click', () => { dirtyAt = Date.now(); saveLocal(); clearTimeout(srvT); saveServer(); });
 function restore() {
-  if ('done' in root.dataset) return; // 이미 낸 신청서는 서버 값 그대로
-  let d = null;
-  try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { d = null; }
+  const srv = JSON.parse($('[data-apply-draft]', root)?.textContent || 'null');
+  let loc = null;
+  try { loc = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { loc = null; }
+  if ('done' in root.dataset && !srv) return; // 이미 낸 신청서는 서버 값 그대로 (그 뒤 고치던 임시 저장이 있으면 그것)
+  // 이 기기 것과 서버 것 중 나중 것 (서버가 늦으면 다른 기기에서 쓴 것)
+  const d = loc && (!srv || loc.at > srv.at) && !('done' in root.dataset) ? loc : srv;
   if (!d) return;
+  if (d === loc && (!srv || loc.at > srv.at)) dirtyAt = Date.now(); // 서버에 못 간 것 → 곧 보낸다
+  restored = d.step || 0;
   Object.entries(d.answers || {}).forEach(([k, v]) => {
     const el = form.elements[k];
     if (!el || !v) return;
@@ -43,11 +71,15 @@ function restore() {
   });
   Object.entries(d.files || {}).forEach(([k, list]) => {
     const ul = $(`[data-file="${k}"] [data-list]`, form);
-    if (ul && !ul.children.length) list.forEach((f) => ul.append(fileItem(f)));
+    if (!ul || !list.length) return;
+    ul.innerHTML = '';
+    list.forEach((f) => ul.append(fileItem(f)));
   });
   if (d.agree) form.elements.agree.checked = true;
-  toast('적던 내용을 불러왔습니다.');
+  showSt(`${d === srv ? '서버에' : '이 기기에'} 저장해 둔 내용을 불러왔습니다 · ${hhmm(d.at)}`, 'ok');
+  if ('done' in root.dataset) { $('[data-done-card]', root).hidden = true; form.hidden = false; }
 }
+let restored = 0;
 
 // ───── 서류 ─────
 function fileItem(f) {
@@ -146,7 +178,7 @@ form.addEventListener('click', (e) => {
 $('[data-next]', form).addEventListener('click', () => {
   const m = check(at);
   if (m) { err.textContent = m; return; }
-  shortOk = false; save(); show(at + 1);
+  shortOk = false; show(at + 1); save();
 });
 $('[data-prev]', form).addEventListener('click', () => show(at - 1));
 
@@ -198,4 +230,5 @@ if (new URLSearchParams(location.search).get('sent')) {
 $$('[data-list] li[data-id]', form).forEach((li) => li.replaceWith(fileItem({ ...li.dataset, size: +li.dataset.size }))); // 이미 낸 서류
 restore();
 refreshFiles();
-show(0, false);
+show(Math.min(restored, LAST - 1), false);
+if (dirtyAt) saveServer();

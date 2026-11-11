@@ -9,14 +9,19 @@ import { featureOn } from './courses.js';
 import { removeUploads } from './uploads.js';
 import { checkTurnstile, turnstileKeys } from './signup.js';
 
-export const APPLY_BASE = -1000000000; // 수정 요청(-요청번호, 작은 음수) · 프로필 사진(-20억 − 회원번호) 과 겹치지 않는다
+export const APPLY_BASE = -1000000000;
+const DRAFT_BASE = -1500000000; // 임시 저장 중인 서류 = DRAFT_BASE − 회원번호 (하루 지나도 지워지지 않게) // 수정 요청(-요청번호, 작은 음수) · 프로필 사진(-20억 − 회원번호) 과 겹치지 않는다
 
 // ───────── 신청서 항목 (구글 폼 그대로, 순서도 같게) ─────────
 export const FORM = {
   intro: [
-    '모든 항목은 꼭 적어야 합니다. 해당 사항이 없으면 \'없음\'이라고 적어 주세요.',
-    '마지막 단계에서 아래 서류 4가지를 올려 주세요. 휴대폰으로 찍은 사진도 됩니다.',
-    '① 주민등록등본 ② 지난 학기 성적증명서 ③ 학생 사진(규격 없음) ④ 통장 사본',
+    '모든 항목은 꼭 적어야 합니다.',
+    '해당 사항이 없으면 \'없음\'이라고 적어 주세요.',
+    '마지막 단계에서 아래 서류 4가지를 올려 주세요. (휴대폰으로 찍은 사진도 됩니다)',
+    '① 주민등록등본',
+    '② 지난 학기 성적증명서',
+    '③ 학생 사진 (규격 없음)',
+    '④ 통장 사본',
     '※ 서류가 하나라도 빠지면 지원이 자동으로 취소됩니다.',
     '※ 주민등록번호 뒷자리 7자리는 가리고 올려 주세요.',
   ],
@@ -94,12 +99,14 @@ async function docsOf(db, site, app) {
 
 // ───────── 방문자 ─────────
 //   POST /xms-api/apply  { round, answers, files: { 항목: [id…] }, turnstile }
-export async function publicApply(ctx) {
+//   PUT  /xms-api/apply/draft  { round, answers, files, agree, step }  — 적는 대로 서버에 임시 저장 (인터넷이 끊겨도 이어서 쓰게)
+export async function publicApply(ctx, path = '/apply') {
   const { request, env, site, me } = ctx;
   const db = env.DB;
-  if (request.method !== 'POST') throw notFound();
   if (!(await applyOn(db, site))) throw notFound('이 사이트는 신청서를 받지 않습니다.');
-  if (me.kind !== 'member') throw new HttpError(401, '회원가입 · 로그인을 한 뒤 신청할 수 있습니다.');
+  if (me.kind !== 'member') throw new HttpError(401, '로그인이 풀렸습니다. 다시 로그인하면 적던 곳부터 이어서 쓸 수 있습니다.');
+  if (path === '/apply/draft' && request.method === 'PUT') return saveDraft(ctx);
+  if (path !== '/apply' || request.method !== 'POST') throw notFound();
   const raw = await body(request);
   const round = await openRound(db, site);
   if (!round || round.id !== Number(raw.round)) throw bad('지금은 신청 기간이 아닙니다. 화면을 새로 고쳐 주세요.');
@@ -120,7 +127,7 @@ export async function publicApply(ctx) {
   const want = {};
   for (const f of FORM.files) want[f.k] = [...new Set((Array.isArray(raw.files?.[f.k]) ? raw.files[f.k] : []).map(String))].slice(0, MAX_FILES);
   const found = new Map((await filesOf(db, site, Object.values(want).flat()))
-    .filter((u) => u.created_by === me.member.id && (u.post_id === null || u.post_id === owner)).map((u) => [u.id, u]));
+    .filter((u) => u.created_by === me.member.id && (u.post_id === null || u.post_id === owner || u.post_id === DRAFT_BASE - me.member.id)).map((u) => [u.id, u]));
   const files = {};
   for (const f of FORM.files) {
     files[f.k] = want[f.k].filter((id) => found.has(id));
@@ -139,7 +146,44 @@ export async function publicApply(ctx) {
   const keep = Object.values(files).flat();
   await db.prepare(`UPDATE uploads SET post_id = ? WHERE site = ? AND kind = 'APPLY' AND id IN (${keep.map(() => '?').join(',')})`).bind(APPLY_BASE - id, site, ...keep).run();
   await removeUploads(env, site, `post_id = ? AND id NOT IN (${keep.map(() => '?').join(',')})`, [APPLY_BASE - id, ...keep]); // 바꿔 올려 빠진 서류
+  // 냈으니 임시 저장은 지운다 (남은 임시 서류도)
+  await db.prepare('DELETE FROM apply_drafts WHERE site = ? AND round_id = ? AND member_id = ?').bind(site, round.id, me.member.id).run();
+  await removeUploads(env, site, 'post_id = ?', [DRAFT_BASE - me.member.id]);
   return json({ ok: true, id, updated: !!cur });
+}
+
+async function saveDraft(ctx) {
+  const { request, env, site, me } = ctx;
+  const db = env.DB;
+  const raw = await body(request);
+  const round = await openRound(db, site);
+  if (!round || round.id !== Number(raw.round)) throw bad('지금은 신청 기간이 아닙니다.');
+  const a = raw.answers || {};
+  const answers = Object.fromEntries(FIELDS.map((f) => [f.k, str(a[f.k], f.type === 'textarea' ? 8000 : 300)]));
+  const files = {};
+  for (const f of FORM.files) files[f.k] = [...new Set((Array.isArray(raw.files?.[f.k]) ? raw.files[f.k] : []).map(String))].filter((x) => /^[0-9a-f]{32}$/.test(x)).slice(0, MAX_FILES);
+  const t = now();
+  const data = JSON.stringify({ answers, files, agree: !!raw.agree, step: Math.max(0, Math.min(20, Number(raw.step) || 0)) });
+  await db.prepare(`INSERT INTO apply_drafts (site, round_id, member_id, data, updated_at) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(site, round_id, member_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`).bind(site, round.id, me.member.id, data, t).run();
+  // 올린 서류를 임시 저장 몫으로 묶어 둔다 (안 묶인 파일은 하루 뒤 지워지므로). 목록에서 뺀 임시 서류는 지운다.
+  const owner = DRAFT_BASE - me.member.id;
+  const ids = Object.values(files).flat();
+  if (ids.length) {
+    await db.prepare(`UPDATE uploads SET post_id = ? WHERE site = ? AND kind = 'APPLY' AND post_id IS NULL AND created_by = ? AND id IN (${ids.map(() => '?').join(',')})`)
+      .bind(owner, site, me.member.id, ...ids).run();
+  }
+  await removeUploads(env, site, `post_id = ?${ids.length ? ` AND id NOT IN (${ids.map(() => '?').join(',')})` : ''}`, [owner, ...ids]);
+  return json({ ok: true, at: t });
+}
+// 화면에 넘길 임시 저장 (서류는 이름 · 크기까지)
+async function draftOf(db, site, roundId, memberId) {
+  const r = await db.prepare('SELECT data, updated_at FROM apply_drafts WHERE site = ? AND round_id = ? AND member_id = ?').bind(site, roundId, memberId).first();
+  if (!r) return null;
+  const d = parse(r.data, {});
+  const found = new Map((await filesOf(db, site, Object.values(d.files || {}).flat())).map((u) => [u.id, u]));
+  const files = Object.fromEntries(FORM.files.map((f) => [f.k, (d.files?.[f.k] || []).filter((id) => found.has(id)).map((id) => fileOut(found.get(id)))]));
+  return { answers: d.answers || {}, files, agree: !!d.agree, step: d.step || 0, at: r.updated_at };
 }
 
 // /member/apply 화면 (public.js 의 page · needLogin 을 받아 쓴다)
@@ -148,7 +192,7 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
   const db = env.DB;
   if (!(await applyOn(db, site))) return msgPage(ctx, '페이지가 없습니다', '주소를 다시 확인해 주세요.', '', 404);
   let round = await openRound(db, site);
-  const adminLink = me.level === 1 ? '<p class="ap-admin"><a href="/xms/#/apply">관리 화면에서 신청서 보기 →</a></p>' : '';
+  const adminLink = me.level === 1 ? await adminCard(db, site) : ''; // 레벨1만: [신청자 확인]
   // 관리자 미리보기: 신청 기간이 아니어도 화면을 끝까지 넘겨 볼 수 있다 (내기는 안 됨)
   const preview = !round && me.level === 1 && me.kind === 'member' && ctx.url.searchParams.get('preview') === '1';
   if (preview) round = (await nextRound(db, site)) || (await db.prepare('SELECT * FROM apply_rounds WHERE site = ? AND deleted_at IS NULL ORDER BY starts_on DESC LIMIT 1').bind(site).first());
@@ -159,7 +203,8 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
     <header class="mb-head"><span class="mb-ico">${CAL}</span><h1>지금은 신청 기간이 아닙니다</h1>
       <p>${next ? `다음 신청 기간은 <b>${esc(periodLabel(next))}</b> 입니다.` : '신청 기간이 정해지면 홈페이지에 알려 드립니다.'}</p></header>
     <div class="mb-acts"><a class="btn" href="/">홈으로</a>${me.level === 1 && me.kind === 'member' ? '<a class="btn primary" href="/member/apply?preview=1">관리자 미리보기</a>' : ''}</div>
-  </div>${adminLink}</section>`, { noindex: true });
+  </div>
+  ${adminLink}</section>`, { noindex: true });
   }
   const period = periodLabel(round);
   if (me.kind !== 'member') {
@@ -174,6 +219,7 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
   const ans = cur ? parse(cur.answers, {}) : {};
   const docs = cur ? await docsOf(db, site, cur) : {};
   const m = me.member;
+  const draft = preview ? null : await draftOf(db, site, round.id, m.id);
   const val = (f) => ans[f.k] ?? (f.prefill ? m[f.prefill] || '' : '');
   const tk = (await turnstileKeys(env, site)).sitekey;
   const notice = String(round.notice || '').trim() ? round.notice.split('\n') : FORM.intro;
@@ -205,6 +251,7 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
     <h1>${esc(round.title)}</h1>
   </header>
   ${preview ? '<p class="ap-preview">관리자 미리보기입니다. 신청 기간이 아니어서 [신청서 내기]는 되지 않습니다.</p>' : ''}
+  ${adminLink}
   ${cur ? `<div class="mb-card ap-done" data-done-card>
     <span class="ap-done-ico" aria-hidden="true">${CHECK}</span>
     <div><b>신청서가 접수됐습니다</b><p>${fmtTime(cur.created_at)} 접수${cur.updated_at > cur.created_at + 60000 ? ` · ${fmtTime(cur.updated_at)} 고침` : ''}${cur.status === 'CHECKED' ? ' · 서류 확인 완료' : ''}</p>
@@ -217,7 +264,7 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
 
     <div class="mb-card ap-step" data-step="0">
       <h2 class="ap-h">꼭 읽어 주세요</h2>
-      <ul class="ap-notice">${notice.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>
+      ${noticeHtml(notice)}
       <label class="check ap-agree"><input type="checkbox" name="agree" value="1"${cur ? ' checked' : ''}> <span>개인정보 수집 · 이용에 동의합니다. <small>적은 정보와 서류는 장학생 선발 심사에만 씁니다.</small></span></label>
     </div>
     ${FORM.sections.map((s, i) => `<div class="mb-card ap-step" data-step="${i + 1}" hidden>
@@ -241,17 +288,160 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
       <button type="button" class="btn primary" data-next>다음</button>
       <button type="submit" class="btn primary" data-submit hidden>${cur ? '고친 내용으로 다시 내기' : '신청서 내기'}</button>
     </div>
-    <p class="mb-note ap-save">적은 내용은 이 기기에 자동으로 임시 저장됩니다.</p>
+    <p class="ap-save"><span class="ap-save-st" data-save-st aria-live="polite">적는 대로 자동으로 저장됩니다.</span><button type="button" class="btn sm" data-save-now>임시 저장</button></p>
   </form>
+  <script type="application/json" data-apply-draft>${JSON.stringify(draft && (!cur || draft.at > cur.updated_at) ? draft : null).replace(/</g, '\\u003c')}</script>
   <script type="application/json" data-apply-form>${JSON.stringify({ sections: FORM.sections.map((s) => ({ title: s.title, fields: s.fields.map((f) => ({ k: f.k, label: f.label, type: f.type || 'text', target: f.target })) })), files: FORM.files.map((f) => ({ k: f.k, label: f.label })), max: MAX_FILES }).replace(/</g, '\\u003c')}</script>
-  ${adminLink}
 </section>`, { noindex: true });
+}
+
+// 안내 문구 → 보기 좋게: 한 줄 = 한 항목, ①②… 은 한 줄에 하나씩 묶음 목록, ※ 는 주의 글
+//   (한 줄에 ① ② 가 여러 개 있으면 나눈다 — 관리 화면에서 한 줄로 적어도 줄이 바뀐다)
+const CIRCLED = /[\u2460-\u2473]/;
+function noticeHtml(lines) {
+  const items = lines.flatMap((l) => String(l).split(/(?=[\u2460-\u2473])/)).map((l) => l.trim()).filter(Boolean);
+  let out = ''; let docs = '';
+  const flush = () => { if (docs) { out += `<ol class="ap-docs">${docs}</ol>`; docs = ''; } };
+  for (const l of items) {
+    if (CIRCLED.test(l[0])) { docs += `<li><span class="ap-docs-n">${l.charCodeAt(0) - 0x245f}</span>${esc(l.slice(1).trim())}</li>`; continue; }
+    flush();
+    out += /^※/.test(l) ? `<p class="ap-warn">${esc(l.replace(/^※\s*/, ''))}</p>` : `<p>${esc(l)}</p>`;
+  }
+  flush();
+  return `<div class="ap-notice">${out}</div>`;
+}
+
+// ───────── 레벨1: 홈페이지 안에서 신청자 확인 (/member/apply/list · /member/apply/<번호>) ─────────
+//   사이트 디자인 그대로, 폰에서도 카드로. 상태 바꾸기는 관리자 API(PUT /xms-api/admin/apply/<번호>)를 그대로 쓴다(js/apply-view.js).
+// 보여 줄 회차: 고른 것 → 지금 열린 것 → 다음 것 → 가장 최근 것
+async function viewRound(db, site, id) {
+  if (id) { const r = await db.prepare('SELECT * FROM apply_rounds WHERE id = ? AND site = ? AND deleted_at IS NULL').bind(id, site).first(); if (r) return r; }
+  return (await openRound(db, site)) || (await nextRound(db, site))
+    || db.prepare('SELECT * FROM apply_rounds WHERE site = ? AND deleted_at IS NULL ORDER BY starts_on DESC, id DESC LIMIT 1').bind(site).first();
+}
+async function adminCard(db, site) {
+  const r = await viewRound(db, site);
+  const n = r ? (await db.prepare('SELECT COUNT(*) AS n FROM applications WHERE round_id = ?').bind(r.id).first()).n : 0;
+  return `<a class="apx-entry" href="/member/apply/list">
+    <span class="apx-entry-ico">${PEOPLE}</span>
+    <span class="apx-entry-t"><b>신청자 확인</b><small>관리자에게만 보입니다</small></span>
+    <span class="apx-entry-n"><b>${n}</b>명</span><span class="apx-chev" aria-hidden="true">›</span></a>`;
+}
+const initial = (name) => esc(String(name || '?').trim().slice(0, 1));
+const statusTag = (st) => `<span class="apx-tag st-${esc(String(st).toLowerCase())}">${esc(STATUS[st] || st)}</span>`;
+const onlyAdmin = (ctx, msgPage, needLogin, back) => {
+  if (ctx.me.kind === 'guest') return needLogin(ctx, back);
+  if (ctx.me.level !== 1) return msgPage(ctx, '볼 수 없는 곳입니다', '관리자만 볼 수 있습니다.', '<div class="actions center"><a class="btn" href="/member/apply">장학금 신청으로</a></div>', 403);
+  return null;
+};
+
+export async function applicantsPage(ctx, { page, msgPage, needLogin }) {
+  const { env, site } = ctx;
+  const db = env.DB;
+  if (!(await applyOn(db, site))) return msgPage(ctx, '페이지가 없습니다', '주소를 다시 확인해 주세요.', '', 404);
+  const stop = onlyAdmin(ctx, msgPage, needLogin, '/member/apply/list');
+  if (stop) return stop;
+  const round = await viewRound(db, site, Number(ctx.url.searchParams.get('round')) || 0);
+  if (!round) return msgPage(ctx, '신청 기간이 없습니다', '관리 화면에서 신청 기간을 먼저 만들어 주세요.', '<div class="actions center"><a class="btn primary" href="/xms/#/apply/rounds/new">신청 기간 만들기</a></div>');
+  const [{ results: rounds }, { results }] = await db.batch([
+    db.prepare('SELECT r.id, r.title, (SELECT COUNT(*) FROM applications a WHERE a.round_id = r.id) AS n FROM apply_rounds r WHERE r.site = ? AND r.deleted_at IS NULL ORDER BY r.starts_on DESC, r.id DESC').bind(site),
+    db.prepare('SELECT a.*, mb.name AS m_name, mb.login_id FROM applications a LEFT JOIN members mb ON mb.id = a.member_id WHERE a.site = ? AND a.round_id = ? ORDER BY a.created_at DESC').bind(site, round.id),
+  ]);
+  const list = results.map(appRow);
+  const cnt = (k) => list.filter((a) => a.status === k).length;
+  const t = kstDay();
+  const state = round.starts_on > t ? ['soon', '시작 전'] : round.ends_on < t ? ['closed', '마감'] : ['open', '접수 중'];
+  const card = (a) => `<a class="apx-card" href="/member/apply/${a.id}" data-q="${esc([a.name, a.dept, a.student_no, a.mobile, a.role].join(' ').toLowerCase())}" data-st="${a.status}">
+      <span class="apx-av">${initial(a.name)}</span>
+      <span class="apx-card-b">
+        <span class="apx-card-t"><b>${esc(a.name)}</b>${statusTag(a.status)}</span>
+        <span class="apx-card-l">${esc([a.dept, a.student_no].filter(Boolean).join(' · ') || '-')}</span>
+        <span class="apx-card-m"><span>성적 <b>${esc(a.gpa || '-')}</b></span><span>${esc(a.role || '-')}</span>${a.state ? `<span>${esc(a.state)}</span>` : ''}</span>
+        <small>${fmtTime(a.created_at)} 접수${a.updated_at > a.created_at + 60000 ? ' · 고침' : ''}</small>
+      </span><span class="apx-chev" aria-hidden="true">›</span></a>`;
+  return page(ctx, '신청자 확인', `<div class="apx" data-apx-list>
+  <a class="apx-back" href="/member/apply">‹ 장학금 신청</a>
+  <header class="apx-head">
+    <p class="apx-eyebrow"><i class="apx-dot st-${state[0]}"></i>${state[1]} · ${esc(periodLabel(round))}</p>
+    <h1>신청자 확인</h1>
+    <p class="apx-sub">${esc(round.title)}</p>
+    ${rounds.length > 1 ? `<select class="input apx-round" data-apx-round aria-label="신청 기간 고르기">${rounds.map((r) => `<option value="${r.id}"${r.id === round.id ? ' selected' : ''}>${esc(r.title)} · ${r.n}명</option>`).join('')}</select>` : ''}
+  </header>
+  <div class="apx-stats" role="group" aria-label="상태로 거르기">
+    <button type="button" class="apx-stat on" data-f="all" aria-pressed="true"><b>${list.length}</b><span>전체</span></button>
+    ${Object.entries(STATUS).map(([k, l]) => `<button type="button" class="apx-stat" data-f="${k}" aria-pressed="false"><b>${cnt(k)}</b><span>${l}</span></button>`).join('')}
+  </div>
+  ${list.length ? `<div class="apx-tools"><input class="input apx-q" type="search" placeholder="이름 · 학과 · 학번으로 찾기" data-apx-q aria-label="신청자 찾기">
+    <a class="btn apx-xls" href="/xms-api/admin/apply/export?round=${round.id}">엑셀</a></div>
+  <div class="apx-list">${list.map(card).join('')}</div>
+  <p class="apx-none" data-apx-none hidden>조건에 맞는 신청자가 없습니다.</p>`
+    : '<div class="apx-empty"><b>아직 신청자가 없습니다</b><span>회원이 신청서를 내면 여기에 바로 나옵니다.</span></div>'}
+  <p class="apx-foot"><a href="/xms/#/apply?round=${round.id}">관리 화면에서 보기 →</a></p>
+</div>`, { noindex: true });
+}
+
+export async function applicantPage(ctx, id, { page, msgPage, needLogin }) {
+  const { env, site } = ctx;
+  const db = env.DB;
+  if (!(await applyOn(db, site))) return msgPage(ctx, '페이지가 없습니다', '주소를 다시 확인해 주세요.', '', 404);
+  const stop = onlyAdmin(ctx, msgPage, needLogin, `/member/apply/${id}`);
+  if (stop) return stop;
+  const a = await db.prepare('SELECT a.*, mb.name AS m_name, mb.login_id, mb.email AS m_email FROM applications a LEFT JOIN members mb ON mb.id = a.member_id WHERE a.id = ? AND a.site = ?').bind(id, site).first();
+  if (!a) return msgPage(ctx, '없는 신청서입니다', '지워졌거나 주소가 바뀌었습니다.', '<div class="actions center"><a class="btn" href="/member/apply/list">신청자 목록</a></div>', 404);
+  const { results: ids } = await db.prepare('SELECT id FROM applications WHERE site = ? AND round_id = ? ORDER BY created_at DESC').bind(site, a.round_id).all();
+  const i = ids.findIndex((x) => x.id === a.id);
+  const prev = ids[i - 1]?.id; const next = ids[i + 1]?.id;
+  const v = parse(a.answers, {});
+  const docs = await docsOf(db, site, a);
+  const row = appRow(a);
+  const tel = String(v.mobile || '').replace(/[^0-9+]/g, '');
+  const mail = a.m_email || (String(a.login_id || '').includes('@') ? a.login_id : '');
+  const kv = (f) => (f.type === 'textarea'
+    ? `<div class="apx-long"><dt>${esc(f.label)}<small>${String(v[f.k] || '').length.toLocaleString()}자</small></dt><dd>${esc(v[f.k] || '-')}</dd></div>`
+    : `<div><dt>${esc(f.label)}</dt><dd>${esc(v[f.k] || '-')}</dd></div>`);
+  const step = (to, label, cls) => (to ? `<a class="btn ${cls}" href="/member/apply/${to}">${label}</a>` : `<span class="btn ${cls} off" aria-disabled="true">${label}</span>`);
+  const docCount = FORM.files.filter((f) => (docs[f.k] || []).length).length;
+  return page(ctx, `${row.name} 신청서`, `<div class="apx" data-apx-view data-id="${a.id}">
+  <div class="apx-topnav"><a class="apx-back" href="/member/apply/list?round=${a.round_id}">‹ 신청자 목록</a><span>${i + 1} / ${ids.length}</span></div>
+  <div class="apx-hero">
+    <div class="apx-hero-top">
+      <span class="apx-av lg">${initial(row.name)}</span>
+      <div class="apx-hero-b">
+        <h1>${esc(row.name)}<span data-apx-tag>${statusTag(a.status)}</span></h1>
+        <p>${esc([v.dept, v.student_no, v.status].filter(Boolean).join(' · '))}</p>
+        <small>${fmtTime(a.created_at)} 접수${a.updated_at > a.created_at + 60000 ? ` · ${fmtTime(a.updated_at)} 고침` : ''} · 서류 ${docCount}/${FORM.files.length}</small>
+      </div>
+    </div>
+    <div class="apx-acts">
+      ${tel ? `<a class="apx-act" href="tel:${esc(tel)}">${PHONE}<span>전화</span></a><a class="apx-act" href="sms:${esc(tel)}">${CHAT}<span>문자</span></a>` : ''}
+      ${mail ? `<a class="apx-act" href="mailto:${esc(mail)}">${MAIL}<span>메일</span></a>` : ''}
+    </div>
+    <div class="apx-judge"><span class="apx-judge-l">심사</span>
+      <div class="apx-chips" role="group" aria-label="상태 바꾸기">${Object.entries(STATUS).map(([k, l]) => `<button type="button" class="apx-chip${k === a.status ? ' on' : ''}" data-st="${k}" aria-pressed="${k === a.status}">${l}</button>`).join('')}</div>
+    </div>
+  </div>
+  ${FORM.sections.map((s) => `<div class="apx-sec"><h2>${esc(s.title)}</h2><dl class="apx-kv">${s.fields.map(kv).join('')}</dl></div>`).join('')}
+  <div class="apx-sec"><h2>서류</h2>
+    ${FORM.files.map((f) => `<div class="apx-doc"><h3>${esc(f.label)}<small>${(docs[f.k] || []).length}개</small></h3>
+      ${(docs[f.k] || []).length ? `<div class="apx-files">${docs[f.k].map((u) => (/^image\//.test(u.mime)
+        ? `<button type="button" class="apx-img" data-zoom="${esc(u.url)}" aria-label="${esc(f.label)} 크게 보기"><img src="${esc(u.url)}" alt="" loading="lazy"></button>`
+        : `<a class="apx-pdf" href="${esc(u.url)}" target="_blank" rel="noopener"><b>PDF</b><span>${esc(u.name)}</span></a>`)).join('')}</div>`
+        : '<p class="apx-miss">올린 파일이 없습니다.</p>'}</div>`).join('')}
+  </div>
+  ${a.memo ? `<div class="apx-sec apx-memo"><h2>관리자 메모</h2><p>${esc(a.memo)}</p></div>` : ''}
+  <nav class="apx-pager">${step(prev, '‹ 이전', '')}${step(next, '다음 신청자 ›', 'primary')}</nav>
+  <p class="apx-foot"><a href="/xms/#/apply/${a.id}">관리 화면에서 열기 (메모 · 지우기) →</a></p>
+</div>`, { noindex: true });
 }
 
 const svg = (p) => `<svg viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
 const DOC = svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>');
 const CAL = svg('<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>');
 const CHECK = svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>');
+const PEOPLE = svg('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5.2 5.5-5.2s4.9 2 5.5 5.2"/><path d="M15.5 5.2a3 3 0 0 1 0 5.6M17.5 14.2c1.6.7 2.6 2.4 3 4.8"/>');
+const PHONE = svg('<path d="M6.5 3.5h3l1.5 4-2 1.3a11 11 0 0 0 6.2 6.2l1.3-2 4 1.5v3a2 2 0 0 1-2.2 2A17 17 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2z"/>');
+const CHAT = svg('<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>');
+const MAIL = svg('<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/>');
 const CLIP = svg('<path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/>');
 
 // ───────── 관리자 ─────────

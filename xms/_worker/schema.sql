@@ -405,3 +405,12 @@ CREATE TABLE IF NOT EXISTS applications (
   UNIQUE (round_id, member_id)
 );
 CREATE INDEX IF NOT EXISTS idx_applications_round ON applications(site, round_id, created_at);
+-- 2026-11-11 신청서 임시 저장 — 적는 대로 서버에 (인터넷이 끊기거나 다른 기기에서도 이어서 쓰게). 내면 지운다.
+CREATE TABLE IF NOT EXISTS apply_drafts (
+  site       TEXT NOT NULL,
+  round_id   INTEGER NOT NULL,
+  member_id  INTEGER NOT NULL,
+  data       TEXT NOT NULL,                  -- { answers, files: { 서류: [upload id…] }, agree, step }
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (site, round_id, member_id)
+);
