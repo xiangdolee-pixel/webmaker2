@@ -51,7 +51,9 @@ async function fillCards(res, env, ctx) {
   //   분류(tag) = xim 에 적은 값, 비어 있으면 index.html 카드 값
   const list = sites.map((s, i) => {
     const base = s.extra ? {} : st[s.slug] || {};
-    return cardHtml(s, info[i] || {}, { ...base, tag: s.tag ? escHtml(s.tag) : base.tag || '' });
+    // 분류는 여러 개(쉼표로, 예: '웹앱, 홈페이지') → 카드에는 '웹앱 · 홈페이지', 탭은 각각에 (사용자 지시 2026-11-11)
+    const tags = String(s.tag || '').split(/\s*[,·]\s*/).filter(Boolean).map(escHtml).join(' · ');
+    return cardHtml(s, info[i] || {}, { ...base, tag: tags || base.tag || '' });
   }).join('\n');
   return new HTMLRewriter()
     .on('ul.grid', { element(e) { e.setInnerContent(list || '<li class="none">아직 올린 사이트가 없습니다.</li>', { html: true }); } })

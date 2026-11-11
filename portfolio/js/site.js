@@ -29,7 +29,8 @@
   });
 })();
 
-// 분류 탭: 카드의 분류(.tag)로 전체 · 홈페이지 · 웹서비스 · 웹앱 · 웹게임 … 탭을 한 번 만들고, 고르면 그 분류만 보인다
+// 분류 탭: 카드의 분류(.tag)로 전체 · 홈페이지 · 웹서비스 · 웹앱 · 웹게임 … 탭을 한 번 만들고, 고르면 그 분류만 보인다.
+//   한 카드에 분류가 여럿이면('웹앱 · 홈페이지') 그 탭 모두에 나온다
 (function () {
   var grid = document.querySelector('.grid');
   var nav = document.querySelector('.cats');
@@ -39,8 +40,8 @@
   var count = {};
   items.forEach(function (li) {
     var t = li.querySelector('.tag');
-    li.dataset.cat = t ? t.textContent.trim() : '';
-    if (li.dataset.cat) count[li.dataset.cat] = (count[li.dataset.cat] || 0) + 1;
+    li.cats = t ? t.textContent.split(/\s*[·,]\s*/).filter(Boolean) : [];
+    li.cats.forEach(function (c) { count[c] = (count[c] || 0) + 1; });
   });
   var cats = Object.keys(count).sort(function (a, b) {
     var x = ORDER.indexOf(a), y = ORDER.indexOf(b);
@@ -65,7 +66,7 @@
     [].forEach.call(nav.querySelectorAll('.cat'), function (x) { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
     slide(); // 배경부터 옮기고 목록은 뒤따라
     var want = b.dataset.cat;
-    items.forEach(function (li) { li.hidden = !!want && li.dataset.cat !== want; });
+    items.forEach(function (li) { li.hidden = !!want && li.cats.indexOf(want) < 0; });
     var box = nav.parentNode;
     if (box.scrollWidth > box.clientWidth) box.scrollTo({ left: b.offsetLeft - (box.clientWidth - b.offsetWidth) / 2, behavior: 'smooth' });
   });

@@ -191,7 +191,7 @@ function render() {
 let siteQ = '', siteCat = '';
 // 사이트 분류 = 포트폴리오 분류(sites.portfolio_tag, 사이트 수정 창). 포트폴리오와 같은 차례, 비어 있으면 '미분류'
 const CAT_ORDER = ['홈페이지', '웹서비스', '웹앱', '웹게임'];
-const catOf = (s) => (s.portfolio_tag || '').trim() || '미분류';
+const catOf = (s) => (s.portfolio_tag || '').split(/\s*[,·]\s*/).filter(Boolean)[0] || '미분류';   // 분류가 여럿('웹앱, 홈페이지')이면 첫째로 묶는다
 async function renderSites() {
   const [sites, cs] = await Promise.all([api('/sites'), api('/customers')]);
   customers = cs;
@@ -333,7 +333,7 @@ function pf2Dialog(l) {
       <label class="field"><span>주소</span><input class="input" name="url" value="${esc(l.url)}" required></label>
       <div class="row2">
         <label class="field"><span>사이트명</span><input class="input" name="name" value="${esc(l.name)}" required maxlength="120"></label>
-        <label class="field"><span>분류</span><input class="input" name="tag" value="${esc(l.tag)}" maxlength="20" placeholder="홈페이지" list="pf-tags">${PF_TAGS}</label>
+        <label class="field"><span>분류</span><input class="input" name="tag" value="${esc(l.tag)}" maxlength="40" placeholder="홈페이지" list="pf-tags">${PF_TAGS}</label>
       </div>
       <label class="field"><span>설명</span><textarea class="input" name="description" maxlength="300">${esc(l.description)}</textarea></label>
       <div class="field"><span>썸네일 그림</span>
@@ -559,7 +559,7 @@ function siteDialog(site) {
         <label class="field"><span>저장 용량 (MB)</span><input class="input" name="quota_mb" type="number" min="0" value="${esc(s.quota_mb)}" required></label>
       </div>
       <label class="field"><span>메모</span><textarea class="input" name="memo">${esc(s.memo)}</textarea></label>
-      ${site ? `<label class="field"><span>포트폴리오 분류</span><input class="input" name="portfolio_tag" value="${esc(s.portfolio_tag)}" maxlength="20" placeholder="홈페이지" list="pf-tags">${PF_TAGS}<small>포트폴리오에서 이 분류 탭으로 묶여 보입니다</small></label>` : ''}
+      ${site ? `<label class="field"><span>포트폴리오 분류</span><input class="input" name="portfolio_tag" value="${esc(s.portfolio_tag)}" maxlength="20" placeholder="홈페이지" list="pf-tags">${PF_TAGS}<small>포트폴리오에서 이 분류 탭으로 묶여 보입니다. 여러 개면 쉼표로 (예: 웹앱, 홈페이지)</small></label>` : ''}
       <p class="err" role="alert"></p>
       <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">저장</button></div>
     </form>`, (dlg) => {
