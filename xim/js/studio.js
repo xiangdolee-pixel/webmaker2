@@ -106,18 +106,72 @@ function timeline(job, steps) {
   return { rows, total, done, cur, remain, elapsed, finished };
 }
 const mins = (sec) => (sec < 60 ? `${sec}초` : sec < 3600 ? `${Math.floor(sec / 60)}분${sec % 60 ? ` ${sec % 60}초` : ''}` : `${Math.floor(sec / 3600)}시간 ${Math.floor((sec % 3600) / 60)}분`);
-function timelineHtml(job, steps) {
+// 발표자료 뒤 단계(사용자 지시 2026-11-11: 영상 만들기 → PC 로 받기 → 유튜브 올리기까지 같은 목록에)
+//   v = 내 목소리 작업(영상), job.options.yt = 유튜브 올리기 상태. 영상을 안 만들기로 한 작업엔 붙이지 않는다
+function afterRows(job, v) {
+  const o = job.options || {}, y = o.yt || null;
+  if (job.kind !== 'main' || (!o.video_job && o.video_auto === false && !y)) return [];
+  const sec = (a, b) => Math.max(1, Math.round(((b || Date.now()) - a) / 1000));
+  const rows = [];
+  let vr = { key: 'video', label: '영상 만들기 (내 목소리 — 음성 → 영상 합성)', status: 'pending', secs: 0, note: '' };
+  if (v) {
+    const t0 = v.started_at || v.created_at;
+    if (v.status === 'failed' || v.video_status === 'failed') vr = { ...vr, status: 'failed', note: String(v.error || v.video_error || '').slice(0, 120) };
+    else if (v.status === 'done' && v.video_status === 'done') vr = { ...vr, status: 'done', secs: sec(t0, v.video_at), note: `영상 길이 ${mins(Math.round(v.seconds || 0))} · 음성 ${mins(sec(t0, v.done_at || v.video_at))} · 영상 ${mins(sec(v.done_at || t0, v.video_at))}`, end: v.video_at };
+    else if (v.status === 'queued') vr = { ...vr, status: 'running', since: v.created_at, note: '처리기 차례 기다리는 중' };
+    else vr = { ...vr, status: 'running', since: t0, note: v.status === 'done' ? '음성 끝 · 영상 합성 · 올리는 중' : '음성 만드는 중' };
+  }
+  rows.push(vr);
+  if (!(o.yt_auto || y)) return rows;
+  const ys = y?.status || '';
+  const up0 = y?.upload_at || 0, dl0 = y?.download_at || y?.started_at || 0;
+  let dr = { key: 'yt-dl', label: '영상 PC 로 받기', status: 'pending', secs: 0, note: '' };
+  let ur = { key: 'yt-up', label: `유튜브 올리기 (${y?.published_at ? '비공개' : y?.visibility || '비공개'})`, status: 'pending', secs: 0, note: '' };
+  if (ys === 'running' && !up0) dr = { ...dr, status: 'running', since: dl0, note: 'PC 도우미' };
+  else if (y && (up0 || ['review', 'done'].includes(ys))) dr = { ...dr, status: 'done', secs: up0 && dl0 ? sec(dl0, up0) : 0 };
+  if (ys === 'running' && up0) ur = { ...ur, status: 'running', since: up0, note: 'PC 도우미 · 엣지' };
+  else if (['review', 'done'].includes(ys) && y.url) ur = { ...ur, status: 'done', secs: y.uploaded_at && (up0 || dl0) ? sec(up0 || dl0, y.uploaded_at) : 0, note: y.url, end: y.uploaded_at };
+  else if (ys === 'failed' || ys === 'login') ur = { ...ur, status: 'failed', note: String(y.error || '').slice(0, 140) };
+  else if (ys === 'queued') ur = { ...ur, note: y.error ? String(y.error).slice(0, 100) : 'PC 도우미 차례 기다리는 중' };
+  rows.push(dr, ur);
+  if (y?.published_at || (y?.publish !== false && (y?.visibility || '비공개') === '비공개')) {   // 공개로 바뀐 뒤에도(visibility='공개') 줄은 남긴다
+    let pr = { key: 'yt-pub', label: '유튜브 검토 끝나면 공개 · 텔레그램', status: 'pending', secs: 0, note: '' };
+    if (ys === 'review') pr = { ...pr, status: 'wait', since: y.uploaded_at, note: `유튜브 검토 기다리는 중 (5분마다 확인 · ${y.checks || 0}번째)` };
+    else if (ys === 'done' && y.published_at) pr = { ...pr, status: 'done', secs: y.uploaded_at ? sec(y.uploaded_at, y.published_at) : 0, note: `공개됨${y.tg ? ` · 텔레그램 ${({ done: '올림', failed: '실패', queued: '올리는 중' })[y.tg.status] || ''}` : ''}`, end: y.published_at };
+    else if (ys === 'done' && y.error) pr = { ...pr, status: 'failed', note: String(y.error).slice(0, 140) };
+    rows.push(pr);
+  }
+  return rows;
+}
+const AFTER_EXPECT = { video: 900, 'yt-dl': 20, 'yt-up': 300, 'yt-pub': 1800 };
+function timelineHtml(job, steps, v = null) {
   const t = timeline(job, steps);
+  const extra = afterRows(job, v);
+  if (extra.length) {
+    for (const r of extra) if (r.since) r.secs = Math.max(1, Math.round((Date.now() - r.since) / 1000));
+    t.rows = t.rows.concat(extra);
+    t.total = t.rows.length; t.done = t.rows.filter((r) => ['done', 'skipped'].includes(r.status)).length;
+    const going = extra.find((r) => ['running', 'wait'].includes(r.status)) || (job.status === 'done' && extra.find((r) => r.status === 'pending'));
+    if (job.status === 'done' && going) {   // 발표자료는 끝났고 뒤 단계 진행 중 → 머리말을 진행형으로
+      t.finished = false; t.cur = going;
+      t.remain = extra.filter((r) => r.status === 'pending').reduce((a, r) => a + (AFTER_EXPECT[r.key] || 60), 0) + (going.status === 'running' ? Math.max(0, (AFTER_EXPECT[going.key] || 60) - going.secs) : 0);
+      t.elapsed = Math.round((Date.now() - job.created_at) / 1000);
+    } else if (job.status === 'done') {
+      const last = Math.max(job.finished_at || 0, ...extra.map((r) => r.end || 0));
+      t.elapsed = Math.round((last - job.created_at) / 1000);
+    }
+  }
   const pct = Math.round((t.done / t.total) * 100);
   const head = t.finished
     ? `${job.status === 'done' ? '완료' : STATUS[job.status]?.[0] || job.status} · ${t.total}단계 중 ${t.done}단계 · 총 ${mins(t.elapsed)}`
     : job.status === 'queued' ? `${t.total}단계 · 시작 대기 (PC 도우미가 집어 갑니다)`
+    : t.cur?.status === 'wait' && t.cur.key === 'yt-pub' ? `${t.total}단계 중 ${t.done + 1}번째 <b>${esc(t.cur.label)}</b> · 경과 ${mins(t.elapsed)} · <span class="tl-wait">유튜브 검토 기다리는 중</span>`
     : `${t.total}단계 중 ${Math.min(t.total, t.done + 1)}번째 <b>${esc(t.cur?.label || '')}</b> · 경과 ${mins(t.elapsed)}${t.cur?.status === 'wait' ? ' · <span class="tl-wait">내 선택 기다리는 중</span>' : t.remain ? ` · 남은 시간 약 ${mins(Math.round(t.remain / 30) * 30 || 30)}` : ''}`;
   const icon = { done: '✓', running: '●', wait: '✋', failed: '✕', skipped: '–', pending: '○' };
-  return `<section class="card st-steps">
+  return `<section class="card st-steps" id="st-tl">
     <div class="tl-head">${head}</div>
     <div class="tl-bar"><i style="width:${pct}%"></i></div>
-    <ol class="tl">${t.rows.map((r, i) => `<li class="tl-${r.status}"><span class="tl-no">${i + 1}</span><span class="tl-ic">${icon[r.status]}</span><b>${esc(r.label)}</b><span class="tl-note">${esc(r.note)}</span><span class="tl-dur">${r.status === 'running' ? `${mins(r.secs)} 진행 중` : r.status === 'wait' ? '기다리는 중' : r.status === 'pending' ? `예상 ${mins(EXPECT[r.key] || 60)}` : r.secs ? mins(r.secs) : ''}</span></li>`).join('')}</ol>
+    <ol class="tl">${t.rows.map((r, i) => `<li class="tl-${r.status}"><span class="tl-no">${i + 1}</span><span class="tl-ic">${icon[r.status]}</span><b>${esc(r.label)}</b><span class="tl-note">${esc(r.note)}</span><span class="tl-dur">${r.status === 'running' ? `${mins(r.secs)} 진행 중` : r.status === 'wait' ? (r.since ? `${mins(r.secs)} 기다리는 중` : '기다리는 중') : r.status === 'pending' ? `예상 ${mins(EXPECT[r.key] || AFTER_EXPECT[r.key] || 60)}` : r.secs ? mins(r.secs) : ''}</span></li>`).join('')}</ol>
   </section>`;
 }
 // 제작 조건 — 스튜디오 첫 화면에 늘 보인다 (사용자 지시 2026-11-09). 네 칸: PC 도우미 · Claude(글) · ChatGPT(그림) · 예약
@@ -450,6 +504,7 @@ async function renderJob() {
   try { r = await api(`/studio/jobs/${openId}`); } catch (e) { toast(e.message); location.hash = ''; return renderStudio(deps); }
   const { job, steps, docs, assets } = r;
   const active = ['queued', 'running', 'pick', 'thumb', 'images'].includes(job.status);
+  const vjob = await readVideoJob(job);
   const J = (k) => { try { return docs[k] ? JSON.parse(docs[k].body) : null; } catch { return null; } };
   const top15 = J('top15'), fact = J('factcheck'), summary = J('summary'), showTexts = J('show_texts');
   const slides = assets.filter((a) => a.kind === 'slide').sort((a, b) => a.idx - b.idx);
@@ -468,7 +523,7 @@ async function renderJob() {
       ${active ? '<button class="btn sm danger" id="st-stop" type="button">멈춤</button>' : '<button class="btn sm danger" id="st-del" type="button">삭제</button>'}
     </div>
     ${job.error ? `<p class="st-warn">${esc(job.error)}</p>` : ''}
-    ${timelineHtml(job, steps)}
+    ${timelineHtml(job, steps, vjob)}
     ${job.status === 'pick' && top15 ? pickPanel(top15) : ''}
     ${job.status === 'thumb' ? `<section class="card st-panel"><h3>썸네일 고르기</h3><form id="st-thumb-form">${thumbPickForm({}, summary?.titles || [], summary?.people || [])}<p class="err" id="tp-err"></p><button class="btn primary" type="submit">이대로 썸네일 만들기</button></form></section>` : ''}
     ${blocks.length || slides.length || thumb || top15 || captures.length ? `<section class="card st-panel">
@@ -521,6 +576,7 @@ async function renderJob() {
     drawRes();
   }
   if (active) pollTimer = setTimeout(() => { if (openId === job.id && document.contains(view)) renderJob(); }, 4000);
+  else watchAfter(job.id, true);
 }
 
 function pickPanel(top) {
@@ -613,6 +669,25 @@ function videoPanel(job, summary, thumbTitle = '') {
     </form>
     ${ytState}
   </div>`;
+}
+async function readVideoJob(job) {
+  if (!job.options?.video_job) return null;
+  try { const r = await deps.api(`/voice/jobs/${job.options.video_job}`); return r.job || r; } catch { return null; }
+}
+// 발표자료가 끝난 뒤 영상 · 유튜브 단계가 진행 중이면 단계 목록만 10초마다 새로 그린다(탭 · 영상 재생은 그대로)
+let tlTimer = 0;
+async function watchAfter(id, first = false) {
+  clearTimeout(tlTimer);
+  const el = $('#st-tl');
+  if (!el || openId !== id) return;
+  if (first) { tlTimer = setTimeout(() => watchAfter(id), 10000); return; }   // 방금 그렸으니 10초 뒤부터
+  let r, v;
+  try { r = await deps.api(`/studio/jobs/${id}`); v = await readVideoJob(r.job); } catch { tlTimer = setTimeout(() => watchAfter(id), 15000); return; }
+  if (openId !== id || !document.contains(el)) return;
+  el.outerHTML = timelineHtml(r.job, r.steps, v);
+  const o = r.job.options || {};
+  const going = afterRows(r.job, v).some((x) => ['running', 'wait'].includes(x.status)) || (o.yt_auto && !o.yt && o.video_job);
+  if (going) tlTimer = setTimeout(() => watchAfter(id), 10000);
 }
 async function fillVideoStatus(job) {
   const { api } = deps;

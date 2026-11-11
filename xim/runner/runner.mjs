@@ -57,12 +57,20 @@ const J = (id) => ({
   rss: () => api(`/api/studio/helper/jobs/${id}/rss`, { method: 'POST', body: {} }),
   asset: (kind, idx, bytes, mime, w, h) => api(`/api/studio/helper/jobs/${id}/asset?kind=${kind}&idx=${idx}&w=${w || 0}&h=${h || 0}`, { method: 'POST', raw: bytes, headers: { 'Content-Type': mime } }),
 });
-async function download(urlPath, dest) {
-  const res = await fetch(XIM + urlPath, { headers: { 'X-Studio-Token': TOKEN } });
-  if (!res.ok) throw new Error(`내려받기 실패 ${urlPath} ${res.status}`);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
-  return dest;
+// 시간 제한(기본 5분) + 3번까지 다시. 2026-11-11: 영상 내려받기가 응답 없이 멈춰 유튜브 올리기가 9분 넘게 '올리는 중' 으로 서 있었다
+async function download(urlPath, dest, { timeoutMin = 5, tries = 3 } = {}) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(XIM + urlPath, { headers: { 'X-Studio-Token': TOKEN }, signal: AbortSignal.timeout(timeoutMin * 60000) });
+      if (!res.ok) throw new Error(`내려받기 실패 ${urlPath} ${res.status}`);
+      const buf = Buffer.from(await res.arrayBuffer());
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, buf);
+      return dest;
+    } catch (e) { last = e; log(`  (내려받기 ${i + 1}/${tries} 실패: ${String(e.message).slice(0, 80)})`); }
+  }
+  throw last;
 }
 
 // ───────── Claude Code (구독) ─────────
@@ -451,8 +459,10 @@ async function runYoutube(payload, work) {
     fs.mkdirSync(work, { recursive: true });
     const video = path.join(work, 'youtube.mp4');
     // 같은 PC 에 내 목소리 처리기가 있으면 방금 만든 mp4 가 로컬에 있다 → 복사(프록시로 28MB 받으면 2분 넘게 걸린다)
-    const local = path.join(process.env.CLONE_DIR || 'D:/ws/clone', 'out', 'studio', y.video_job, `${y.video_job}.mp4`);
-    if (fs.existsSync(local) && fs.statSync(local).size > 100000) { fs.mkdirSync(work, { recursive: true }); fs.copyFileSync(local, video); log(`  유튜브: 영상 로컬 복사 ${y.video_job}`); }
+    //   폴더 = 스튜디오 작업 id(job.id) 아래 <영상 id>.mp4. 2026-11-10 _pc 이사 뒤 clone 은 DOCS 옆(_pc/clone) — 옛 D:/ws/clone 만 찾아 매번 내려받고 있었다(2026-11-11)
+    const cloneDir = [process.env.CLONE_DIR, DOCS && path.join(DOCS, '..', 'clone'), 'D:/ws/clone'].filter(Boolean).find((d) => fs.existsSync(d)) || '';
+    const local = [path.join(cloneDir, 'out', 'studio', job.id, `${y.video_job}.mp4`), path.join(cloneDir, 'out', 'studio', y.video_job, `${y.video_job}.mp4`)].find((f) => fs.existsSync(f)) || '';
+    if (local && fs.statSync(local).size > 100000) { fs.mkdirSync(work, { recursive: true }); fs.copyFileSync(local, video); log(`  유튜브: 영상 로컬 복사 ${y.video_job}`); }
     else { log(`  유튜브: 영상 내려받기 ${y.video_job}`); await download(`/api/studio/helper/video/${y.video_job}`, video); }
     let thumb = '';
     if (y.thumb_url) { try { thumb = await download(y.thumb_url, path.join(work, 'youtube_thumb' + (/\.png$/i.test(y.thumb_url) ? '.png' : '.webp'))); } catch (e) { log('  (썸네일 내려받기 실패)', e.message); } }
@@ -464,6 +474,7 @@ async function runYoutube(payload, work) {
     const jobJson = path.join(work, 'youtube_job.json');
     fs.writeFileSync(jobJson, JSON.stringify({ video, thumb, title: y.title || job.title, more: y.more || '', visibility: y.visibility || '비공개', playlist: '코인뉴스', channel_name: y.channel_name || (job.channel === '순섬' ? '순수한크립토' : '사적인자산왕') }, null, 2), 'utf8');
     log(`  유튜브: 업로드 시작 — ${y.channel_name || ''} · ${y.title || job.title} (${y.visibility || '비공개'})`);
+    await report('progress', { phase: 'upload' });   // 단계 목록: 'PC 로 받기' 끝 · '유튜브 올리기' 시작
     const r = await py(['tools\\yt_upload_auto.py', jobJson], { cwd: DOCS, timeoutMin: 120, label: '유튜브 업로드' });
     const lines = (r.out || '').trim().split(/\r?\n/).filter(Boolean);
     let res = null; for (let i = lines.length - 1; i >= 0 && !res; i--) { try { if (lines[i].startsWith('{')) res = JSON.parse(lines[i]); } catch { /* 다음 줄 */ } }

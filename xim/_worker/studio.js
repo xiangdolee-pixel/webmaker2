@@ -544,7 +544,7 @@ export async function studioHelper(request, env, url, path, method) {
       if (yrow) {
         const job = await getJob(db, yrow.id);
         const jo = JSON.parse(job.options || '{}');
-        jo.yt = { ...jo.yt, status: 'running', started_at: now(), error: '' };
+        jo.yt = { ...jo.yt, status: 'running', started_at: now(), error: '', phase: 'download', download_at: now(), upload_at: null };
         await setJob(db, job.id, { options: JSON.stringify(jo) });
         const summary = docJson(await latestDoc(db, job.id, 'summary')) || {};
         const thumb = (await jobAssets(db, job.id)).filter((a) => a.kind === 'thumb').pop();
@@ -610,7 +610,10 @@ export async function studioHelper(request, env, url, path, method) {
       const jo = JSON.parse(job.options || '{}');
       const y = jo.yt || {};
       const st = String(d.status || '');
-      if (st === 'done') {
+      if (st === 'progress') {   // 올리기 중간 단계 시각(2026-11-11): download = 영상 PC 로 받기 시작, upload = 유튜브 올리기 시작 → 단계 목록에 표시
+        const ph = d.phase === 'upload' ? 'upload' : 'download';
+        if (y.status === 'running') jo.yt = { ...y, phase: ph, [`${ph}_at`]: now() };
+      } else if (st === 'done') {
         const url = String(d.url || '').slice(0, 200);
         const vidm = url.match(/(?:youtu\.be\/|v=|\/video\/)([\w-]{6,})/);
         const review = (y.visibility || '비공개') === '비공개' && y.publish !== false;   // 비공개로 올렸고 "검토 끝나면 공개" 가 켜져 있으면 검토 단계로
