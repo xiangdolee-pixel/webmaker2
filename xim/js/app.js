@@ -9,7 +9,12 @@ const api = makeApi('/api');
 const view = $('#view');
 const TAB_KEY = 'xim.tab';
 let tab = 'sites';
-try { const t = localStorage.getItem(TAB_KEY); if (t && ['sites', 'customers', 'portfolio2', 'requests', 'studio', 'voice', 'pc', 'monitor', 'security', 'audit', 'pricing'].includes(t)) tab = t; } catch { /* 저장소 못 쓰면 사이트 */ }   // F5 해도 보던 메뉴로 (사용자 지시 2026-11-09)
+const TABS = ['sites', 'customers', 'portfolio2', 'requests', 'studio', 'voice', 'pc', 'monitor', 'security', 'audit', 'pricing'];
+try { const t = localStorage.getItem(TAB_KEY); if (t && TABS.includes(t)) tab = t; } catch { /* 저장소 못 쓰면 사이트 */ }   // F5 해도 보던 메뉴로 (사용자 지시 2026-11-09)
+// 메뉴마다 주소(사용자 지시 2026-11-11): xim.plators.com/studio 로 들어오면 스튜디오. 주소가 있으면 저장된 메뉴보다 먼저
+const pathTab = location.pathname.slice(1);
+if (TABS.includes(pathTab)) tab = pathTab;
+const setPath = (v) => { const want = `/${v}`; if (location.pathname !== want) history.replaceState(null, '', want + location.search + location.hash); };
 let reqFilter = '';
 let reqSite = ''; // 사이트 카드의 '처리할 요청' 을 눌러 들어오면 그 사이트만
 let customers = [];
@@ -77,6 +82,7 @@ function showApp() {
     pillTabs($('#nav'), [['sites', '사이트'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC']], tab, (v) => {
       tab = v;
       try { localStorage.setItem(TAB_KEY, v); } catch { /* 무시 */ }
+      setPath(v);
       if (reqOpen && !(v === 'requests' && /^#req-\d+$/.test(location.hash))) { reqOpen = 0; if (location.hash) history.replaceState(null, '', location.pathname); }
       render();
     });
@@ -96,6 +102,7 @@ function showApp() {
     const pfLink = $('.side > .side-link'); const pf2 = $('#nav > button[data-v="portfolio2"]');
     if (pfLink && pf2) pf2.before(pfLink);
     requestAnimationFrame(() => slideTabs($('#nav')));
+    setPath(tab);   // 첫 화면(/)도 지금 메뉴 주소로
   }
   render();
 }

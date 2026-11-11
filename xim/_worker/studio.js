@@ -520,8 +520,15 @@ export async function studioHelper(request, env, url, path, method) {
               const pick = docJson(await latestDoc(db, job.id, 'thumb_pick')) || {};
               jo.yt = { status: 'queued', title: String(pick.title || summary.titles?.[0] || job.title || '').slice(0, 100), visibility: '비공개', publish: true, at: now(), url: '', error: '', auto: true };
               await setJob(db, job.id, { options: JSON.stringify(jo) });
+            } else if (v && (v.status === 'failed' || v.video_status === 'failed') && (jo.video_retry || 0) < 3) {
+              // 영상 실패도 3번까지 자동으로 다시 만든다(완주 — 2026-11-11). 음성 캐시가 있어 이어서 빠르게 된다
+              await env.CLONE.fetch(new Request(`https://clone/api/jobs/${jo.video_job}/retry`, { method: 'POST', headers: { 'X-Agent-Token': env.CLONE_TOKEN } }));
+              jo.video_retry = (jo.video_retry || 0) + 1;
+              jo.video_retry_log = [...(jo.video_retry_log || []), { at: now(), error: String(v.error || v.video_error || '').slice(0, 200) }].slice(-3);
+              if (jo.yt?.status === 'failed') delete jo.yt;
+              await setJob(db, job.id, { options: JSON.stringify(jo) });
             } else if (v && (v.status === 'failed' || v.video_status === 'failed') && !hadFailed) {
-              jo.yt = { status: 'failed', error: '영상이 실패해 유튜브에 올리지 못했습니다 — 내 목소리에서 영상을 다시 만들면 자동으로 다시 올립니다', at: now(), auto: true }; await setJob(db, job.id, { options: JSON.stringify(jo) });
+              jo.yt = { status: 'failed', error: '영상이 3번 다시 만들어도 실패해 유튜브에 올리지 못했습니다 — 내 목소리에서 영상을 다시 만들면 자동으로 다시 올립니다', at: now(), auto: true }; await setJob(db, job.id, { options: JSON.stringify(jo) });
             }
           } catch { /* 다음 폴링 때 */ }
         }
@@ -628,8 +635,9 @@ export async function studioHelper(request, env, url, path, method) {
       } else if (y.status === 'review' && (st === 'failed' || st === 'login')) {
         const n = (y.fails || 0) + 1;   // 공개 전환 실패는 3번까지 다시, 그 뒤 포기(비공개로 남음)
         jo.yt = n >= 3 ? { ...y, status: 'done', error: `공개 전환 실패: ${String(d.error || '').slice(0, 200)} — 유튜브에서 직접 공개로 바꿔 주세요`, finished_at: now() } : { ...y, status: 'review', fails: n, next_check: now() + 5 * 60000, error: String(d.error || '').slice(0, 300) };
-      } else if (st === 'failed' && !y.retried) {
-        jo.yt = { ...y, status: 'queued', retried: true, at: now(), error: `1차 실패(다시 시도): ${String(d.error || '').slice(0, 200)}` };   // 업로드 중 일시 오류(파일 선택 시간 초과 등)는 한 번 자동으로 다시
+      } else if (st === 'failed' && (y.retries || (y.retried ? 1 : 0)) < 3) {
+        const n = (y.retries || (y.retried ? 1 : 0)) + 1;   // 업로드 중 일시 오류(파일 선택 시간 초과 · 연결 끊김 등)는 3번까지 자동으로 다시 (2026-11-11: 1번 → 3번)
+        jo.yt = { ...y, status: 'queued', retried: true, retries: n, at: now(), error: `${n}차 실패(다시 시도): ${String(d.error || '').slice(0, 200)}` };
       } else {
         jo.yt = { ...y, status: ['failed', 'login'].includes(st) ? st : 'failed', error: String(d.error || '').slice(0, 400), finished_at: now() };
       }
@@ -716,9 +724,49 @@ async function getSchedules(db) {
 const kstDate = (ms) => new Date(ms + 9 * 3600000).toISOString().slice(0, 10);
 const kstHM = (ms) => new Date(ms + 9 * 3600000).toISOString().slice(11, 16);
 // Cron(5분마다): 예약 시각이 지났고 오늘 아직 안 만든 예약 → 작업 만들기 (PC 가 꺼져 있어도 '대기' 로 쌓인다)
+// ───── 끝까지 완주시키기 (사용자 지시 2026-11-11: "반드시 멈추지 않고, 마지막까지 완료") ─────
+//   5분마다(cron) 멈춘 작업 · 실패한 작업 · 멈춘 유튜브 올리기를 되살린다. 같은 작업은 RECOVER_MAX 번까지, 그 뒤엔 실패로 두고 멈춘다(무한 반복 금지).
+//   되살릴 때 이미 만든 것(원고 · 그림)은 그대로 쓰고 남은 단계부터: 패키지(팩트체크)까지 됐으면 그림 단계(images), 아니면 글 단계(queued, 원고가 있으면 원고는 건너뜀)
+const RECOVER_MAX = 3;
+async function requeueJob(db, j, why) {
+  const jo = JSON.parse(j.options || '{}');
+  const n = (jo.recover || 0) + 1;
+  if (n > RECOVER_MAX) {
+    jo.recover_gaveup = 1;
+    await setJob(db, j.id, { status: 'failed', options: JSON.stringify(jo), error: `${RECOVER_MAX}번 다시 해도 안 됐습니다 — ${why}: ${j.error || ''}`.slice(0, 500), finished_at: j.finished_at || now() });
+    return false;
+  }
+  const packaged = !!(await latestDoc(db, j.id, 'factcheck'));
+  jo.recover = n; jo.recover_log = [...(jo.recover_log || []), { at: now(), why, error: String(j.error || '').slice(0, 200) }].slice(-5);
+  await setJob(db, j.id, { status: packaged ? 'images' : 'queued', step: packaged ? 'slides' : '', options: JSON.stringify(jo), error: `${why} (${n}/${RECOVER_MAX}) — 자동으로 이어서 합니다`, finished_at: null });
+  return true;
+}
+async function recoverStudio(env) {
+  const db = env.DB, t = now();
+  const seen = +((await db.prepare("SELECT value FROM studio_settings WHERE key = 'helper_seen'").first())?.value || 0);
+  const helperAlive = t - seen < 5 * 60000;
+  // 1) '진행 중' 인데 오래 아무 기록이 없는 작업(도우미가 죽었거나 멈춤). 도우미가 살아 있으면 50분(그림 엔진 최대 40분), 꺼져 있으면 10분
+  for (const j of (await db.prepare("SELECT * FROM studio_jobs WHERE status = 'running'").all()).results) {
+    const m = (await db.prepare('SELECT MAX(MAX(started_at, COALESCE(finished_at, 0))) AS m FROM studio_steps WHERE job_id = ?').bind(j.id).first())?.m || 0;
+    const idle = t - Math.max(j.updated_at || 0, m);
+    if (idle > (helperAlive ? 50 : 10) * 60000) await requeueJob(db, j, `${Math.round(idle / 60000)}분 동안 진행이 없어 되살림`);
+  }
+  // 2) 실패한 본편 · 썸네일 — 3분 뒤 자동으로 다시(최근 6시간 안, 포기 표시 없는 것)
+  for (const j of (await db.prepare("SELECT * FROM studio_jobs WHERE status = 'failed' AND kind IN ('main', 'thumb') AND finished_at BETWEEN ? AND ? AND json_extract(options, '$.recover_gaveup') IS NULL").bind(t - 6 * 3600000, t - 3 * 60000).all()).results) {
+    await requeueJob(db, j, '실패');
+  }
+  // 3) 유튜브 올리기가 40분 넘게 '올리는 중'(도우미가 멈춤) → 다시 대기열, 3번까지
+  for (const r of (await db.prepare("SELECT id, options FROM studio_jobs WHERE json_extract(options, '$.yt.status') = 'running' AND json_extract(options, '$.yt.started_at') < ?").bind(t - 40 * 60000).all()).results) {
+    const jo = JSON.parse(r.options || '{}'); const n = (jo.yt.stale || 0) + 1;
+    jo.yt = n > 3 ? { ...jo.yt, status: 'failed', error: '유튜브 올리기가 계속 멈춰 포기했습니다 — 카드에서 다시 올려 주세요', finished_at: t } : { ...jo.yt, status: 'queued', at: t, stale: n, error: `올리기가 멈춰 다시 시도 (${n}/3)` };
+    await setJob(db, r.id, { options: JSON.stringify(jo) });
+  }
+}
+
 export async function studioScheduled(env, gh) {
   const db = env.DB;
   try { await purgeOld(env); } catch (e) { console.error('보관 정리 실패', e.message); }
+  try { await recoverStudio(env); } catch (e) { console.error('되살리기 실패', e.message); }
   const list = await getSchedules(db);
   const today = kstDate(now()), hm = kstHM(now());
   let changed = false;

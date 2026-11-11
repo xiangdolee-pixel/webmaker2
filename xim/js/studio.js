@@ -715,7 +715,7 @@ async function fillVideoStatus(job) {
 }
 function wireRes(job, blocks, thumb, summary) {
   const { api } = deps;
-  $('#st-video-voice')?.addEventListener('click', () => { try { localStorage.setItem('xim.tab', 'voice'); } catch { /* 무시 */ } location.hash = ''; location.reload(); });
+  $('#st-video-voice')?.addEventListener('click', () => { try { localStorage.setItem('xim.tab', 'voice'); } catch { /* 무시 */ } location.href = '/voice'; });   // 메뉴 주소(/voice)로
   $('#st-yt-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const f = e.currentTarget, d = { title: f.title.value, visibility: f.visibility.value, publish: f.visibility.value === '비공개', telegram: !!f.telegram?.checked };

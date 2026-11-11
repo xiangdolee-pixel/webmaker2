@@ -493,9 +493,11 @@ async function runYoutube(payload, work) {
     const r = await py(['tools\\yt_upload_auto.py', jobJson], { cwd: DOCS, timeoutMin: 120, label: '유튜브 업로드' });
     const lines = (r.out || '').trim().split(/\r?\n/).filter(Boolean);
     let res = null; for (let i = lines.length - 1; i >= 0 && !res; i--) { try { if (lines[i].startsWith('{')) res = JSON.parse(lines[i]); } catch { /* 다음 줄 */ } }
-    if (r.code === 2 || res?.error === 'LOGIN_REQUIRED') { log('  유튜브: 로그인 필요'); await report('login', { error: '자동화 프로필에 유튜브 로그인이 필요합니다 — PC 에서 docs\\tools\\유튜브로그인.bat 실행 후 다시' }); return; }
+    if (r.code === 2 || res?.error === 'LOGIN_REQUIRED') { log('  유튜브: 로그인 필요'); notify('yt-login', '유튜브 로그인이 풀려 영상을 못 올리고 있습니다 — PC 에서 docs/tools/유튜브로그인.bat 로 로그인해 주세요.', 60); await report('login', { error: '자동화 프로필에 유튜브 로그인이 필요합니다 — PC 에서 docs\\tools\\유튜브로그인.bat 실행 후 다시' }); return; }
     if (r.code !== 0 || !res?.ok) { const err = res?.error || lines.slice(-3).join(' | ').slice(0, 300) || `exit ${r.code}`; log('  유튜브: 실패', err); await report('failed', { error: err }); return; }
     log(`  유튜브: 완료 ${res.url || ''} (${res.took || 0}초)`);
+    notify(`yt-done-${job.id}`, `유튜브에 올렸습니다(비공개 → 검토 끝나면 자동 공개): ${y.title || job.title}
+${res.url || ''}`, 600);
     await report('done', { url: res.url || '' });
   } catch (e) {
     log('  유튜브: 오류', e.message);
@@ -575,13 +577,22 @@ async function processJob(payload) {
     log(`✅ ${job.id} 완료`);
   } catch (e) {
     if (e.message === 'STOPPED') { log('  사용자가 멈춤'); return; }
-    if (e.message === 'LOGIN_REQUIRED') { await j.status('images', 'slides', { error: 'ChatGPT 로그인이 필요합니다 — PC 에서 스튜디오_ChatGPT로그인.bat 로 로그인하면 다시 시도됩니다.' }); loginNeeded = true; lastReport = Date.now() - 20 * 60000; return; }   // 10분 뒤 다시 점검
+    if (e.message === 'LOGIN_REQUIRED') { notify('chatgpt', `ChatGPT(그림) 로그인이 필요해 "${job.title || job.id}" 그림 단계가 기다리고 있습니다 — PC 에서 node xim/runner/runner.mjs --login 으로 로그인해 주세요.`, 60); await j.status('images', 'slides', { error: 'ChatGPT 로그인이 필요합니다 — PC 에서 스튜디오_ChatGPT로그인.bat 로 로그인하면 다시 시도됩니다.' }); loginNeeded = true; lastReport = Date.now() - 20 * 60000; return; }   // 10분 뒤 다시 점검
     if (e.message.startsWith('ENGINE_FAILED')) { await j.status('images', 'slides', { error: `그림 엔진 실패 — 잠시 뒤 다시 시도합니다. ${e.message.slice(15, 200)}` }); engineFailAt = Date.now(); return; }
     log('❌', e.message);
+    notify(`fail-${job.id}`, `"${job.title || job.id}" 실패: ${String(e.message).slice(0, 200)} — 3분 뒤 자동으로 이어서 다시 합니다(최대 3번).`, 20);
     await j.status('failed', '', { error: e.message }).catch(() => {});
   }
 }
 let loginNeeded = false;
+// 운영자 개인 텔레그램 알림(2026-11-11 "멈추지 않고 끝까지" — 사람이 해야 할 일 · 실패를 바로 알린다). docs	ools	elegram.json 의 chat_id 로.
+//   같은 종류는 throttleMin 분에 한 번만(밤새 같은 알림이 쌓이지 않게). 알림이 실패해도 작업은 그대로 간다
+const notified = {};
+function notify(key, text, throttleMin = 180) {
+  if (!DOCS || Date.now() - (notified[key] || 0) < throttleMin * 60000) return;
+  notified[key] = Date.now();
+  try { spawn(PYTHON, [path.join('tools', 'telegram_notify.py'), `[xim 스튜디오] ${text}`], { cwd: DOCS, windowsHide: true, stdio: 'ignore', env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }).on('error', () => {}); } catch { /* 무시 */ }
+}
 let engineFailAt = 0;   // 그림 엔진이 실패하면 2분 뒤에 다시 그림 일감을 집는다
 
 // 제작 조건 보고 — 도우미가 시작할 때 · 30분마다 · 그림 작업 뒤에 xim 에 올린다 (스튜디오 첫 화면 '제작 조건' 표시)
@@ -604,6 +615,8 @@ async function reportEnv(force = false) {
   info.browserOk = fs.existsSync(BROWSER);
   try { await api('/api/studio/helper/ping', { method: 'POST', body: { info } }); log(`  제작 조건 보고: Claude ${info.claude.email || '로그인 안 됨'} · ChatGPT ${info.chatgpt.loggedIn ? (info.chatgpt.email || '로그인됨') : '로그인 안 됨'}`); } catch (e) { log('(조건 보고 실패)', e.message); }
   if (info.chatgpt && info.chatgpt.loggedIn) loginNeeded = false;
+  if (info.claude && !info.claude.loggedIn) notify('claude', 'Claude(글 쓰기) 로그인이 풀렸습니다 — PC 에서 claude 로그인을 다시 해 주세요. 그 전까지 원고를 못 씁니다.');
+  if (info.chatgpt && info.chatgpt.loggedIn === false) notify('chatgpt', 'ChatGPT(그림) 로그인이 풀렸습니다 — PC 에서 node xim/runner/runner.mjs --login 으로 로그인해 주세요. 로그인되면 멈춘 작업이 저절로 이어집니다.');
 }
 
 // PC 의 작업 폴더도 3일치만 (사용자 지시 2026-11-11: 스튜디오 · 내 목소리 3일 보관, 파일까지). 작업 id(20자리 hex) 폴더만, 마지막으로 손댄 지 3일 지난 것

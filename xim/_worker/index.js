@@ -196,7 +196,7 @@ async function ximApi(request, env, url, ctx) {
     if (!env.XIM_ADMIN_PASSWORD) throw new HttpError(503, '운영자 비밀번호가 아직 설정되지 않았습니다.');
     const key = `xim:${clientIp(request)}`;
     if (await tooManyFails(db, key)) throw new HttpError(429, '로그인 실패가 많아 10분 뒤에 다시 시도해 주세요.');
-    const { password, otp } = await body(request);
+    const { password, otp, remember } = await body(request);
     const ok = sameText(await sha256(String(password ?? '').slice(0, 200)), await sha256(env.XIM_ADMIN_PASSWORD));
     if (!ok) { await recordFail(db, key); throw new HttpError(401, '비밀번호가 맞지 않습니다.'); }
 
@@ -215,6 +215,8 @@ async function ximApi(request, env, url, ctx) {
         expires = t.until;
       }
     }
+    // "이 PC 기억하기"(사용자 지시 2026-11-11: 이 PC 의 엣지에서는 로그인 절차 없이 바로) — 비밀번호(+OTP)를 통과한 이번 한 번으로 1년짜리 로그인
+    if (['1', 'on', 'true', true].includes(remember)) expires = Math.max(expires, now() + 365 * DAY);
     const token = await newSession(db, 'xim', null, null, expires);
     cookies.push(setCookie(XIM_COOKIE, token, Math.round((expires - now()) / 1000)));
     await audit(db, request, 'LOGIN', '운영자', secret ? 'OTP 사용' : '');
@@ -1031,11 +1033,14 @@ export default {
 
 // 화면 파일: 배포 번호(?v=)를 붙여 한 번 받으면 브라우저가 다시 묻지 않게 (배포하면 번호가 바뀌어 새로 받음)
 //   index.html → css · js 주소에 ?v=번호,  js 안의 import './x.js' 에도 같은 번호.  번호 붙은 파일 = 1년, 첫 화면 = 매번 확인
+// 메뉴마다 주소(사용자 지시 2026-11-11: xim.plators.com/studio 처럼) — 이 주소들은 첫 화면(index.html)을 내주고, 화면(app.js)이 주소를 보고 그 메뉴를 연다
+const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'monitor', 'security', 'audit', 'pricing', 'studio', 'voice', 'pc']);
 async function staticFile(request, env, url) {
   const v = String(env.VER?.id || 'dev').slice(0, 8);
-  const res = await env.ASSETS.fetch(request);
+  const isNav = NAV_PATHS.has(url.pathname.slice(1));
+  const res = await env.ASSETS.fetch(isNav ? new Request(new URL('/', url), request) : request);
   if (!res.ok) return res;
-  const p = url.pathname;
+  const p = isNav ? '/' : url.pathname;
   if (p === '/' || p === '/index.html') {
     const out = new HTMLRewriter()
       .on('link[href^="css/"]', { element(el) { el.setAttribute('href', `${el.getAttribute('href')}?v=${v}`); } })

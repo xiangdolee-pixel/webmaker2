@@ -718,3 +718,4 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 @media (max-width: 640px) { .st-sched-detail { margin-left: 0; } }
 .st-vbar { display: flex; width: 100%; margin-bottom: 6px; cursor: default; }
 .st-vbar:active { transform: none; }
+.login-remember { margin: 2px 0 4px; text-align: left; }
