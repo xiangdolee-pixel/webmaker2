@@ -750,6 +750,9 @@ export async function startStudioVideo(env, db, job, speed = 0.95) {
   const out = await res.json().catch(() => ({}));
   if (!res.ok) throw new HttpError(res.status, out.error || '내 목소리 작업을 만들지 못했습니다.');
   const jo = JSON.parse(job.options || '{}');
+  // 전 영상이 실패해 남은 "유튜브 올리기 실패" 표시는 새 영상을 시작할 때 지운다 (2026-11-11: 새 영상을 만드는 중인데 실패 문구가 그대로 보였다).
+  // 자동 올리기(yt_auto)는 그대로라 새 영상이 완성되면 다시 올라간다
+  if (jo.yt && jo.yt.status === 'failed' && !jo.yt.url) delete jo.yt;
   await setJob(db, job.id, { options: JSON.stringify({ ...jo, video_job: out.job?.id || '', video_at: now() }) });
   return { id: out.job?.id || '', slides: list.length, chars: list.reduce((n, x) => n + x.text.length, 0) };
 }
