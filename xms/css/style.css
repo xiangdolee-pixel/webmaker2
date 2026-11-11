@@ -493,7 +493,8 @@ tr.dragging td { background: var(--surface); }
 }
 @media (prefers-reduced-motion: reduce) { .mb-card { animation: none; } .steps li i::after, .ap-steps i::after { transition: none; } }
 /* 신청서 (/member/apply) — 한 단계씩 카드 하나, 강조색은 사이트 --brand */
-.ap { max-width: 720px; scroll-margin-top: 90px; }
+.mb.wide.ap { max-width: 920px; }
+.ap { scroll-margin-top: 90px; }
 .ap-top { text-align: center; }
 .ap-eyebrow { margin: 0 0 6px; color: var(--brand); font-size: 14px; font-weight: 700; }
 .ap-top h1 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 1.35; word-break: keep-all; }
@@ -510,6 +511,8 @@ tr.dragging td { background: var(--surface); }
 .ap-desc { margin: 0 0 20px; color: var(--sub); font-size: 15px; }
 .ap-grid { display: grid; gap: 0 14px; }
 .ap-grid .wide { grid-column: 1 / -1; }
+.ap-grid > .field { align-content: start; }
+.ap-grid > fieldset.field > legend { margin-bottom: 8px; } /* fieldset 제목은 grid 간격을 안 받는다 — 옆 입력칸과 높이 맞춤 */ /* 옆 칸에 안내 문구가 있어 줄이 높아져도 제목 · 입력칸은 위에 맞춘다 */
 .ap .field small { line-height: 1.5; }
 .ap-long { min-height: 300px; line-height: 1.75; resize: vertical; }
 .ap-count { font-weight: 600; }
@@ -529,7 +532,7 @@ tr.dragging td { background: var(--surface); }
 .ap-seg { display: flex; flex-wrap: wrap; gap: 8px; }
 .ap-seg label { position: relative; cursor: pointer; }
 .ap-seg input { position: absolute; opacity: 0; pointer-events: none; }
-.ap-seg span { display: inline-flex; align-items: center; min-height: 46px; padding: 0 20px; border: 1px solid #e3e6ec; border-radius: 12px; background: #f8f9fb; font-size: 16px; font-weight: 600; transition: background .2s, color .2s, border-color .2s; }
+.ap-seg span { display: inline-flex; align-items: center; min-height: 52px; padding: 0 20px; border: 1px solid #e3e6ec; border-radius: 12px; background: #f8f9fb; font-size: 16px; font-weight: 600; transition: background .2s, color .2s, border-color .2s; }
 .ap-seg input:checked + span { border-color: var(--brand); background: var(--brand); color: var(--brand-ink); }
 .ap-seg input:focus-visible + span { outline: 2px solid var(--brand); outline-offset: 2px; }
 .ap-files { display: grid; gap: 12px; }
