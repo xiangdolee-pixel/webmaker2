@@ -178,7 +178,11 @@ async function handle(request, env) {
     if (request.method === 'GET' && /^\/(board|member)(\/|$)/.test(pathname)) return embedPage(request, env);
     if (XMS_PATHS.test(pathname)) return forward(env.XMS, request, env);
     if (request.method === 'GET' && looksHtml(pathname)) {
-      const [res, data] = await Promise.all([env.ASSETS.fetch(request), siteHead(request, env, isHome(pathname))]);
+      // html 은 방문자마다 다르다(계정 버튼 · 등급별 메뉴) → 브라우저의 '안 바뀌었나요?'(If-None-Match) 를 정적 파일에 넘기지 않는다.
+      //   넘기면 304 가 나가 예전 화면(예: 등급 바꾸기 전)이 그대로 남는다 (사용자 지시 2026-11-11: 9→1 바꾸면 바로 적용)
+      const plain = new Request(request);
+      plain.headers.delete('If-None-Match'); plain.headers.delete('If-Modified-Since');
+      const [res, data] = await Promise.all([env.ASSETS.fetch(plain), siteHead(request, env, isHome(pathname))]);
       // xms 메뉴 권한으로 이 방문자가 볼 수 없는 페이지 → 사이트 틀 안에 '로그인이 필요합니다' / '볼 수 없는 곳입니다'
       if (Array.isArray(data?.blocked) && data.blocked.includes(pagePath(pathname))) {
         const u = new URL('/member/denied', url.origin);
@@ -402,7 +406,14 @@ async function withXms(res, request, env, data) {
     tail.push(`<script>${XE_APPLY.replace('__T__', () => T)}</script>`);
   }
   if (tail.length) rw = rw.on('body', { element(el) { el.onEndTag((end) => { end.before(tail.join('\n'), { html: true }); }); } });
-  return rw.transform(res);
+  // 사람마다 다른 html 이므로 브라우저가 묵혀 두지 않게: 늘 새로 받는다 (ETag 를 지워 304 로 예전 것을 쓰지 않게)
+  const t = rw.transform(res);
+  const out = new Response(t.body, t);
+  if (data) {
+    out.headers.delete('ETag'); out.headers.delete('Last-Modified');
+    out.headers.set('Cache-Control', 'private, no-cache');
+  }
+  return out;
 }
 
 // 맨 위로 버튼 — 스크롤을 조금 내리면 오른쪽 아래에 동그라미가 떠오른다. 누르면 맨 위로 부드럽게.
