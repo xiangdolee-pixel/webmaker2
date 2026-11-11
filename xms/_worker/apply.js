@@ -274,7 +274,7 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
       <p class="ap-sub">낸 신청서는 고칠 수 없습니다. 바꿀 내용이 있으면 장학회에 문의해 주세요.</p></div>
   </div>` : ''}
   <form class="mb-form ap-form" data-form="apply" novalidate${cur ? ' hidden' : ''}>
-    <ol class="ap-steps" aria-label="신청 단계">${steps.map((s, i) => `<li data-dot="${i}"><i></i><span>${esc(s)}</span></li>`).join('')}</ol>
+    <ol class="ap-steps" aria-label="신청 단계">${steps.map((s, i) => `<li data-dot="${i}"><button type="button" data-goto="${i}" aria-label="${i + 1}단계 ${esc(s)}로 가기"><i></i><span>${esc(s)}</span></button></li>`).join('')}</ol>
     <p class="ap-now" aria-live="polite"><b data-now-no>1</b> / ${steps.length} · <span data-now-t>${steps[0]}</span></p>
 
     <div class="mb-card ap-step" data-step="0">

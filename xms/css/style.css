@@ -499,7 +499,10 @@ tr.dragging td { background: var(--surface); }
 .ap-eyebrow { margin: 0 0 6px; color: var(--brand); font-size: 14px; font-weight: 700; }
 .ap-top h1 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 1.35; word-break: keep-all; }
 .ap-steps { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
-.ap-steps li { display: grid; gap: 6px; color: var(--mute); font-size: 12px; font-weight: 600; text-align: center; }
+.ap-steps li { display: grid; color: var(--mute); font-size: 12px; font-weight: 600; text-align: center; }
+.ap-steps button { display: grid; gap: 6px; width: 100%; padding: 6px 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.ap-steps button:hover { color: var(--ink); }
+.ap-steps button:hover i { background: #d5d9e1; }
 .ap-steps i { position: relative; display: block; height: 5px; border-radius: 99px; background: #e4e7ed; overflow: hidden; }
 .ap-steps i::after { content: ""; position: absolute; inset: 0; background: var(--brand); transform: scaleX(0); transform-origin: left; transition: transform .35s var(--ease); }
 .ap-steps li.on i::after { transform: none; }

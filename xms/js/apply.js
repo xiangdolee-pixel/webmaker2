@@ -187,6 +187,19 @@ $('[data-next]', form).addEventListener('click', () => {
   show(at + 1); save();
 });
 $('[data-prev]', form).addEventListener('click', () => show(at - 1));
+// 위 단계 표시줄을 눌러도 그 단계로: 앞으로는 바로, 뒤로 건너뛸 때는 사이 단계에 빈칸이 있으면 거기서 멈춘다
+form.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-goto]');
+  if (!b) return;
+  const n = +b.dataset.goto;
+  if (n === at) return;
+  if (n < at) { show(n); return; }
+  for (let i = at; i < n; i++) {
+    const m = check(i);
+    if (m) { if (i !== at) show(i); err.textContent = m; return; }
+  }
+  save(); show(n);
+});
 
 // 신청 사유 글자 수
 $$('textarea[data-min]', form).forEach((t) => {
