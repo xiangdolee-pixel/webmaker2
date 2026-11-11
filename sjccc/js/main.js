@@ -52,7 +52,18 @@
     else window.addEventListener("load", function () { setTimeout(kick, 300); });
   }
 
-  /* ─── 배경 영상 페이드인 (히어로·후원/푸터) ─── */
+  /* ─── 후원 · 꼬리말 배경 사진: 화면 가까이 오면 불러온다 (첫 화면을 늦추지 않게) ─── */
+  var peBg = document.querySelector(".pe-bg");
+  if (peBg) {
+    if ("IntersectionObserver" in window) {
+      var peIo = new IntersectionObserver(function (entries) {
+        if (entries.some(function (en) { return en.isIntersecting; })) { peBg.classList.add("on"); peIo.disconnect(); }
+      }, { rootMargin: "900px 0px" });
+      peIo.observe(peBg);
+    } else peBg.classList.add("on");
+  }
+
+  /* ─── 배경 영상 페이드인 (히어로) ─── */
   document.querySelectorAll(".cover-video iframe").forEach(function (v) {
     v.addEventListener("load", function () {
       v.classList.add("loaded");

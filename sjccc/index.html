@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://vod-adaptive-ak.vimeocdn.com">
 <link rel="preload" as="image" href="images/hero-poster.webp" fetchpriority="high">
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=20261111b">
 </head>
 <body>
 
@@ -402,12 +402,9 @@
 
 </main>
 
-<!-- ══════════ SUPPORT + FOOTER (공통 배경 영상) ══════════ -->
+<!-- ══════════ SUPPORT + FOOTER (공통 배경 사진 — 가까이 오면 불러옴) ══════════ -->
 <div class="page-end">
-    <div class="pe-video cover-video" aria-hidden="true">
-      <iframe data-src="https://player.vimeo.com/video/1213162121?background=1&autoplay=1&loop=1&muted=1&autopause=0&dnt=1"
-              allow="autoplay" title="배경 영상"></iframe>
-    </div>
+    <div class="pe-bg" aria-hidden="true"></div>
   <section class="support" id="support">
     <div class="support-inner">
       <div class="support-copy">
@@ -484,6 +481,6 @@
 <div class="toast" id="toast" role="status">계좌번호가 복사되었습니다</div>
 
 
-<script src="js/main.js" defer></script>
+<script src="js/main.js?v=20261111b" defer></script>
 </body>
 </html>

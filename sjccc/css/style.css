@@ -1025,32 +1025,22 @@ section { padding: var(--sec-y) var(--gutter); }
 }
 .notice dd a:hover { color: var(--accent); border-color: var(--accent); }
 
-/* ═══════════ SUPPORT + FOOTER 래퍼 (공통 배경 영상) ═══════════ */
+/* ═══════════ SUPPORT + FOOTER 래퍼 (공통 배경 사진 — 2026-11-11 영상 → 사진, 화면 가까이 오면 .on 으로 불러온다) ═══════════ */
 .page-end {
   position: relative;
   overflow: hidden;
   background: var(--deep);
 }
-.pe-video {
+.pe-bg {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: url("../images/hero-poster.webp") center / cover no-repeat;
+  background: var(--deep) center / cover no-repeat;
 }
-.pe-video iframe {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: max(100vw, 177.78svh);
-  height: max(100svh, 56.25vw);
-  border: 0;
-  opacity: 0;
-  transition: opacity 1.2s ease;
-}
-.pe-video iframe.loaded { opacity: 1; }
-.pe-video::after {
+.pe-bg.on { background-image: url("../images/support-bg.webp"); }
+@media (max-width: 760px) { .pe-bg.on { background-image: url("../images/support-bg-m.webp"); } }
+.pe-bg::after {
   content: "";
   position: absolute;
   inset: 0;
