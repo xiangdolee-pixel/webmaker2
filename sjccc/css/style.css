@@ -418,8 +418,20 @@ section { padding: var(--sec-y) var(--gutter); }
   max-width: 36rem;
 }
 .about-body strong { color: var(--accent-deep); font-weight: 600; }
-.jeonggwan-link strong { border-bottom: 1px solid var(--accent-soft); transition: border-color 0.3s; }
-.jeonggwan-link:hover strong { border-color: var(--accent-deep); }
+/* 문장 속 문서 버튼 (정관 PDF) — 알약 + 문서 아이콘. 어두운 바탕(.on-dark)에서는 색을 뒤집는다 */
+.doc-btn {
+  display: inline-flex; align-items: center; gap: 0.3em;
+  margin: 0 0.15em; padding: 0.12em 0.75em 0.12em 0.6em;
+  border-radius: 999px; background: var(--accent-deep); color: #fff;
+  font-weight: 700; font-size: 0.95em; line-height: 1.5; text-decoration: none; white-space: nowrap;
+  box-shadow: 0 4px 12px -6px rgba(156, 12, 38, 0.7);
+  transition: background 0.25s, color 0.25s, transform 0.25s, box-shadow 0.25s;
+}
+.doc-btn svg { width: 1.05em; height: 1.05em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.doc-btn:hover { background: var(--accent); transform: translateY(-1px); box-shadow: 0 8px 18px -8px rgba(156, 12, 38, 0.8); }
+.doc-btn.on-dark { background: #fff; color: var(--accent-deep); box-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.6); }
+.doc-btn.on-dark:hover { background: var(--accent-soft); color: var(--accent-deep); }
+@media (prefers-reduced-motion: reduce) { .doc-btn { transition: none; } .doc-btn:hover { transform: none; } }
 
 .board {
   margin-top: 2.6rem;
@@ -1164,12 +1176,6 @@ section { padding: var(--sec-y) var(--gutter); }
   font-weight: 400;
   white-space: nowrap;
 }
-.f-jeonggwan {
-  color: rgba(255, 255, 255, 0.85);
-  border-bottom: 1px solid var(--accent-soft);
-  transition: color 0.3s;
-}
-.f-jeonggwan:hover { color: var(--accent-soft); }
 
 /* ═══════════ TOAST ═══════════ */
 .toast {
