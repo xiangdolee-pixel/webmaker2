@@ -1278,4 +1278,4 @@ section { padding: var(--sec-y) var(--gutter); }
 }
 
 /* xms 게시판 · 회원 화면(사이트 안에 끼워짐) — 강조색만 사이트 색으로 */
-.xms-c { --brand: var(--accent-deep, var(--accent)); }
+.xms-c { --brand: var(--accent-deep, var(--accent)); --xms-fs: 1.15px; } /* 게시판 · 회원 · 장학금 신청 화면 글자를 사이트 본문(18px)에 맞춰 15% 크게 */

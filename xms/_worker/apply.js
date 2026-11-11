@@ -230,7 +230,7 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
   const val = (f) => ans[f.k] ?? (f.prefill ? m[f.prefill] || '' : '');
   const tk = (await turnstileKeys(env, site)).sitekey;
   const notice = String(round.notice || '').trim() ? round.notice.split('\n') : FORM.intro;
-  const steps = ['안내', ...FORM.sections.map((s) => s.title.replace(/ 정보$/, '')), '서류', '확인'];
+  const steps = ['안내', ...FORM.sections.map((s) => s.title.replace(/ 정보$/, '').replace(/^장학금 /, '')), '서류', '확인'];
 
   const fieldHtml = (f) => {
     const head = `<span>${esc(f.label)} <em class="req">*</em></span>`;

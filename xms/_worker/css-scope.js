@@ -13,6 +13,10 @@ function scopeSelector(sel) {
   return `${SCOPE} ${s}`;
 }
 
+// 사이트 안에서는 글자 크기(px)에 사이트 배율을 곱한다: 사이트 CSS 에서 .xms-c { --xms-fs: 1.15px } 처럼 (기본 1px = 그대로)
+//   사이트 본문 글자가 큰 곳(예: sjccc 18px)에서 xms 화면만 작아 보이지 않게 (사용자 지시 2026-11-11)
+const scaleFont = (decl) => decl.replace(/font-size:\s*([\d.]+)px/g, (m, n) => `font-size:calc(${n} * var(--xms-fs, 1px))`);
+
 // 아주 작은 CSS 쪼개기: @media · @supports 는 안쪽을 다시, @keyframes · @font-face 는 그대로
 function walk(css) {
   let out = '';
@@ -29,7 +33,7 @@ function walk(css) {
     else if (/^@/.test(head)) out += `${head}{${inner}}\n`;
     else {
       const sels = head.split(',').map(scopeSelector).filter(Boolean);
-      if (sels.length) out += `${sels.join(', ')}{${inner}}\n`;
+      if (sels.length) out += `${sels.join(', ')}{${scaleFont(inner)}}\n`;
     }
     i = j;
   }
