@@ -107,8 +107,8 @@ ul, ol { list-style: none; }
 .gnb { display: flex; align-items: center; gap: clamp(1.2rem, 2.5vw, 2.4rem); }
 .gnb a {
   font-size: 1.1rem;
-  font-weight: 500;
-  opacity: 0.75;
+  font-weight: 600;
+  opacity: 0.9;
   padding: 0.5rem 0;
   position: relative;
   transition: opacity 0.3s;
@@ -144,7 +144,7 @@ ul, ol { list-style: none; }
 /* 로그인 · 계정 버튼 (xim 공통 /xms/js/account.js 가 채운다) */
 .gnb { margin-left: auto; }
 .gnb-account { margin-left: clamp(1rem, 2vw, 1.8rem); --xa-bg: var(--accent); }
-.gnb-account .xa-login { font-size: 1.1rem; font-weight: 500; opacity: 0.75; padding: 0.5rem 0; transition: opacity 0.3s; }
+.gnb-account .xa-login { font-size: 1.1rem; font-weight: 600; opacity: 0.9; padding: 0.5rem 0; transition: opacity 0.3s; }
 .gnb-account .xa-login:hover { opacity: 1; }
 
 .nav-toggle {
@@ -896,7 +896,7 @@ section { padding: var(--sec-y) var(--gutter); }
   color: var(--white) !important;
   background: var(--accent-deep);
 }
-.gnb a[aria-current="page"] { opacity: 1; color: var(--accent); font-weight: 600; }
+.gnb a[aria-current="page"] { opacity: 1; color: var(--accent); font-weight: 700; }
 
 /* ═══════════ CRITERIA ═══════════ */
 /* 03(포토)·05(신청절차)의 흰 배경과 구분되도록 연회색 */
