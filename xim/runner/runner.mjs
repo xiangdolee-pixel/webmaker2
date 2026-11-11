@@ -187,19 +187,34 @@ async function runText(payload, work, { stage = 'run', onBlocks } = {}) {
       await assertAlive(j);
       blocks = await stepRun(j, 'articles', `${items.length}개 동시`, async () => {
         // 속도: 기사마다 독립 Claude Code 프로세스를 동시에 띄운다(오케스트레이터 1개 + 서브에이전트 6개보다 1~2분 빠름). 실패한 기사만 1회 재시도
-        const one = async (it) => {
-          const prompt = `${P.ARTICLE_FROM_URL(it.url, `${it.title} — ${it.summary}`)}\n${P.ARTICLE_SELFCHECK}\n\n★ WebFetch 로 URL 을 1회만 읽는다. 결과는 📌 로 시작하는 대본 텍스트만(마지막 줄 [인물] 포함). 설명 · 머리말 · 코드펜스 금지. 사용자에게 묻지 않는다.`;
+        const one = async (it, extra = '') => {
+          const prompt = `${P.ARTICLE_FROM_URL(it.url, `${it.title} — ${it.summary}`)}\n${P.ARTICLE_SELFCHECK}${extra}\n\n★ WebFetch 로 URL 을 1회만 읽는다. 결과는 📌 로 시작하는 대본 텍스트만(마지막 줄 [인물] 포함). 설명 · 머리말 · 코드펜스 금지. 사용자에게 묻지 않는다.`;
           const out = (await claude(prompt, { label: `기사 ${it.n}`, timeoutMin: 8, model: 'opus' })).replace(/```[a-z]*\n?/g, '').trim();
           const b = splitBlocks(out)[0];
           if (!b) throw new Error(`기사 ${it.n} 대본 형식 아님`);
           return b;
         };
         const results = await Promise.all(items.map(async (it) => { try { return await one(it); } catch (e) { log(`  기사 ${it.n} 실패(${e.message.slice(0, 60)}) → 재시도`); try { return await one(it); } catch { return null; } } }));
+        // 분량 지킴이(사용자 지시 2026-11-11 "영상은 무조건 8분을 넘겨야"): 읽는 본문 합계가 MIN_CHARS 아래면
+        //   짧은 기사부터 다시 써서 늘린다(같은 URL 을 다시 읽음, 지어내기 금지는 그대로). 1분 ≈ 466자 실측, 인사말 · 인트로 ≈ 230자
+        const MIN_CHARS = 3600, bodyLen = (x) => slideText(x).split('\n').filter((l) => !/^\s*📌/.test(l)).join(' ').length;   // 띄어쓰기 포함(음성 길이와 맞는 셈법) — 3600 + 인사말 · 인트로 ≈ 8분 13초
+        const total = () => results.filter(Boolean).reduce((a, x) => a + bodyLen(x), 0);
+        if (results.some(Boolean) && total() < MIN_CHARS) {
+          const order = items.map((it, i) => ({ it, i })).filter(({ i }) => results[i]).sort((a, z) => bodyLen(results[a.i]) - bodyLen(results[z.i]));
+          const need = order.filter(({ i }) => bodyLen(results[i]) < 600);
+          log(`  원고가 짧음(${total()}자 < ${MIN_CHARS}자 ≈ 8분) → 짧은 기사 ${need.length || 2}개 늘려 다시`);
+          await Promise.all((need.length ? need : order.slice(0, 2)).map(async ({ it, i }) => {
+            const len = bodyLen(results[i]);
+            try { const nb = await one(it, `\n\n★ 분량: 직전 대본 본문이 ${len}자로 짧았다. 본문을 640~680자(문단 4개)로 늘려 다시 쓴다. 기사 안의 배경 · 수치 · 맥락으로 채우고 같은 말 되풀이나 없는 사실은 금지.`); if (bodyLen(nb) > len) results[i] = nb; } catch (e) { log(`  기사 ${it.n} 늘리기 실패 — 그대로(${e.message.slice(0, 60)})`); }
+          }));
+          log(`  늘린 뒤 ${total()}자`);
+        }
         const b = results.filter(Boolean);
         if (!b.length) throw new Error('대본을 하나도 만들지 못했습니다.');
         if (b.length < items.length) log(`  기사 ${items.length - b.length}개는 끝내 실패 — ${b.length}개로 진행`);
         await j.doc('articles', b.join('\n\n'));
-        return b;
+        log(`  원고 ${b.length}개 · 본문 ${b.reduce((a, x) => a + bodyLen(x), 0)}자 (≈ ${((b.reduce((a, x) => a + bodyLen(x), 0) + 230) / 466).toFixed(1)}분)`);
+        return b;   // stepRun 이 돌려준 값이 blocks 가 된다 — 배열 그대로
       });
     } else if (job.source === 'capture') {
       const caps = payload.captures || [];
