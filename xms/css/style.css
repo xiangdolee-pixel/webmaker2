@@ -1303,3 +1303,12 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .apx-sc-l { color: var(--mute); font-size: 12px; font-weight: 700; }
 .apx-sc.none { background: #f6f7f9; }
 .apx-sc.none b { background: transparent; color: var(--mute); font-weight: 600; }
+/* 글 보기 아래 최신글 (표 · 카드) — 지금 글 강조 */
+.post-more { margin-top: 40px; padding-top: 24px; border-top: 2px solid var(--line); }
+.post-more-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; margin: 0 0 12px; }
+.post-more-h h2 { margin: 0; font-size: 18px; font-weight: 800; }
+.post-more-h a { color: var(--sub); font-size: 14px; font-weight: 600; text-decoration: none; }
+.post-more-h a:hover { color: var(--brand); }
+.more-table tr.is-current td { background: var(--brand-soft); }
+.more-table tr.is-current a { font-weight: 700; }
+.more-cards .pcard.is-current { outline: 2px solid var(--brand); outline-offset: 2px; }

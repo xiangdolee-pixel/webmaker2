@@ -412,7 +412,7 @@ async function postView(ctx, b, id) {
     </section>`;
   }
   const mine = me.level === 1 || isMine(p, me);
-  const atts = await postAttachments(env, ctx.site, p.id);
+  const [atts, more] = await Promise.all([postAttachments(env, ctx.site, p.id), moreList(ctx, b, p)]);
   const imgs = atts.filter((u) => u.kind === 'IMAGE');
   const files = atts.filter((u) => u.kind === 'FILE');
   return page(ctx, p.title, `<section class="pub-box wide">
@@ -428,7 +428,38 @@ async function postView(ctx, b, id) {
     <div class="actions"><a class="btn" href="/board/${b.slug}">목록</a>${mine ? `<a class="btn" href="/board/${b.slug}/${p.id}/edit">수정</a>
       <button class="btn danger" type="button" data-del-post="${p.id}" data-back="/board/${b.slug}">삭제</button>` : ''}</div>
     ${comments}
+    ${more}
   </section>`);
+}
+
+// 글 보기 아래 '최신글' — 표 · 블로그형은 줄 목록, 카드(갤러리)형은 썸네일. 지금 글은 강조 (사용자 지시 2026-11-11)
+//   목록을 볼 수 있는 사람에게만. 공지는 빼고 최근 글 page_size 개(카드는 최대 12)
+async function moreList(ctx, b, cur) {
+  const { env, me } = ctx;
+  if (!canList(b, me)) return '';
+  const admin = me.level === 1;
+  const n = Math.min(b.list_layout === 'CARD' ? 12 : 20, b.opt.page_size || 10);
+  const { results } = await env.DB.prepare(`SELECT id, title, content_html, published_at, view_count, writer_name, writer_id, is_secret, is_hidden, is_notice FROM posts
+    WHERE board_id = ? AND deleted_at IS NULL AND is_notice = 0 ${admin ? '' : 'AND published_at <= ? AND is_hidden = 0'} ORDER BY published_at DESC, id DESC LIMIT ?`)
+    .bind(...(admin ? [b.id, n] : [b.id, now(), n])).all();
+  if (!results.length) return '';
+  const ls = b.opt.list_show;
+  const secret = (p) => p.is_secret && !admin && !isMine(p, me);
+  const title = (p) => `${p.is_secret ? '<span class="tag">비밀</span>' : ''}${esc(secret(p) ? '비밀글입니다' : p.title)}${p.id === cur.id ? '<span class="tag blue">보는 글</span>' : ''}`;
+  const link = (p) => `/board/${b.slug}/${p.id}`;
+  let body;
+  if (b.list_layout === 'CARD') {
+    const ids = results.filter((p) => !secret(p) && !firstImage(p.content_html)).map((p) => p.id);
+    const atts = ids.length ? (await env.DB.prepare(`SELECT post_id, id FROM uploads WHERE site = ? AND kind = 'IMAGE' AND post_id IN (${ids.map(() => '?').join(',')}) ORDER BY sort`).bind(ctx.site, ...ids).all()).results : [];
+    const thumb = (p) => (secret(p) ? '' : firstImage(p.content_html) || (atts.find((a) => a.post_id === p.id) ? `/xms/upload/${atts.find((a) => a.post_id === p.id).id}` : ''));
+    body = `<div class="cards more-cards">${results.map((p) => `<a class="pcard${p.id === cur.id ? ' is-current' : ''}" href="${link(p)}"${p.id === cur.id ? ' aria-current="page"' : ''}>
+      <div class="thumb">${thumb(p) ? `<img src="${esc(thumb(p))}" alt="" loading="lazy">` : '<span>No Image</span>'}</div>
+      <div class="pcard-b"><b>${title(p)}</b>${ls.date ? `<small>${fmtDate(p.published_at)}</small>` : ''}</div></a>`).join('')}</div>`;
+  } else {
+    body = `<table class="ptable more-table"><tbody>${results.map((p) => `<tr${p.id === cur.id ? ' class="is-current" aria-current="page"' : ''}>
+      <td class="c-t"><a href="${link(p)}">${title(p)}</a></td>${ls.writer ? `<td class="c-w">${esc(writerOf(b, p, me))}</td>` : ''}${ls.date ? `<td class="c-d">${fmtDate(p.published_at)}</td>` : ''}</tr>`).join('')}</tbody></table>`;
+  }
+  return `<section class="post-more"><div class="post-more-h"><h2>${esc(b.name)} 최신글</h2><a href="/board/${b.slug}">전체 목록 →</a></div>${body}</section>`;
 }
 
 const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`);
