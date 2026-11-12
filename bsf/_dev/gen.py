@@ -288,8 +288,8 @@ home = head('BSF COMPANY — 글로벌 의류 OEM · ODM 소싱 파트너', '17�
   <section class="sec ink" style="padding-top:110px;padding-bottom:110px">
     <div class="wrap">
       <div class="sec-head row" style="margin-bottom:56px"><div><p class="eyebrow rv">TRUSTED BY</p><h2 class="title-ko rv d1">함께한 브랜드</h2></div></div>
+      {logo_rows()}
     </div>
-    {logo_rows()}
   </section>
 
   <section class="brand-band sec">
@@ -525,7 +525,7 @@ works = head('납품실적 | BSF COMPANY', 'T1 월즈 유니폼, 무신사 1위 
 {page_hero('images/works/t1-team.webp', 'WORKS', 'Made by <span class="o">BSF.</span>', '세계 대회 무대의 선수단부터 수천 명이 걷는 행사, 무신사 랭킹 1위까지 — BSF가 만든 옷들입니다.')}
 
   <section class="sec ink" style="padding-top:90px;padding-bottom:90px">
-    {logo_rows()}
+    <div class="wrap">{logo_rows()}</div>
   </section>
 
   <section class="sec">
