@@ -51,7 +51,7 @@ for gy in range(STEP // 2, H, STEP):
         v = px[gx * S, gy * S]
         if v: dots[inv[v]].append((gx, gy))
 out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}">']
-style = {'land': ('#3e6a86', .55, 2.2), 'cn': ('#ff8a2a', .95, 2.7), 'vn': ('#ff8a2a', .95, 2.7), 'mm': ('#ff8a2a', .95, 2.7), 'bd': ('#ff8a2a', .95, 2.7), 'kr': ('#ffffff', 1, 2.9)}
+style = {'land': ('#8fbfdc', .62, 2.6), 'cn': ('#ff9640', 1, 3), 'vn': ('#ff9640', 1, 3), 'mm': ('#ff9640', 1, 3), 'bd': ('#ff9640', 1, 3), 'kr': ('#ffffff', 1, 3.2)}
 for k, pts in dots.items():
     c, o, r = style[k]
     out.append(f'<g fill="{c}" fill-opacity="{o}">' + ''.join(f'<circle cx="{x}" cy="{y}" r="{r}"/>' for x, y in pts) + '</g>')

@@ -216,9 +216,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .world-wrap::-webkit-scrollbar { display: none; }
 .world { position: relative; width: 100%; aspect-ratio: 1600 / 596; }
 .world > img, .world > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.arc { fill: none; stroke: url(#arc-grad); stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 700; stroke-dashoffset: 700; }
+.arc { fill: none; stroke: url(#arc-grad); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 700; stroke-dashoffset: 700; }
 .world.in .arc { animation: draw 2.6s var(--ease) forwards; }
-.arc.ex { stroke: rgba(110, 166, 203, .6); stroke-dasharray: 4 7; stroke-dashoffset: 0; opacity: 0; }
+.arc.ex { stroke: rgba(143, 191, 220, .85); stroke-width: 1.6; stroke-dasharray: 4 7; stroke-dashoffset: 0; opacity: 0; }
 .world.in .arc.ex { animation: fadeIn 1.4s 1.8s forwards, dash 40s linear infinite; }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 @keyframes fadeIn { to { opacity: 1; } }
@@ -230,9 +230,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .pin.mk .core { fill: var(--steel-2); }
 .pin.mk .ring { stroke: var(--steel-2); }
 @keyframes pin { 0% { transform: scale(.7); opacity: .9; } 100% { transform: scale(3.6); opacity: 0; } }
-.callout line { stroke: rgba(255, 255, 255, .4); stroke-width: 1; }
-.callout text { fill: #fff; font: 800 16px var(--display); letter-spacing: .08em; }
-.callout text.ko { font: 600 13px var(--font); letter-spacing: 0; fill: rgba(255, 255, 255, .75); }
+.callout line { stroke: rgba(255, 255, 255, .6); stroke-width: 1.2; }
+.callout text { fill: #fff; font: 800 19px var(--display); letter-spacing: .08em; paint-order: stroke; stroke: rgba(5, 15, 23, .7); stroke-width: 4px; }
+.callout text.ko { font: 600 15px var(--font); letter-spacing: 0; fill: rgba(255, 255, 255, .88); }
 .callout.mk text { fill: var(--steel-2); }
 .globe-legend { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 26px 0 0; padding: 0; list-style: none; color: rgba(255, 255, 255, .72); font-size: 15px; }
 .globe-legend li { display: inline-flex; align-items: center; gap: 10px; }
@@ -587,8 +587,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .logo-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (min-width: 1024px) {
-  /* 모든 페이지 · 모든 구간의 콘텐츠 폭을 하나로: 좌우 여백 각 10% (사용자 지시 2026-11-12) */
-  :root { --gutter: 10vw; }
+  /* 모든 페이지 · 모든 구간의 콘텐츠 폭을 하나로 (사용자 지시 2026-11-12): 큰 화면(1600px~)은 좌우 여백 각 20%,
+     1024px 에서 10% 까지 화면 폭에 따라 줄어든다 — 노트북에서 글 폭이 너무 좁아지지 않게 */
+  :root { --gutter: max(10vw, min(20vw, calc(37.78vw - 284.5px))); }
   .world-wrap { margin: 0; overflow: visible; }
   .spot { padding: 0 var(--gutter); }
   .spot-body { padding: clamp(64px, 7vw, 120px) 0 clamp(64px, 7vw, 120px) clamp(40px, 5vw, 96px); background: none; }

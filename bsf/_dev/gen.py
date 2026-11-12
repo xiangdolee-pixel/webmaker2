@@ -136,23 +136,23 @@ def world():
         parts.append(f'<path class="arc ex" d="{arc(hq, xy(lon, lat), .22)}"/>')
     for lon, lat in CITIES:
         x, y = xy(lon, lat)
-        parts.append(f'<g class="pin"><circle class="ring" cx="{x}" cy="{y}" r="3"/><circle class="core" cx="{x}" cy="{y}" r="3"/></g>')
+        parts.append(f'<g class="pin"><circle class="ring" cx="{x}" cy="{y}" r="4"/><circle class="core" cx="{x}" cy="{y}" r="4"/></g>')
     for en, ko, lon, lat, dx, dy in MARKETS:
         x, y = xy(lon, lat)
-        parts.append(f'<g class="pin mk"><circle class="ring" cx="{x}" cy="{y}" r="4"/><circle class="core" cx="{x}" cy="{y}" r="4"/></g>')
+        parts.append(f'<g class="pin mk"><circle class="ring" cx="{x}" cy="{y}" r="5.5"/><circle class="core" cx="{x}" cy="{y}" r="5.5"/></g>')
         parts.append(callout(x, y, dx, dy, en, ko, 'mk'))
     x, y = hq
-    parts.append(f'<g class="pin hq"><circle class="ring" cx="{x}" cy="{y}" r="5"/><circle class="core" cx="{x}" cy="{y}" r="5"/></g>')
+    parts.append(f'<g class="pin hq"><circle class="ring" cx="{x}" cy="{y}" r="7"/><circle class="core" cx="{x}" cy="{y}" r="7"/></g>')
     for en, ko, lon, lat, dx, dy, cls in CALLOUTS:
         parts.append(callout(*xy(lon, lat), dx, dy, en, ko, cls))
-    return (f'<div class="world-wrap"><div class="world"><img src="images/world-dots.svg" alt="" width="{W}" height="{H}" loading="lazy">'
+    return (f'<div class="world-wrap"><div class="world"><img src="images/world-dots.svg?v={V}" alt="" width="{W}" height="{H}" loading="lazy">'
             f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="BSF 글로벌 생산 네트워크: 서울 본사와 중국 · 베트남 · 미얀마 · 방글라데시 생산 거점, 북미 · 유럽 · 오세아니아 바이어">' + ''.join(parts) + '</svg></div></div>')
 def callout(x, y, dx, dy, en, ko, cls):
     ex, ey = x + dx, y + dy
     anchor = 'start' if dx >= 0 else 'end'
     tx = ex + (6 if dx >= 0 else -6)
     return (f'<g class="callout {cls}"><line x1="{x}" y1="{y}" x2="{ex}" y2="{ey}"/><circle cx="{ex}" cy="{ey}" r="1.8" fill="#fff"/>'
-            f'<text x="{tx}" y="{ey - 4}" text-anchor="{anchor}">{en}</text><text class="ko" x="{tx}" y="{ey + 15}" text-anchor="{anchor}">{ko}</text></g>')
+            f'<text x="{tx}" y="{ey - 5}" text-anchor="{anchor}">{en}</text><text class="ko" x="{tx}" y="{ey + 17}" text-anchor="{anchor}">{ko}</text></g>')
 
 COUNTRIES = [('CN', 'CHINA', '중국', [('다롄 · 단둥', '우븐'), ('칭다오', '니트 · 스웨터'), ('닝보 · 난퉁 · 난창', '니트 · 우븐'), ('지난', '데님'), ('양저우', '모자'), ('상하이 · 항저우 · 광저우', '원단 · 부자재 · 가방')]),
              ('VN', 'VIETNAM', '베트남', [('호찌민', '아우터 · 데님'), ('하노이', '아우터 · 데님')]),
