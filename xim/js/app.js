@@ -81,7 +81,7 @@ function showApp() {
   $('#app').hidden = false;
   if (!navReady) {
     navReady = true;
-    pillTabs($('#nav'), [['sites', '사이트'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC'], ['domains', '도메인 연결']], tab, (v) => {
+    pillTabs($('#nav'), [['sites', '사이트'], ['domains', '도메인 연결'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC']], tab, (v) => {
       tab = v;
       try { localStorage.setItem(TAB_KEY, v); } catch { /* 무시 */ }
       setPath(v);
