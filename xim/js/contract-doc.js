@@ -54,12 +54,12 @@ export const today = () => { const d = new Date(); return `${d.getFullYear()}-${
 const stamp = (ms) => { const d = new Date(ms); return `${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
 
 // 글자 → 단락 html (자리 표시를 채운다)
-function bodyHtml(c, eul, lines = false) {
+function bodyHtml(c, eul, lines = false, edit = false) {
   const fill = { '갑': c.client_name || '갑', '을': eul.name || '을', '제작비': moneyText(c.build_fee), '연간비': moneyText(c.yearly_fee), '계약일': dateKo(c.contract_date) };
-  const put = (t) => esc(t).replace(/\{(갑|을|제작비|연간비|계약일)\}/g, (_, k) => `<b>${esc(fill[k])}</b>`);
+  const put = (t) => esc(t).replace(/\{(갑|을|제작비|연간비|계약일)\}/g, (_, k) => (edit ? `<b class="ct-ph" contenteditable="false" data-ph="${k}" title="왼쪽 칸 값이 들어가는 자리">${esc(fill[k])}</b>` : `<b>${esc(fill[k])}</b>`));
   return String(c.body || '').split(/\r?\n/).map((line, i) => {
     const t = line.trim();
-    const l = lines ? ` data-l="${i}"` : '';
+    const l = (lines || edit ? ` data-l="${i}"` : '') + (edit ? ' contenteditable="plaintext-only" spellcheck="false"' : '');
     if (!t) return `<p class="ct-gap"${l}></p>`;
     const art = t.match(/^(제\s*\d+\s*조\s*(?:\([^)]*\))?)\s*(.*)$/);
     if (art) return `<p class="ct-art"${l}><b>${esc(art[1])}</b>${art[2] ? ` ${put(art[2])}` : ''}</p>`;
@@ -74,7 +74,7 @@ export function contractHtml(c, eul, opt = {}) {
   const signed = c.status === 'signed';
   return `<article class="ct-doc${opt.a4 ? ' ct-a4' : ''}">
     <header class="ct-head"><h1>홈페이지 제작 계약서</h1>${c.code ? `<span class="ct-no">No. ${esc(c.code)}</span>` : ''}</header>
-    <div class="ct-body">${bodyHtml(c, eul, opt.lines)}</div>
+    <div class="ct-body">${bodyHtml(c, eul, opt.lines, opt.edit)}</div>
     <p class="ct-date">${esc(dateKo(c.contract_date) || '　　년　　월　　일')}</p>
     <div class="ct-parties">
       ${party('갑', c.client_name, c.client_phone, c.client_sign || opt.preview || '', 'gap')}
@@ -169,4 +169,19 @@ export async function markImage(file) {
     if (s < 0.2) throw new Error('그림이 너무 큽니다. 더 작은 그림으로 올려 주세요.');
     s *= 0.75;   // 거친 도장처럼 무늬가 많으면 더 줄인다
   }
+}
+
+// 문서 위에서 고친 문단 → 글자 한 줄 (자리 표시 칸은 {갑} 같은 원래 표시로)
+export function lineText(p) {
+  let out = '';
+  const walk = (n) => {
+    for (const ch of n.childNodes) {
+      if (ch.nodeType === 3) out += ch.nodeValue;
+      else if (ch.dataset?.ph) out += `{${ch.dataset.ph}}`;
+      else if (ch.nodeName === 'BR') out += '';
+      else walk(ch);
+    }
+  };
+  walk(p);
+  return out.replace(/\u00a0/g, ' ').replace(/\s*\n\s*/g, ' ');
 }

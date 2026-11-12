@@ -842,10 +842,10 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .ct-party dl > div { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; min-height: 38px; }
 .ct-party dt { color: #6a717e; font-size: .88em; }
 .ct-party dd { margin: 0; font-weight: 600; }
-.ct-name { display: flex; align-items: center; gap: 28px; }
+.ct-name { display: flex; align-items: center; gap: 36px; }
 .ct-name > span:first-child { min-width: 0; }
 /* (인) — 서명 · 도장은 이 동그라미 한가운데에 찍힌다 */
-.ct-in { position: relative; flex: none; display: inline-grid; place-items: center; width: 32px; height: 32px; border: 1.4px solid #9aa0aa; border-radius: 50%; color: #8a909c; font-size: 14px; font-weight: 500; line-height: 1; }
+.ct-in { position: relative; flex: none; display: inline-grid; place-items: center; width: 17px; height: 17px; border: 1px solid #9aa0aa; border-radius: 50%; color: #8a909c; font-size: 9.5px; font-weight: 600; line-height: 1; }   /* 사용자 지시 2026-11-12: 동그라미는 처음의 절반 */
 .ct-in i { font-style: normal; }
 .ct-in img { position: absolute; left: 50%; top: 50%; max-width: 120px; max-height: 58px; transform: translate(-50%, -50%); pointer-events: none; }
 .ct-in-eul img { width: 66px; max-height: none; transform: translate(-50%, -50%) rotate(-8deg); opacity: .94; }   /* 도장: 살짝 기울게, 찍은 것처럼 */
@@ -885,18 +885,28 @@ textarea.ct-text { min-height: 320px; font-size: 14px; line-height: 1.65; }
 /* 계약서 화면: 왼쪽 고치기 · 오른쪽 A4 미리보기 */
 .ct-ed-bar h2 { margin: 0 4px; }
 .ct-ed-bar .ct-share { margin: 0 0 0 auto; padding: 4px 6px 4px 12px; }
-.ct-ed { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.ct-ed { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 18px; align-items: start; }
 .ct-ed-form { padding: 18px; }
 .ct-ed-prev { position: sticky; top: 16px; min-width: 0; }
 .ct-ed-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ct-dirty { color: var(--warn); font-size: 13px; font-weight: 600; }
-textarea.ct-text { min-height: 420px; overflow: hidden; resize: none; }
-.ct-sheet { position: relative; overflow: hidden; border-radius: 4px; background: #fff; box-shadow: var(--shadow); border: 1px solid var(--line); }
+textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size: 13.5px; }
+.ct-sheet { position: relative; max-width: 794px; margin: 0 auto; overflow: hidden; border-radius: 4px; background: #fff; box-shadow: var(--shadow); border: 1px solid var(--line); }
 .ct-sheet-in { width: 794px; transform-origin: 0 0; }
-.ct-sheet-in [data-l] { cursor: text; border-radius: 3px; transition: background .15s; }
-.ct-sheet-in [data-l]:hover { background: var(--brand-soft); }
+.ct-sheet-in [data-l] { cursor: text; border-radius: 3px; outline: none; transition: background .15s, box-shadow .15s; }
+.ct-sheet-in [data-l]:hover { background: rgba(59, 76, 202, .05); }
+.ct-sheet-in [data-l]:focus { background: rgba(59, 76, 202, .07); box-shadow: 0 0 0 2px rgba(59, 76, 202, .35); }
+.ct-sheet-in .ct-gap[data-l] { min-height: 10px; height: auto; }
+.ct-sheet-in .ct-gap[data-l]:focus { min-height: 1.7em; }
+.ct-sheet-in .ct-ph { padding: 0 2px; border-radius: 3px; background: var(--warn-soft); cursor: default; }
+.ct-how { margin: 2px 0 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--brand-soft); color: var(--sub); font-size: 13.5px; line-height: 1.55; }
+.ct-how b { display: block; color: var(--brand); font-size: 14px; }
+.ct-raw { margin-bottom: 12px; }
+.ct-raw summary { cursor: pointer; padding: 4px 0 8px; color: var(--sub); font-size: 14px; font-weight: 600; }
+.ct-raw small { display: block; margin-top: 4px; color: var(--mute); font-size: 13px; }
 .ct-sheet.is-over::after { content: 'A4 한 장 끝'; position: absolute; left: 0; right: 0; top: var(--end); border-top: 2px dashed var(--danger); color: var(--danger); font-size: 12px; font-weight: 700; text-align: right; padding: 2px 8px; }
 .ct-ed.is-signed { grid-template-columns: minmax(0, 340px) minmax(0, 1fr); }
+.ct-ed .row2 { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 1099px) { .ct-ed, .ct-ed.is-signed { grid-template-columns: minmax(0, 1fr); } .ct-ed-prev { position: static; } .ct-ed-bar .ct-share { margin-left: 0; flex-basis: 100%; } }
 .ct-eul-sign { display: grid; place-items: center; height: 96px; border: 1px dashed var(--line); border-radius: var(--radius-sm); background: #fff; }
 .ct-eul-sign img { max-height: 80px; max-width: 90%; }

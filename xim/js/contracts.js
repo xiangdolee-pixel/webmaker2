@@ -2,7 +2,7 @@
 //   새 계약서: 갑 이름 · 연락처 · 제작비 · 1년 호스팅(1GB) · 유지보수 관리비 → 만들면 바로 글자 고치기 창이 열린다
 //   갑은 sign.plators.com/<5자> 에서 직접 서명 → 완료. 서명이 끝나면 고칠 수 없고 PDF 로 내려받는다.
 import { $, esc, toast, openDialog, busy, fmtDate } from './common.js';
-import { DEFAULT_BODY, contractHtml, a4Overflow, downloadPdf, won, today, markImage } from './contract-doc.js';
+import { DEFAULT_BODY, contractHtml, a4Overflow, downloadPdf, won, today, markImage, lineText } from './contract-doc.js';
 
 let deps = null; // { view, api, shrinkImage }
 let data = { items: [], eul: {}, host: 'sign.plators.com' };
@@ -111,8 +111,9 @@ async function editContract(id, fresh = false) {
         <label class="field"><span>1년 호스팅(1GB) · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" value="${c.yearly_fee || ''}"></label>
       </div>
       <label class="field"><span>계약일</span><input class="input" type="date" name="contract_date" value="${esc(c.contract_date)}"></label>
-      <label class="field"><span>계약서 문구</span><textarea class="input ct-text" name="body" spellcheck="false">${esc(c.body)}</textarea>
-        <small>{갑} {을} {제작비} {연간비} {계약일} 은 위 칸 값으로 바뀝니다. 줄 첫머리 '제1조(…)' 는 조 제목, '①' 은 항으로 들여 씁니다. 오른쪽 문장을 누르면 그 줄로 갑니다.</small></label>
+      <p class="ct-how"><b>계약서 문구는 오른쪽 문서를 눌러 바로 고칩니다.</b> Enter = 새 줄, 빈 줄에서 Backspace = 줄 지우기. 줄 첫머리 '제10조(…)' 는 조 제목, '①' 은 항이 됩니다. 색이 칠해진 이름 · 금액 · 날짜는 위 칸에서 바꿉니다.</p>
+      <details class="ct-raw"><summary>글자 원문으로 고치기</summary><textarea class="input ct-text" name="body" spellcheck="false">${esc(c.body)}</textarea>
+        <small>{갑} {을} {제작비} {연간비} {계약일} 은 위 칸 값으로 바뀝니다.</small></details>
       <p class="ct-fit" data-fit></p>
       <p class="err" data-err></p>
       <div class="ct-ed-foot"><button class="btn sm danger" type="button" data-del>삭제</button><button class="btn sm" type="button" data-reset>기본 문구로</button><span class="iq-grow"></span><span class="ct-dirty" data-dirty></span><button class="btn primary" type="submit">저장</button></div>
@@ -155,32 +156,71 @@ async function editContract(id, fresh = false) {
   const ta = f.elements.body;
   const fit = view.querySelector('[data-fit]'); const dirty = view.querySelector('[data-dirty]');
   const cur = () => { const v = Object.fromEntries(new FormData(f)); return { ...c, ...v, build_fee: +digits(v.build_fee) || 0, yearly_fee: +digits(v.yearly_fee) || 0 }; };
-  const draw = () => {
-    pv.innerHTML = contractHtml(cur(), data.eul, { a4: true, lines: true });
+  const measure = () => {
     fitSheet();
     const over = pv.firstElementChild.offsetHeight / 1123;
     fit.className = `ct-fit ${over > 1 ? 'is-over' : 'is-ok'}`;
     fit.textContent = over > 1 ? `A4 한 장보다 ${Math.round((over - 1) * 100)}% 깁니다. PDF 는 한 장에 들도록 줄여서 만들지만, 문구를 조금 줄이면 더 읽기 좋습니다.` : `A4 한 장에 들어갑니다 (${Math.round(over * 100)}%).`;
   };
+  // focus = [줄 번호, 'start' | 'end'] — 다시 그린 뒤 그 줄에 글자 쓰는 자리를 둔다
+  const draw = (focus) => {
+    pv.innerHTML = contractHtml(cur(), data.eul, { a4: true, edit: true });
+    measure();
+    if (focus) caretTo(focus[0], focus[1]);
+  };
+  const caretTo = (n, where) => {
+    const p = pv.querySelector(`[data-l="${n}"]`); if (!p) return;
+    p.focus({ preventScroll: true });
+    const r = document.createRange(); r.selectNodeContents(p); r.collapse(where === 'start');
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  };
   const autosize = () => { ta.style.height = 'auto'; ta.style.height = `${ta.scrollHeight + 4}px`; };
-  f.addEventListener('input', () => { dirty.textContent = '저장 안 됨'; backBtn.dataset.sure = ''; backBtn.textContent = '← 목록'; autosize(); requestAnimationFrame(draw); });
-  // 미리보기 문장을 누르면 문구 칸의 그 줄을 골라 준다
-  pv.addEventListener('click', (e) => {
-    const p = e.target.closest('[data-l]'); if (!p) return;
-    const lines = ta.value.split('\n'); const n = +p.dataset.l;
-    if (n >= lines.length) return;
-    const start = lines.slice(0, n).reduce((acc, l) => acc + l.length + 1, 0);
-    ta.focus({ preventScroll: true });
-    ta.setSelectionRange(start, start + lines[n].length);
-    const mirror = ta.value.slice(0, start).split('\n').length - 1;
-    const lh = parseFloat(getComputedStyle(ta).lineHeight) || 23;
-    const y = ta.getBoundingClientRect().top + scrollY + mirror * lh - innerHeight / 3;
-    scrollTo({ top: Math.max(0, y), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  const touched = () => { dirty.textContent = '저장 안 됨'; backBtn.dataset.sure = ''; backBtn.textContent = '← 목록'; };
+  const lines = () => [...pv.querySelectorAll('[data-l]')].map(lineText);
+  // 왼쪽 칸(이름 · 금액 · 날짜 · 원문)을 고치면 문서를 다시 그린다
+  f.addEventListener('input', (e) => { touched(); if (e.target === ta) autosize(); requestAnimationFrame(() => draw()); });
+  // 문서 위에서 고치면: 글자 원문만 맞추고(다시 그리지 않아 글자 쓰는 자리가 안 튄다), 문서를 떠날 때 모양(조 · 항)을 다시 그린다
+  pv.addEventListener('input', (e) => {
+    const p = e.target.closest?.('[data-l]');
+    if (p?.classList.contains('ct-gap') && p.textContent.trim()) p.classList.remove('ct-gap');   // 빈 줄에 글을 쓰기 시작하면 보통 문단으로
+    ta.value = lines().join('\n'); autosize(); touched(); measure();
   });
-  view.querySelector('[data-reset]').onclick = () => { ta.value = DEFAULT_BODY; dirty.textContent = '저장 안 됨'; autosize(); draw(); toast('기본 문구로 바꿨습니다. 저장해야 반영됩니다.'); };
+  pv.addEventListener('focusout', () => setTimeout(() => { if (pv.isConnected && !pv.contains(document.activeElement)) draw(); }, 0));
+  pv.addEventListener('paste', (e) => {
+    if (!e.target.closest('[data-l]')) return;
+    e.preventDefault();
+    document.execCommand('insertText', false, (e.clipboardData.getData('text/plain') || '').replace(/\s*\r?\n\s*/g, ' '));
+  });
+  pv.addEventListener('keydown', (e) => {
+    const p = e.target.closest('[data-l]'); if (!p) return;
+    const n = +p.dataset.l; const sel = getSelection();
+    if (e.key === 'Enter') {   // 글자 쓰는 자리에서 줄을 나눈다
+      e.preventDefault();
+      const r = sel.getRangeAt(0); r.deleteContents();
+      const tail = document.createRange(); tail.setStart(r.endContainer, r.endOffset); tail.setEnd(p, p.childNodes.length);
+      const holder = document.createElement('p'); holder.append(tail.extractContents());
+      const ls = lines(); ls.splice(n + 1, 0, lineText(holder).trim());
+      ls[n] = ls[n].replace(/\s+$/, '');
+      ta.value = ls.join('\n'); autosize(); touched();
+      draw([n + 1, 'start']);
+      return;
+    }
+    if (e.key === 'Backspace' && n > 0 && sel.isCollapsed) {   // 줄 맨 앞에서 지우면 윗줄과 합친다
+      const before = document.createRange(); before.setStart(p, 0); before.setEnd(sel.anchorNode, sel.anchorOffset);
+      if (before.toString() !== '' || before.cloneContents().querySelector?.('[data-ph]')) return;
+      e.preventDefault();
+      const ls = lines(); const prevLen = ls[n - 1].length;
+      ls[n - 1] = ls[n - 1] + ls[n]; ls.splice(n, 1);
+      ta.value = ls.join('\n'); autosize(); touched();
+      draw([n - 1, 'end']);
+      if (prevLen === 0) caretTo(n - 1, 'start');
+    }
+  });
+  view.querySelector('[data-reset]').onclick = () => { ta.value = DEFAULT_BODY; touched(); autosize(); draw(); toast('기본 문구로 바꿨습니다. 저장해야 반영됩니다.'); };
   draw(); autosize();
-  document.fonts?.ready.then(() => { if (pv.isConnected) { draw(); autosize(); } });
-  if (fresh) ta.focus();
+  view.querySelector('.ct-raw').addEventListener('toggle', autosize);
+  document.fonts?.ready.then(() => { if (pv.isConnected && !pv.contains(document.activeElement)) draw(); });
+  if (fresh) caretTo(0, 'end');
   f.onsubmit = (e) => {
     e.preventDefault();
     busy(f.querySelector('[type=submit]'), f.querySelector('[data-err]'), async () => {
