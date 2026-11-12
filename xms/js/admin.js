@@ -712,28 +712,82 @@ async function menuPage(id) {
   });
 }
 
-// ───────── 문의 (홈페이지 문의 폼으로 들어온 글) ─────────
+// ───────── 문의 (홈페이지 문의 폼으로 들어온 글) — 받은 편지함 꼴 (사용자 지시 2026-11-13 "와꾸 잘 잡아줘") ─────────
 const INQ_PAGE = 20;
+const inqWho = (r) => [r.org, r.name].filter(Boolean).join(' · ') || '이름 없음';
+const inqAgo = (ms) => {
+  const m = Math.floor((Date.now() - ms) / 60000);
+  if (m < 1) return '방금';
+  if (m < 60) return `${m}분 전`;
+  if (m < 60 * 24) return `${Math.floor(m / 60)}시간 전`;
+  if (m < 60 * 24 * 7) return `${Math.floor(m / 1440)}일 전`;
+  return fmtDate(ms);
+};
+// 폼이 보낸 글: 앞쪽 '항목: 값' 줄들 + 빈 줄 + 본문 → { facts, body }
+function inqParse(msg) {
+  const lines = String(msg || '').split('\n'), facts = [];
+  let i = 0;
+  for (; i < lines.length; i++) {
+    const m = lines[i].match(/^\s*([^:\n]{1,20}):\s*(.*)$/);
+    if (!m) break;
+    facts.push([m[1].trim(), m[2].trim()]);
+  }
+  return { facts, body: lines.slice(i).join('\n').trim() };
+}
+const inqMail = (r) => (/@/.test(r.contact) ? r.contact : ((r.message || '').match(/이메일:\s*(\S+@\S+)/) || [])[1] || '');
+
 async function inquiriesPage(qs) {
-  const { items, unread } = await api('/inquiries');
+  const [{ items, unread }, mail] = await Promise.all([api('/inquiries'), api('/inquiries/mail').catch(() => ({ emails: [] }))]);
   const only = qs.get('only') === 'new';
-  const rows = only ? items.filter((r) => !r.site_read_at) : items;
+  const rows = only ? items.filter((r) => !r.read_at) : items;
   const page = Math.max(1, Number(qs.get('page')) || 1);
   const shown = rows.slice((page - 1) * INQ_PAGE, page * INQ_PAGE);
   const tab = (on, href, label, n) => `<a class="req-tab${on ? ' on' : ''}" href="${href}">${label} <b>${n}</b></a>`;
-  main.innerHTML = `${head('사이트', '문의', '홈페이지의 문의 폼(예: 생산 문의)으로 들어온 글입니다. 열어 본 글은 새 문의 숫자에서 빠집니다.')}
-    <div class="req-top"><nav class="req-tabs" aria-label="보기">${tab(!only, '#/inquiries', '전체', items.length)}${tab(only, '#/inquiries?only=new', '새 문의', unread)}</nav></div>
-    <div class="panel">${shown.length ? `<table class="tbl cardy req-tbl"><thead><tr><th class="c-no">번호</th><th>회사 · 담당자</th><th>내용</th><th>연락처</th><th class="c-d">받은 때</th></tr></thead><tbody>
-      ${shown.map((r, i) => `<tr data-go="#/inquiries/${r.id}"${r.site_read_at ? '' : ' class="is-new"'}>
-        <td class="c-no num" data-l="번호">${rows.length - (page - 1) * INQ_PAGE - i}</td>
-        <td data-l="회사 · 담당자">${r.site_read_at ? '' : '<span class="tag warn">새 문의</span> '}<a href="#/inquiries/${r.id}"><b>${esc(r.org || '')}</b> ${esc(r.name)}</a></td>
-        <td class="c-t" data-l="내용">${r.kind ? `<span class="tag">${esc(r.kind)}</span> ` : ''}${esc((r.preview || '').replace(/\s+/g, ' ').slice(0, 70))}</td>
-        <td data-l="연락처">${esc(r.contact)}</td>
-        <td class="c-d" data-l="받은 때">${fmtDate(r.created_at)}</td></tr>`).join('')}</tbody></table>`
-      : empty(only ? '새 문의가 없습니다' : '아직 들어온 문의가 없습니다', only ? '모두 확인했습니다.' : '홈페이지 문의 폼으로 글이 들어오면 여기에 쌓입니다.')}</div>
+  const mailLabel = mail.emails.length ? esc(mail.emails[0]) + (mail.emails.length > 1 ? ` 외 ${mail.emails.length - 1}` : '') : '없음';
+  main.innerHTML = `${head('사이트', '문의', '홈페이지 문의 폼으로 들어온 글입니다. 새 글이 오면 알림 메일로도 보내 드립니다.')}
+    <div class="inq-top">
+      <nav class="req-tabs" aria-label="보기">${tab(!only, '#/inquiries', '전체', items.length)}${tab(only, '#/inquiries?only=new', '새 문의', unread)}</nav>
+      <button class="inq-mailbtn" type="button" data-mail><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>알림 메일 <b>${mailLabel}</b></button>
+    </div>
+    ${shown.length ? `<ul class="inq-list">${shown.map((r) => {
+      const { facts } = inqParse(r.preview);
+      const pv = (r.preview || '').replace(/\s+/g, ' ').trim();
+      return `<li><a class="inq-row${r.read_at ? '' : ' is-new'}" href="#/inquiries/${r.id}">
+        <span class="inq-av" aria-hidden="true">${esc((r.org || r.name || '?').trim().slice(0, 1))}</span>
+        <span class="inq-main">
+          <span class="inq-line1"><b class="inq-who">${esc(inqWho(r))}</b>${r.kind ? `<span class="inq-kind">${esc(r.kind)}</span>` : ''}${r.read_at ? '' : '<span class="inq-newtag">새 문의</span>'}</span>
+          <span class="inq-pv">${esc(facts.length ? facts.filter((f) => f[0] !== '품목').slice(0, 3).map((f) => `${f[0]} ${f[1]}`).join('  ·  ') : pv.slice(0, 90))}</span>
+        </span>
+        <span class="inq-side"><time>${inqAgo(r.created_at)}</time><span>${esc(r.contact)}</span></span>
+      </a></li>`;
+    }).join('')}</ul>`
+    : `<div class="panel">${empty(only ? '새 문의가 없습니다' : '아직 들어온 문의가 없습니다', only ? '모두 확인했습니다.' : '홈페이지 문의 폼으로 글이 들어오면 여기에 쌓입니다.')}</div>`}
     ${pager(page, INQ_PAGE, rows.length, (n) => `#/inquiries?${new URLSearchParams({ ...(only ? { only: 'new' } : {}), page: n })}`)}`;
-  main.querySelectorAll('tr[data-go]').forEach((tr) => tr.addEventListener('click', (e) => { if (!e.target.closest('a')) go(tr.dataset.go); }));
+  main.querySelector('[data-mail]').onclick = () => inquiryMailDialog(mail.emails, () => inquiriesPage(qs));
 }
+
+// 새 문의 알림 메일 받을 주소 (최대 3개)
+function inquiryMailDialog(emails, done) {
+  const box = (v, i) => `<label class="field"><span>받는 주소 ${i + 1}</span><input class="input" type="email" name="e${i}" value="${esc(v || '')}" placeholder="name@example.com" maxlength="120"></label>`;
+  openDialog(`<h2>새 문의 알림 메일</h2>
+    <form data-f>
+      <p class="meta" style="margin:0 0 14px">홈페이지 문의 폼으로 새 글이 들어오면 그 내용을 이 주소들로 바로 보냅니다. 최대 3개까지 넣을 수 있고, 모두 비우면 보내지 않습니다.</p>
+      ${[0, 1, 2].map((i) => box(emails[i], i)).join('')}
+      <p class="err" data-err></p>
+      <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">저장</button></div>
+    </form>`, (dlg) => {
+    const f = dlg.querySelector('[data-f]');
+    f.onsubmit = (e) => {
+      e.preventDefault();
+      busy(f.querySelector('[type=submit]'), f.querySelector('[data-err]'), async () => {
+        const list = [0, 1, 2].map((i) => f[`e${i}`].value.trim()).filter(Boolean);
+        await api('/inquiries/mail', { method: 'PUT', data: { emails: list } });
+        dlg.close(); toast('알림 메일을 저장했습니다.'); done();
+      });
+    };
+  });
+}
+
 async function inquiryView(id) {
   let r;
   try { r = await api(`/inquiries/${id}`); } catch {
@@ -742,16 +796,37 @@ async function inquiryView(id) {
   }
   inqBadge();
   const tel = String(r.contact || '').replace(/[^\d+]/g, '');
-  const mail = /@/.test(r.contact) ? r.contact : ((r.message || '').match(/이메일:\s*(\S+@\S+)/) || [])[1];
-  main.innerHTML = `${head('사이트', '문의')}
-    <article class="panel pad req-view">
-      <div class="req-view-head"><span class="tag blue">${esc(r.kind || '문의')}</span><h2>${esc(r.org || '')} ${esc(r.name)}</h2>
-        <p class="meta"><span>${esc(r.contact)}</span><span>받은 때 ${fmtDate(r.created_at, true)}</span></p></div>
-      <p class="pre">${esc(r.message)}</p>
-      <div class="req-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px">
-        ${tel.length >= 9 ? `<a class="btn primary" href="tel:${esc(tel)}">전화 걸기</a>` : ''}${mail ? `<a class="btn" href="mailto:${esc(mail)}">메일 쓰기</a>` : ''}
-        <button class="btn" type="button" data-copy>연락처 복사</button><button class="btn" type="button" data-unread>안 읽음으로</button><a class="btn" href="#/inquiries">목록</a></div>
-    </article>`;
+  const mail = inqMail(r);
+  const { facts, body } = inqParse(r.message);
+  const factRows = facts.filter((f) => f[0] !== '이메일');
+  main.innerHTML = `
+    <a class="inq-back" href="#/inquiries"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>문의 목록</a>
+    <header class="inq-head">
+      ${r.kind ? `<span class="inq-kind lg">${esc(r.kind)}</span>` : ''}<h1>${esc(inqWho(r))}</h1>
+      <p>${fmtDate(r.created_at, true)} 에 받음 · ${inqAgo(r.created_at)}</p>
+    </header>
+    <div class="inq-grid">
+      <article class="panel inq-body">
+        ${factRows.length ? `<dl class="inq-facts">${factRows.map((f) => `<div><dt>${esc(f[0])}</dt><dd>${esc(f[1] || '-')}</dd></div>`).join('')}</dl>` : ''}
+        <h2>문의 내용</h2>
+        <div class="inq-text">${body ? esc(body) : '<span class="inq-none">따로 적은 내용이 없습니다.</span>'}</div>
+      </article>
+      <aside class="panel inq-card">
+        <h2>보낸 사람</h2>
+        <dl>
+          ${r.org ? `<div><dt>회사</dt><dd>${esc(r.org)}</dd></div>` : ''}
+          <div><dt>담당자</dt><dd>${esc(r.name)}</dd></div>
+          <div><dt>연락처</dt><dd>${esc(r.contact)}</dd></div>
+          ${mail ? `<div><dt>이메일</dt><dd>${esc(mail)}</dd></div>` : ''}
+        </dl>
+        <div class="inq-acts">
+          ${tel.length >= 9 ? `<a class="btn primary" href="tel:${esc(tel)}">전화 걸기</a>` : ''}
+          ${mail ? `<a class="btn${tel.length >= 9 ? '' : ' primary'}" href="mailto:${esc(mail)}">메일 쓰기</a>` : ''}
+          <button class="btn" type="button" data-copy>연락처 복사</button>
+          <button class="btn inq-unread" type="button" data-unread>안 읽음으로 표시</button>
+        </div>
+      </aside>
+    </div>`;
   main.querySelector('[data-copy]').onclick = () => navigator.clipboard.writeText(r.contact).then(() => toast('연락처를 복사했습니다.'));
   main.querySelector('[data-unread]').onclick = async () => { await api(`/inquiries/${id}`, { method: 'PATCH', data: {} }); toast('안 읽음으로 바꿨습니다.'); go('#/inquiries'); };
 }

@@ -429,3 +429,21 @@ CREATE INDEX IF NOT EXISTS idx_apply_scores_site ON apply_scores(site, applicati
 -- 2026-11-11 최종 선정한 사람 · 시각 — 한 번만 실행:
 --   ALTER TABLE applications ADD COLUMN selected_by INTEGER;
 --   ALTER TABLE applications ADD COLUMN selected_at INTEGER;
+
+-- 홈페이지 문의 폼으로 들어온 글 — 그 사이트의 xms 에만 쌓인다(사이트마다 site 로 나뉘고, 읽을 때 반드시 site = 로그인한 사이트).
+--   xim 운영자의 '제작문의'(portfolio.plators.com) 는 xim DB inquiries 에 따로. (사용자 지시 2026-11-13)
+CREATE TABLE IF NOT EXISTS site_inquiries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  site TEXT NOT NULL,
+  name TEXT NOT NULL,
+  contact TEXT NOT NULL,
+  org TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT '',
+  message TEXT NOT NULL,
+  ip TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  read_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS site_inquiries_site ON site_inquiries (site, id);
+-- 새 문의 알림 메일 받을 주소 (사이트마다 최대 3개)
+CREATE TABLE IF NOT EXISTS site_inquiry_mail (site TEXT PRIMARY KEY, emails TEXT NOT NULL DEFAULT '[]', updated_at INTEGER NOT NULL DEFAULT 0);

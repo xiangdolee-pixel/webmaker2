@@ -27,6 +27,11 @@
 /* 페이지를 옮길 때 부드럽게 겹쳐 바뀌게(크롬 · 엣지) */
 @view-transition { navigation: auto; }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .22s; }
+/* 탑메뉴는 페이지를 옮겨도 그대로(겹쳐 바뀌거나 색이 천천히 바뀌며 조립되듯 보이지 않게, 사용자 지시 2026-11-13) */
+.hd { view-transition-name: site-hd; }
+::view-transition-group(site-hd), ::view-transition-old(site-hd), ::view-transition-new(site-hd) { animation: none; }
+::view-transition-old(site-hd) { display: none; }
+html:not(.hd-ready) .hd, html:not(.hd-ready) .hd *, html:not(.hd-ready) .hd *::after { transition: none !important; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html { font-size: 17px; scroll-behavior: smooth; scroll-padding-top: var(--hd); }
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); font-size: 1rem; line-height: 1.7; word-break: keep-all; overflow-wrap: anywhere; -webkit-font-smoothing: antialiased; }
@@ -101,7 +106,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .hd-account .xa-avatar { box-shadow: inset 3px 3px 7px rgba(5, 15, 23, .35), inset -2px -2px 5px rgba(255, 255, 255, .18); }
 .hd.on-dark .hd-account .xa-login { background: linear-gradient(145deg, #ffffff, #dfe4e8); box-shadow: 3px 3px 10px rgba(0, 0, 0, .35), -1px -1px 4px rgba(255, 255, 255, .25); }
 .gnb .gnb-login { display: none; }
-.hd-account:empty { display: none; }
+.hd-account:empty { width: 44px; height: 44px; }   /* 계정 버튼이 늦게 와도 메뉴가 옆으로 밀리지 않게 자리를 미리 비워 둔다 */
 
 .nav-toggle { display: none; flex: none; position: relative; width: 46px; height: 46px; margin-right: -8px; border: 0; background: none; cursor: pointer; }
 .nav-toggle i { position: absolute; left: 11px; right: 11px; height: 2px; background: currentColor; border-radius: 2px; transition: transform .35s var(--ease), opacity .2s; }
@@ -357,6 +362,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .axis-y small, .axis-x small { display: block; color: var(--mute); font-family: var(--font); font-size: 12px; letter-spacing: 0; font-weight: 600; }
 .mx { position: absolute; transform: translate(-50%, 50%); padding: 8px 14px; border-radius: 12px; background: var(--navy); color: #fff; font-size: 14px; font-weight: 700; line-height: 1.25; text-align: center; white-space: nowrap; box-shadow: 0 8px 20px -8px rgba(10, 25, 38, .55); transition: opacity .45s var(--ease), transform .55s var(--ease); }
 .mx small { display: block; color: var(--accent-2); font-family: var(--display); font-size: 10.5px; letter-spacing: .1em; }
+/* KNIT 로 바뀌면 남색 ↔ 주황을 뒤집어 바뀐 걸 티 나게 (사용자 지시 2026-11-13) */
+.mx[data-k="knit"] { background: var(--accent); box-shadow: 0 8px 20px -8px rgba(200, 80, 10, .6); }
+.mx[data-k="knit"] small { color: var(--navy); }
 .mx[hidden] { display: block; opacity: 0; transform: translate(-50%, 50%) scale(.6); pointer-events: none; }
 .matrix-points ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
 .matrix-points li { padding: 20px 22px; border-left: 3px solid var(--accent); background: #fff; border-radius: 0 16px 16px 0; box-shadow: var(--shadow); }
@@ -365,11 +373,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* 역할표 */
 .table-scroll { overflow-x: auto; }
-.role-table { width: 100%; min-width: 640px; border-collapse: collapse; background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); font-size: 16px; }
-.role-table th, .role-table td { padding: 20px 22px; border-bottom: 1px solid var(--paper-2); text-align: left; vertical-align: top; }
-.role-table thead th { background: var(--navy); color: #fff; font-size: 15px; font-weight: 700; }
-.role-table tbody th { width: 28%; color: var(--navy); font-size: 17px; }
-.role-table tbody th small { display: block; color: var(--accent); font-family: var(--display); font-size: 11.5px; letter-spacing: .18em; }
+.role-table { width: 100%; min-width: 640px; border-collapse: collapse; background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); font-size: clamp(16px, 1.15vw, 19px); line-height: 1.6; }
+.role-table th, .role-table td { padding: clamp(20px, 1.6vw, 28px) clamp(22px, 1.8vw, 32px); border-bottom: 1px solid var(--paper-2); text-align: left; vertical-align: top; }
+.role-table thead th { background: var(--navy); color: #fff; font-size: clamp(15px, 1.05vw, 18px); font-weight: 700; }
+.role-table tbody th { width: 26%; color: var(--navy); font-size: clamp(17px, 1.3vw, 22px); }
+.role-table tbody th small { display: block; color: var(--accent); font-family: var(--display); font-size: clamp(11.5px, .8vw, 13.5px); letter-spacing: .18em; margin-bottom: 4px; }
 .role-table td { color: var(--sub); }
 
 /* 품질관리 */
@@ -558,7 +566,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .side-card dd { margin: 0; font-size: 16.5px; font-weight: 600; }
 .side-card.light { background: #fff; color: var(--ink); box-shadow: var(--shadow); }
 .side-card.light p { margin: 0 0 18px; color: var(--sub); }
-.map-frame { width: 100%; aspect-ratio: 4 / 3; border: 0; border-radius: var(--radius); }
+/* 생산 문의 옆 작은 네이버 지도 */
+.map-mini { margin-top: 0; }
+.map-mini .map-canvas { height: auto; aspect-ratio: 4 / 3; }
+.map-mini .map-ph i { left: 50%; top: 52%; }
+.map-open { position: absolute; z-index: 2; left: 12px; bottom: 12px; padding: 8px 14px; border-radius: 999px; background: rgba(255, 255, 255, .96); color: var(--ink); font-size: 13.5px; font-weight: 700; box-shadow: 0 6px 16px -8px rgba(10, 25, 38, .45); transition: background-color .25s, color .25s; }
+.map-open:hover { background: var(--navy); color: #fff; }
 
 /* ───── 꼬리 ───── */
 .ft { padding: 84px 0 44px; background: var(--ink-dark); color: rgba(255, 255, 255, .7); font-size: 15.5px; }

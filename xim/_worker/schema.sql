@@ -252,6 +252,7 @@ CREATE TABLE IF NOT EXISTS inquiries (
   done INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS inquiries_created ON inquiries (created_at);
+-- 2026-11-13: 여기엔 portfolio(운영자 제작문의)만. 고객 사이트 문의는 xms DB site_inquiries (사이트끼리 섞이지 않게)
 -- 2026-11-12: 업체(xms '문의' 메뉴)가 열어 본 때 — 한 번만 실행해 둠: ALTER TABLE inquiries ADD COLUMN site_read_at INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS inquiries_site ON inquiries (site, created_at);
 
@@ -263,7 +264,8 @@ CREATE TABLE IF NOT EXISTS contracts (
   client_name TEXT NOT NULL,
   client_phone TEXT NOT NULL DEFAULT '',
   build_fee INTEGER NOT NULL DEFAULT 0,      -- 제작비(원)
-  yearly_fee INTEGER NOT NULL DEFAULT 0,     -- 1년 호스팅 1GB · 유지보수 관리비(원)
+  yearly_fee INTEGER NOT NULL DEFAULT 0,     -- 1년 호스팅 · 유지보수 관리비(원)
+  hosting TEXT NOT NULL DEFAULT '1GB',       -- 호스팅 저장 용량 (2026-11-13 ALTER TABLE contracts ADD COLUMN hosting TEXT NOT NULL DEFAULT '1GB')
   contract_date TEXT NOT NULL DEFAULT '',    -- YYYY-MM-DD
   body TEXT NOT NULL,                        -- 계약서 글자 ({갑} {을} {제작비} {연간비} 자리 표시)
   status TEXT NOT NULL DEFAULT 'wait',
@@ -277,3 +279,4 @@ CREATE TABLE IF NOT EXISTS contracts (
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
+

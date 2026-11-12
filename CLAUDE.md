@@ -119,6 +119,13 @@ design 쪽 규칙(`E:\ws\WebMaker\CLAUDE.md`, `E:\ws\WebMaker\design\CLAUDE.md`)
 
 - 스크롤을 내리면 오른쪽 아래에 **맨 위로** 동그라미 버튼 — 공통 사이트 Worker 가 넣고, **기본으로 켜져 있다**(xms 관리 › 부가 기능에서 끈 사이트 · 뺄 주소만 빠짐). 사이트에 떠 있는 버튼(문의 등)이 오른쪽 아래에 있으면 사이트 CSS 에서 `body .xms-top { bottom: … }` 으로 그 위에 둔다(예: bsf).
 
+## 고객 정보는 그 사이트 xms 에만 (사용자 지시 2026-11-13, "정말 주의해야해")
+
+- 고객 사이트의 문의 · 신청 · 회원 정보는 **그 사이트의 xms 에서만** 보인다. 다른 사이트의 xms 에도, xim 운영자 화면에도 섞여 나오면 안 된다.
+- 고객 사이트 문의 폼 → xms DB `site_inquiries`(site 칸으로 나뉨). xms 의 모든 읽기 · 고치기 쿼리에 `WHERE site = <로그인한 사이트>` 를 꼭 붙인다(id 하나로만 찾지 않는다).
+- xim '제작문의' 는 portfolio.plators.com 에서 온 것만(xim DB `inquiries`, site = 'portfolio').
+- 새 기능에서 사이트끼리 나눠야 할 자료를 만들면 같은 원칙: 그 사이트 xms 저장소 + site 조건.
+
 ## 화면 파일 캐시 (xim · xms)
 
 - css · js 주소에 배포 번호 `?v=<Worker 버전>` 을 붙여(첫 화면 html 과 js 안 import 를 Worker 가 고쳐 줌) 1년 캐시한다. 배포하면 번호가 바뀌어 브라우저가 바로 새 파일을 받는다 — 사용자에게 Ctrl+F5 를 시키지 않는다. 새 css · js 파일을 추가할 때도 이 경로(/xms/css · /xms/js, xim 의 css/ · js/) 아래에 둔다.

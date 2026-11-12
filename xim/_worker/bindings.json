@@ -52,5 +52,14 @@
     "crons": [
       "*/5 * * * *"
     ]
+  },
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "remote": true
+    }
+  ],
+  "vars": {
+    "MAIL_FROM": "noreply@plators.com"
   }
 }

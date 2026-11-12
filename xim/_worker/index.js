@@ -283,6 +283,19 @@ async function ximApi(request, env, url, ctx) {
     if (method !== 'GET' && res.ok) await audit(db, request, 'DOMAIN', path.slice('/api/dm'.length), method);
     return out;
   }
+  // 네이버 지도(NCP Maps) Application 기록 — 운영자만, 화면은 js/naver-map.js
+  if (path === '/api/naver-map' && method === 'GET') {
+    let m = {}; try { m = JSON.parse((await getSetting(db, 'naver_map')) || '{}'); } catch { m = {}; }
+    return json(m);
+  }
+  if (path === '/api/naver-map' && method === 'PUT') {
+    const t = (v, n) => String(v ?? '').trim().slice(0, n);
+    const urls = (Array.isArray(body.urls) ? body.urls : []).map((u) => t(u, 200)).filter((u) => /^https?:\/\//.test(u)).slice(0, 10);
+    const m = { name: t(body.name, 60), client_id: t(body.client_id, 80), client_secret: t(body.client_secret, 120), apis: (Array.isArray(body.apis) ? body.apis : []).map((a) => t(a, 40)).filter(Boolean).slice(0, 10), urls };
+    await setSetting(db, 'naver_map', JSON.stringify(m));
+    await audit(db, request, 'NAVER_MAP', m.name, `${urls.length} urls`);
+    return json(m);
+  }
   if (path.startsWith('/api/contracts')) { const r = await contractsApi(request, env, path, method, body, (a, t, d) => audit(db, request, a, t, d)); if (r) return r; }
   if (path.startsWith('/api/studio/') || path === '/api/studio') return studioApi(request, env, url, ctx, path, method, body, (a, t, d) => audit(db, request, a, t, d), (p, d) => github(env, p, d));
 
@@ -326,7 +339,7 @@ async function ximApi(request, env, url, ctx) {
 
   // 제작문의 (포트폴리오 '제작문의' 폼 → Engine.inquiry 가 저장). 열어 보면 읽음
   if (path === '/api/inquiries' && method === 'GET') {
-    const { results } = await db.prepare('SELECT i.id, i.site, s.name AS site_name, i.name, i.contact, i.org, i.kind, substr(i.message, 1, 120) AS preview, i.created_at, i.read_at, i.done FROM inquiries i LEFT JOIN sites s ON s.slug = i.site ORDER BY i.id DESC LIMIT 300').all();
+    const { results } = await db.prepare("SELECT i.id, i.site, s.name AS site_name, i.name, i.contact, i.org, i.kind, substr(i.message, 1, 120) AS preview, i.created_at, i.read_at, i.done FROM inquiries i LEFT JOIN sites s ON s.slug = i.site WHERE i.site = 'portfolio' ORDER BY i.id DESC LIMIT 300").all();
     return json({ items: results, unread: results.filter((r) => !r.read_at).length });
   }
   {
@@ -334,7 +347,7 @@ async function ximApi(request, env, url, ctx) {
     if (im) {
       const id = +im[1];
       if (method === 'GET') {
-        const row = await db.prepare('SELECT i.*, s.name AS site_name FROM inquiries i LEFT JOIN sites s ON s.slug = i.site WHERE i.id = ?').bind(id).first();
+        const row = await db.prepare("SELECT i.*, s.name AS site_name FROM inquiries i LEFT JOIN sites s ON s.slug = i.site WHERE i.id = ? AND i.site = 'portfolio'").bind(id).first();
         if (!row) throw new HttpError(404, '없는 문의입니다.');
         if (!row.read_at) { row.read_at = now(); await db.prepare('UPDATE inquiries SET read_at = ? WHERE id = ?').bind(row.read_at, id).run(); }
         return json(row);
@@ -343,12 +356,12 @@ async function ximApi(request, env, url, ctx) {
         const b = await body(request);
         const done = b.done ? 1 : 0;
         const unread = b.unread ? 1 : 0;
-        await db.prepare(`UPDATE inquiries SET done = ?${unread ? ', read_at = 0' : ''} WHERE id = ?`).bind(done, id).run();
+        await db.prepare(`UPDATE inquiries SET done = ?${unread ? ', read_at = 0' : ''} WHERE id = ? AND site = 'portfolio'`).bind(done, id).run();
         await audit(db, request, 'INQUIRY_UPDATE', `제작문의 #${id}`, unread ? '안 읽음으로' : done ? '처리함' : '처리 안 함');
         return json({ ok: true });
       }
       if (method === 'DELETE') {
-        await db.prepare('DELETE FROM inquiries WHERE id = ?').bind(id).run();
+        await db.prepare("DELETE FROM inquiries WHERE id = ? AND site = 'portfolio'").bind(id).run();
         await audit(db, request, 'INQUIRY_DELETE', `제작문의 #${id}`);
         return json({ ok: true });
       }
@@ -361,7 +374,7 @@ async function ximApi(request, env, url, ctx) {
       db.prepare("SELECT COUNT(*) AS n, SUM(status = 'suspended') AS off FROM sites"),
       db.prepare("SELECT COUNT(*) AS n FROM requests WHERE status != 'done'"),
       db.prepare("SELECT COUNT(*) AS n FROM requests r WHERE ((CASE WHEN r.created_at > r.op_seen_at THEN 1 ELSE 0 END) + (SELECT COUNT(*) FROM request_messages m WHERE m.request_id = r.id AND m.side = 'site' AND m.created_at > r.op_seen_at)) > 0"),
-      db.prepare('SELECT COUNT(*) AS n FROM inquiries WHERE read_at = 0'),
+      db.prepare("SELECT COUNT(*) AS n FROM inquiries WHERE read_at = 0 AND site = 'portfolio'"),
     ]);
     // 데이터베이스 전체 크기 (D1 이 돌려주는 size_after) · R2 에 올린 파일 합계
     const [ximMeta, xmsMeta, r2] = await Promise.all([
@@ -1008,6 +1021,41 @@ main{max-width:420px;text-align:center}h1{font-size:1.4rem;margin:0 0 12px}p{mar
 const getSite = (env, slug) =>
   SLUG_RE.test(slug || '') ? env.DB.prepare('SELECT * FROM sites WHERE slug = ?').bind(slug).first() : null;
 
+// 새 문의 → 업체가 xms '문의' 에서 정한 알림 메일(최대 3개, inquiry_mail)로 내용을 보낸다 (사용자 지시 2026-11-13)
+//   보내는 주소: 사이트 대표 도메인의 noreply@ (Email Sending 등록돼 있을 때), 안 되면 예비 주소 MAIL_FROM
+async function inquiryMail(env, slug, q) {
+  if (!env.EMAIL) return;
+  const row = await env.XMS_DB.prepare('SELECT emails FROM site_inquiry_mail WHERE site = ?').bind(slug).first();
+  let to = []; try { to = JSON.parse(row?.emails || '[]').filter(Boolean).slice(0, 3); } catch { to = []; }
+  if (!to.length) return;
+  const site = await env.DB.prepare('SELECT name, domain FROM sites WHERE slug = ?').bind(slug).first();
+  const siteName = site?.name || slug;
+  const host = String(site?.domain || '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const who = [q.org, q.name].filter(Boolean).join(' · ');
+  const subject = `[${siteName}] 새 문의 — ${who}${q.kind ? ` (${q.kind})` : ''}`;
+  const adminUrl = `https://${host || `${slug}.xiangdolee.workers.dev`}/xms/#/inquiries`;
+  const text = `${siteName} 홈페이지로 새 문의가 들어왔습니다.\n\n회사 · 담당자: ${who}\n연락처: ${q.contact}\n${q.kind ? `품목: ${q.kind}\n` : ''}\n${q.message}\n\n관리 화면에서 보기: ${adminUrl}`;
+  const e = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const html = `<div style="font-family:Pretendard,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;max-width:600px;margin:0 auto;color:#171c27">
+    <p style="margin:0 0 6px;color:#5c6474;font-size:13px">${e(siteName)} · 새 문의</p>
+    <h1 style="margin:0 0 18px;font-size:22px">${e(who)}</h1>
+    <table style="width:100%;border-collapse:collapse;font-size:15px;margin-bottom:18px">
+      <tr><td style="padding:10px 0;border-top:1px solid #e2e5eb;color:#8d94a2;width:90px">연락처</td><td style="padding:10px 0;border-top:1px solid #e2e5eb;font-weight:600">${e(q.contact)}</td></tr>
+      ${q.kind ? `<tr><td style="padding:10px 0;border-top:1px solid #e2e5eb;color:#8d94a2">품목</td><td style="padding:10px 0;border-top:1px solid #e2e5eb;font-weight:600">${e(q.kind)}</td></tr>` : ''}
+    </table>
+    <div style="padding:18px 20px;border-radius:12px;background:#f4f5f8;white-space:pre-wrap;line-height:1.75;font-size:15px;word-break:break-all">${e(q.message)}</div>
+    <p style="margin:22px 0 0"><a href="${e(adminUrl)}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#2f5fd0;color:#fff;text-decoration:none;font-weight:700">관리 화면에서 보기</a></p>
+  </div>`;
+  const froms = [...new Set([host ? `noreply@${host}` : '', env.MAIL_FROM].filter(Boolean))];
+  for (const addr of to) {
+    let sent = false;
+    for (const from of froms) {
+      try { await env.EMAIL.send({ to: addr, from: { email: from, name: siteName }, subject, text, html }); sent = true; break; } catch (err) { console.error('문의 메일', from, addr, err?.message || err); }
+    }
+    if (!sent) console.error('문의 메일 못 보냄', addr);
+  }
+}
+
 export class Engine extends WorkerEntrypoint {
   // 고객 사이트 Worker 가 요청마다(30초 캐시) 묻는다
   async status(slug) {
@@ -1046,10 +1094,14 @@ export class Engine extends WorkerEntrypoint {
       if (!v?.success) return { error: '사람인지 확인하지 못했습니다. 확인 칸을 다시 해 주세요.' };
     }
     // 같은 곳에서 10분에 3번까지
-    const recent = await db.prepare('SELECT COUNT(*) AS n FROM inquiries WHERE ip = ? AND created_at > ?').bind(ip || '', now() - 600000).first();
+    // 어디에 쌓나: xim 의 portfolio(운영자 '제작문의') 만 xim DB, 고객 사이트는 그 사이트 xms(DB xms, site 로 나뉨) 에만 — 서로 섞이지 않게 (사용자 지시 2026-11-13)
+    const own = slug === 'portfolio';
+    const store = own ? db : this.env.XMS_DB, table = own ? 'inquiries' : 'site_inquiries';
+    const recent = await store.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ip = ? AND created_at > ?`).bind(ip || '', now() - 600000).first();
     if (recent.n >= 3) return { error: '잠시 뒤에 다시 보내 주세요.' };
-    await db.prepare('INSERT INTO inquiries (site, name, contact, org, kind, message, ip, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    await store.prepare(`INSERT INTO ${table} (site, name, contact, org, kind, message, ip, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(slug, name, contact, org, kind, message, ip || '', now()).run();
+    if (!own) this.ctx.waitUntil(inquiryMail(this.env, slug, { name, contact, org, kind, message }).catch((e) => console.error('문의 알림 메일 실패', slug, e?.message || e)));
     return { ok: true };
   }
 
@@ -1135,7 +1187,7 @@ export default {
 // 화면 파일: 배포 번호(?v=)를 붙여 한 번 받으면 브라우저가 다시 묻지 않게 (배포하면 번호가 바뀌어 새로 받음)
 //   index.html → css · js 주소에 ?v=번호,  js 안의 import './x.js' 에도 같은 번호.  번호 붙은 파일 = 1년, 첫 화면 = 매번 확인
 // 메뉴마다 주소(사용자 지시 2026-11-11: xim.plators.com/studio 처럼) — 이 주소들은 첫 화면(index.html)을 내주고, 화면(app.js)이 주소를 보고 그 메뉴를 연다
-const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'monitor', 'security', 'audit', 'contracts', 'pricing', 'studio', 'voice', 'pc', 'domains']);
+const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'monitor', 'security', 'audit', 'naver', 'contracts', 'pricing', 'studio', 'voice', 'pc', 'domains']);
 async function staticFile(request, env, url) {
   const v = String(env.VER?.id || 'dev').slice(0, 8);
   const isNav = NAV_PATHS.has(url.pathname.slice(1));

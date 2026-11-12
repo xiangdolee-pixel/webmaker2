@@ -939,3 +939,21 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .sign-stamp { display: grid; place-items: center; min-height: 140px; padding: 16px; border: 1.5px dashed #c3c8d2; border-radius: var(--radius-sm); background: #fff; text-align: center; color: #a0a6b1; font-size: 15px; }
 .sign-stamp img { max-width: 70%; max-height: 160px; }
 .ct-doc .ct-in-gap { cursor: pointer; }
+/* 네이버 지도 (사용자 지시 2026-11-13) */
+.nm-how, .nm-info { padding: 20px 22px; margin-bottom: 14px; }
+.nm-how h3, .nm-info h3 { margin: 0 0 12px; font-size: 16px; }
+.nm-info h3:not(:first-child) { margin-top: 22px; }
+.nm-how ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--sub); font-size: 14px; line-height: 1.6; }
+.nm-how b { color: var(--text, inherit); }
+.nm-how code, .nm-dl code { padding: 2px 6px; border-radius: 6px; background: var(--bg, #f3f4f7); font-size: 13px; word-break: break-all; }
+.nm-dl { display: grid; gap: 0; margin: 0; }
+.nm-dl > div { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+.nm-dl dt { font-size: 14px; font-weight: 600; color: var(--sub); }
+.nm-dl dt small { display: block; font-weight: 400; color: var(--mute); font-size: 12px; }
+.nm-dl dd { margin: 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+.nm-count { margin-left: 6px; color: var(--mute); font-size: 13px; font-weight: 600; }
+.nm-urls { margin: 0; padding: 0; list-style: none; }
+.nm-urls li { padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; word-break: break-all; }
+.nm-empty { color: var(--mute); }
+.nm-note { margin: 14px 0 0; color: var(--mute); font-size: 13px; }
+@media (max-width: 640px) { .nm-dl > div { grid-template-columns: minmax(0, 1fr); gap: 4px; } }

@@ -1312,3 +1312,67 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .more-table tr.is-current td { background: var(--brand-soft); }
 .more-table tr.is-current a { font-weight: 700; }
 .more-cards .pcard.is-current { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ───── 문의: 받은 편지함 꼴 (사용자 지시 2026-11-13) ───── */
+.inq-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.inq-mailbtn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border: 1px solid var(--line); border-radius: 99px; background: var(--surface); color: var(--sub); font: 600 14px var(--font); cursor: pointer; transition: border-color .2s, color .2s, background-color .2s; }
+.inq-mailbtn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.inq-mailbtn b { color: var(--ink); font-weight: 700; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inq-mailbtn:hover { border-color: var(--brand); color: var(--brand); }
+.inq-mailbtn:hover b { color: var(--brand); }
+.inq-list { margin: 0; padding: 0; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.inq-list li + li { border-top: 1px solid var(--line); }
+.inq-row { position: relative; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 18px 22px; color: var(--ink); text-decoration: none; transition: background-color .15s; }
+.inq-row:hover { background: #f7f8fb; }
+.inq-row.is-new::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 0 3px 3px 0; background: var(--brand); }
+.inq-av { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-size: 17px; font-weight: 800; }
+.inq-row:not(.is-new) .inq-av { background: var(--line-2, #eef0f4); color: var(--sub); }
+.inq-main { display: grid; gap: 5px; min-width: 0; }
+.inq-line1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.inq-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 700; }
+.inq-row:not(.is-new) .inq-who { font-weight: 600; }
+.inq-kind { flex: none; padding: 2px 9px; border-radius: 99px; background: #f1f3f7; color: var(--sub); font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.inq-kind.lg { display: inline-block; margin-bottom: 10px; padding: 4px 12px; background: var(--brand-soft); color: var(--brand); font-size: 13px; }
+.inq-newtag { flex: none; padding: 2px 8px; border-radius: 99px; background: var(--danger); color: #fff; font-size: 11.5px; font-weight: 800; }
+.inq-pv { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sub); font-size: 14px; }
+.inq-side { display: grid; justify-items: end; gap: 5px; color: var(--mute); font-size: 13px; white-space: nowrap; }
+.inq-side time { color: var(--sub); font-weight: 600; }
+.inq-row.is-new .inq-side time { color: var(--brand); }
+.inq-back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 14px; color: var(--sub); font-size: 14px; font-weight: 600; text-decoration: none; }
+.inq-back svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.inq-back:hover { color: var(--brand); }
+.inq-head { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.inq-head h1 { margin: 0; font-size: clamp(24px, 2.4vw, 30px); letter-spacing: -.02em; }
+.inq-head p { margin: 8px 0 0; color: var(--sub); font-size: 14px; }
+.inq-grid { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+.inq-body { padding: 26px 28px; }
+.inq-body h2, .inq-card h2 { margin: 0 0 14px; color: var(--mute); font-size: 13px; font-weight: 700; letter-spacing: .02em; }
+.inq-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 0 0 26px; }
+.inq-facts div { padding: 14px 16px; border-radius: var(--radius-sm); background: #f6f7fa; }
+.inq-facts dt { color: var(--mute); font-size: 12.5px; font-weight: 600; }
+.inq-facts dd { margin: 4px 0 0; color: var(--ink); font-size: 15.5px; font-weight: 700; word-break: break-word; }
+.inq-text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); font-size: 15.5px; line-height: 1.8; }
+.inq-none { color: var(--mute); }
+.inq-card { position: sticky; top: 76px; padding: 24px; margin-top: 0 !important; }
+.inq-card dl { display: grid; gap: 0; margin: 0 0 18px; }
+.inq-card dl div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); }
+.inq-card dl div:first-child { border-top: 0; padding-top: 0; }
+.inq-card dt { color: var(--mute); font-size: 13.5px; }
+.inq-card dd { margin: 0; font-size: 14.5px; font-weight: 600; overflow-wrap: anywhere; }
+.inq-acts { display: grid; gap: 8px; }
+.inq-acts .btn { width: 100%; justify-content: center; }
+.inq-unread { color: var(--sub); }
+@media (max-width: 960px) {
+  .inq-grid { grid-template-columns: minmax(0, 1fr); }
+  .inq-card { position: static; }
+}
+@media (max-width: 640px) {
+  .inq-row { grid-template-columns: 40px minmax(0, 1fr); gap: 12px; padding: 16px; }
+  .inq-av { width: 40px; height: 40px; font-size: 15px; }
+  .inq-side { grid-column: 2; grid-auto-flow: column; justify-content: start; gap: 10px; }
+  .inq-body { padding: 20px 18px; }
+  .inq-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .inq-facts div { padding: 12px 14px; }
+  .inq-facts dd { font-size: 15px; }
+  .inq-mailbtn b { max-width: 150px; }
+}

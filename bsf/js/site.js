@@ -11,6 +11,8 @@
   var darkTop = body.classList.contains('has-hero') || body.classList.contains('has-page-hero');
   var fab = $('.fab');
   var accents = $$('.cta-band');
+  // 처음 그릴 때는 색 바뀜 움직임 없이 바로 제 모습으로, 그 뒤 스크롤할 때만 부드럽게
+  requestAnimationFrame(function () { requestAnimationFrame(function () { doc.documentElement.classList.add('hd-ready'); }); });
   function onScroll() {
     var y = window.pageYOffset || doc.documentElement.scrollTop;
     if (hd && darkTop) hd.classList.toggle('on-dark', y < 40);
@@ -259,17 +261,18 @@
     // 네이버 지도(NCP Maps): 주소 → 좌표는 geocoder 로. 클라이언트 ID 는 서비스 URL(이 사이트 주소)이 등록돼 있어야 동작한다
     var ns = doc.createElement('script');
     ns.src = 'https://oapi.map.naver.com/openapi/v3/maps.js?submodules=geocoder&ncpKeyId=' + encodeURIComponent(mb.getAttribute('data-naver'));
-    ns.onload = function () {
+    var nTry = 0;
+    ns.onload = function draw() {
       var N = window.naver && window.naver.maps, box = $('.map-canvas', mb);
-      if (!N || !N.Service) return;
+      if (!N || !N.Service || !N.Service.geocode) { if (++nTry < 60) setTimeout(draw, 100); return; }   // 주소 찾기 모듈은 지도 스크립트 뒤에 따로 온다
       N.Service.geocode({ query: mb.getAttribute('data-addr') }, function (st, res) {
-        var a = st === N.Service.Status.OK && res.v2 && res.v2.addresses && res.v2.addresses[0];
+        var a = (st === N.Service.Status.OK || st === 200) && res && res.v2 && res.v2.addresses && res.v2.addresses[0];
         if (!a) return;
         var at = new N.LatLng(+a.y, +a.x);
         box.innerHTML = '';
-        var map = new N.Map(box, { center: at, zoom: 17, scrollWheel: false, zoomControl: true, zoomControlOptions: { position: N.Position.RIGHT_CENTER } });
+        var map = new N.Map(box, { center: at, zoom: mb.classList.contains('map-mini') ? 16 : 17, scrollWheel: false, zoomControl: true, zoomControlOptions: { position: N.Position.RIGHT_CENTER } });
         new N.Marker({ map: map, position: at, icon: { content: '<div class="map-pin">' + mb.getAttribute('data-name') + '</div>', anchor: new N.Point(50, 40) } });
-        if (innerWidth > 767) map.panBy(new N.Point(-Math.min(220, box.clientWidth * .18), 0));
+        if (innerWidth > 767 && !mb.classList.contains('map-mini')) map.panBy(new N.Point(-Math.min(220, box.clientWidth * .18), 0));
         mb.classList.add('is-live');
       });
     };

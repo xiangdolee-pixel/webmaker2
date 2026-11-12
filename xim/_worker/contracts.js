@@ -41,9 +41,11 @@ async function getEul(db) {
   try { return { ...EUL_DEFAULT, ...(row ? JSON.parse(row.value) : {}) }; } catch { return { ...EUL_DEFAULT }; }
 }
 // 서명 때 남기는 내용 지문 — 계약서 글자 · 금액 · 당사자가 그대로인지 확인용
-const docHash = (c, eul) => sha256(JSON.stringify([c.code, c.client_name, c.client_phone, c.build_fee, c.yearly_fee, c.contract_date, c.body, eul.name, eul.phone]));
+//   호스팅 용량은 {용량} 자리가 있는 계약서만 넣는다(그 전에 서명한 계약서의 지문이 바뀌지 않게)
+const docHash = (c, eul) => sha256(JSON.stringify([c.code, c.client_name, c.client_phone, c.build_fee, c.yearly_fee, c.contract_date, c.body, eul.name, eul.phone, ...(String(c.body).includes('{용량}') ? [c.hosting || '1GB'] : [])]));
+const hostingStr = (v) => String(v ?? '').trim().slice(0, 20) || '1GB';   // 호스팅 저장 용량 (예: 1GB, 500MB)
 
-const LIST_COLS = 'id, code, client_name, client_phone, build_fee, yearly_fee, contract_date, status, viewed_at, signed_at, created_at, updated_at';
+const LIST_COLS = 'id, code, client_name, client_phone, build_fee, yearly_fee, hosting, contract_date, status, viewed_at, signed_at, created_at, updated_at';
 
 // ───────── 운영자 API (로그인 확인은 index.js 가 먼저 한다) ─────────
 export async function contractsApi(request, env, path, method, readBody, audit) {
@@ -62,9 +64,9 @@ export async function contractsApi(request, env, path, method, readBody, audit) 
     let code;
     for (let i = 0; i < 8; i++) { code = newCode(); if (!(await db.prepare('SELECT 1 FROM contracts WHERE code = ?').bind(code).first())) break; }
     const t = now();
-    const r = await db.prepare(`INSERT INTO contracts (code, client_name, client_phone, build_fee, yearly_fee, contract_date, body, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'wait', ?, ?)`)
-      .bind(code, name, str(b.client_phone, 40), money(b.build_fee), money(b.yearly_fee), dateStr(b.contract_date), body, t, t).run();
+    const r = await db.prepare(`INSERT INTO contracts (code, client_name, client_phone, build_fee, yearly_fee, hosting, contract_date, body, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'wait', ?, ?)`)
+      .bind(code, name, str(b.client_phone, 40), money(b.build_fee), money(b.yearly_fee), hostingStr(b.hosting), dateStr(b.contract_date), body, t, t).run();
     await audit('CONTRACT_NEW', name, `sign/${code}`);
     return json({ id: r.meta.last_row_id, code });
   }
@@ -89,9 +91,9 @@ export async function contractsApi(request, env, path, method, readBody, audit) 
     if (!name) throw bad('갑(고객) 이름을 넣어 주세요.');
     const body = b.body === undefined ? c.body : str(b.body, 20000);
     if (!body) throw bad('계약서 내용이 비어 있습니다.');
-    await db.prepare('UPDATE contracts SET client_name = ?, client_phone = ?, build_fee = ?, yearly_fee = ?, contract_date = ?, body = ?, updated_at = ? WHERE id = ?')
+    await db.prepare('UPDATE contracts SET client_name = ?, client_phone = ?, build_fee = ?, yearly_fee = ?, hosting = ?, contract_date = ?, body = ?, updated_at = ? WHERE id = ?')
       .bind(name, b.client_phone === undefined ? c.client_phone : str(b.client_phone, 40),
-        b.build_fee === undefined ? c.build_fee : money(b.build_fee), b.yearly_fee === undefined ? c.yearly_fee : money(b.yearly_fee),
+        b.build_fee === undefined ? c.build_fee : money(b.build_fee), b.yearly_fee === undefined ? c.yearly_fee : money(b.yearly_fee), b.hosting === undefined ? c.hosting : hostingStr(b.hosting),
         b.contract_date === undefined ? c.contract_date : dateStr(b.contract_date), body, now(), id).run();
     await audit('CONTRACT_EDIT', name, `sign/${c.code}`);
     return json({ ok: true });
@@ -147,7 +149,7 @@ async function signApi(request, env, code) {
   if (request.method === 'GET') {
     if (!c.viewed_at && c.status !== 'signed') await db.prepare('UPDATE contracts SET viewed_at = ? WHERE id = ?').bind(now(), c.id).run();
     return json({
-      code: c.code, client_name: c.client_name, client_phone: c.client_phone, build_fee: c.build_fee, yearly_fee: c.yearly_fee,
+      code: c.code, client_name: c.client_name, client_phone: c.client_phone, build_fee: c.build_fee, yearly_fee: c.yearly_fee, hosting: c.hosting,
       contract_date: c.contract_date, body: c.body, status: c.status, signed_at: c.signed_at, client_sign: c.client_sign, doc_hash: c.doc_hash,
       eul: { name: eul.name, phone: eul.phone, sign: eul.sign }, host: SIGN_HOST,
     });

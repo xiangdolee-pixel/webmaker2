@@ -396,24 +396,40 @@ export async function adminApi(ctx) {
       FROM requests r WHERE r.site_id = ? ORDER BY r.id DESC LIMIT 300`).bind(s.id).all();
     return json(results.map((r) => ({ ...r, attachments: JSON.parse(r.attachments || '[]') })));
   }
-  // ───── 문의 (사이트 문의 폼 → xim inquiries). 업체가 열어 보면 site_read_at (xim 운영자의 읽음과 따로) ─────
+  // ───── 문의 (사이트 문의 폼 → xim inquiries). 업체가 열어 보면 read_at (xim 운영자의 읽음과 따로) ─────
   if (path === '/inquiries' && method === 'GET') {
-    const { results } = await env.XIM_DB.prepare('SELECT id, name, contact, org, kind, substr(message, 1, 140) AS preview, created_at, site_read_at FROM inquiries WHERE site = ? ORDER BY id DESC LIMIT 500').bind(site).all();
-    return json({ items: results, unread: results.filter((r) => !r.site_read_at).length });
+    const { results } = await db.prepare('SELECT id, name, contact, org, kind, substr(message, 1, 140) AS preview, created_at, read_at FROM site_inquiries WHERE site = ? ORDER BY id DESC LIMIT 500').bind(site).all();
+    return json({ items: results, unread: results.filter((r) => !r.read_at).length });
+  }
+  // 새 문의 알림 메일 받을 주소 (최대 3개) — xim 이 문의를 받을 때 이 주소로 보낸다
+  if (path === '/inquiries/mail' && method === 'GET') {
+    const r = await db.prepare('SELECT emails FROM site_inquiry_mail WHERE site = ?').bind(site).first();
+    let emails = []; try { emails = JSON.parse(r?.emails || '[]'); } catch { emails = []; }
+    return json({ emails });
+  }
+  if (path === '/inquiries/mail' && method === 'PUT') {
+    const b = await body(request);
+    const list = (Array.isArray(b?.emails) ? b.emails : []).map((e) => String(e || '').trim().toLowerCase()).filter(Boolean);
+    if (list.length > 3) throw new HttpError(400, '알림 메일은 3개까지 넣을 수 있습니다.');
+    const bad = list.find((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) || e.length > 120);
+    if (bad) throw new HttpError(400, `메일 주소를 확인해 주세요: ${bad}`);
+    const emails = [...new Set(list)];
+    await db.prepare('INSERT INTO site_inquiry_mail (site, emails, updated_at) VALUES (?, ?, ?) ON CONFLICT(site) DO UPDATE SET emails = excluded.emails, updated_at = excluded.updated_at').bind(site, JSON.stringify(emails), Date.now()).run();
+    return json({ emails });
   }
   if (path === '/inquiries/unread' && method === 'GET') {
-    const r = await env.XIM_DB.prepare('SELECT COUNT(*) AS n FROM inquiries WHERE site = ? AND site_read_at = 0').bind(site).first();
+    const r = await db.prepare('SELECT COUNT(*) AS n FROM site_inquiries WHERE site = ? AND read_at = 0').bind(site).first();
     return json({ n: r.n });
   }
   if ((m = path.match(/^\/inquiries\/(\d+)$/))) {
-    const row = await env.XIM_DB.prepare('SELECT id, name, contact, org, kind, message, created_at, site_read_at FROM inquiries WHERE id = ? AND site = ?').bind(Number(m[1]), site).first();
+    const row = await db.prepare('SELECT id, name, contact, org, kind, message, created_at, read_at FROM site_inquiries WHERE id = ? AND site = ?').bind(Number(m[1]), site).first();
     if (!row) throw new HttpError(404, '없는 문의입니다.');
     if (method === 'GET') {
-      if (!row.site_read_at) { row.site_read_at = Date.now(); await env.XIM_DB.prepare('UPDATE inquiries SET site_read_at = ? WHERE id = ?').bind(row.site_read_at, row.id).run(); }
+      if (!row.read_at) { row.read_at = Date.now(); await db.prepare('UPDATE site_inquiries SET read_at = ? WHERE id = ? AND site = ?').bind(row.read_at, row.id, site).run(); }
       return json(row);
     }
     if (method === 'PATCH') {   // 안 읽음으로 되돌리기
-      await env.XIM_DB.prepare('UPDATE inquiries SET site_read_at = 0 WHERE id = ?').bind(row.id).run();
+      await db.prepare('UPDATE site_inquiries SET read_at = 0 WHERE id = ? AND site = ?').bind(row.id, site).run();
       return json({ ok: true });
     }
   }

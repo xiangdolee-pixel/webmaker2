@@ -138,7 +138,7 @@ export class Cms extends WorkerEntrypoint {
         }
         const who = me.kind === 'guest' ? { guest: true } : me.kind === 'staff' ? { staff: true, admin: true } : { name: me.member.name, admin: me.level === 1, avatar: avatarOf(me.member) };
         const texts = await pageTexts(env.DB, site, url.searchParams.get('path') || '', me.level === 1);
-        if (who.admin) { try { who.inq = (await env.XIM_DB.prepare('SELECT COUNT(*) AS n FROM inquiries WHERE site = ? AND site_read_at = 0').bind(site).first()).n; } catch { who.inq = 0; } }   // 관리자에게만: 새 문의 수
+        if (who.admin) { try { who.inq = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_inquiries WHERE site = ? AND read_at = 0').bind(site).first()).n; } catch { who.inq = 0; } }   // 관리자에게만: 새 문의 수
         return new Response(JSON.stringify({ menu: data.menu, blocked: data.blocked, head: data.head, popups: data.popups, me: who, texts, top: data.top, account_css: await accountCss(env), ver: verOf(env) }),
           { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
       }

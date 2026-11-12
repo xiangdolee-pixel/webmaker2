@@ -1,5 +1,5 @@
 // xim 계약서 — 홈페이지 제작 계약서 만들기 · 고치기 · 서명 주소 보내기 (사용자 지시 2026-11-12)
-//   새 계약서: 갑 이름 · 연락처 · 제작비 · 1년 호스팅(1GB) · 유지보수 관리비 → 만들면 바로 글자 고치기 창이 열린다
+//   새 계약서: 갑 이름 · 연락처 · 제작비 · 1년 호스팅 · 유지보수 관리비 · 호스팅 저장 용량 → 만들면 바로 글자 고치기 창이 열린다
 //   갑은 sign.plators.com/<5자> 에서 직접 서명 → 완료. 서명이 끝나면 고칠 수 없고 PDF 로 내려받는다.
 import { $, esc, toast, openDialog, busy, fmtDate } from './common.js';
 import { DEFAULT_BODY, contractHtml, a4Overflow, downloadPdf, won, today, markImage, lineText } from './contract-doc.js';
@@ -37,7 +37,7 @@ function row(c) {
     : c.viewed_at ? `<span class="badge doing">열어 봄</span><small>${fmtDate(c.viewed_at)}</small>` : '<span class="badge new">서명 대기</span>';
   return `<div class="card crow ct-row" data-open="${c.id}" title="눌러서 계약서 보기 · 고치기">
     <div class="cr-name"><b>${esc(c.client_name)}</b>${c.client_phone ? `<span>${esc(c.client_phone)}</span>` : ''}</div>
-    <div class="ct-fees"><span>제작비 <b>${won(c.build_fee)}</b></span><span>1년 관리비 <b>${won(c.yearly_fee)}</b></span></div>
+    <div class="ct-fees"><span>제작비 <b>${won(c.build_fee)}</b></span><span>1년 관리비 <b>${won(c.yearly_fee)}</b></span><span>호스팅 <b>${esc(c.hosting || '1GB')}</b></span></div>
     <div class="ct-link"><a href="${esc(signUrl(c.code))}" target="_blank" rel="noopener">${esc(data.host)}/${esc(c.code)}</a><button class="btn sm" type="button" data-copy="${esc(c.code)}">복사</button></div>
     <div class="sr-meta ct-state">${state}</div>
     <div class="sr-act">${signed ? `<button class="btn sm primary" type="button" data-pdf="${c.id}">PDF</button>` : ''}<button class="btn sm" type="button" data-edit="${c.id}">${signed ? '보기' : '보기 · 고치기'}</button></div>
@@ -57,9 +57,12 @@ function newContract() {
       </div>
       <div class="row2">
         <label class="field"><span>홈페이지 제작비(원)</span><input class="input ct-money" name="build_fee" inputmode="numeric" placeholder="0"></label>
-        <label class="field"><span>1년 호스팅(1GB) · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" placeholder="0"></label>
+        <label class="field"><span>1년 호스팅 · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" placeholder="0"></label>
       </div>
-      <label class="field"><span>계약일</span><input class="input" type="date" name="contract_date" value="${today()}"></label>
+      <div class="row2">
+        <label class="field"><span>호스팅 저장 용량</span><input class="input" name="hosting" list="ct-hosting" maxlength="20" value="1GB" placeholder="예: 1GB"><datalist id="ct-hosting"><option value="500MB"><option value="1GB"><option value="2GB"><option value="3GB"><option value="5GB"><option value="10GB"></datalist><small>고르거나 직접 적습니다(예: 500MB, 2GB).</small></label>
+        <label class="field"><span>계약일</span><input class="input" type="date" name="contract_date" value="${today()}"></label>
+      </div>
       <p class="meta">만들면 계약서 글자를 고칠 수 있는 창이 바로 열리고, 서명 주소(${esc(data.host)}/5자)가 생깁니다.</p>
       <p class="err" data-err></p>
       <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">만들기</button></div>
@@ -108,12 +111,15 @@ async function editContract(id, fresh = false) {
       </div>
       <div class="row2">
         <label class="field"><span>홈페이지 제작비(원)</span><input class="input ct-money" name="build_fee" inputmode="numeric" value="${c.build_fee || ''}"></label>
-        <label class="field"><span>1년 호스팅(1GB) · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" value="${c.yearly_fee || ''}"></label>
+        <label class="field"><span>1년 호스팅 · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" value="${c.yearly_fee || ''}"></label>
       </div>
-      <label class="field"><span>계약일</span><input class="input" type="date" name="contract_date" value="${esc(c.contract_date)}"></label>
+      <div class="row2">
+        <label class="field"><span>호스팅 저장 용량</span><input class="input" name="hosting" list="ct-hosting" maxlength="20" value="${esc(c.hosting || '1GB')}" placeholder="예: 1GB"><datalist id="ct-hosting"><option value="500MB"><option value="1GB"><option value="2GB"><option value="3GB"><option value="5GB"><option value="10GB"></datalist></label>
+        <label class="field"><span>계약일</span><input class="input" type="date" name="contract_date" value="${esc(c.contract_date)}"></label>
+      </div>
       <p class="ct-how"><b>계약서 문구는 오른쪽 문서를 눌러 바로 고칩니다.</b> Enter = 새 줄, 빈 줄에서 Backspace = 줄 지우기. 줄 첫머리 '제10조(…)' 는 조 제목, '①' 은 항이 됩니다. 색이 칠해진 이름 · 금액 · 날짜는 위 칸에서 바꿉니다.</p>
       <details class="ct-raw"><summary>글자 원문으로 고치기</summary><textarea class="input ct-text" name="body" spellcheck="false">${esc(c.body)}</textarea>
-        <small>{갑} {을} {제작비} {연간비} {계약일} 은 위 칸 값으로 바뀝니다.</small></details>
+        <small>{갑} {을} {제작비} {연간비} {용량} {계약일} 은 위 칸 값으로 바뀝니다.</small></details>
       <p class="ct-fit" data-fit></p>
       <p class="err" data-err></p>
       <div class="ct-ed-foot"><button class="btn sm danger" type="button" data-del>삭제</button><button class="btn sm" type="button" data-reset>기본 문구로</button><span class="iq-grow"></span><span class="ct-dirty" data-dirty></span><button class="btn primary" type="submit">저장</button></div>
