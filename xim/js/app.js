@@ -183,7 +183,7 @@ function meter(name, sub, used, limit, cls) {
 
 function render() {
   guarded(async () => {
-    const noTiles = tab === 'studio' || tab === 'voice' || tab === 'pc' || tab === 'domains';   // 제작 도구 화면에서는 사이트 요약 타일을 숨긴다 (사용자 지시 2026-11-09)
+    const noTiles = tab === 'studio' || tab === 'voice' || tab === 'pc' || tab === 'domains' || tab === 'contracts';   // 계약서도 문서를 넓게 보려고 타일을 숨긴다   // 제작 도구 화면에서는 사이트 요약 타일을 숨긴다 (사용자 지시 2026-11-09)
     $('#tiles').hidden = noTiles;
     const tasks = noTiles ? [] : [renderTiles()];
     if (tab === 'sites') tasks.push(renderSites());

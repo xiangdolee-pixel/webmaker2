@@ -1,6 +1,6 @@
 // 계약서 서명 화면 (sign.plators.com/<5자>) — 갑이 계약서를 읽고, 손가락 · 마우스로 서명해 완료한 뒤 PDF 로 내려받는다
-import { $, esc, toast } from './common.js';
-import { contractHtml, downloadPdf } from './contract-doc.js';
+import { $, esc, toast, pillTabs } from './common.js';
+import { contractHtml, downloadPdf, markImage } from './contract-doc.js';
 
 const box = $('#sign');
 const code = (location.pathname.match(/([A-Za-z0-9]{5})\/?$/) || [])[1];
@@ -28,11 +28,20 @@ function render() {
       <p>${signed ? '서명이 끝난 계약서입니다. PDF 로 내려받아 보관해 주세요.' : '계약서를 끝까지 읽고, 맨 아래에서 서명해 주세요.'}</p>
       ${signed ? '<button class="btn primary" type="button" data-pdf>PDF 내려받기</button>' : ''}
     </div>
-    ${contractHtml(c, c.eul, { signSlot: '<span class="ct-sign-ph">아래에서 서명</span>' })}
+    <div data-doc>${contractHtml(c, c.eul)}</div>
     ${signed ? '' : `
-    <section class="card sign-pad" aria-label="갑 서명">
-      <div class="sign-pad-head"><h2>갑 서명 <small>${esc(c.client_name)}</small></h2><button class="btn sm" type="button" data-clear>다시 쓰기</button></div>
-      <div class="sign-canvas"><canvas aria-label="이 칸에 서명해 주세요"></canvas><span class="sign-hint">이 칸에 손가락이나 마우스로 서명해 주세요</span></div>
+    <section class="card sign-pad" aria-label="갑 서명 또는 도장" id="pad">
+      <div class="sign-pad-head"><h2>갑 서명 · 도장 <small>${esc(c.client_name)}</small></h2></div>
+      <p class="sign-pad-note">서명이나 도장은 계약서의 갑 이름 옆 <b>(인)</b> 자리에 들어갑니다.</p>
+      <nav class="tabs sign-mode" aria-label="서명 방법"></nav>
+      <div data-mode="draw">
+        <div class="sign-canvas"><canvas aria-label="이 칸에 서명해 주세요"></canvas><span class="sign-hint">이 칸에 손가락이나 마우스로 서명해 주세요</span></div>
+        <div class="sign-row"><button class="btn sm" type="button" data-clear>다시 쓰기</button></div>
+      </div>
+      <div data-mode="stamp" hidden>
+        <div class="sign-stamp" data-stamp-prev><span>도장(또는 서명)을 찍은 사진 · 그림을 올려 주세요. 흰 바탕은 자동으로 투명해집니다.</span></div>
+        <div class="sign-row"><label class="btn sm">그림 고르기<input type="file" accept="image/png,image/jpeg,image/webp" hidden data-stamp></label></div>
+      </div>
       <label class="st-check sign-agree"><input type="checkbox" data-agree><span><b>계약 내용을 모두 읽었고 동의합니다.</b></span></label>
       <p class="err" role="alert" data-err></p>
       <button class="btn primary sign-done" type="button" data-done>서명하고 완료</button>
@@ -50,7 +59,32 @@ async function pdf(e) {
 
 // ───────── 서명 칸 ─────────
 function pad() {
+  let mode = 'draw';
+  let stamp = '';
   const wrap = box.querySelector('.sign-canvas');
+  // 계약서의 갑 (인) 자리에 바로 보여 준다
+  const preview = () => {
+    const at = box.querySelector('[data-doc] .ct-in-gap');
+    if (!at) return;
+    at.querySelector('img')?.remove();
+    const src = mode === 'stamp' ? stamp : strokes.length ? exportSign(strokes) : '';
+    if (src) at.insertAdjacentHTML('beforeend', `<img src="${src}" alt="서명 미리보기">`);
+  };
+  box.querySelector('[data-doc] .ct-in-gap')?.addEventListener('click', () => box.querySelector('#pad').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' }));
+  pillTabs(box.querySelector('.sign-mode'), [['draw', '서명 그리기'], ['stamp', '도장 그림 올리기']], mode, (v) => {
+    mode = v;
+    box.querySelectorAll('[data-mode]').forEach((el) => { el.hidden = el.dataset.mode !== v; });
+    if (v === 'draw') size();
+    preview();
+  });
+  box.querySelector('[data-stamp]').onchange = async (ev) => {
+    const f = ev.target.files[0]; if (!f) return;
+    try {
+      stamp = await markImage(f);
+      box.querySelector('[data-stamp-prev]').innerHTML = `<img src="${stamp}" alt="올린 도장">`;
+      preview();
+    } catch (x) { toast(x.message); }
+  };
   const cv = wrap.querySelector('canvas');
   const ctx = cv.getContext('2d');
   let strokes = [];   // 크기가 바뀌면 다시 그리려고 점을 모아 둔다 (0~1 비율)
@@ -79,21 +113,22 @@ function pad() {
     cur.push(p);
     line(); ctx.beginPath(); ctx.moveTo(q[0] * cv.width, q[1] * cv.height); ctx.lineTo(p[0] * cv.width, p[1] * cv.height); ctx.stroke();
   });
-  const end = () => { cur = null; };
+  const end = () => { if (cur) preview(); cur = null; };
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
   addEventListener('resize', size);
   size();
-  box.querySelector('[data-clear]').onclick = () => { strokes = []; redraw(); };
+  box.querySelector('[data-clear]').onclick = () => { strokes = []; redraw(); preview(); };
 
   const err = box.querySelector('[data-err]');
   box.querySelector('[data-done]').onclick = async (e) => {
     err.textContent = '';
-    if (!strokes.length || strokes.flat().length < 6) { err.textContent = '서명 칸에 서명을 그려 주세요.'; return; }
+    if (mode === 'draw' && (!strokes.length || strokes.flat().length < 6)) { err.textContent = '서명 칸에 서명을 그려 주세요.'; return; }
+    if (mode === 'stamp' && !stamp) { err.textContent = '도장 그림을 올려 주세요.'; return; }
     if (!box.querySelector('[data-agree]').checked) { err.textContent = '계약 내용에 동의한다는 칸을 눌러 주세요.'; return; }
     const b = e.currentTarget;
     b.disabled = true; b.innerHTML = '<span class="spin" aria-hidden="true"></span>보내는 중…';
     try {
-      const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agree: true, sign: exportSign(strokes) }) });
+      const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agree: true, sign: mode === 'stamp' ? stamp : exportSign(strokes) }) });
       const out = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(out.error || '서명을 보내지 못했습니다.');
       removeEventListener('resize', size);

@@ -54,45 +54,46 @@ export const today = () => { const d = new Date(); return `${d.getFullYear()}-${
 const stamp = (ms) => { const d = new Date(ms); return `${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
 
 // 글자 → 단락 html (자리 표시를 채운다)
-function bodyHtml(c, eul) {
+function bodyHtml(c, eul, lines = false) {
   const fill = { '갑': c.client_name || '갑', '을': eul.name || '을', '제작비': moneyText(c.build_fee), '연간비': moneyText(c.yearly_fee), '계약일': dateKo(c.contract_date) };
   const put = (t) => esc(t).replace(/\{(갑|을|제작비|연간비|계약일)\}/g, (_, k) => `<b>${esc(fill[k])}</b>`);
-  return String(c.body || '').split(/\r?\n/).map((line) => {
+  return String(c.body || '').split(/\r?\n/).map((line, i) => {
     const t = line.trim();
-    if (!t) return '<p class="ct-gap"></p>';
+    const l = lines ? ` data-l="${i}"` : '';
+    if (!t) return `<p class="ct-gap"${l}></p>`;
     const art = t.match(/^(제\s*\d+\s*조\s*(?:\([^)]*\))?)\s*(.*)$/);
-    if (art) return `<p class="ct-art"><b>${esc(art[1])}</b>${art[2] ? ` ${put(art[2])}` : ''}</p>`;
-    if (/^[①-⑳]/.test(t)) return `<p class="ct-sub">${put(t)}</p>`;
-    return `<p>${put(t)}</p>`;
+    if (art) return `<p class="ct-art"${l}><b>${esc(art[1])}</b>${art[2] ? ` ${put(art[2])}` : ''}</p>`;
+    if (/^[①-⑳]/.test(t)) return `<p class="ct-sub"${l}>${put(t)}</p>`;
+    return `<p${l}>${put(t)}</p>`;
   }).join('');
 }
 
-// 문서 한 장. opt.a4 = PDF 용 고정 크기(794 × 1123px), opt.signSlot = 갑 서명 칸에 넣을 html(서명 전 안내 등)
+// 문서 한 장. opt.a4 = PDF 용 고정 크기(794 × 1123px), opt.preview = 갑 서명 미리보기(서명 화면에서 그리는 중)
+//   서명 · 도장은 이름 오른쪽 (인) 동그라미 한가운데에 찍힌다 (사용자 지시 2026-11-12)
 export function contractHtml(c, eul, opt = {}) {
-  const signImg = (src, alt) => (src ? `<img src="${esc(src)}" alt="${esc(alt)} 서명">` : '');
   const signed = c.status === 'signed';
   return `<article class="ct-doc${opt.a4 ? ' ct-a4' : ''}">
     <header class="ct-head"><h1>홈페이지 제작 계약서</h1>${c.code ? `<span class="ct-no">No. ${esc(c.code)}</span>` : ''}</header>
-    <div class="ct-body">${bodyHtml(c, eul)}</div>
+    <div class="ct-body">${bodyHtml(c, eul, opt.lines)}</div>
     <p class="ct-date">${esc(dateKo(c.contract_date) || '　　년　　월　　일')}</p>
     <div class="ct-parties">
-      ${party('갑', c.client_name, c.client_phone, signImg(c.client_sign, c.client_name) || opt.signSlot || '')}
-      ${party('을', eul.name, eul.phone, signImg(eul.sign, eul.name))}
+      ${party('갑', c.client_name, c.client_phone, c.client_sign || opt.preview || '', 'gap')}
+      ${party('을', eul.name, eul.phone, eul.sign, 'eul')}
     </div>
     ${signed ? `<footer class="ct-foot">전자 서명 완료 ${esc(stamp(c.signed_at))} · 문서 확인 ${esc(c.host || 'sign.plators.com')}/${esc(c.code)}${c.doc_hash ? ` · 지문 ${esc(c.doc_hash.slice(0, 16))}` : ''}</footer>` : ''}
   </article>`;
 }
-const party = (role, name, phone, sign) => `<section class="ct-party">
+const party = (role, name, phone, mark, who) => `<section class="ct-party">
   <h2>${role}</h2>
-  <dl><div><dt>이름</dt><dd>${esc(name || '')}</dd></div><div><dt>연락처</dt><dd>${esc(phone || '')}</dd></div>
-  <div class="ct-sign-row"><dt>서명</dt><dd class="ct-sign">${sign}</dd></div></dl>
+  <dl><div><dt>이름</dt><dd class="ct-name"><span>${esc(name || '')}</span><span class="ct-in ct-in-${who}" data-in="${who}"><i>인</i>${mark ? `<img src="${esc(mark)}" alt="${esc(name)} 서명 · 도장">` : ''}</span></dd></div>
+  <div><dt>연락처</dt><dd>${esc(phone || '')}</dd></div></dl>
 </section>`;
 
 // A4 한 장에 들어가는지 (PDF 크기로 몰래 그려 높이를 잰다). 넘으면 몇 % 넘는지
 export function a4Overflow(c, eul) {
   const box = document.createElement('div');
   box.className = 'ct-offscreen';
-  box.innerHTML = contractHtml(c, eul, { a4: true, signSlot: '<i class="ct-sign-ph"></i>' });
+  box.innerHTML = contractHtml(c, eul, { a4: true });
   document.body.append(box);
   const el = box.firstElementChild;
   const over = el.scrollHeight / 1123;
@@ -132,4 +133,40 @@ export async function downloadPdf(c, eul) {
     const safe = String(c.client_name || '').replace(/[\\/:*?"<>|\s]+/g, '').slice(0, 30);
     pdf.save(`홈페이지제작계약서_${safe}_${c.code}.pdf`);
   } finally { box.remove(); }
+}
+
+// 서명 · 도장 그림 올리기: 가로 600px 안으로 줄이고, 흰 바탕은 투명하게, 둘레 여백을 잘라 PNG data URL 로 (xim 을 사인 · 서명 화면 갑 도장 같이 씀)
+export async function markImage(file) {
+  let bmp;
+  try { bmp = await createImageBitmap(file); } catch { throw new Error('이 그림은 읽을 수 없어요. png · jpg 로 올려 주세요.'); }
+  const k = Math.min(1, 1200 / bmp.width);
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(bmp, 0, 0, cv.width, cv.height);
+  const img = ctx.getImageData(0, 0, cv.width, cv.height); const px = img.data;
+  let x0 = cv.width; let y0 = cv.height; let x1 = -1; let y1 = -1;
+  for (let y = 0; y < cv.height; y++) {
+    for (let x = 0; x < cv.width; x++) {
+      const i = (y * cv.width + x) * 4;
+      const light = Math.min(px[i], px[i + 1], px[i + 2]);
+      if (light > 235) px[i + 3] = 0;                                                  // 흰 바탕 → 투명
+      else if (light > 200) px[i + 3] = Math.round(px[i + 3] * (235 - light) / 35);    // 가장자리 부드럽게
+      if (px[i + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+  }
+  if (x1 < 0) throw new Error('그림에서 서명 · 도장을 찾지 못했습니다.');
+  ctx.putImageData(img, 0, 0);
+  const m = 6; x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m); x1 = Math.min(cv.width - 1, x1 + m); y1 = Math.min(cv.height - 1, y1 + m);
+  const w = x1 - x0 + 1; const h = y1 - y0 + 1;
+  let s = Math.min(1, 600 / w, 400 / h);
+  for (;;) {
+    const out = document.createElement('canvas');
+    out.width = Math.round(w * s); out.height = Math.round(h * s);
+    out.getContext('2d').drawImage(cv, x0, y0, w, h, 0, 0, out.width, out.height);
+    const url = out.toDataURL('image/png');
+    if (url.length <= 380 * 1024) return url;
+    if (s < 0.2) throw new Error('그림이 너무 큽니다. 더 작은 그림으로 올려 주세요.');
+    s *= 0.75;   // 거친 도장처럼 무늬가 많으면 더 줄인다
+  }
 }
