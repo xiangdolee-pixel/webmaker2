@@ -27,7 +27,7 @@ Worker `xms` + D1 `xms` (xiangdolee 계정). 업체 구분은 모든 표의 `sit
 
 ## 부가 기능: 맨 위로 버튼
 
-- 관리 화면 **사이트 › 부가 기능** 에서 켜고 끈다(사이트마다, 기본은 꺼짐). 뺄 주소(예: 올리브바스켓 /app · /basket)도 여기서.
+- 관리 화면 **사이트 › 부가 기능** 에서 켜고 끈다(사이트마다, **기본은 켜짐** — 2026-11-12 사용자 지시: xim 으로 만든 사이트는 모두 오른쪽 아래 맨 위로 버튼). 뺄 주소(예: 올리브바스켓 /app · /basket)도 여기서.
 - 값은 D1 `site_options` (k = top_button, v = {"on":true,"except":[...]}). 사이트 Worker 가 페이지 끝에 버튼을 넣는다 — 그 사이트를 한 번 다시 배포해야(새 사이트 Worker) 붙는다.
 - 켠 곳(2026-11-07): sound-build · sjccc · olivebasket(웹페이지만) · school-timeline.
 

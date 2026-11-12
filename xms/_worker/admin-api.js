@@ -64,7 +64,7 @@ export async function adminApi(ctx) {
       return json({ ok: true });
     }
     const r = await db.prepare("SELECT v FROM site_options WHERE site = ? AND k = 'top_button'").bind(site).first();
-    let v = { on: false, except: [] };
+    let v = { on: true, except: [] };   // 기본 켬 (사용자 지시 2026-11-12)
     try { if (r) v = { ...v, ...JSON.parse(r.v) }; } catch { /* 기본값 */ }
     return json(v);
   }

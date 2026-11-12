@@ -131,7 +131,8 @@ export class Cms extends WorkerEntrypoint {
           const [ma, head, popups, top] = await Promise.all([menuAccess(env.DB, site, me), headData(env, site), home ? livePopups(env.DB, site) : [],
             env.DB.prepare("SELECT v FROM site_options WHERE site = ? AND k = 'top_button'").bind(site).first()]);
           let topBtn = null;
-          try { topBtn = top ? JSON.parse(top.v) : null; } catch { topBtn = null; }
+          // 맨 위로 버튼은 xim 의 모든 사이트에 기본으로 켠다(사용자 지시 2026-11-12). 부가 기능에서 끈 사이트만 뺀다
+          try { topBtn = top ? JSON.parse(top.v) : { on: true, except: [] }; } catch { topBtn = { on: true, except: [] }; }
           data = { at: Date.now(), menu: ma.menu, blocked: ma.blocked, head, popups, top: topBtn?.on ? { except: topBtn.except || [] } : null };
           if (me.level !== 1) headCache.set(key, data);
         }
