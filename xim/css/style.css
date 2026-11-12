@@ -823,3 +823,90 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .iq-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
 .iq-grow { flex: 1; }
 @media (max-width: 560px) { .iq-dl > div { grid-template-columns: 1fr; gap: 2px; } .iq-when { margin-left: 0; width: 100%; } }
+
+/* ── 계약서 (xim '계약서' 메뉴 + 서명 화면 sign.html) ── */
+.ct-doc { width: 100%; max-width: 794px; margin: 0 auto; padding: 56px 64px 44px; background: #fff; color: #15171c; font-size: 15px; line-height: 1.72; letter-spacing: -.01em; border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow); word-break: keep-all; overflow-wrap: anywhere; }
+.ct-head { position: relative; margin-bottom: 26px; padding-bottom: 16px; border-bottom: 2px solid #15171c; text-align: center; }
+.ct-head h1 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: .28em; text-indent: .28em; }
+.ct-no { position: absolute; right: 0; bottom: 4px; color: #8a909c; font-size: 12px; letter-spacing: .04em; }
+.ct-body p { margin: 0; }
+.ct-body .ct-art { margin-top: 7px; }
+.ct-body .ct-art b { font-weight: 700; }
+.ct-body .ct-sub { padding-left: 1.15em; text-indent: -1.15em; margin-left: .9em; }
+.ct-body .ct-gap { height: 8px; }
+.ct-date { margin: 26px 0 20px; text-align: center; font-weight: 600; letter-spacing: .06em; }
+.ct-parties { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.ct-party { padding: 12px 16px 10px; border: 1px solid #d5d9e0; border-radius: 4px; }
+.ct-party h2 { margin: 0 0 6px; font-size: 16px; font-weight: 800; }
+.ct-party dl { margin: 0; display: grid; gap: 2px; }
+.ct-party dl > div { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; }
+.ct-party dt { color: #6a717e; font-size: .88em; }
+.ct-party dd { margin: 0; font-weight: 600; }
+.ct-sign { height: 60px; display: flex; align-items: center; }
+.ct-sign img { max-width: 100%; max-height: 60px; object-fit: contain; }
+.ct-sign-ph { color: #a0a6b1; font-size: 13px; font-weight: 500; }
+.ct-foot { margin-top: 18px; padding-top: 10px; border-top: 1px solid #e2e5ea; color: #8a909c; font-size: 11.5px; text-align: center; }
+/* PDF 용 A4(794 × 1123px) — 화면 크기와 상관없이 같은 모양 */
+.ct-doc.ct-a4 { width: 794px; max-width: none; margin: 0; padding: 62px 70px 40px; font-size: 13px; line-height: 1.62; border: 0; border-radius: 0; box-shadow: none; }
+.ct-a4 .ct-head { margin-bottom: 20px; padding-bottom: 13px; }
+.ct-a4 .ct-head h1 { font-size: 24px; }
+.ct-a4 .ct-date { margin: 20px 0 16px; }
+.ct-a4 .ct-sign { height: 56px; }
+.ct-a4 .ct-sign img { max-height: 56px; }
+.ct-offscreen { position: fixed; left: -12000px; top: 0; pointer-events: none; }
+@media (max-width: 640px) {
+  .ct-doc:not(.ct-a4) { padding: 28px 18px 24px; font-size: 15px; line-height: 1.7; }
+  .ct-doc:not(.ct-a4) .ct-head h1 { font-size: 21px; letter-spacing: .16em; text-indent: .16em; }
+  .ct-doc:not(.ct-a4) .ct-no { position: static; display: block; margin-top: 4px; }
+  .ct-doc:not(.ct-a4) .ct-parties { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+}
+
+/* xim 계약서 목록 · 창 */
+.crow.ct-row { grid-template-columns: minmax(150px, 1fr) minmax(190px, 1.1fr) minmax(230px, 1.3fr) minmax(130px, auto) auto; }
+.ct-row .cr-name { flex-direction: column; align-items: flex-start !important; gap: 0 !important; }
+.ct-fees, .ct-state { flex-direction: column; align-items: flex-start !important; gap: 0 !important; }
+.ct-fees b { color: var(--ink); font-weight: 600; }
+.ct-link a { font-weight: 600; }
+@media (max-width: 1279px) { .crow.ct-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .ct-row .sr-act { justify-content: flex-start; } }
+@media (max-width: 767px) { .crow.ct-row { grid-template-columns: minmax(0, 1fr); } }
+.ct-warn, .ct-ok { margin: 0 0 12px; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 14px; }
+.ct-warn { color: var(--warn); background: var(--warn-soft); }
+.ct-ok { color: var(--ok); background: var(--ok-soft); }
+dialog.ct-dialog { width: min(880px, calc(100vw - 24px)); }
+.ct-dlg-no { color: var(--mute); font-size: 14px; font-weight: 500; }
+.ct-share { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -6px 0 14px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--brand-soft); }
+.ct-share a { flex: 1; min-width: 0; color: var(--brand); font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
+textarea.ct-text { min-height: 320px; font-size: 14px; line-height: 1.65; }
+.ct-fit { margin: -4px 0 12px; font-size: 14px; font-weight: 600; }
+.ct-fit.is-ok { color: var(--ok); }
+.ct-fit.is-over { color: var(--warn); }
+.ct-preview { margin-bottom: 12px; }
+.ct-preview summary { cursor: pointer; font-weight: 600; color: var(--sub); padding: 6px 0; }
+.ct-view { padding: 12px; border-radius: var(--radius-sm); background: var(--bg); }
+.ct-view .ct-doc { padding: 36px 34px 28px; font-size: 14px; }
+@media (max-width: 640px) { .ct-view { padding: 0; background: none; } .ct-view .ct-doc { padding: 22px 14px 18px; } }
+.ct-eul-sign { display: grid; place-items: center; height: 96px; border: 1px dashed var(--line); border-radius: var(--radius-sm); background: #fff; }
+.ct-eul-sign img { max-height: 80px; max-width: 90%; }
+.ct-eul-sign em { color: var(--mute); font-style: normal; font-size: 14px; }
+.ct-eul-act { display: flex; gap: 8px; }
+
+/* 서명 화면 (sign.plators.com/<5자>) */
+.sign-wrap { max-width: 860px; margin: 0 auto; padding: 20px 16px 64px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.sign-load { padding: 60px 0; text-align: center; color: var(--mute); }
+.sign-msg { padding: 32px 24px; text-align: center; }
+.sign-msg h1 { margin: 0 0 8px; font-size: 20px; }
+.sign-msg p { margin: 0; color: var(--sub); }
+.sign-top { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; }
+.sign-top p { flex: 1; min-width: 200px; margin: 0; color: var(--sub); font-size: 15px; }
+.sign-pad { padding: 18px; display: grid; gap: 12px; }
+.sign-pad-head { display: flex; align-items: center; gap: 10px; }
+.sign-pad-head h2 { flex: 1; margin: 0; font-size: 18px; }
+.sign-pad-head small { margin-left: 6px; color: var(--sub); font-size: 15px; font-weight: 500; }
+.sign-canvas { position: relative; aspect-ratio: 3 / 1; min-height: 120px; border: 1.5px dashed #c3c8d2; border-radius: var(--radius-sm); background: #fff; }
+.sign-canvas canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.sign-hint { position: absolute; inset: 0; display: grid; place-items: center; padding: 0 16px; text-align: center; color: #a0a6b1; font-size: 15px; pointer-events: none; transition: opacity .2s; }
+.sign-canvas.has-ink .sign-hint { opacity: 0; }
+.sign-done { width: 100%; min-height: 52px; font-size: 16px; }
+.sign-pad .err { margin: 0; min-height: 0; }
+@media (max-width: 640px) { .sign-wrap { padding: 12px 16px 48px; gap: 12px; } .sign-top .btn { width: 100%; } .sign-pad { padding: 14px; } }
+.ct-intro { margin: 0 0 14px; color: var(--sub); font-size: 13px; }

@@ -6,12 +6,13 @@ import { renderVoice, stopVoice } from './voice.js';
 import { renderPc } from './pc.js';
 import { renderDomains, stopDomains } from './domains.js';
 import { renderInquiries } from './inquiries.js';
+import { renderContracts } from './contracts.js';
 
 const api = makeApi('/api');
 const view = $('#view');
 const TAB_KEY = 'xim.tab';
 let tab = 'sites';
-const TABS = ['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'studio', 'voice', 'pc', 'domains', 'monitor', 'security', 'audit', 'pricing'];
+const TABS = ['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'studio', 'voice', 'pc', 'domains', 'monitor', 'security', 'audit', 'contracts', 'pricing'];
 try { const t = localStorage.getItem(TAB_KEY); if (t && TABS.includes(t)) tab = t; } catch { /* 저장소 못 쓰면 사이트 */ }   // F5 해도 보던 메뉴로 (사용자 지시 2026-11-09)
 // 메뉴마다 주소(사용자 지시 2026-11-11): xim.plators.com/studio 로 들어오면 스튜디오. 주소가 있으면 저장된 메뉴보다 먼저
 const pathTab = location.pathname.slice(1);
@@ -69,6 +70,7 @@ const NAV_ICON = {
   monitor: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M8.5 12h2l1-2.5 2 5 1-2.5h1"/></svg>',
   audit: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>',
   portfolio2: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M12 11v5M9.5 13.5h5"/></svg>',
+  contracts: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8.5 13h7M8.5 16.5c1.2-.9 1.8-2.6 2.6-2.6s.3 2.4 1.2 2.4 1-1 1.9-1h1.3"/></svg>',
   pricing: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>',
   security: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
   studio: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M10 9l5 2.5-5 2.5zM8 21h8"/></svg>',
@@ -83,7 +85,7 @@ function showApp() {
   $('#app').hidden = false;
   if (!navReady) {
     navReady = true;
-    pillTabs($('#nav'), [['sites', '사이트'], ['domains', '도메인 부스터'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['inquiries', '제작문의'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC']], tab, (v) => {
+    pillTabs($('#nav'), [['sites', '사이트'], ['domains', '도메인 부스터'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['inquiries', '제작문의'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['contracts', '계약서'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC']], tab, (v) => {
       tab = v;
       try { localStorage.setItem(TAB_KEY, v); } catch { /* 무시 */ }
       setPath(v);
@@ -192,6 +194,7 @@ function render() {
     if (tab === 'security') tasks.push(renderSecurity());
     if (tab === 'monitor') tasks.push(renderMonitor());
     if (tab === 'audit') tasks.push(renderAudit());
+    if (tab === 'contracts') tasks.push(renderContracts({ view, api }));
     if (tab === 'pricing') renderPricing();
     if (tab === 'studio') tasks.push(renderStudio({ view, api, shrinkImage })); else stopStudio();
     if (tab === 'voice') tasks.push(renderVoice({ view, api })); else stopVoice();

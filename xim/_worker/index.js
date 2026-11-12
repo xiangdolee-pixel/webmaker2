@@ -16,6 +16,8 @@ import { studioApi, studioHelper, studioPublic, studioScheduled, StudioMain } fr
 export { StudioMain };
 // 관리자 계정 추가도 그 사이트 홈페이지 회원가입과 같은 항목 · 같은 검사로 (xms 와 같은 코드)
 import { siteSettings, memberValues, uniqueProblem } from '../../xms/_worker/lib.js';
+// 홈페이지 제작 계약서 — /api/contracts* (운영자) · sign.plators.com/<5자> · /api/sign/<5자> (갑, 로그인 없음)
+import { contractsApi, contractsPublic } from './contracts.js';
 
 const DAY = 86400000;
 const SEC_WINDOW = 10 * 60000; // 없는 주소: 10분 동안
@@ -281,6 +283,7 @@ async function ximApi(request, env, url, ctx) {
     if (method !== 'GET' && res.ok) await audit(db, request, 'DOMAIN', path.slice('/api/dm'.length), method);
     return out;
   }
+  if (path.startsWith('/api/contracts')) { const r = await contractsApi(request, env, path, method, body, (a, t, d) => audit(db, request, a, t, d)); if (r) return r; }
   if (path.startsWith('/api/studio/') || path === '/api/studio') return studioApi(request, env, url, ctx, path, method, body, (a, t, d) => audit(db, request, a, t, d), (p, d) => github(env, p, d));
 
   // 구글 OTP 등록 · 해제
@@ -1111,6 +1114,8 @@ export default {
   },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    // 계약서 서명(sign.plators.com 전체 · /api/sign/* · /sign/*) — 운영자 화면 · API 보다 먼저. sign 주소에서는 이것 말고 아무것도 안 열린다
+    try { const r = await contractsPublic(request, env, url, staticFile); if (r) return r; } catch (e) { return fail(e); }
     if (url.pathname.startsWith('/api/')) {
       try { return await ximApi(request, env, url, ctx); } catch (e) { return fail(e); }
     }
@@ -1130,17 +1135,17 @@ export default {
 // 화면 파일: 배포 번호(?v=)를 붙여 한 번 받으면 브라우저가 다시 묻지 않게 (배포하면 번호가 바뀌어 새로 받음)
 //   index.html → css · js 주소에 ?v=번호,  js 안의 import './x.js' 에도 같은 번호.  번호 붙은 파일 = 1년, 첫 화면 = 매번 확인
 // 메뉴마다 주소(사용자 지시 2026-11-11: xim.plators.com/studio 처럼) — 이 주소들은 첫 화면(index.html)을 내주고, 화면(app.js)이 주소를 보고 그 메뉴를 연다
-const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'monitor', 'security', 'audit', 'pricing', 'studio', 'voice', 'pc', 'domains']);
+const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'monitor', 'security', 'audit', 'contracts', 'pricing', 'studio', 'voice', 'pc', 'domains']);
 async function staticFile(request, env, url) {
   const v = String(env.VER?.id || 'dev').slice(0, 8);
   const isNav = NAV_PATHS.has(url.pathname.slice(1));
   const res = await env.ASSETS.fetch(isNav ? new Request(new URL('/', url), request) : request);
   if (!res.ok) return res;
   const p = isNav ? '/' : url.pathname;
-  if (p === '/' || p === '/index.html') {
+  if (p === '/' || p === '/index.html' || p === '/sign') {   // /sign = 계약서 서명 화면(sign.html)
     const out = new HTMLRewriter()
-      .on('link[href^="css/"]', { element(el) { el.setAttribute('href', `${el.getAttribute('href')}?v=${v}`); } })
-      .on('script[src^="js/"]', { element(el) { el.setAttribute('src', `${el.getAttribute('src')}?v=${v}`); } })
+      .on('link[href^="css/"], link[href^="/css/"]', { element(el) { el.setAttribute('href', `${el.getAttribute('href')}?v=${v}`); } })
+      .on('script[src^="js/"], script[src^="/js/"]', { element(el) { el.setAttribute('src', `${el.getAttribute('src')}?v=${v}`); } })
       .transform(res);
     const r = new Response(out.body, out);
     r.headers.set('Cache-Control', 'no-cache');

@@ -252,3 +252,26 @@ CREATE TABLE IF NOT EXISTS inquiries (
   done INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS inquiries_created ON inquiries (created_at);
+
+-- 홈페이지 제작 계약서 (2026-11-12): xim '계약서' 메뉴에서 만들고, 갑은 sign.plators.com/<code> 에서 직접 서명
+--   status: wait(서명 대기) · signed(서명 완료 — 그 뒤로 고칠 수 없음). 을 정보 · 사인 그림은 settings.contract_eul, 서명 때 eul_snapshot 으로 굳힌다
+CREATE TABLE IF NOT EXISTS contracts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL UNIQUE,                 -- 주소 5자 (대소문자 · 숫자)
+  client_name TEXT NOT NULL,
+  client_phone TEXT NOT NULL DEFAULT '',
+  build_fee INTEGER NOT NULL DEFAULT 0,      -- 제작비(원)
+  yearly_fee INTEGER NOT NULL DEFAULT 0,     -- 1년 호스팅 1GB · 유지보수 관리비(원)
+  contract_date TEXT NOT NULL DEFAULT '',    -- YYYY-MM-DD
+  body TEXT NOT NULL,                        -- 계약서 글자 ({갑} {을} {제작비} {연간비} 자리 표시)
+  status TEXT NOT NULL DEFAULT 'wait',
+  viewed_at INTEGER NOT NULL DEFAULT 0,      -- 갑이 처음 열어 본 때
+  client_sign TEXT NOT NULL DEFAULT '',      -- 갑 서명 그림(data URL)
+  signed_at INTEGER NOT NULL DEFAULT 0,
+  signed_ip TEXT NOT NULL DEFAULT '',
+  signed_ua TEXT NOT NULL DEFAULT '',
+  doc_hash TEXT NOT NULL DEFAULT '',         -- 서명 때 내용 지문(sha256)
+  eul_snapshot TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
