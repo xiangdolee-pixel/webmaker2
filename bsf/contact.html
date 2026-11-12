@@ -9,7 +9,7 @@
 <meta property="og:title" content="생산 문의 | BSF COMPANY">
 <meta property="og:description" content="품목 · 수량 · 납기를 알려 주시면 맞는 생산지와 원가를 제안드립니다. BSF COMPANY 생산 문의.">
 <meta property="og:image" content="images/og.jpg">
-<meta name="theme-color" content="#153c54">
+<meta name="theme-color" content="#081a26">
 <link rel="icon" href="favicon.ico" sizes="32x32">
 <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-192.png">
 <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
@@ -17,14 +17,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="css/style.css?v=20261112a">
-<script src="js/site.js?v=20261112a" defer></script>
+<link rel="stylesheet" href="css/style.css?v=20261112c">
+<script src="js/site.js?v=20261112c" defer></script>
 </head>
 <body class="has-page-hero">
 <a class="sr" href="#main">본문 바로가기</a>
 <header class="hd">
   <div class="wrap hd-in">
-    <a class="logo" href="./" aria-label="BSF COMPANY 처음으로"><img src="images/favicon-192.png" alt="" width="38" height="38"><span>BSF COMPANY<small>CHALLENGE INSPIRATION</small></span></a>
+    <a class="logo" href="./" aria-label="BSF COMPANY 처음으로"><img src="images/favicon-192.png" alt="" width="42" height="42"><span>BSF COMPANY<small>GLOBAL APPAREL SOURCING</small></span></a>
     <nav class="gnb" aria-label="주 메뉴" data-xms-menu>
       <a href="about.html" data-xms-item>회사소개</a>
       <a href="capability.html" data-xms-item>생산역량</a>
@@ -38,10 +38,10 @@
 </header>
 
 <main id="main">
-  <section class="page-hero img"><div class="ph-bg" style="background-image:url(images/process/material.webp)"></div>
+  <section class="page-hero"><div class="ph-bg" style="background-image:url(images/hero-detail.webp)"></div>
     <div class="wrap">
       <p class="eyebrow rv">CONTACT</p>
-      <h1 class="title rv d1">Let's make it.</h1>
+      <h1 class="title rv d1">Let's make <span class="o">it.</span></h1>
       <p class="lead rv d2">품목 · 수량 · 납기를 알려 주시면, 맞는 생산지와 원가를 제안드립니다.</p>
     </div>
   </section>
@@ -58,10 +58,10 @@
               <label class="f"><span>예상 수량</span><select name="qty"><option value="">고르세요</option><option>300장 미만</option><option>300 ~ 1,000장</option><option>1,000 ~ 5,000장</option><option>5,000 ~ 20,000장</option><option>20,000장 이상</option><option>아직 미정</option></select></label>
               <label class="f"><span>희망 납기</span><input name="due" type="month" aria-label="희망 납기 (년-월)"></label>
             </div>
-            <label class="f" style="margin-top:14px"><span>준비된 것</span><select name="ready"><option value="">고르세요</option><option>아이디어 · 레퍼런스만</option><option>디자인 스케치</option><option>작업지시서(테크팩)</option><option>샘플(실물)</option></select></label>
+            <label class="f" style="margin-top:16px"><span>준비된 것</span><select name="ready"><option value="">고르세요</option><option>아이디어 · 레퍼런스만</option><option>디자인 스케치</option><option>작업지시서(테크팩)</option><option>샘플(실물)</option></select></label>
           </fieldset>
           <fieldset class="f-step"><legend><b>03</b>내용</legend>
-            <label class="f"><span>문의 내용</span><textarea name="message" maxlength="4000" placeholder="소재 · 디테일 · 목표 단가 · 참고 브랜드 등 편하게 적어 주세요. 이미지나 작업지시서는 답변 메일로 보내 주시면 됩니다."></textarea></label>
+            <label class="f"><span>문의 내용</span><textarea name="message" maxlength="2000" placeholder="소재 · 디테일 · 목표 단가 · 참고 브랜드 등 편하게 적어 주세요. 이미지나 작업지시서는 답변 메일로 보내 주시면 됩니다."></textarea></label>
           </fieldset>
           <fieldset class="f-step"><legend><b>04</b>연락받으실 곳</legend>
             <div class="f-grid two">
@@ -71,7 +71,11 @@
               <label class="f"><span>이메일</span><input name="email" type="email" maxlength="80" autocomplete="email" placeholder="name@company.com"></label>
             </div>
           </fieldset>
-          <label class="agree"><input type="checkbox" name="agree"><span>문의 답변을 위해 회사명 · 담당자 · 연락처 · 이메일을 수집하며, 답변이 끝나면 지체 없이 파기합니다. 동의합니다. (필수)</span></label>
+          <div class="privacy">
+            <p>개인정보 수집 · 이용 안내</p>
+            <dl><div><dt>수집 항목</dt><dd>회사명 · 담당자 · 연락처 · 이메일</dd></div><div><dt>이용 목적</dt><dd>생산 문의 확인 및 답변</dd></div><div><dt>보관 기간</dt><dd>답변이 끝나면 지체 없이 파기</dd></div></dl>
+            <label class="agree"><input type="checkbox" name="agree"><span class="box" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7"/></svg></span><span>위 내용에 동의합니다 <em>(필수)</em></span></label>
+          </div>
           <div class="f-bot"></div>
           <p class="f-err" role="alert"></p>
           <button class="btn solid f-send" type="submit">문의 보내기</button>
@@ -84,18 +88,8 @@
         </div>
       </div>
       <aside class="side-info">
-        <div class="side-card rv">
-          <h3>BSF COMPANY</h3>
-          <dl>
-            <div><dt>주소</dt><dd>서울특별시 구로구 디지털로 271<br>벽산디지털밸리 3차 110호</dd></div>
-            <div><dt>대표</dt><dd>오은총</dd></div>
-          </dl>
-        </div>
-        <div class="side-card light rv d1">
-          <h3>빠른 답변을 위한 팁</h3>
-          <p>품목 · 예상 수량 · 희망 납기 · 목표 단가를 알려 주시면 생산지와 원가를 바로 비교해 드릴 수 있습니다.</p>
-          <a class="btn line" href="capability.html#faq">자주 묻는 질문</a>
-        </div>
+        <div class="side-card rv"><h3>BSF COMPANY</h3><dl><div><dt>주소</dt><dd>서울특별시 구로구 디지털로 271<br>벽산디지털밸리 3차 110호</dd></div><div><dt>대표</dt><dd>오은총</dd></div></dl></div>
+        <div class="side-card light rv d1"><h3>빠른 답변을 위한 팁</h3><p>품목 · 예상 수량 · 희망 납기 · 목표 단가를 알려 주시면 생산지와 원가를 바로 비교해 드릴 수 있습니다.</p><a class="btn line" href="capability.html#faq">자주 묻는 질문</a></div>
         <iframe class="map-frame rv d2" title="BSF COMPANY 오시는 길 지도" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=%EC%84%9C%EC%9A%B8%20%EA%B5%AC%EB%A1%9C%EA%B5%AC%20%EB%94%94%EC%A7%80%ED%84%B8%EB%A1%9C%20271&z=16&output=embed"></iframe>
       </aside>
     </div>
@@ -106,8 +100,8 @@
   <div class="wrap">
     <div class="ft-top">
       <div>
-        <a class="logo" href="./"><img src="images/favicon-192.png" alt="" width="38" height="38"><span>BSF COMPANY<small>Global Apparel Sourcing</small></span></a>
-        <p class="ft-slogan">CHALLENGE INSPIRATION</p>
+        <a class="logo" href="./"><img src="images/favicon-192.png" alt="" width="42" height="42"><span>BSF COMPANY<small>GLOBAL APPAREL SOURCING</small></span></a>
+        <p class="ft-slogan">Challenge<br><span>Inspiration.</span></p>
       </div>
       <nav class="ft-nav" aria-label="아래 메뉴">
         <a href="about.html">회사소개</a><a href="capability.html">생산역량</a><a href="works.html">납품실적</a><a href="brand.html">자체브랜드</a><a href="contact.html">생산 문의</a>
@@ -117,6 +111,6 @@
     <p class="ft-copy">© BSF COMPANY. All rights reserved.</p>
   </div>
 </footer>
-<a class="fab" href="contact.html" aria-label="생산 문의하기"><i aria-hidden="true"></i><i aria-hidden="true"></i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>생산 문의</a>
+<a class="fab" href="contact.html" aria-label="생산 문의하기"><i aria-hidden="true"></i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>생산 문의</a>
 </body>
 </html>

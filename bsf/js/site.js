@@ -48,17 +48,17 @@
   /* 스크롤 등장 + 숫자 올라가기 */
   function countUp(el) {
     var to = parseFloat(el.getAttribute('data-count')), dec = (el.getAttribute('data-count').split('.')[1] || '').length;
-    if (reduce) { el.firstChild.nodeValue = to.toFixed(dec); return; }
+    if (reduce) { el.firstChild.nodeValue = dec ? to.toFixed(dec) : to.toLocaleString('en-US'); return; }
     var t0 = null, dur = 1600;
     function step(t) {
       if (!t0) t0 = t;
       var p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
-      el.firstChild.nodeValue = (to * e).toFixed(dec);
+      el.firstChild.nodeValue = dec ? (to * e).toFixed(dec) : Math.round(to * e).toLocaleString('en-US');
       if (p < 1) requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
   }
-  var rvs = $$('.rv'), counts = $$('[data-count]');
+  var rvs = $$('.rv, .world'), counts = $$('[data-count]');
   if ('IntersectionObserver' in window) {
     var io = new IntersectionObserver(function (ents) {
       ents.forEach(function (en) {
@@ -72,6 +72,51 @@
   } else {
     rvs.forEach(function (el) { el.classList.add('in'); });
     counts.forEach(function (el) { el.firstChild.nodeValue = el.getAttribute('data-count'); });
+  }
+
+  /* 첫 화면 배경 영상(Vimeo): 사진 슬라이드 위에 영상이 준비되면 서서히 덮는다. 움직임 줄이기면 사진만 */
+  var hv = $('.hero-video');
+  if (hv && hv.getAttribute('data-vimeo') && !reduce) {
+    var fr = doc.createElement('iframe');
+    fr.src = 'https://player.vimeo.com/video/' + hv.getAttribute('data-vimeo') + '?background=1&autoplay=1&loop=1&muted=1&autopause=0&dnt=1';
+    fr.allow = 'autoplay; fullscreen; picture-in-picture'; fr.title = '배경 영상'; fr.setAttribute('tabindex', '-1');
+    fr.addEventListener('load', function () { setTimeout(function () { fr.classList.add('loaded'); $('.hero').classList.add('has-video'); }, 1200); });
+    hv.appendChild(fr);
+  }
+
+  /* 첫 화면 슬라이드: 6.5초마다 다음 장으로 (천천히 확대되며 겹쳐 바뀜) */
+  var slides = $$('.slide');
+  if (slides.length > 1) {
+    var cur = 0, bar = $('.hero-cap .bar i'), cnt = $('.hero-cap .count'), caps = $$('[data-cap]');
+    function show(i) {
+      slides[cur].classList.remove('on'); cur = i; slides[cur].classList.add('on');
+      if (cnt) cnt.textContent = ('0' + (cur + 1)).slice(-2);
+      caps.forEach(function (c, k) { c.hidden = k !== cur; });
+      if (bar) { bar.classList.remove('run'); void bar.offsetWidth; bar.classList.add('run'); }
+    }
+    if (bar) bar.classList.add('run');
+    if (!reduce) setInterval(function () { if (!doc.hidden) show((cur + 1) % slides.length); }, 6500);
+  }
+
+  /* 선언문: 스크롤을 내리면 글자가 차례로 채워진다 */
+  var st = $('.statement');
+  if (st) {
+    var html = '';
+    [].slice.call(st.childNodes).forEach(function (n) {
+      var hl = n.nodeType === 1 && n.classList.contains('hl');
+      (n.textContent || '').split(/(\s+)/).forEach(function (w) {
+        html += /^\s+$/.test(w) || !w ? w : '<span class="w' + (hl ? ' hl' : '') + '">' + w + '</span>';
+      });
+    });
+    st.innerHTML = html;
+    var ws = $$('.w', st);
+    var fill = function () {
+      var r = st.getBoundingClientRect(), vh = window.innerHeight;
+      var p = Math.min(1, Math.max(0, (vh * .85 - r.top) / (r.height + vh * .35)));
+      var n = Math.round(p * ws.length);
+      ws.forEach(function (w, i) { w.classList.toggle('on', i < n); });
+    };
+    if (reduce) ws.forEach(function (w) { w.classList.add('on'); }); else { window.addEventListener('scroll', fill, { passive: true }); fill(); }
   }
 
   /* 알약 탭: 떠 있는 배경 하나(.seg-ind)가 고른 칸으로 미끄러진다 */
