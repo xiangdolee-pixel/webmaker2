@@ -234,7 +234,12 @@ async function handle(request, env) {
       await tryIt('SSL and Certificates · Edit (사용자 지정 호스트)', () => cf.call('GET', `/zones/${zone.id}/custom_hostnames?per_page=1`).catch((e) => { if ((e.cf || []).some((c) => c.code === 10000 || c.code === 9109)) throw e; }));
       await tryIt('Workers Routes · Edit', () => cf.call('GET', `/zones/${zone.id}/workers/routes`));
     }
-    await tryIt('Workers Scripts · Edit (계정)', () => cf.call('GET', `/accounts/${ACCOUNT_ID}/workers/scripts`));
+    // 권한이 없어도 scripts 목록은 빈 목록으로 성공한다 → 권한이 없으면 오류가 나는 workers/domains 로 확인
+    await tryIt('Workers Scripts · Edit (계정)', async () => {
+      await cf.call('GET', `/accounts/${ACCOUNT_ID}/workers/domains`);
+      const n = ((await cf.call('GET', `/accounts/${ACCOUNT_ID}/workers/scripts`)).result || []).length;
+      if (!n) throw new HttpError(400, 'Worker 목록이 비어 있습니다 — 계정 정책이 xiangdolee 계정에 걸려 있는지 확인');
+    });
     if (checks.some((c) => !c.ok)) return json({ ok: false, checks }, 400);
     await env.KV.put('token', token);
     return json({ ok: true, checks });
