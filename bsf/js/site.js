@@ -223,4 +223,12 @@
         .then(function () { send.disabled = false; send.textContent = '문의 보내기'; });
     });
   }
+
+  // 서랍의 '로그인' 은 로그인 전에만 (계약 버튼 자리에 사람 버튼이 생기면 숨긴다)
+  var acc = $('.hd-account'), gl = $('.gnb-login');
+  if (acc && gl && window.MutationObserver) {
+    var syncLogin = function () { gl.hidden = !!acc.firstElementChild && !acc.querySelector('.xa-login'); };
+    new MutationObserver(syncLogin).observe(acc, { childList: true, subtree: true });
+    syncLogin();
+  }
 })();

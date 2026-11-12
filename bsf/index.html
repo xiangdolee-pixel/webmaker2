@@ -13,13 +13,14 @@
 <link rel="icon" href="favicon.ico" sizes="32x32">
 <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-192.png">
 <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
-<link rel="preload" as="image" href="images/hero-port.webp" media="(min-width: 768px)">
+<link rel="preload" as="image" href="images/hero-campaign.webp" media="(min-width: 768px)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="css/style.css?v=20261112c">
-<script src="js/site.js?v=20261112c" defer></script>
+<link rel="stylesheet" href="css/style.css?v=20261112g">
+<script src="js/site.js?v=20261112g" defer></script>
+<script src="js/globe.js?v=20261112a" defer></script>
 </head>
 <body class="has-hero">
 <a class="sr" href="#main">본문 바로가기</a>
@@ -32,6 +33,7 @@
       <a href="works.html" data-xms-item>납품실적</a>
       <a href="brand.html" data-xms-item>자체브랜드</a>
       <a href="contact.html" class="cta">생산 문의</a>
+      <a href="/member/login" class="gnb-login">로그인</a>
     </nav>
     <span class="hd-account" data-xms-account></span>
     <button class="nav-toggle" type="button" aria-label="메뉴 열기" aria-expanded="false"><i></i><i></i><i></i></button>
@@ -40,9 +42,9 @@
 
 <main id="main">
   <section class="hero">
-    <div class="slides"><div class="slide on"><picture><source media="(max-width: 767px)" srcset="images/hero-port-m.webp"><img src="images/hero-port.webp" alt="" width="1920" height="1076" fetchpriority="high"></picture></div><div class="slide"><picture><source media="(max-width: 767px)" srcset="images/hero-campaign-m.webp"><img src="images/hero-campaign.webp" alt="" width="1920" height="1076" loading="lazy"></picture></div><div class="slide"><picture><source media="(max-width: 767px)" srcset="images/hero-detail-m.webp"><img src="images/hero-detail.webp" alt="" width="1920" height="1076" loading="lazy"></picture></div></div>
+    <div class="slides"><div class="slide on"><picture><source media="(max-width: 767px)" srcset="images/hero-campaign-m.webp"><img src="images/hero-campaign.webp" alt="" width="1920" height="1076" fetchpriority="high"></picture></div><div class="slide"><picture><source media="(max-width: 767px)" srcset="images/hero-detail-m.webp"><img src="images/hero-detail.webp" alt="" width="1920" height="1076" loading="lazy"></picture></div><div class="slide"><picture><source media="(max-width: 767px)" srcset="images/hero-port-m.webp"><img src="images/hero-port.webp" alt="" width="1920" height="1076" loading="lazy"></picture></div></div>
     
-    <div class="hero-cap" aria-hidden="true"><span class="count">01</span><span class="bar"><i></i></span><span>03</span><span><span data-cap>GLOBAL SOURCING NETWORK</span><span data-cap hidden>BRAND-GRADE PRODUCTION</span><span data-cap hidden>CRAFTED IN DETAIL</span></span></div>
+    <div class="hero-cap" aria-hidden="true"><span class="count">01</span><span class="bar"><i></i></span><span>03</span><span><span data-cap>BRAND-GRADE PRODUCTION</span><span data-cap hidden>CRAFTED IN DETAIL</span><span data-cap hidden>GLOBAL SOURCING NETWORK</span></span></div>
     <div class="wrap hero-in">
       <p class="hero-kicker">OEM · ODM · SOURCING</p>
       <h1><span><i>Global apparel</i></span><span><i>sourcing <em class="o">partner.</em></i></span></h1>
@@ -50,16 +52,16 @@
       <div class="hero-cta"><a class="btn solid" href="contact.html">생산 문의하기</a><a class="btn line" href="capability.html">생산역량 보기</a></div>
     </div>
     <span class="scroll-cue" aria-hidden="true"></span>
-    <div class="hero-stats"><ul>
-      <li><b><span data-count="17">0</span><sup>+</sup></b><span>년 소싱 경력</span></li>
-      <li><b><span data-count="4">0</span></b><span>개국 생산 거점</span></li>
-      <li><b><span data-count="16">0</span></b><span>개 도시 네트워크</span></li>
-      <li><b><span data-count="25">0</span><sup>+</sup></b><span>가지 생산 품목</span></li>
-    </ul></div>
   </section>
 
   <section class="sec">
     <div class="wrap">
+      <ul class="stats">
+        <li class="rv"><b><span data-count="17">0</span><sup>+</sup></b><span>년 소싱 경력</span></li>
+        <li class="rv d1"><b><span data-count="4">0</span></b><span>개국 생산 거점</span></li>
+        <li class="rv d2"><b><span data-count="16">0</span></b><span>개 도시 네트워크</span></li>
+        <li class="rv d3"><b><span data-count="25">0</span><sup>+</sup></b><span>가지 생산 품목</span></li>
+      </ul>
       <p class="eyebrow rv">WHO WE ARE</p>
       <p class="statement">BSF는 의류 해외생산 소싱 전문 기업입니다. <span class="hl">17년</span> 동안 쌓아 온 4개국 공장 네트워크로, 브랜드의 디자인이 <span class="hl">원가 · 납기 · 품질</span>을 모두 지킨 한 벌의 옷이 되기까지 처음부터 끝까지 설계합니다.</p>
       <div class="state-foot rv"><p>BSF COMPANY 대표<b>오은총</b></p><a class="btn line" href="about.html">회사소개</a></div>
@@ -107,7 +109,7 @@
         <div><p class="eyebrow rv">GLOBAL NETWORK</p><h2 class="title rv d1">One network,<br><span class="o">four countries.</span></h2></div>
         <p class="lead rv d2">서울 본사를 중심으로 중국 · 베트남 · 미얀마 · 방글라데시 16개 도시의 생산 · 소싱 거점을 연결해, 북미 · 유럽 · 오세아니아의 바이어에게 납품합니다.</p>
       </div>
-      <div class="world-wrap"><div class="world"><img src="images/world-dots.svg?v=20261112c" alt="" width="1600" height="596" loading="lazy"><svg viewBox="0 0 1600 596" role="img" aria-label="BSF 글로벌 생산 네트워크: 서울 본사와 중국 · 베트남 · 미얀마 · 방글라데시 생산 거점, 북미 · 유럽 · 오세아니아 바이어"><defs><linearGradient id="arc-grad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff8f33"/><stop offset="1" stop-color="#ffffff" stop-opacity=".9"/></linearGradient></defs><path class="arc" d="M1296.0,173.9 Q1307.95,167.00710742866247 1319.9,179.8"/><path class="arc" d="M1308.4,168.6 Q1314.15,164.10523682492612 1319.9,179.8"/><path class="arc" d="M1290.7,186.4 Q1305.3000000000002,171.41775209147332 1319.9,179.8"/><path class="arc" d="M1275.6,183.7 Q1297.75,167.34802505624103 1319.9,179.8"/><path class="arc" d="M1286.2,202.8 Q1303.0500000000002,168.37582843266085 1319.9,179.8"/><path class="arc" d="M1292.9,204.6 Q1306.4,169.5348776919123 1319.9,179.8"/><path class="arc" d="M1295.6,208.2 Q1307.75,169.3344030270605 1319.9,179.8"/><path class="arc" d="M1289.8,212.2 Q1304.85,167.41725523157325 1319.9,179.8"/><path class="arc" d="M1296.0,213.9 Q1307.95,168.14036158365104 1319.9,179.8"/><path class="arc" d="M1270.7,219.3 Q1295.3000000000002,162.13359753656675 1319.9,179.8"/><path class="arc" d="M1259.1,244.2 Q1289.5,155.0014193954573 1319.9,179.8"/><path class="arc" d="M1225.8,253.5 Q1272.85,146.3326786252619 1319.9,179.8"/><path class="arc" d="M1229.8,298.9 Q1274.85,137.9844396426402 1319.9,179.8"/><path class="arc" d="M1183.1,272.2 Q1251.5,133.57709658621602 1319.9,179.8"/><path class="arc" d="M1157.3,241.1 Q1238.6,131.14404784612674 1319.9,179.8"/><path class="arc ex" d="M1319.9,179.8 Q819.95,-50.99083130894343 320.0,169.0"/><path class="arc ex" d="M1319.9,179.8 Q1055.5,12.128412896889245 791.1,129.0"/><path class="arc ex" d="M1319.9,179.8 Q1362.15,108.28360003467738 1404.4,493.7"/><g class="pin"><circle class="ring" cx="1296.0" cy="173.9" r="4"/><circle class="core" cx="1296.0" cy="173.9" r="4"/></g><g class="pin"><circle class="ring" cx="1308.4" cy="168.6" r="4"/><circle class="core" cx="1308.4" cy="168.6" r="4"/></g><g class="pin"><circle class="ring" cx="1290.7" cy="186.4" r="4"/><circle class="core" cx="1290.7" cy="186.4" r="4"/></g><g class="pin"><circle class="ring" cx="1275.6" cy="183.7" r="4"/><circle class="core" cx="1275.6" cy="183.7" r="4"/></g><g class="pin"><circle class="ring" cx="1286.2" cy="202.8" r="4"/><circle class="core" cx="1286.2" cy="202.8" r="4"/></g><g class="pin"><circle class="ring" cx="1292.9" cy="204.6" r="4"/><circle class="core" cx="1292.9" cy="204.6" r="4"/></g><g class="pin"><circle class="ring" cx="1295.6" cy="208.2" r="4"/><circle class="core" cx="1295.6" cy="208.2" r="4"/></g><g class="pin"><circle class="ring" cx="1289.8" cy="212.2" r="4"/><circle class="core" cx="1289.8" cy="212.2" r="4"/></g><g class="pin"><circle class="ring" cx="1296.0" cy="213.9" r="4"/><circle class="core" cx="1296.0" cy="213.9" r="4"/></g><g class="pin"><circle class="ring" cx="1270.7" cy="219.3" r="4"/><circle class="core" cx="1270.7" cy="219.3" r="4"/></g><g class="pin"><circle class="ring" cx="1259.1" cy="244.2" r="4"/><circle class="core" cx="1259.1" cy="244.2" r="4"/></g><g class="pin"><circle class="ring" cx="1225.8" cy="253.5" r="4"/><circle class="core" cx="1225.8" cy="253.5" r="4"/></g><g class="pin"><circle class="ring" cx="1229.8" cy="298.9" r="4"/><circle class="core" cx="1229.8" cy="298.9" r="4"/></g><g class="pin"><circle class="ring" cx="1183.1" cy="272.2" r="4"/><circle class="core" cx="1183.1" cy="272.2" r="4"/></g><g class="pin"><circle class="ring" cx="1157.3" cy="241.1" r="4"/><circle class="core" cx="1157.3" cy="241.1" r="4"/></g><g class="pin mk"><circle class="ring" cx="320.0" cy="169.0" r="5.5"/><circle class="core" cx="320.0" cy="169.0" r="5.5"/></g><g class="callout mk"><line x1="320.0" y1="169.0" x2="280.0" y2="139.0"/><circle cx="280.0" cy="139.0" r="1.8" fill="#fff"/><text x="274.0" y="134.0" text-anchor="end">NORTH AMERICA</text><text class="ko" x="274.0" y="156.0" text-anchor="end">북미 바이어</text></g><g class="pin mk"><circle class="ring" cx="791.1" cy="129.0" r="5.5"/><circle class="core" cx="791.1" cy="129.0" r="5.5"/></g><g class="callout mk"><line x1="791.1" y1="129.0" x2="781.1" y2="95.0"/><circle cx="781.1" cy="95.0" r="1.8" fill="#fff"/><text x="775.1" y="90.0" text-anchor="end">EUROPE</text><text class="ko" x="775.1" y="112.0" text-anchor="end">유럽 바이어</text></g><g class="pin mk"><circle class="ring" cx="1404.4" cy="493.7" r="5.5"/><circle class="core" cx="1404.4" cy="493.7" r="5.5"/></g><g class="callout mk"><line x1="1404.4" y1="493.7" x2="1430.4" y2="517.7"/><circle cx="1430.4" cy="517.7" r="1.8" fill="#fff"/><text x="1436.4" y="512.7" text-anchor="start">OCEANIA</text><text class="ko" x="1436.4" y="534.7" text-anchor="start">오세아니아 바이어</text></g><g class="pin hq"><circle class="ring" cx="1319.9" cy="179.8" r="7"/><circle class="core" cx="1319.9" cy="179.8" r="7"/></g><g class="callout hq"><line x1="1319.9" y1="179.8" x2="1375.9" y2="127.80000000000001"/><circle cx="1375.9" cy="127.80000000000001" r="1.8" fill="#fff"/><text x="1381.9" y="122.80000000000001" text-anchor="start">KOREA · HQ</text><text class="ko" x="1381.9" y="144.8" text-anchor="start">서울 본사</text></g><g class="callout "><line x1="1253.3" y1="195.7" x2="1083.3" y2="131.7"/><circle cx="1083.3" cy="131.7" r="1.8" fill="#fff"/><text x="1077.3" y="126.69999999999999" text-anchor="end">CHINA</text><text class="ko" x="1077.3" y="148.7" text-anchor="end">10개 도시 · 우븐 · 니트 · 모자 · 원단</text></g><g class="callout "><line x1="1227.6" y1="278.0" x2="1297.6" y2="324.0"/><circle cx="1297.6" cy="324.0" r="1.8" fill="#fff"/><text x="1303.6" y="319.0" text-anchor="start">VIETNAM</text><text class="ko" x="1303.6" y="341.0" text-anchor="start">호찌민 · 하노이 · 아우터 · 데님</text></g><g class="callout "><line x1="1183.1" y1="272.2" x2="1063.1" y2="324.2"/><circle cx="1063.1" cy="324.2" r="1.8" fill="#fff"/><text x="1057.1" y="319.2" text-anchor="end">MYANMAR</text><text class="ko" x="1057.1" y="341.2" text-anchor="end">양곤 · 아우터 대량</text></g><g class="callout "><line x1="1157.3" y1="241.1" x2="1007.3" y2="235.1"/><circle cx="1007.3" cy="235.1" r="1.8" fill="#fff"/><text x="1001.3" y="230.1" text-anchor="end">BANGLADESH</text><text class="ko" x="1001.3" y="252.1" text-anchor="end">다카 · 팬츠</text></g></svg></div></div>
+      <div class="globe-wrap rv"><div class="globe" data-globe role="img" aria-label="BSF 글로벌 생산 네트워크 지구본: 서울 본사에서 중국 · 베트남 · 미얀마 · 방글라데시 생산 거점과 북미 · 유럽 · 오세아니아 바이어로 이어지는 선"><canvas aria-hidden="true"></canvas><div class="globe-labels" aria-hidden="true"></div></div><p class="globe-hint" aria-hidden="true">끌어서 돌려 보세요</p></div>
       <ul class="globe-legend"><li><i class="hq"></i>서울 본사</li><li><i></i>생산 · 소싱 거점</li><li><i class="mk"></i>바이어 시장</li></ul>
       <div class="countries"><article class="country rv d0"><div class="code"><b>CN</b><span>CHINA</span></div><h3>중국</h3><ul><li>다롄 · 단둥<b>우븐</b></li><li>칭다오<b>니트 · 스웨터</b></li><li>닝보 · 난퉁 · 난창<b>니트 · 우븐</b></li><li>지난<b>데님</b></li><li>양저우<b>모자</b></li><li>상하이 · 항저우 · 광저우<b>원단 · 부자재 · 가방</b></li></ul></article><article class="country rv d1"><div class="code"><b>VN</b><span>VIETNAM</span></div><h3>베트남</h3><ul><li>호찌민<b>아우터 · 데님</b></li><li>하노이<b>아우터 · 데님</b></li></ul></article><article class="country rv d2"><div class="code"><b>MM</b><span>MYANMAR</span></div><h3>미얀마</h3><ul><li>양곤<b>다운 · 패딩 · 레인 자켓</b></li></ul></article><article class="country rv d3"><div class="code"><b>BD</b><span>BANGLADESH</span></div><h3>방글라데시</h3><ul><li>다카<b>팬츠</b></li></ul></article></div>
     </div>
