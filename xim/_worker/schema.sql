@@ -252,6 +252,8 @@ CREATE TABLE IF NOT EXISTS inquiries (
   done INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS inquiries_created ON inquiries (created_at);
+-- 2026-11-12: 업체(xms '문의' 메뉴)가 열어 본 때 — 한 번만 실행해 둠: ALTER TABLE inquiries ADD COLUMN site_read_at INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS inquiries_site ON inquiries (site, created_at);
 
 -- 홈페이지 제작 계약서 (2026-11-12): xim '계약서' 메뉴에서 만들고, 갑은 sign.plators.com/<code> 에서 직접 서명
 --   status: wait(서명 대기) · signed(서명 완료 — 그 뒤로 고칠 수 없음). 을 정보 · 사인 그림은 settings.contract_eul, 서명 때 eul_snapshot 으로 굳힌다

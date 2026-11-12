@@ -26,3 +26,7 @@
 .xa-ic{width:19px;height:19px;flex-shrink:0;opacity:.62}
 .xa-menu a:hover .xa-ic,.xa-menu button:hover .xa-ic{opacity:1}
 @media (prefers-reduced-motion:reduce){.xa-avatar,.xa-menu{transition:none}}
+/* 관리자 계정 메뉴: 새 문의 숫자 (2026-11-12) */
+.xa-menu .xa-num{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#e23b2e;color:#fff;font-size:12px;font-weight:800;line-height:20px;text-align:center;font-style:normal}
+.xa-has-new .xa-avatar{position:relative}
+.xa-has-new .xa-avatar::after{content:"";position:absolute;top:1px;right:1px;width:10px;height:10px;border-radius:50%;background:#e23b2e;box-shadow:0 0 0 2px #fff}

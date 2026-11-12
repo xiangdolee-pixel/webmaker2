@@ -396,6 +396,27 @@ export async function adminApi(ctx) {
       FROM requests r WHERE r.site_id = ? ORDER BY r.id DESC LIMIT 300`).bind(s.id).all();
     return json(results.map((r) => ({ ...r, attachments: JSON.parse(r.attachments || '[]') })));
   }
+  // ───── 문의 (사이트 문의 폼 → xim inquiries). 업체가 열어 보면 site_read_at (xim 운영자의 읽음과 따로) ─────
+  if (path === '/inquiries' && method === 'GET') {
+    const { results } = await env.XIM_DB.prepare('SELECT id, name, contact, org, kind, substr(message, 1, 140) AS preview, created_at, site_read_at FROM inquiries WHERE site = ? ORDER BY id DESC LIMIT 500').bind(site).all();
+    return json({ items: results, unread: results.filter((r) => !r.site_read_at).length });
+  }
+  if (path === '/inquiries/unread' && method === 'GET') {
+    const r = await env.XIM_DB.prepare('SELECT COUNT(*) AS n FROM inquiries WHERE site = ? AND site_read_at = 0').bind(site).first();
+    return json({ n: r.n });
+  }
+  if ((m = path.match(/^\/inquiries\/(\d+)$/))) {
+    const row = await env.XIM_DB.prepare('SELECT id, name, contact, org, kind, message, created_at, site_read_at FROM inquiries WHERE id = ? AND site = ?').bind(Number(m[1]), site).first();
+    if (!row) throw new HttpError(404, '없는 문의입니다.');
+    if (method === 'GET') {
+      if (!row.site_read_at) { row.site_read_at = Date.now(); await env.XIM_DB.prepare('UPDATE inquiries SET site_read_at = ? WHERE id = ?').bind(row.site_read_at, row.id).run(); }
+      return json(row);
+    }
+    if (method === 'PATCH') {   // 안 읽음으로 되돌리기
+      await env.XIM_DB.prepare('UPDATE inquiries SET site_read_at = 0 WHERE id = ?').bind(row.id).run();
+      return json({ ok: true });
+    }
+  }
   // 왼쪽 메뉴 숫자: 운영자가 새로 답한 요청 수
   if (path === '/requests/unread' && method === 'GET') {
     const s = await ximSite(env, site);

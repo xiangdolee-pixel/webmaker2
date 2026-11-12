@@ -93,6 +93,7 @@ const SIDE_ICON = {
   favicon: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 14l2-5 2 5M9.7 12.5h2.6"/></svg>',
   seo: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.3-4.3"/></svg>',
   share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4c-4.4 0-8 2.8-8 6.3 0 2.2 1.5 4.2 3.7 5.3L7 20l4.3-3.1c.2 0 .5.1.7.1 4.4 0 8-2.8 8-6.3S16.4 4 12 4z"/></svg>',
+  inquiries: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
   requests: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>',
   account: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
   stats: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-4M12 16V7M17 16v-7"/></svg>',
@@ -107,7 +108,7 @@ const SIDE = [
   [null, [['#/storage', '저장 공간', 'storage'], ['#/stats', '방문 통계', 'stats']]],
   ['회원', [['#/members', '가입회원', 'members'], ['#/members/withdrawn', '탈퇴회원', 'withdrawn'], ['#/levels', '등급 이름', 'levels'],
     ['#/fields', '가입 항목', 'fields'], ['#/terms', '이용약관', 'terms'], ['#/privacy', '개인정보 처리방침', 'privacy']]],
-  ['사이트', [['#/boards', '게시판', 'boards'], ['#/menus', '메뉴', 'menus'], ['#/popups', '팝업', 'popups'], ['#/extras', '부가 기능', 'extras'],
+  ['사이트', [['#/inquiries', '문의', 'inquiries'], ['#/boards', '게시판', 'boards'], ['#/menus', '메뉴', 'menus'], ['#/popups', '팝업', 'popups'], ['#/extras', '부가 기능', 'extras'],
     ['#/favicon', '파비콘', 'favicon'], ['#/seo', '검색엔진', 'seo'], ['#/share', '카카오톡 미리보기', 'share'], ['#/requests', '수정 요청', 'requests']]],
   ['내 계정', [['#/account', '비밀번호 변경', 'account'], ['#/audit', '관리 로그', 'audit']]],
 ];
@@ -155,11 +156,25 @@ async function reqBadge() {
   } catch { /* 숫자는 못 보여도 화면은 그대로 */ }
 }
 
+// 왼쪽 메뉴 '문의' 옆 숫자 = 아직 열어 보지 않은 문의 수
+async function inqBadge() {
+  try {
+    const { n } = await api('/inquiries/unread');
+    const a = $('#side a[href="#/inquiries"]');
+    if (!a) return;
+    let i = a.querySelector('.new-num');
+    if (!n) { i?.remove(); return; }
+    if (!i) { i = document.createElement('i'); i.className = 'new-num'; a.append(i); }
+    i.textContent = n;
+  } catch { /* 숫자는 못 보여도 화면은 그대로 */ }
+}
+
 async function route() {
   if (!INFO) return;
   dirty = false;
   markSide();
   setTimeout(reqBadge, 300);
+  setTimeout(inqBadge, 300);
   const h = (location.hash || '#/members').slice(1);
   const parts = h.split('?')[0].split('/').filter(Boolean);
   const qs = new URLSearchParams(h.split('?')[1] || '');
@@ -178,6 +193,8 @@ async function route() {
     if (parts[0] === 'menus' && parts[1] === 'new') return await menuPage(null);
     if (parts[0] === 'menus' && parts[1]) return await menuPage(Number(parts[1]));
     if (parts[0] === 'menus') return await menusPage();
+    if (parts[0] === 'inquiries' && parts[1]) return await inquiryView(Number(parts[1]));
+    if (parts[0] === 'inquiries') return await inquiriesPage(qs);
     if (parts[0] === 'requests' && parts[1] === 'new') return requestWrite();
     if (parts[0] === 'requests' && parts[1]) return await requestView(Number(parts[1]));
     if (parts[0] === 'requests') return await requestsPage(qs);
@@ -693,6 +710,50 @@ async function menuPage(id) {
       toast(m ? '메뉴를 저장했습니다.' : '메뉴를 추가했습니다.'); go('#/menus');
     });
   });
+}
+
+// ───────── 문의 (홈페이지 문의 폼으로 들어온 글) ─────────
+const INQ_PAGE = 20;
+async function inquiriesPage(qs) {
+  const { items, unread } = await api('/inquiries');
+  const only = qs.get('only') === 'new';
+  const rows = only ? items.filter((r) => !r.site_read_at) : items;
+  const page = Math.max(1, Number(qs.get('page')) || 1);
+  const shown = rows.slice((page - 1) * INQ_PAGE, page * INQ_PAGE);
+  const tab = (on, href, label, n) => `<a class="req-tab${on ? ' on' : ''}" href="${href}">${label} <b>${n}</b></a>`;
+  main.innerHTML = `${head('사이트', '문의', '홈페이지의 문의 폼(예: 생산 문의)으로 들어온 글입니다. 열어 본 글은 새 문의 숫자에서 빠집니다.')}
+    <div class="req-top"><nav class="req-tabs" aria-label="보기">${tab(!only, '#/inquiries', '전체', items.length)}${tab(only, '#/inquiries?only=new', '새 문의', unread)}</nav></div>
+    <div class="panel">${shown.length ? `<table class="tbl cardy req-tbl"><thead><tr><th class="c-no">번호</th><th>회사 · 담당자</th><th>내용</th><th>연락처</th><th class="c-d">받은 때</th></tr></thead><tbody>
+      ${shown.map((r, i) => `<tr data-go="#/inquiries/${r.id}"${r.site_read_at ? '' : ' class="is-new"'}>
+        <td class="c-no num" data-l="번호">${rows.length - (page - 1) * INQ_PAGE - i}</td>
+        <td data-l="회사 · 담당자">${r.site_read_at ? '' : '<span class="tag warn">새 문의</span> '}<a href="#/inquiries/${r.id}"><b>${esc(r.org || '')}</b> ${esc(r.name)}</a></td>
+        <td class="c-t" data-l="내용">${r.kind ? `<span class="tag">${esc(r.kind)}</span> ` : ''}${esc((r.preview || '').replace(/\s+/g, ' ').slice(0, 70))}</td>
+        <td data-l="연락처">${esc(r.contact)}</td>
+        <td class="c-d" data-l="받은 때">${fmtDate(r.created_at)}</td></tr>`).join('')}</tbody></table>`
+      : empty(only ? '새 문의가 없습니다' : '아직 들어온 문의가 없습니다', only ? '모두 확인했습니다.' : '홈페이지 문의 폼으로 글이 들어오면 여기에 쌓입니다.')}</div>
+    ${pager(page, INQ_PAGE, rows.length, (n) => `#/inquiries?${new URLSearchParams({ ...(only ? { only: 'new' } : {}), page: n })}`)}`;
+  main.querySelectorAll('tr[data-go]').forEach((tr) => tr.addEventListener('click', (e) => { if (!e.target.closest('a')) go(tr.dataset.go); }));
+}
+async function inquiryView(id) {
+  let r;
+  try { r = await api(`/inquiries/${id}`); } catch {
+    main.innerHTML = `${head('사이트', '문의')}<div class="panel">${empty('문의를 찾을 수 없습니다', '지워졌거나 없는 문의입니다.', '<a class="btn" href="#/inquiries">목록으로</a>')}</div>`;
+    return;
+  }
+  inqBadge();
+  const tel = String(r.contact || '').replace(/[^\d+]/g, '');
+  const mail = /@/.test(r.contact) ? r.contact : ((r.message || '').match(/이메일:\s*(\S+@\S+)/) || [])[1];
+  main.innerHTML = `${head('사이트', '문의')}
+    <article class="panel pad req-view">
+      <div class="req-view-head"><span class="tag blue">${esc(r.kind || '문의')}</span><h2>${esc(r.org || '')} ${esc(r.name)}</h2>
+        <p class="meta"><span>${esc(r.contact)}</span><span>받은 때 ${fmtDate(r.created_at, true)}</span></p></div>
+      <p class="pre">${esc(r.message)}</p>
+      <div class="req-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px">
+        ${tel.length >= 9 ? `<a class="btn primary" href="tel:${esc(tel)}">전화 걸기</a>` : ''}${mail ? `<a class="btn" href="mailto:${esc(mail)}">메일 쓰기</a>` : ''}
+        <button class="btn" type="button" data-copy>연락처 복사</button><button class="btn" type="button" data-unread>안 읽음으로</button><a class="btn" href="#/inquiries">목록</a></div>
+    </article>`;
+  main.querySelector('[data-copy]').onclick = () => navigator.clipboard.writeText(r.contact).then(() => toast('연락처를 복사했습니다.'));
+  main.querySelector('[data-unread]').onclick = async () => { await api(`/inquiries/${id}`, { method: 'PATCH', data: {} }); toast('안 읽음으로 바꿨습니다.'); go('#/inquiries'); };
 }
 
 // ───────── 수정 요청 ─────────

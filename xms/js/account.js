@@ -67,6 +67,10 @@
       b.innerHTML = '<img src="' + me.avatar + '" alt="">';
       b.classList.add('has-img');
     }
+    // 문의 메뉴 이름 = 사이트 머리의 문의 버튼 글자(예: '생산 문의'), 없으면 '문의'
+    const cta = [...document.querySelectorAll('header a')].map((a) => a.textContent.trim()).find((t) => /문의/.test(t) && t.length <= 10);
+    const inqLabel = cta || '문의';
+    if (admin && me.inq) el.classList.add('xa-has-new');
     const menu = document.createElement('div');
     menu.className = 'xa-menu';
     menu.setAttribute('role', 'menu');
@@ -76,11 +80,12 @@
     const IC = {
       admin: ic('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
       edit: ic('<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'),
+      inq: ic('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>'),
       req: ic('<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/>'),
       me: ic('<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c.8-3.7 3.9-6 7.5-6s6.7 2.3 7.5 6"/>'),
       out: ic('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 16l-4-4 4-4M6 12h10"/>'),
     };
-    menu.innerHTML = `${me.name ? `<div class="xa-me"><b>${String(me.name).replace(/[&<>"]/g, (c) => '&#' + c.charCodeAt(0) + ';')}</b> 님</div>` : ''}${admin ? `<a role="menuitem" href="/xms/">${IC.admin}관리</a>${document.querySelector('[data-xe]') ? `<button type="button" role="menuitem" data-xa-edit>${IC.edit}수정 모드</button>` : ''}<a role="menuitem" href="/xms/#/requests">${IC.req}유지보수 요청</a>` : ''}
+    menu.innerHTML = `${me.name ? `<div class="xa-me"><b>${String(me.name).replace(/[&<>"]/g, (c) => '&#' + c.charCodeAt(0) + ';')}</b> 님</div>` : ''}${admin ? `<a role="menuitem" href="/xms/">${IC.admin}관리</a>${document.querySelector('[data-xe]') ? `<button type="button" role="menuitem" data-xa-edit>${IC.edit}수정 모드</button>` : ''}<a role="menuitem" href="/xms/#/inquiries">${IC.inq}${inqLabel}${me.inq ? `<i class="xa-num">${me.inq > 99 ? '99+' : me.inq}</i>` : ''}</a><a role="menuitem" href="/xms/#/requests">${IC.req}유지보수 요청</a>` : ''}
       ${me.staff ? '' : `<a role="menuitem" href="/member/mypage">${IC.me}내 정보</a>`}
       <button type="button" role="menuitem" data-xa-logout>${IC.out}로그아웃</button>`;
     document.body.append(menu);

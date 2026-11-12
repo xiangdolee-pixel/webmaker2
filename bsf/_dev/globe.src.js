@@ -49,7 +49,7 @@
   function arc(to, kind, i) {
     var B = vec(to[0], to[1]);
     var dot = A[0] * B[0] + A[1] * B[1] + A[2] * B[2], w = Math.acos(Math.max(-1, Math.min(1, dot))), sw = Math.sin(w) || 1;
-    var lift = .03 + .32 * w / Math.PI, n = Math.max(16, Math.round(w * 40)), pts = [];
+    var lift = .03 + .32 * w / Math.PI, n = Math.max(60, Math.round(w * 130)), pts = [];
     for (var k = 0; k <= n; k++) {
       var t = k / n, a = Math.sin((1 - t) * w) / sw, b = Math.sin(t * w) / sw, h = 1 + lift * Math.sin(Math.PI * t);
       pts.push([(a * A[0] + b * B[0]) * h, (a * A[1] + b * B[1]) * h, (a * A[2] + b * B[2]) * h]);
@@ -128,7 +128,8 @@
     for (var hi = 0; hi < HUBS.length; hi++) pin(vec(HUBS[hi][0], HUBS[hi][1]), C.hub, 3, t + hi * .3);
     for (var mi = 0; mi < MARKETS.length; mi++) pin(vec(MARKETS[mi][0], MARKETS[mi][1]), C.mk, 4, t + mi);
     pin(A, C.hq, 5.5, t, true);
-    // 이름표
+    // 이름표 — 앞 순서(대한민국 · 중국 …)가 먼저 자리를 잡고, 겹치는 뒤 이름표는 잠시 감춘다
+    var placed = [];
     for (var li = 0; li < LABELS.length; li++) {
       rot(vec(LABELS[li].at[0], LABELS[li].at[1]), tmp);
       var el = labEls[li], o = Math.max(0, Math.min(1, (tmp[2] - .12) / .2));
@@ -140,6 +141,8 @@
         var lx = side.charAt(0) === 'l' ? sx - lw - gap : sx + gap, ly = side.charAt(1) === 'd' ? sy + gap * .6 : sy - lh - gap * .6;
         if (lx + lw > W) lx = sx - lw - gap; if (lx < 0) lx = sx + gap;   // 화면 밖이면 반대쪽으로
         el.style.transform = 'translate(' + lx.toFixed(1) + 'px,' + ly.toFixed(1) + 'px)';
+        var hit = placed.some(function (r) { return lx < r[2] + 4 && lx + lw > r[0] - 4 && ly < r[3] + 4 && ly + lh > r[1] - 4; });
+        if (hit) { el.style.opacity = '0'; el.style.visibility = 'hidden'; } else placed.push([lx, ly, lx + lw, ly + lh]);
       }
     }
   }
@@ -158,16 +161,22 @@
     // 서울에서 떠나 도착하는 빛 (머리 + 꼬리)
     var cyc = a.dur + 1.2, ph = reduce ? 1 : ((t - a.delay) % cyc + cyc) % cyc / a.dur;
     if (ph > 1.0001) return;
-    var head = Math.min(n, Math.round(ph * n)), tail = Math.max(0, head - Math.round(n * .28));
-    for (var k = tail; k < head; k++) {
-      rot(pts[k], q); var x1 = cx + R * q[0], y1 = cy - R * q[1], v1 = visible(q);
-      rot(pts[k + 1], q); var x2 = cx + R * q[0], y2 = cy - R * q[1];
-      if (!v1 || !visible(q)) continue;
-      var f = (k - tail + 1) / (head - tail + 1);
-      ctx.lineWidth = 1 + 1.8 * f; ctx.strokeStyle = 'rgba(' + col + ', ' + (.15 + .85 * f).toFixed(3) + ')';
+    var e = ph < 1 ? ph * ph * (3 - 2 * ph) : 1;   // 부드럽게 출발 · 도착
+    var hf = e * n, head = Math.min(n - 1, Math.floor(hf)), fr = hf - head, tl = Math.max(0, hf - n * .28), tail = Math.floor(tl);
+    var lerp = function (k, f, o) { var a1 = pts[k], b1 = pts[Math.min(n, k + 1)]; o[0] = a1[0] + (b1[0] - a1[0]) * f; o[1] = a1[1] + (b1[1] - a1[1]) * f; o[2] = a1[2] + (b1[2] - a1[2]) * f; return o; };
+    var pA = [0, 0, 0], pB = [0, 0, 0], q2 = [0, 0, 0];
+    ctx.lineCap = 'round';
+    for (var k = tail; k <= head; k++) {
+      var s0 = k === tail ? tl - tail : 0, s1 = k === head ? fr : 1;
+      if (s1 <= s0) continue;
+      rot(lerp(k, s0, pA), q); var x1 = cx + R * q[0], y1 = cy - R * q[1], v1 = visible(q);
+      rot(lerp(k, s1, pB), q2); var x2 = cx + R * q2[0], y2 = cy - R * q2[1];
+      if (!v1 || !visible(q2)) continue;
+      var f = (k + s1 - tl) / Math.max(1e-6, hf - tl);
+      ctx.lineWidth = 1 + 1.8 * f; ctx.strokeStyle = 'rgba(' + col + ', ' + (.12 + .88 * f).toFixed(3) + ')';
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
     }
-    rot(pts[head], q);
+    rot(lerp(head, fr, pA), q);
     if (!reduce && visible(q) && ph < 1) {
       var hx = cx + R * q[0], hy = cy - R * q[1], g = ctx.createRadialGradient(hx, hy, 0, hx, hy, 9);
       g.addColorStop(0, 'rgba(255, 255, 255, .95)'); g.addColorStop(.35, 'rgba(' + col + ', .8)'); g.addColorStop(1, 'rgba(' + col + ', 0)');

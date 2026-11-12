@@ -46,17 +46,17 @@
   }
 
   /* 스크롤 등장 + 숫자 올라가기 */
-  function countUp(el) {
+  // 숫자 올라가기 (사용자 지시 2026-11-12): 한 묶음의 숫자는 모두 같은 속도(같은 수만큼)로 가장 큰 숫자까지 오른다.
+  //   작은 숫자는 제 숫자에 닿으면 0부터 다시 돌고, 마지막 순간에 모두 함께 제 숫자로 멈춘다
+  function countUp(el, max) {
     var to = parseFloat(el.getAttribute('data-count')), dec = (el.getAttribute('data-count').split('.')[1] || '').length;
-    if (reduce) { el.firstChild.nodeValue = dec ? to.toFixed(dec) : to.toLocaleString('en-US'); return; }
-    var t0 = null, dur = 2000;
+    if (reduce || dec) { el.firstChild.nodeValue = dec ? to.toFixed(dec) : to.toLocaleString('en-US'); return; }
+    max = Math.max(to, max || to);
+    var t0 = null, dur = 1500;
     function step(t) {
       if (!t0) t0 = t;
-      // 큰 숫자 · 작은 숫자 모두 같은 시간에 끝나게: 내림(floor)이라 마지막 순간에만 목표 숫자가 된다 (사용자 지시 2026-11-12)
-      var p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 2);
-      // 한 자리 숫자(예: 4)는 금방 끝나 보여서, 다른 숫자가 오르는 동안 0 → 목표를 빠르게 되풀이하다 함께 멈춘다
-      var v = to < 10 && !dec ? Math.floor((t - t0) / (dur / (to + 1) / 3.5)) % (to + 1) : Math.floor(to * e);
-      el.firstChild.nodeValue = dec ? (Math.floor(to * e * Math.pow(10, dec)) / Math.pow(10, dec)).toFixed(dec) : (p >= 1 ? to : v).toLocaleString('en-US');
+      var p = Math.min(1, (t - t0) / dur), c = Math.floor(p * max);
+      el.firstChild.nodeValue = (p >= 1 ? to : c % (to + 1)).toLocaleString('en-US');
       if (p < 1) requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
@@ -69,8 +69,9 @@
         var el = en.target;
         if (el.hasAttribute('data-count')) {
           // 같은 묶음(.stats 등)의 숫자는 함께 출발한다
-          var grp = el.closest('.stats, ul, .fac-cards') || el;
-          $$('[data-count]', grp).forEach(function (c) { if (!c._ran) { c._ran = true; io.unobserve(c); countUp(c); } });
+          var grp = el.closest('.stats, ul, .fac-cards') || el, all = $$('[data-count]', grp);
+          var big = Math.max.apply(null, all.map(function (c) { return parseFloat(c.getAttribute('data-count')) || 0; }));
+          all.forEach(function (c) { if (!c._ran) { c._ran = true; io.unobserve(c); countUp(c, big); } });
         } else el.classList.add('in');
         io.unobserve(el);
       });
@@ -194,6 +195,18 @@
   /* 소싱 전략 매트릭스: WOVEN / KNIT */
   var mx = $('#matrix');
   if (mx) {
+    // 화면에 붙어 있는 동안 반을 넘게 내리면 KNIT, 다시 올리면 WOVEN (탭인 줄 모르고 지나치지 않게)
+    var mxSec = mx.closest('.mx-scroll');
+    if (mxSec) {
+      var mxPick = function () {
+        if (getComputedStyle(mxSec).position === 'static' && mxSec.offsetHeight < innerHeight * 1.5) return;   // 붙여 두기가 꺼진 화면
+        var r = mxSec.getBoundingClientRect(), p = -r.top / Math.max(1, r.height - innerHeight);
+        if (p < 0 || p > 1) return;
+        var want = p > .5 ? 'knit' : 'woven', b = $('#matrix-seg button[data-v="' + want + '"]');
+        if (b && !b.classList.contains('on')) b.click();
+      };
+      window.addEventListener('scroll', mxPick, { passive: true });
+    }
     seg($('#matrix-seg'), function (v) {
       $$('.mx', mx).forEach(function (p) { p.hidden = p.getAttribute('data-k') !== v; });
       $$('[data-mk]').forEach(function (p) { p.hidden = p.getAttribute('data-mk') !== v; });
@@ -230,7 +243,26 @@
 
   /* 회사 약도: 카카오 지도(주소로 자리 찾기). JavaScript 키(data-key)가 있을 때만 지도를 그린다 — 없으면 주소 카드 + 카카오맵 · 네이버 지도 버튼 */
   var mb = $('[data-kakao-map]');
-  if (mb && mb.getAttribute('data-key')) {
+  if (mb && mb.getAttribute('data-naver')) {
+    // 네이버 지도(NCP Maps): 주소 → 좌표는 geocoder 로. 클라이언트 ID 는 서비스 URL(이 사이트 주소)이 등록돼 있어야 동작한다
+    var ns = doc.createElement('script');
+    ns.src = 'https://oapi.map.naver.com/openapi/v3/maps.js?submodules=geocoder&ncpKeyId=' + encodeURIComponent(mb.getAttribute('data-naver'));
+    ns.onload = function () {
+      var N = window.naver && window.naver.maps, box = $('.map-canvas', mb);
+      if (!N || !N.Service) return;
+      N.Service.geocode({ query: mb.getAttribute('data-addr') }, function (st, res) {
+        var a = st === N.Service.Status.OK && res.v2 && res.v2.addresses && res.v2.addresses[0];
+        if (!a) return;
+        var at = new N.LatLng(+a.y, +a.x);
+        box.innerHTML = '';
+        var map = new N.Map(box, { center: at, zoom: 17, scrollWheel: false, zoomControl: true, zoomControlOptions: { position: N.Position.RIGHT_CENTER } });
+        new N.Marker({ map: map, position: at, icon: { content: '<div class="map-pin">' + mb.getAttribute('data-name') + '</div>', anchor: new N.Point(50, 40) } });
+        if (innerWidth > 767) map.panBy(new N.Point(-Math.min(220, box.clientWidth * .18), 0));
+        mb.classList.add('is-live');
+      });
+    };
+    doc.head.appendChild(ns);
+  } else if (mb && mb.getAttribute('data-key')) {
     var ks = doc.createElement('script');
     ks.src = 'https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&libraries=services&appkey=' + encodeURIComponent(mb.getAttribute('data-key'));
     ks.onload = function () {
@@ -253,6 +285,32 @@
     doc.head.appendChild(ks);
   }
 
+  /* 자주 묻는 질문: 열고 닫을 때 높이가 부드럽게 늘었다 줄었다 (사용자 지시 2026-11-12) */
+  $$('.faq details').forEach(function (d) {
+    var sum = d.querySelector('summary'), anim = null;
+    if (!sum || !d.animate) return;
+    sum.addEventListener('click', function (e) {
+      if (reduce) return;
+      e.preventDefault();
+      if (anim) anim.cancel();
+      d.style.overflow = 'hidden';
+      var from = d.offsetHeight, opening = !d.open, to;
+      if (opening) { d.open = true; to = d.offsetHeight; } else { to = sum.offsetHeight; }
+      d.classList.toggle('is-closing', !opening);
+      anim = d.animate({ height: [from + 'px', to + 'px'] }, { duration: opening ? 380 : 300, easing: 'cubic-bezier(.22, .8, .24, 1)' });
+      anim.onfinish = function () { if (!opening) d.open = false; d.style.overflow = ''; d.classList.remove('is-closing'); anim = null; };
+      anim.oncancel = function () { d.style.overflow = ''; };
+    });
+  });
+
+  /* 문의 내용 글자 수 (600자까지 — 사용자 지시 2026-11-12) */
+  $$('textarea[maxlength]').forEach(function (ta) {
+    var c = ta.parentNode.querySelector('.f-count b'); if (!c) return;
+    var max = +ta.getAttribute('maxlength');
+    var up = function () { if (ta.value.length > max) ta.value = ta.value.slice(0, max); c.textContent = ta.value.length; c.parentNode.classList.toggle('is-full', ta.value.length >= max); };
+    ta.addEventListener('input', up); up();
+  });
+
   /* 날짜 칸은 어디를 눌러도 달력이 뜨게 (사용자 지시 2026-11-12) */
   $$('input[type="date"], input[type="month"]').forEach(function (d) {
     d.addEventListener('click', function () { try { if (d.showPicker) d.showPicker(); } catch (x) { /* 오래된 브라우저 */ } });
@@ -274,14 +332,29 @@
       e.preventDefault(); err.textContent = '';
       var f = form.elements;
       var items = $$('input[name="item"]:checked', form).map(function (x) { return x.value; });
-      function need(el, msg) { err.textContent = msg; if (el && el.focus) el.focus(); }
-      if (!items.length) return need(null, '만들 품목을 하나 이상 골라 주세요.');
+      // 빠뜨린 칸: 그 자리로 화면을 옮기고, 빨갛게 흔들어 표시 + 바로 아래에 안내 (사용자 지시 2026-11-12)
+      function need(el, msg, box) {
+        err.textContent = msg;
+        box = box || (el && (el.closest('.f, .agree') || el));
+        $$('.f-bad', form).forEach(function (x) { x.classList.remove('f-bad'); });
+        $$('.f-msg', form).forEach(function (x) { x.remove(); });
+        if (!box) return;
+        void box.offsetWidth; box.classList.add('f-bad');
+        var m = doc.createElement('p'); m.className = 'f-msg'; m.setAttribute('role', 'alert'); m.textContent = msg;
+        box.insertAdjacentElement('afterend', m);
+        var y = box.getBoundingClientRect().top + window.pageYOffset - (window.innerHeight * .28);
+        window.scrollTo({ top: Math.max(0, y), behavior: reduce ? 'auto' : 'smooth' });
+        if (el && el.focus) setTimeout(function () { el.focus({ preventScroll: true }); }, reduce ? 0 : 450);
+        var clear = function () { box.classList.remove('f-bad'); m.remove(); err.textContent = ''; };
+        box.addEventListener('input', clear, { once: true }); box.addEventListener('change', clear, { once: true });
+      }
+      if (!items.length) return need(null, '만들 품목을 하나 이상 골라 주세요.', $('.picks', form));
       if (!f.company.value.trim()) return need(f.company, '회사 · 브랜드명을 넣어 주세요.');
       if (!f.name.value.trim()) return need(f.name, '담당자 이름을 넣어 주세요.');
       if (!f.contact.value.trim()) return need(f.contact, '연락처(전화 또는 이메일)를 넣어 주세요.');
       if (!f.agree.checked) return need(f.agree, '개인정보 수집 · 이용에 동의해 주세요.');
       var token = widget !== null && window.turnstile ? window.turnstile.getResponse(widget) : '';
-      if (sitekey && !token) return need(null, '"사람입니다" 확인을 먼저 끝내 주세요.');
+      if (sitekey && !token) return need(null, '"사람입니다" 확인을 먼저 끝내 주세요.', bot);
       var msg = [
         '품목: ' + items.join(', '),
         '예상 수량: ' + (f.qty.value || '-'),
