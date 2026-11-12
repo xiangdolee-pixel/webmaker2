@@ -1,0 +1,7 @@
+{
+  "placement": { "region": "aws:ap-northeast-2" },
+  "assets": { "run_worker_first": ["/api/*"] },
+  "kv_namespaces": [
+    { "binding": "KV", "id": "f4a6b34724564894b4df02e3729d828b" }
+  ]
+}
