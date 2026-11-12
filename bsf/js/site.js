@@ -54,7 +54,9 @@
       if (!t0) t0 = t;
       // 큰 숫자 · 작은 숫자 모두 같은 시간에 끝나게: 내림(floor)이라 마지막 순간에만 목표 숫자가 된다 (사용자 지시 2026-11-12)
       var p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 2);
-      el.firstChild.nodeValue = dec ? (Math.floor(to * e * Math.pow(10, dec)) / Math.pow(10, dec)).toFixed(dec) : (p >= 1 ? to : Math.floor(to * e)).toLocaleString('en-US');
+      // 한 자리 숫자(예: 4)는 금방 끝나 보여서, 다른 숫자가 오르는 동안 0 → 목표를 빠르게 되풀이하다 함께 멈춘다
+      var v = to < 10 && !dec ? Math.floor((t - t0) / (dur / (to + 1) / 3.5)) % (to + 1) : Math.floor(to * e);
+      el.firstChild.nodeValue = dec ? (Math.floor(to * e * Math.pow(10, dec)) / Math.pow(10, dec)).toFixed(dec) : (p >= 1 ? to : v).toLocaleString('en-US');
       if (p < 1) requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
@@ -240,6 +242,7 @@
           box.innerHTML = '';
           var map = new K.Map(box, { center: at, level: 3 });
           map.setZoomable(false);
+          if (innerWidth > 767) map.panBy(-Math.min(220, box.clientWidth * .18), 0);   // 왼쪽 주소 카드에 가리지 않게 자리를 오른쪽으로
           new K.Marker({ map: map, position: at });
           new K.CustomOverlay({ map: map, position: at, yAnchor: 2.4, content: '<div class="map-pin">' + mb.getAttribute('data-name') + '</div>' });
           map.addControl(new K.ZoomControl(), K.ControlPosition.RIGHT);
