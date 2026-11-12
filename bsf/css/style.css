@@ -34,10 +34,12 @@
 html:not(.hd-ready) .hd, html:not(.hd-ready) .hd *, html:not(.hd-ready) .hd *::after { transition: none !important; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html { font-size: 17px; scroll-behavior: smooth; scroll-padding-top: var(--hd); }
-body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); font-size: 1rem; line-height: 1.7; word-break: keep-all; overflow-wrap: anywhere; -webkit-font-smoothing: antialiased; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); font-size: 1rem; line-height: 1.7; word-break: keep-all; overflow-wrap: break-word; -webkit-font-smoothing: antialiased; }
 img { display: block; max-width: 100%; height: auto; }
 /* 쓸데없는 줄바꿈 막기: 끝줄에 한두 단어만 떨어지지 않게, 제목은 줄 길이를 고르게 */
 p, li, dd, figcaption { text-wrap: pretty; }
+/* 줄바꿈: 숫자 · 하이픈 이름(E-LAND) · 강조 구는 한 덩어리로 (사용자 지시 2026-11-13 "단어 · 구문 · 숫자는 떨어지면 안 돼") */
+.nw, .title .o { white-space: nowrap; }
 h1, h2, h3, .title, .title-ko, .quote, .statement { text-wrap: balance; }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -337,10 +339,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .fac-body .where { margin: 4px 0 16px; color: var(--sub); }
 .fac-body > p { margin: 0 0 20px; color: var(--sub); }
 .fac-nums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 0 18px; }
-.fac-nums div { padding: 14px 16px; border-radius: 14px; background: var(--paper); }
+.fac-nums div { padding: 14px 16px; border-radius: 14px; background: var(--paper); container-type: inline-size; }
 .fac-nums dt { color: var(--mute); font-size: 13.5px; font-weight: 600; }
-.fac-nums dd { margin: 0; font-family: var(--display); font-size: 26px; font-weight: 800; color: var(--navy); letter-spacing: -.02em; }
-.fac-nums dd small { font-family: var(--font); font-size: 13.5px; font-weight: 600; color: var(--sub); margin-left: 3px; }
+.fac-nums dd { margin: 0; white-space: nowrap; font-family: var(--display); font-size: min(26px, 13.5cqi); font-weight: 800; color: var(--navy); letter-spacing: -.02em; }
+.fac-nums dd small { font-family: var(--font); font-size: min(13.5px, 8.5cqi); font-weight: 600; color: var(--sub); margin-left: 3px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .chips li { padding: 6px 13px; border-radius: 999px; border: 1px solid var(--line); color: var(--sub); font-size: 14px; font-weight: 600; }
 .fac-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 18px; }
