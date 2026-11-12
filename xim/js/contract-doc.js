@@ -56,7 +56,7 @@ const stamp = (ms) => { const d = new Date(ms); return `${d.getFullYear()}.${p2(
 // 글자 → 단락 html (자리 표시를 채운다)
 function bodyHtml(c, eul, lines = false, edit = false) {
   const fill = { '갑': c.client_name || '갑', '을': eul.name || '을', '제작비': moneyText(c.build_fee), '연간비': moneyText(c.yearly_fee), '용량': c.hosting || '1GB', '계약일': dateKo(c.contract_date) };
-  const put = (t) => esc(t).replace(/\{(갑|을|제작비|연간비|계약일)\}/g, (_, k) => (edit ? `<b class="ct-ph" contenteditable="false" data-ph="${k}" title="왼쪽 칸 값이 들어가는 자리">${esc(fill[k])}</b>` : `<b>${esc(fill[k])}</b>`));
+  const put = (t) => esc(t).replace(/\{(갑|을|제작비|연간비|용량|계약일)\}/g, (_, k) => (edit ? `<b class="ct-ph" contenteditable="false" data-ph="${k}" title="왼쪽 칸 값이 들어가는 자리">${esc(fill[k])}</b>` : `<b>${esc(fill[k])}</b>`));
   return String(c.body || '').split(/\r?\n/).map((line, i) => {
     const t = line.trim();
     const l = (lines || edit ? ` data-l="${i}"` : '') + (edit ? ' contenteditable="plaintext-only" spellcheck="false"' : '');
