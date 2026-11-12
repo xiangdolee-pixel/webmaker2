@@ -174,6 +174,16 @@ async function handle(request, env) {
     }
     if (!isAdmin && request.method === 'GET' && !looksHtml(pathname) && !XMS_PATHS.test(pathname)) return cacheStatic(await env.ASSETS.fetch(request), pathname);
     if (!isAdmin && (await siteStatus(env, request)) === 'suspended') return forward(env.XIM, request, env, '/__suspended');
+    // 문의 받기 (모든 xim 사이트 공통, 2026-11-12): 사이트 문의 폼 → xim '제작문의' 메뉴. 봇 확인(Turnstile) 키도 xim 에서
+    //   GET /site-api/inquiry-key → { sitekey },  POST /site-api/inquiry { name, contact, org, kind, message, turnstile } → { ok } | { error }
+    if (pathname === '/site-api/inquiry-key' || pathname === '/site-api/inquiry') {
+      const j = (d, status = 200) => new Response(JSON.stringify(d), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+      if (pathname === '/site-api/inquiry-key') return j({ sitekey: await env.XIM.inquiryKey(env.XIM_SITE).catch(() => '') });
+      if (request.method !== 'POST') return j({ error: 'POST 로 보내 주세요.' }, 405);
+      let raw = {}; try { raw = await request.json(); } catch { return j({ error: '내용을 읽지 못했습니다.' }, 400); }
+      const r = await env.XIM.inquiry(env.XIM_SITE, raw, request.headers.get('CF-Connecting-IP') || '').catch((e) => ({ error: `잠시 뒤 다시 보내 주세요. (${e.message || e})` }));
+      return r.error ? j({ error: r.error }, 400) : j({ ok: true });
+    }
     // 게시판 · 회원 화면: 사이트의 기존 페이지(틀)에 끼워 넣는다 — 머리 · 꼬리 · CSS 는 사이트 그대로
     if (request.method === 'GET' && /^\/(board|member)(\/|$)/.test(pathname)) return embedPage(request, env);
     if (XMS_PATHS.test(pathname)) return forward(env.XMS, request, env);

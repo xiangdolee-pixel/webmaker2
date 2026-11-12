@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="css/style.css?v=10">
+<link rel="stylesheet" href="css/style.css?v=12">
 <script src="js/site.js?v=5" defer></script>
 </head>
 <body>
@@ -16,7 +16,7 @@
 <span class="xms-account" data-xms-account hidden></span>
 <main class="wrap">
   <header class="intro">
-    <div class="intro-top"><p class="eyebrow">PORTFOLIO</p><button type="button" class="ask-btn" data-ask>제작문의</button></div>
+    <p class="eyebrow">PORTFOLIO</p>
     <h1>직접 만들어 운영 중인<br>웹사이트 · 웹앱</h1>
     <p class="lead">기획부터 디자인, 개발, 배포까지 직접 했습니다. 바로가기를 누르면 실제 사이트가 열립니다.</p>
   </header>
@@ -81,7 +81,8 @@
     </li>
   </ul>
 
-  <footer class="foot"><p>홈페이지 · 웹서비스 · 웹앱 제작을 맡겨 주세요.</p><button type="button" class="ask-btn" data-ask>제작문의</button><p class="mail">master@plators.com</p></footer>
+  <footer class="foot">문의 · <span class="mail">master@plators.com</span></footer>
+  <button type="button" class="ask-fab" data-ask aria-label="제작문의 열기"><span class="ask-wave" aria-hidden="true"></span><span class="ask-wave" aria-hidden="true"></span><span class="ask-wave" aria-hidden="true"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg><b>제작문의</b></button>
   <p class="toast" role="status" aria-live="polite"></p>
   <dialog class="ask" id="ask" aria-labelledby="ask-t">
     <form class="ask-form" id="ask-form" novalidate>

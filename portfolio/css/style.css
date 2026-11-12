@@ -69,14 +69,25 @@ a { color: inherit; text-decoration: none; }
 .card:hover .go::after { transform: translateX(3px); }
 
 .foot { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--sub); font-size: 14px; text-align: center; }
-/* 제작문의 버튼(위 · 아래) */
-.intro-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-.intro-top .eyebrow { margin: 0; }
-.ask-btn { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-fg); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: var(--shadow); transition: transform .2s var(--ease), box-shadow .2s var(--ease); }
-.ask-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-up); }
-.ask-btn:active { transform: scale(.97); }
-.foot p { margin: 0 0 12px; }
-.foot .mail { margin: 12px 0 0; color: var(--sub); font-size: 13px; }
+.mail { color: var(--fg); font-weight: 600; }
+.wrap { padding-bottom: 120px; }
+
+/* 제작문의 — 오른쪽 아래에 떠서 따라다니는 버튼. 가운데서 바깥으로 신호(고리)가 퍼진다 */
+.ask-fab { position: fixed; z-index: 40; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); display: inline-flex; align-items: center; gap: 9px; height: 60px; padding: 0 26px 0 22px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-fg); font: inherit; font-size: 17px; font-weight: 800; letter-spacing: -.01em; cursor: pointer; box-shadow: 0 10px 28px -6px rgba(37, 99, 235, .55), 0 2px 6px rgba(16, 24, 40, .15); transition: transform .25s var(--ease), box-shadow .25s var(--ease); isolation: isolate; }
+.ask-fab svg { position: relative; z-index: 1; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ask-fab b { position: relative; z-index: 1; }
+.ask-fab:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 16px 36px -8px rgba(37, 99, 235, .65), 0 2px 6px rgba(16, 24, 40, .15); }
+.ask-fab:active { transform: scale(.96); }
+.ask-wave { position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: var(--brand); opacity: 0; animation: ask-wave 2.4s cubic-bezier(.2, .6, .3, 1) infinite; }
+.ask-wave:nth-child(2) { animation-delay: .8s; }
+.ask-wave:nth-child(3) { animation-delay: 1.6s; }
+@keyframes ask-wave { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(1.45, 2); opacity: 0; } }
+.ask-fab:hover .ask-wave { animation-duration: 1.6s; }
+@media (max-width: 560px) {
+  .ask-fab { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); height: 56px; padding: 0 22px 0 18px; font-size: 16px; }
+  .wrap { padding-bottom: 104px; }
+}
+@media (prefers-reduced-motion: reduce) { .ask-wave { animation: none; } }
 
 /* 제작문의 창 */
 .ask { width: min(520px, calc(100% - 32px)); max-height: calc(100% - 32px); padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--fg); box-shadow: var(--shadow-up); }
@@ -132,6 +143,6 @@ a { color: inherit; text-decoration: none; }
   .desc { font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .card, .thumb img, .tag, .go, .go::after, .toast, .cat, .cat i, .tab-ind, .ask-btn { transition: none; }
+  .card, .thumb img, .tag, .go, .go::after, .toast, .cat, .cat i, .tab-ind, .ask-fab { transition: none; }
   .card:hover, .card:hover .thumb img, .card:hover .go::after { transform: none; }
 }

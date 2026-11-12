@@ -5,7 +5,6 @@ import { $, esc, toast, openDialog, busy, fmtDate, pillTabs } from './common.js'
 let deps = null; // { view, api, setBadge }
 let filter = '';  // '' 전체 · 'new' 새 문의 · 'open' 처리 전
 
-const SITE_NAME = { portfolio: '포트폴리오' };
 
 let data = { items: [], unread: 0 };
 
@@ -17,7 +16,7 @@ export async function renderInquiries(d) {
   const cnt = { all: data.items.length, new: data.unread, open: data.items.filter((i) => !i.done).length };
   view.innerHTML = `
     <div class="bar"><h2>제작문의 ${data.items.length}</h2></div>
-    <p class="meta mon-rule">포트폴리오(portfolio.plators.com) 위 · 아래의 <b>제작문의</b> 버튼으로 들어온 글입니다. 누르면 내용이 열리고, 열어 본 글은 새 문의 숫자에서 빠집니다.</p>
+    <p class="meta mon-rule">각 사이트의 문의 폼(포트폴리오 <b>제작문의</b>, 고객 사이트 문의 등)으로 들어온 글입니다. 누르면 내용이 열리고, 열어 본 글은 새 문의 숫자에서 빠집니다.</p>
     <nav class="tabs iq-tabs" id="iq-tabs" aria-label="보기"></nav>
     <div id="iq-body"></div>`;
   // 보기 탭은 한 번만 그리고 고른 칸 배경이 미끄러진다(목록만 다시 그림)
@@ -30,7 +29,7 @@ function renderList() {
   const list = data.items.filter((it) => (filter === 'new' ? !it.read_at : filter === 'open' ? !it.done : true));
   box.innerHTML = list.length ? `<ul class="iq-list">${list.map((it) => `
       <li><button type="button" class="card iq-item${it.read_at ? '' : ' is-new'}${it.done ? ' is-done' : ''}" data-id="${it.id}">
-        <span class="iq-top">${it.read_at ? '' : '<span class="badge new">새 문의</span>'}${it.done ? '<span class="badge done">처리함</span>' : ''}<b class="iq-name">${esc(it.name)}</b>${it.org ? `<span class="iq-org">${esc(it.org)}</span>` : ''}<span class="iq-when">${fmtDate(it.created_at, true)}</span></span>
+        <span class="iq-top">${it.read_at ? '' : '<span class="badge new">새 문의</span>'}${it.done ? '<span class="badge done">처리함</span>' : ''}<b class="iq-name">${esc(it.name)}</b><span class="badge idle">${esc(it.site_name || it.site)}</span>${it.org ? `<span class="iq-org">${esc(it.org)}</span>` : ''}<span class="iq-when">${fmtDate(it.created_at, true)}</span></span>
         <span class="iq-prev">${it.kind ? `<em>${esc(it.kind)}</em> · ` : ''}${esc(it.preview)}</span>
       </button></li>`).join('')}</ul>`
     : `<section class="card item"><p class="meta">${data.items.length ? '이 보기에는 문의가 없습니다.' : '아직 들어온 제작문의가 없습니다.'}</p></section>`;
@@ -52,7 +51,7 @@ async function openInquiry(id) {
         ${isMail ? `<a class="btn sm" href="mailto:${esc(it.contact)}">메일 쓰기</a>` : tel.length >= 9 ? `<a class="btn sm" href="tel:${esc(tel)}">전화</a>` : ''}</dd></div>
       ${it.org ? `<div><dt>업체 · 단체</dt><dd>${esc(it.org)}</dd></div>` : ''}
       ${it.kind ? `<div><dt>만들고 싶은 것</dt><dd>${esc(it.kind)}</dd></div>` : ''}
-      <div><dt>받은 때</dt><dd>${fmtDate(it.created_at, true)} · ${esc(SITE_NAME[it.site] || it.site)}</dd></div>
+      <div><dt>받은 때</dt><dd>${fmtDate(it.created_at, true)} · ${esc(it.site_name || it.site)}</dd></div>
     </dl>
     <div class="iq-msg">${esc(it.message)}</div>
     <div class="dlg-foot iq-foot">

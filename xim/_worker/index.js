@@ -323,7 +323,7 @@ async function ximApi(request, env, url, ctx) {
 
   // 제작문의 (포트폴리오 '제작문의' 폼 → Engine.inquiry 가 저장). 열어 보면 읽음
   if (path === '/api/inquiries' && method === 'GET') {
-    const { results } = await db.prepare('SELECT id, site, name, contact, org, kind, substr(message, 1, 120) AS preview, created_at, read_at, done FROM inquiries ORDER BY id DESC LIMIT 300').all();
+    const { results } = await db.prepare('SELECT i.id, i.site, s.name AS site_name, i.name, i.contact, i.org, i.kind, substr(i.message, 1, 120) AS preview, i.created_at, i.read_at, i.done FROM inquiries i LEFT JOIN sites s ON s.slug = i.site ORDER BY i.id DESC LIMIT 300').all();
     return json({ items: results, unread: results.filter((r) => !r.read_at).length });
   }
   {
@@ -331,7 +331,7 @@ async function ximApi(request, env, url, ctx) {
     if (im) {
       const id = +im[1];
       if (method === 'GET') {
-        const row = await db.prepare('SELECT * FROM inquiries WHERE id = ?').bind(id).first();
+        const row = await db.prepare('SELECT i.*, s.name AS site_name FROM inquiries i LEFT JOIN sites s ON s.slug = i.site WHERE i.id = ?').bind(id).first();
         if (!row) throw new HttpError(404, '없는 문의입니다.');
         if (!row.read_at) { row.read_at = now(); await db.prepare('UPDATE inquiries SET read_at = ? WHERE id = ?').bind(row.read_at, id).run(); }
         return json(row);
