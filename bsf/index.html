@@ -13,13 +13,13 @@
 <link rel="icon" href="favicon.ico" sizes="32x32">
 <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-192.png">
 <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
-<link rel="preload" as="image" href="images/hero-campaign.webp" media="(min-width: 768px)">
+<link rel="preload" as="image" href="images/hero-video.webp" media="(min-width: 768px)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="css/style.css?v=20261112i">
-<script src="js/site.js?v=20261112g" defer></script>
+<link rel="stylesheet" href="css/style.css?v=20261112o">
+<script src="js/site.js?v=20261112m" defer></script>
 <script src="js/globe.js?v=20261112a" defer></script>
 </head>
 <body class="has-hero">
@@ -42,8 +42,8 @@
 
 <main id="main">
   <section class="hero">
-    <div class="slides"><div class="slide on"><picture><source media="(max-width: 767px)" srcset="images/hero-campaign-m.webp"><img src="images/hero-campaign.webp" alt="" width="1920" height="1076" fetchpriority="high"></picture></div><div class="slide"><picture><source media="(max-width: 767px)" srcset="images/hero-detail-m.webp"><img src="images/hero-detail.webp" alt="" width="1920" height="1076" loading="lazy"></picture></div><div class="slide"><picture><source media="(max-width: 767px)" srcset="images/hero-port-m.webp"><img src="images/hero-port.webp" alt="" width="1920" height="1076" loading="lazy"></picture></div></div>
-    
+    <div class="slides"><div class="slide on"><picture><source media="(max-width: 767px)" srcset="images/hero-campaign-m.webp"><img src="images/hero-campaign.webp" alt="" width="1920" height="1076" loading="lazy"></picture></div><div class="slide"><picture><source media="(max-width: 767px)" srcset="images/hero-detail-m.webp"><img src="images/hero-detail.webp" alt="" width="1920" height="1076" loading="lazy"></picture></div><div class="slide"><picture><source media="(max-width: 767px)" srcset="images/hero-port-m.webp"><img src="images/hero-port.webp" alt="" width="1920" height="1076" loading="lazy"></picture></div></div>
+    <div class="hero-video" data-vimeo="1246254294" aria-hidden="true"><picture><source media="(max-width: 767px)" srcset="images/hero-video-m.webp"><img class="hero-poster" src="images/hero-video.webp" alt="" width="1920" height="1080" fetchpriority="high"></picture></div>
     <div class="hero-cap" aria-hidden="true"><span class="count">01</span><span class="bar"><i></i></span><span>03</span><span><span data-cap>BRAND-GRADE PRODUCTION</span><span data-cap hidden>CRAFTED IN DETAIL</span><span data-cap hidden>GLOBAL SOURCING NETWORK</span></span></div>
     <div class="wrap hero-in">
       <p class="hero-kicker">OEM · ODM · SOURCING</p>
@@ -62,9 +62,11 @@
         <li class="rv d2"><b><span data-count="16">0</span></b><span>개 도시 네트워크</span></li>
         <li class="rv d3"><b><span data-count="25">0</span><sup>+</sup></b><span>가지 생산 품목</span></li>
       </ul>
-      <p class="eyebrow rv">WHO WE ARE</p>
-      <p class="statement">BSF는 의류 해외생산 소싱 전문 기업입니다. <span class="hl">17년</span> 동안 쌓아 온 4개국 공장 네트워크로, 브랜드의 디자인이 <span class="hl">원가 · 납기 · 품질</span>을 모두 지킨 한 벌의 옷이 되기까지 처음부터 끝까지 설계합니다.</p>
-      <div class="state-foot rv"><p>BSF COMPANY 대표<b>오은총</b></p><a class="btn line" href="about.html">회사소개</a></div>
+      <div class="state-track"><div class="state-pin">
+        <p class="eyebrow rv">WHO WE ARE</p>
+        <p class="statement">BSF는 의류 해외생산 소싱 전문 기업입니다. <span class="hl">17년</span> 동안 쌓아 온 4개국 공장 네트워크로, 브랜드의 디자인이 <span class="hl">원가 · 납기 · 품질</span>을 모두 지킨 한 벌의 옷이 되기까지 처음부터 끝까지 설계합니다.</p>
+        <div class="state-foot rv"><p>BSF COMPANY 대표<b>오은총</b></p><a class="btn line" href="about.html">회사소개</a></div>
+      </div></div>
     </div>
   </section>
 
@@ -104,14 +106,15 @@
   </section>
 
   <section class="sec globe-sec">
-    <div class="wrap">
-      <div class="sec-head row">
-        <div><p class="eyebrow rv">GLOBAL NETWORK</p><h2 class="title rv d1">One network,<br><span class="o">four countries.</span></h2></div>
+    <div class="wrap net">
+      <div class="net-head"><p class="eyebrow rv">GLOBAL NETWORK</p><h2 class="title rv d1">One network,<br><span class="o">four countries.</span></h2>
         <p class="lead rv d2">서울 본사를 중심으로 중국 · 베트남 · 미얀마 · 방글라데시 16개 도시의 생산 · 소싱 거점을 연결해, 북미 · 유럽 · 오세아니아의 바이어에게 납품합니다.</p>
       </div>
-      <div class="globe-wrap rv"><div class="globe" data-globe role="img" aria-label="BSF 글로벌 생산 네트워크 지구본: 서울 본사에서 중국 · 베트남 · 미얀마 · 방글라데시 생산 거점과 북미 · 유럽 · 오세아니아 바이어로 이어지는 선"><canvas aria-hidden="true"></canvas><div class="globe-labels" aria-hidden="true"></div></div><p class="globe-hint" aria-hidden="true">끌어서 돌려 보세요</p></div>
-      <ul class="globe-legend"><li><i class="hq"></i>서울 본사</li><li><i></i>생산 · 소싱 거점</li><li><i class="mk"></i>바이어 시장</li></ul>
-      <div class="countries"><article class="country rv d0"><div class="code"><b>CN</b><span>CHINA</span></div><h3>중국</h3><ul><li>다롄 · 단둥<b>우븐</b></li><li>칭다오<b>니트 · 스웨터</b></li><li>닝보 · 난퉁 · 난창<b>니트 · 우븐</b></li><li>지난<b>데님</b></li><li>양저우<b>모자</b></li><li>상하이 · 항저우 · 광저우<b>원단 · 부자재 · 가방</b></li></ul></article><article class="country rv d1"><div class="code"><b>VN</b><span>VIETNAM</span></div><h3>베트남</h3><ul><li>호찌민<b>아우터 · 데님</b></li><li>하노이<b>아우터 · 데님</b></li></ul></article><article class="country rv d2"><div class="code"><b>MM</b><span>MYANMAR</span></div><h3>미얀마</h3><ul><li>양곤<b>다운 · 패딩 · 레인 자켓</b></li></ul></article><article class="country rv d3"><div class="code"><b>BD</b><span>BANGLADESH</span></div><h3>방글라데시</h3><ul><li>다카<b>팬츠</b></li></ul></article></div>
+      <div class="net-globe"><div class="globe-wrap rv"><div class="globe" data-globe role="img" aria-label="BSF 글로벌 생산 네트워크 지구본: 서울 본사에서 중국 · 베트남 · 미얀마 · 방글라데시 생산 거점과 북미 · 유럽 · 오세아니아 바이어로 이어지는 선"><canvas aria-hidden="true"></canvas><div class="globe-labels" aria-hidden="true"></div></div><p class="globe-hint" aria-hidden="true">끌어서 돌려 보세요</p></div></div>
+      <div class="net-list">
+        <ul class="globe-legend"><li><i class="hq"></i>서울 본사</li><li><i></i>생산 · 소싱 거점</li><li><i class="mk"></i>바이어 시장</li></ul>
+        <div class="countries"><article class="country rv d0"><div class="code"><b>CN</b><span>CHINA</span></div><h3>중국</h3><ul><li>다롄 · 단둥<b>우븐</b></li><li>칭다오<b>니트 · 스웨터</b></li><li>닝보 · 난퉁 · 난창<b>니트 · 우븐</b></li><li>지난<b>데님</b></li><li>양저우<b>모자</b></li><li>상하이 · 항저우 · 광저우<b>원단 · 부자재 · 가방</b></li></ul></article><article class="country rv d1"><div class="code"><b>VN</b><span>VIETNAM</span></div><h3>베트남</h3><ul><li>호찌민<b>아우터 · 데님</b></li><li>하노이<b>아우터 · 데님</b></li></ul></article><article class="country rv d2"><div class="code"><b>MM</b><span>MYANMAR</span></div><h3>미얀마</h3><ul><li>양곤<b>다운 · 패딩 · 레인 자켓</b></li></ul></article><article class="country rv d3"><div class="code"><b>BD</b><span>BANGLADESH</span></div><h3>방글라데시</h3><ul><li>다카<b>팬츠</b></li></ul></article></div>
+      </div>
     </div>
   </section>
 
@@ -124,7 +127,7 @@
       <div class="fac-cards">
         <a class="fac-card rv" href="capability.html#ningbo"><img src="images/factory/ningbo-sewing.webp" alt="" loading="lazy"><div class="in-c"><div><span class="where">NINGBO · CHINA · KNIT</span><h3>HUAHE KNITWEAR</h3></div><div><span class="big"><span data-count="2">0</span>M+<small>장 / 연</small></span><p>2003년부터 · 400명 · WRAP 골드 · adidas · Disney 인증</p></div></div></a>
         <a class="fac-card rv d1" href="capability.html#yangon"><img src="images/factory/yangon-line2.webp" alt="" loading="lazy"><div class="in-c"><div><span class="where">YANGON · MYANMAR · OUTER</span><h3>SUJIN CO., LTD.</h3></div><div><span class="big"><span data-count="1150">0</span><small>명</small></span><p>11개 라인 · 다운 · 패딩 · 레인 자켓 · ZARA · E-LAND 생산</p></div></div></a>
-        <a class="fac-card rv d2" href="capability.html#yangzhou"><img src="images/factory/yangzhou-line.webp" alt="" loading="lazy"><div class="in-c"><div><span class="where">YANGZHOU · CHINA · CAP</span><h3>HEHAN CLOTHING</h3></div><div><span class="big"><span data-count="100">0</span>K<small>개 / 월</small></span><p>7개 라인 · 볼캡 · 니트 모자 · 버킷햇 · adidas · Patagonia 생산</p></div></div></a>
+        <a class="fac-card rv d2" href="capability.html#yangzhou"><img src="images/factory/yangzhou-line.webp?v=2" alt="" loading="lazy"><div class="in-c"><div><span class="where">YANGZHOU · CHINA · CAP</span><h3>HEHAN CLOTHING</h3></div><div><span class="big"><span data-count="100">0</span>K<small>개 / 월</small></span><p>7개 라인 · 볼캡 · 니트 모자 · 버킷햇 · adidas · Patagonia 생산</p></div></div></a>
       </div>
     </div>
   </section>
@@ -139,7 +142,7 @@
         <a class="work w-a rv" href="works.html#armed"><img src="images/works/armed-ai.webp" alt="" loading="lazy"><div class="work-txt"><small>무신사 판매 1위</small><h3>MUSCLE ARMED 23 저지 티셔츠</h3><p>스트리트 · 피트니스 · 하프집 · 자켓 · 더플백</p></div></a>
         <a class="work w-b rv d1" href="works.html#daegu"><img src="images/works/daegu-ai.webp" alt="" loading="lazy"><div class="work-txt"><small>FOOTBALL</small><h3>대구FC 트레이닝웨어</h3><p>GOALSTUDIO</p></div></a>
         <a class="work w-c rv d2" href="works.html#nightwalk"><img src="images/works/nightwalk-ai.webp" alt="" loading="lazy"><div class="work-txt"><small>EVENT</small><h3>한강 · 부산 나이트워크</h3><p>참가자 티셔츠 · 양말</p></div></a>
-        <a class="work w-d rv" href="brand.html"><img src="images/brand/camp.webp" alt="" loading="lazy"><div class="work-txt"><small>OWN BRAND</small><h3>NATURE TRAIL — 캠핑 아웃도어 자체 브랜드</h3><p>기획 · 생산 · 판매까지 직접</p></div></a>
+        <a class="work w-d rv" href="brand.html"><img src="images/brand/camp.webp?v=2" alt="" loading="lazy"><div class="work-txt"><small>OWN BRAND</small><h3>NATURE TRAIL — 캠핑 아웃도어 자체 브랜드</h3><p>기획 · 생산 · 판매까지 직접</p></div></a>
       </div>
     </div>
   </section>
@@ -158,7 +161,7 @@
       <h2 class="title rv d1">NATURE TRAIL</h2>
       <p class="lead rv d2">BSF가 직접 기획 · 생산 · 판매하는 캠핑 아웃도어 브랜드입니다.<br>브랜드를 직접 운영해 봤기에, 바이어가 무엇을 걱정하는지 압니다.</p>
       <div class="rv d3" style="margin-top:34px"><a class="btn line" href="brand.html">브랜드 이야기</a></div>
-      <div class="nt-strip"><figure><img src="images/brand/p14.webp" alt="네이처트레일 제품 화보" loading="lazy" width="700" height="1100"></figure><figure><img src="images/brand/p15.webp" alt="네이처트레일 제품 화보" loading="lazy" width="700" height="1100"></figure><figure><img src="images/brand/p06.webp" alt="네이처트레일 제품 화보" loading="lazy" width="700" height="1100"></figure><figure><img src="images/brand/p03.webp" alt="네이처트레일 제품 화보" loading="lazy" width="700" height="1100"></figure><figure><img src="images/brand/p13.webp" alt="네이처트레일 제품 화보" loading="lazy" width="700" height="1100"></figure><figure><img src="images/brand/p04.webp" alt="네이처트레일 제품 화보" loading="lazy" width="700" height="1100"></figure></div>
+      <div class="nt-strip" aria-label="네이처트레일 제품 사진"><div class="nt-track"><figure><img src="images/brand/p14.webp" alt="네이처트레일 제품" width="700" height="1100"></figure><figure><img src="images/brand/p10.webp" alt="네이처트레일 제품" width="700" height="700"></figure><figure><img src="images/brand/p15.webp" alt="네이처트레일 제품" width="700" height="1100"></figure><figure><img src="images/brand/p18.webp" alt="네이처트레일 제품" width="700" height="700"></figure><figure><img src="images/brand/p06.webp" alt="네이처트레일 제품" width="700" height="1100"></figure><figure><img src="images/brand/p12.webp" alt="네이처트레일 제품" width="700" height="700"></figure><figure><img src="images/brand/p03.webp" alt="네이처트레일 제품" width="700" height="1100"></figure><figure><img src="images/brand/p19.webp" alt="네이처트레일 제품" width="700" height="700"></figure><figure><img src="images/brand/p13.webp" alt="네이처트레일 제품" width="700" height="1100"></figure><figure><img src="images/brand/p20.webp" alt="네이처트레일 제품" width="700" height="700"></figure><figure><img src="images/brand/p04.webp" alt="네이처트레일 제품" width="700" height="1100"></figure><figure><img src="images/brand/p21.webp" alt="네이처트레일 제품" width="700" height="700"></figure><figure><img src="images/brand/p22.webp" alt="네이처트레일 제품" width="700" height="700"></figure><figure><img src="images/brand/p24.webp" alt="네이처트레일 제품" width="700" height="700"></figure><figure><img src="images/brand/p25.webp" alt="네이처트레일 제품" width="700" height="700"></figure><figure><img src="images/brand/p26.webp" alt="네이처트레일 제품" width="700" height="700"></figure><div class="nt-dup" aria-hidden="true"><figure><img src="images/brand/p14.webp" alt="" width="700" height="1100"></figure><figure><img src="images/brand/p10.webp" alt="" width="700" height="700"></figure><figure><img src="images/brand/p15.webp" alt="" width="700" height="1100"></figure><figure><img src="images/brand/p18.webp" alt="" width="700" height="700"></figure><figure><img src="images/brand/p06.webp" alt="" width="700" height="1100"></figure><figure><img src="images/brand/p12.webp" alt="" width="700" height="700"></figure><figure><img src="images/brand/p03.webp" alt="" width="700" height="1100"></figure><figure><img src="images/brand/p19.webp" alt="" width="700" height="700"></figure><figure><img src="images/brand/p13.webp" alt="" width="700" height="1100"></figure><figure><img src="images/brand/p20.webp" alt="" width="700" height="700"></figure><figure><img src="images/brand/p04.webp" alt="" width="700" height="1100"></figure><figure><img src="images/brand/p21.webp" alt="" width="700" height="700"></figure><figure><img src="images/brand/p22.webp" alt="" width="700" height="700"></figure><figure><img src="images/brand/p24.webp" alt="" width="700" height="700"></figure><figure><img src="images/brand/p25.webp" alt="" width="700" height="700"></figure><figure><img src="images/brand/p26.webp" alt="" width="700" height="700"></figure></div></div></div>
     </div>
   </section>
 

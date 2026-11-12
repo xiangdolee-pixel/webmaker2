@@ -15,7 +15,7 @@
     var y = window.pageYOffset || doc.documentElement.scrollTop;
     if (hd && darkTop) hd.classList.toggle('on-dark', y < 40);
     if (fab) {
-      fab.classList.toggle('show', y > 420);
+      fab.classList.toggle('up', y > 400);   // 맨 위로 버튼(400px 넘으면 뜸)에게 자리를 비켜 준다
       // 주황 띠 위에 오면 버튼 색을 뒤집는다(같은 색끼리 겹치지 않게)
       var r = fab.getBoundingClientRect(), on = false;
       accents.forEach(function (a) { var q = a.getBoundingClientRect(); if (r.bottom > q.top && r.top < q.bottom) on = true; });
@@ -74,29 +74,60 @@
     counts.forEach(function (el) { el.firstChild.nodeValue = el.getAttribute('data-count'); });
   }
 
-  /* 첫 화면 배경 영상(Vimeo): 사진 슬라이드 위에 영상이 준비되면 서서히 덮는다. 움직임 줄이기면 사진만 */
-  var hv = $('.hero-video');
+  /* 첫 화면: 배경 영상(Vimeo) 한 번 → 사진 3장 차례로 → 다시 영상부터 (사용자 지시 2026-11-12)
+     영상이 안 열리거나 움직임 줄이기면 사진만 돈다. Vimeo 와는 postMessage 로 주고받는다(재생 · 끝남 · 처음으로) */
+  var hero = $('.hero'), slides = $$('.slide'), hv = $('.hero-video');
+  var cur = 0, bar = $('.hero-cap .bar i'), cnt = $('.hero-cap .count'), caps = $$('[data-cap]'), timer = 0, SLIDE_MS = 6500;
+  function show(i) {
+    slides[cur].classList.remove('on'); cur = i; slides[cur].classList.add('on');
+    if (cnt) cnt.textContent = ('0' + (cur + 1)).slice(-2);
+    caps.forEach(function (c, k) { c.hidden = k !== cur; });
+    if (bar) { bar.classList.remove('run'); void bar.offsetWidth; bar.classList.add('run'); }
+  }
+  // 사진만 계속 돌기 (영상이 없을 때)
+  function slidesForever() {
+    clearTimeout(timer);
+    (function next() { timer = setTimeout(function () { if (!doc.hidden) show((cur + 1) % slides.length); next(); }, SLIDE_MS); })();
+  }
+  // 순서: 영상 첫 화면(그림) → 영상 → 사진 1 · 2 · 3 → 다시 영상. 사진은 영상이 끝난 뒤에만 보인다(.slides-on)
+  var fr = null, player = null, vPlaying = false;
+  function photos() { hero.classList.add('slides-on'); hero.classList.remove('has-video'); }
+  function videoOn() { vPlaying = true; clearTimeout(timer); hero.classList.remove('slides-on'); hero.classList.add('has-video'); fr.classList.add('loaded'); }
+  function videoEnded() {
+    if (!vPlaying) return;
+    vPlaying = false;
+    player.pause().catch(function () {});
+    show(0); photos();
+    var k = 0;
+    clearTimeout(timer);
+    (function next() {
+      timer = setTimeout(function () {
+        if (++k < slides.length) { show(k); next(); return; }
+        player.setCurrentTime(0).then(function () { return player.play(); }).catch(function () { slidesForever(); });
+      }, SLIDE_MS);
+    })();
+  }
+  function fallback() { if (fr) fr.remove(); fr = null; photos(); slidesForever(); }   // 영상이 안 되면 사진만
   if (hv && hv.getAttribute('data-vimeo') && !reduce) {
-    var fr = doc.createElement('iframe');
-    fr.src = 'https://player.vimeo.com/video/' + hv.getAttribute('data-vimeo') + '?background=1&autoplay=1&loop=1&muted=1&autopause=0&dnt=1';
+    fr = doc.createElement('iframe');
+    fr.src = 'https://player.vimeo.com/video/' + hv.getAttribute('data-vimeo') + '?background=1&autoplay=1&loop=0&muted=1&autopause=0&dnt=1';
     fr.allow = 'autoplay; fullscreen; picture-in-picture'; fr.title = '배경 영상'; fr.setAttribute('tabindex', '-1');
-    fr.addEventListener('load', function () { setTimeout(function () { fr.classList.add('loaded'); $('.hero').classList.add('has-video'); }, 1200); });
     hv.appendChild(fr);
-  }
-
-  /* 첫 화면 슬라이드: 6.5초마다 다음 장으로 (천천히 확대되며 겹쳐 바뀜) */
-  var slides = $$('.slide');
-  if (slides.length > 1) {
-    var cur = 0, bar = $('.hero-cap .bar i'), cnt = $('.hero-cap .count'), caps = $$('[data-cap]');
-    function show(i) {
-      slides[cur].classList.remove('on'); cur = i; slides[cur].classList.add('on');
-      if (cnt) cnt.textContent = ('0' + (cur + 1)).slice(-2);
-      caps.forEach(function (c, k) { c.hidden = k !== cur; });
-      if (bar) { bar.classList.remove('run'); void bar.offsetWidth; bar.classList.add('run'); }
-    }
-    if (bar) bar.classList.add('run');
-    if (!reduce) setInterval(function () { if (!doc.hidden) show((cur + 1) % slides.length); }, 6500);
-  }
+    var waiting = setTimeout(function () { if (!vPlaying) fallback(); }, 12000);
+    var sc = doc.createElement('script');
+    sc.src = 'https://player.vimeo.com/api/player.js';
+    sc.onload = function () {
+      player = new window.Vimeo.Player(fr);
+      player.setLoop(false).catch(function () {});
+      player.on('playing', function () { if (!vPlaying) { clearTimeout(waiting); setTimeout(videoOn, 250); } });
+      player.on('ended', videoEnded);
+      player.on('timeupdate', function (d) { if (vPlaying && d.duration && d.seconds >= d.duration - .35) videoEnded(); });   // 'ended' 가 안 올 때 대비
+      player.play().catch(function () {});
+    };
+    sc.onerror = fallback;
+    doc.head.appendChild(sc);
+  } else { photos(); if (slides.length > 1 && !reduce) slidesForever(); }
+  if (bar && slides.length > 1) bar.classList.add('run');
 
   /* 선언문: 스크롤을 내리면 글자가 차례로 채워진다 */
   var st = $('.statement');
@@ -110,9 +141,17 @@
     });
     st.innerHTML = html;
     var ws = $$('.w', st);
+    // 선언문은 화면에 붙어 있는 동안(.state-track 높이만큼) 천천히 채워진다 — 다 채워진 뒤에 아래로 내려간다 (사용자 지시 2026-11-12)
+    var track = st.closest('.state-track');
     var fill = function () {
-      var r = st.getBoundingClientRect(), vh = window.innerHeight;
-      var p = Math.min(1, Math.max(0, (vh * .85 - r.top) / (r.height + vh * .35)));
+      var vh = window.innerHeight, p;
+      if (track && getComputedStyle(track).height !== 'auto') {
+        var t = track.getBoundingClientRect();
+        p = Math.min(1, Math.max(0, (vh * .35 - t.top) / (t.height - vh * .35 - vh * .25)));
+      } else {
+        var r = st.getBoundingClientRect();
+        p = Math.min(1, Math.max(0, (vh * .85 - r.top) / (r.height + vh * .35)));
+      }
       var n = Math.round(p * ws.length);
       ws.forEach(function (w, i) { w.classList.toggle('on', i < n); });
     };
