@@ -988,8 +988,26 @@ const PRICE_DOCS = {
   workers: 'https://developers.cloudflare.com/workers/platform/pricing/',
   d1: 'https://developers.cloudflare.com/d1/platform/pricing/',
   r2: 'https://developers.cloudflare.com/r2/pricing/',
+  pro: 'https://www.cloudflare.com/plans/pro/',
+  saas: 'https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/plans/',
 };
+// 매달 고정으로 나가는 돈 (사용자 지시 2026-11-12: plators.com Pro 월 $25 추가)
+const PRICE_FIXED = [
+  { name: 'Workers Paid', what: '계정 전체 — 모든 사이트 · xim · xms 의 서버 · DB · 파일', usd: 5, since: '' },
+  { name: 'plators.com Pro', what: '도메인 플랜 — KT 에서 느려지지 않는 유료 IP 길. ○○.plators.com 전부 + xim "도메인 연결" 로 붙인 다른 도메인', usd: 25, since: '2026-11-12 부터' },
+];
 const PRICING = [
+  {
+    key: 'pro', title: '도메인 · plators.com Pro', use: 'KT 에서 느려지지 않는 유료 IP 길 — ○○.plators.com 과 xim "도메인 연결" 로 붙인 도메인',
+    cols: ['무료', 'Pro'],
+    rows: [
+      ['월 요금', '0원', '<b>$25</b> (연 결제면 월 $20 꼴)'],
+      ['KT 접속 길', 'LA(LAX) — 평소 0.9초, 수시로 2초 넘게 튐', '시애틀(SEA) — 0.55초 안팎으로 고름'],
+      ['적용 범위', '-', 'plators.com · ○○.plators.com 전부 자동'],
+      ['다른 도메인 붙이기 (Cloudflare for SaaS)', '-', '100개까지 무료 · 넘으면 개당 월 $0.10'],
+    ],
+    note: '다른 도메인(예: 나사렛장학회.kr)은 xim "도메인 연결" 에서 붙인다. SaaS 안내 문서: <a href="https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/plans/" target="_blank" rel="noopener">Cloudflare for SaaS 요금</a>',
+  },
   {
     key: 'workers', title: '컴퓨트 · Workers', use: '모든 사이트 · xim · xms 가 돌아가는 서버 코드. 사이트 하나 = Worker 하나',
     rows: [
@@ -1034,18 +1052,26 @@ const PRICING = [
   },
 ];
 function renderPricing() {
+  const total = PRICE_FIXED.reduce((a, f) => a + f.usd, 0);
+  const head = (g) => g.rows.find(([k]) => k === '월 요금')?.[2] || '';
   view.innerHTML = `
     <div class="bar"><h2>Cloudflare 요금제</h2></div>
-    <p class="meta mon-rule">xiangdolee 계정의 사이트가 쓰는 Cloudflare 서비스별 <b>무료 한도</b>와 <b>유료(Workers Paid, 월 $5)</b> 기준입니다. 위 '전체 사용량'은 유료 기준으로 계산합니다. 공식 문서에서 ${PRICE_CHECKED} 에 확인한 값이라, 바뀌었을 수 있으니 정확한 값은 각 칸의 공식 문서를 보세요.</p>
-    ${PRICING.map((g) => `<section class="card item price-card">
-      <div class="price-head"><h3>${g.title}</h3><a class="btn sm" href="${PRICE_DOCS[g.key]}" target="_blank" rel="noopener">공식 문서</a></div>
-      <p class="meta">${g.use}</p>
-      <div class="tbl-wrap"><table class="tbl price-tbl"><thead><tr><th>항목</th><th>무료</th><th>유료 (월 $5)</th></tr></thead><tbody>
-        ${g.rows.map(([k, f, p]) => `<tr><td data-l="항목"><b>${k}</b></td><td data-l="무료">${f}</td><td data-l="유료">${p}</td></tr>`).join('')}
-      </tbody></table></div>
-      ${g.note ? `<p class="meta price-note">${g.note}</p>` : ''}
-    </section>`).join('')}
-    <p class="meta">달러 요금은 한 달 단위로 쌓여 다음 달에 청구됩니다. 포함량 안에서만 쓰면 유료 요금제는 매달 $5 만 나갑니다.</p>`;
+    <section class="card item price-fixed">
+      <div class="price-head"><h3>매달 나가는 돈</h3><b class="price-total">월 $${total}</b></div>
+      <ul class="price-list">${PRICE_FIXED.map((f) => `<li><div><b>${f.name}</b><small>${f.what}</small></div><span>$${f.usd}${f.since ? `<small>${f.since}</small>` : ''}</span></li>`).join('')}</ul>
+      <p class="meta">포함량 안에서만 쓰면 이 금액만 나갑니다. 넘는 만큼은 한 달 단위로 쌓여 다음 달에 청구됩니다.</p>
+    </section>
+    <h3 class="price-sub">서비스별 한도 <small>눌러서 펼치기 · 공식 문서에서 ${PRICE_CHECKED} 에 확인한 값</small></h3>
+    ${PRICING.map((g) => `<details class="card item price-card">
+      <summary><span class="price-sum"><b>${g.title}</b><small>${g.use}</small></span><span class="price-pay">${head(g)}</span></summary>
+      <div class="price-body">
+        <div class="tbl-wrap"><table class="tbl price-tbl"><thead><tr><th>항목</th><th>${(g.cols || ['무료'])[0]}</th><th>${(g.cols || [, '유료 (월 $5)'])[1]}</th></tr></thead><tbody>
+          ${g.rows.filter(([k]) => k !== '월 요금' || g.cols).map(([k, f, p]) => `<tr><td data-l="항목"><b>${k}</b></td><td data-l="${(g.cols || ['무료'])[0]}">${f}</td><td data-l="${(g.cols || [, '유료'])[1]}">${p}</td></tr>`).join('')}
+        </tbody></table></div>
+        ${g.note ? `<p class="meta price-note">${g.note}</p>` : ''}
+        <a class="btn sm" href="${PRICE_DOCS[g.key]}" target="_blank" rel="noopener">공식 문서</a>
+      </div>
+    </details>`).join('')}`;
 }
 
 async function renderAudit() {

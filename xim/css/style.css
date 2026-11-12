@@ -374,9 +374,30 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 }
 
 /* Cloudflare 요금제 */
-.price-card { margin-bottom: 12px; }
+.price-card { margin-bottom: 10px; padding: 0; }
 .price-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .price-head h3 { margin: 0; font-size: 17px; }
+.price-fixed { margin-bottom: 22px; }
+.price-total { font-size: 22px; color: var(--brand); white-space: nowrap; }
+.price-list { margin: 12px 0 8px; padding: 0; list-style: none; }
+.price-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+.price-list li > div { min-width: 0; }
+.price-list small { display: block; margin-top: 2px; color: var(--sub); font-size: 13px; }
+.price-list li > span { flex: none; font-size: 17px; font-weight: 800; text-align: right; }
+.price-sub { margin: 0 0 10px; font-size: 16px; }
+.price-sub small { margin-left: 6px; color: var(--mute); font-size: 13px; font-weight: 500; }
+.price-card summary { display: flex; align-items: center; gap: 12px; padding: 16px 18px; cursor: pointer; list-style: none; }
+.price-card summary::-webkit-details-marker { display: none; }
+.price-card summary::after { content: ""; flex: none; width: 9px; height: 9px; margin-left: 4px; border-right: 2px solid var(--mute); border-bottom: 2px solid var(--mute); transform: rotate(45deg) translateY(-3px); transition: transform .25s var(--ease); }
+.price-card[open] summary::after { transform: rotate(225deg) translate(-2px, -1px); }
+.price-sum { flex: 1; min-width: 0; }
+.price-sum b { display: block; font-size: 16px; }
+.price-sum small { display: block; margin-top: 2px; color: var(--sub); font-size: 13px; }
+.price-pay { flex: none; max-width: 40%; color: var(--ink); font-size: 14px; text-align: right; }
+.price-body { padding: 0 18px 16px; }
+.price-body > .btn { margin-top: 10px; }
+@media (prefers-reduced-motion: reduce) { .price-card summary::after { transition: none; } }
+@media (max-width: 599px) { .price-pay { display: none; } .price-card summary { padding: 14px 16px; } .price-body { padding: 0 16px 14px; } }
 .price-tbl td:first-child { white-space: nowrap; }
 .price-tbl td:nth-child(3) { color: var(--ink); }
 .price-note { margin-top: 8px; }
