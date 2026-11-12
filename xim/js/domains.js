@@ -1,4 +1,4 @@
-// xim 도메인 연결 — 다른 도메인을 plators.com(Pro) IP 로 태운다 (KT 에서 갑자기 느려지는 일 막기)
+// xim 도메인 부스터 — 다른 도메인을 plators.com(Pro) IP 로 태운다 (KT 에서 갑자기 느려지는 일 막기)
 //   Worker 는 /api/dm/* 를 Worker `domains` 에 넘긴다. 단계: 등록 → 인증서 → 회색 CNAME 으로 주소 바꾸기 → 완료
 //   그 도메인이 xiangdolee 계정 Cloudflare 에 있으면 화면이 열려 있는 동안 15초마다 스스로 다음 단계를 진행한다.
 import { $, esc, toast, openDialog, busy } from './common.js';
@@ -55,7 +55,7 @@ export async function renderDomains(d) {
   const { view, api } = deps;
   view.innerHTML = `
     <div class="card dm-card">
-      <div class="dm-h"><h2>도메인 연결</h2><button type="button" class="btn sm" id="dm-reload">새로고침</button></div>
+      <div class="dm-h"><h2>도메인 부스터</h2><button type="button" class="btn sm" id="dm-reload">새로고침</button></div>
       <p class="dm-desc">다른 도메인을 <b>plators.com(유료)</b> 의 IP 로 태워, KT 에서 갑자기 느려지는 일을 막습니다. <b>○○.plators.com 은 할 필요가 없습니다</b> — 이미 빠른 길입니다.</p>
       <dl class="dm-facts" id="dm-facts"><div><dt>확인 중…</dt></div></dl>
       <div class="dm-setup" id="dm-setup" hidden><p>다른 도메인이 가리킬 입구(<code>sites.plators.com</code>)가 아직 없습니다.</p><button type="button" class="btn primary sm" id="dm-setup-go">준비하기</button></div>
@@ -63,7 +63,7 @@ export async function renderDomains(d) {
     </div>
     <div class="card dm-card" id="dm-token" hidden>
       <h2>Cloudflare API 토큰</h2>
-      <p class="dm-desc">도메인 연결 도구에 Cloudflare 토큰이 없습니다. 토큰 값을 붙여 넣어 주세요(권한: 계정 Workers 스크립트 편집 · 영역 읽기 · DNS 편집 · SSL 및 인증서 편집 · Workers 경로 편집, 모든 영역).</p>
+      <p class="dm-desc">도메인 부스터 도구에 Cloudflare 토큰이 없습니다. 토큰 값을 붙여 넣어 주세요(권한: 계정 Workers 스크립트 편집 · 영역 읽기 · DNS 편집 · SSL 및 인증서 편집 · Workers 경로 편집, 모든 영역).</p>
       <form id="dm-token-form" class="dm-add"><label class="field dm-grow"><span>API 토큰</span><input class="input" id="dm-token-in" autocomplete="off" spellcheck="false" required></label><button type="submit" class="btn primary">확인하고 저장</button></form>
       <ul class="dm-checks" id="dm-checks"></ul><p class="err" id="dm-token-err" role="alert"></p>
     </div>

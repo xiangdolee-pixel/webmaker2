@@ -5,12 +5,13 @@ import { renderStudio, stopStudio } from './studio.js';
 import { renderVoice, stopVoice } from './voice.js';
 import { renderPc } from './pc.js';
 import { renderDomains, stopDomains } from './domains.js';
+import { renderInquiries } from './inquiries.js';
 
 const api = makeApi('/api');
 const view = $('#view');
 const TAB_KEY = 'xim.tab';
 let tab = 'sites';
-const TABS = ['sites', 'customers', 'portfolio2', 'requests', 'studio', 'voice', 'pc', 'domains', 'monitor', 'security', 'audit', 'pricing'];
+const TABS = ['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'studio', 'voice', 'pc', 'domains', 'monitor', 'security', 'audit', 'pricing'];
 try { const t = localStorage.getItem(TAB_KEY); if (t && TABS.includes(t)) tab = t; } catch { /* 저장소 못 쓰면 사이트 */ }   // F5 해도 보던 메뉴로 (사용자 지시 2026-11-09)
 // 메뉴마다 주소(사용자 지시 2026-11-11): xim.plators.com/studio 로 들어오면 스튜디오. 주소가 있으면 저장된 메뉴보다 먼저
 const pathTab = location.pathname.slice(1);
@@ -73,6 +74,7 @@ const NAV_ICON = {
   studio: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M10 9l5 2.5-5 2.5zM8 21h8"/></svg>',
   voice: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>',
   domains: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>',
+  inquiries: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
   pc: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M2 20h20M9.5 9L7 11.5 9.5 14M14.5 9l2.5 2.5-2.5 2.5"/></svg>',
 };
 let navReady = false;
@@ -81,7 +83,7 @@ function showApp() {
   $('#app').hidden = false;
   if (!navReady) {
     navReady = true;
-    pillTabs($('#nav'), [['sites', '사이트'], ['domains', '도메인 연결'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC']], tab, (v) => {
+    pillTabs($('#nav'), [['sites', '사이트'], ['domains', '도메인 부스터'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['inquiries', '제작문의'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC']], tab, (v) => {
       tab = v;
       try { localStorage.setItem(TAB_KEY, v); } catch { /* 무시 */ }
       setPath(v);
@@ -120,6 +122,7 @@ async function guarded(fn) {
 async function renderTiles() {
   const s = await api('/summary');
   navBadge(s.unreadRequests);
+  navBadge(s.unreadInquiries, 'inquiries');
   $('#tiles').innerHTML = [
     ['고객', s.customers],
     ['사이트', s.sites],
@@ -152,8 +155,8 @@ document.addEventListener('click', (e) => {
   if (t) goRequests(t.dataset.goReqs || '');
 });
 // 위 탭 '수정요청' 옆 숫자 = 새 글이 있는 요청 수
-function navBadge(n) {
-  const b = $('#nav [data-v="requests"]');
+function navBadge(n, v = 'requests') {
+  const b = $(`#nav [data-v="${v}"]`);
   if (!b) return;
   let i = b.querySelector('.nav-num');
   const before = i ? i.textContent : '';
@@ -185,6 +188,7 @@ function render() {
     if (tab === 'customers') tasks.push(renderCustomers());
     if (tab === 'portfolio2') tasks.push(renderPortfolio2());
     if (tab === 'requests') tasks.push(renderRequests());
+    if (tab === 'inquiries') tasks.push(renderInquiries({ view, api, setBadge: (n) => navBadge(n, 'inquiries') }));
     if (tab === 'security') tasks.push(renderSecurity());
     if (tab === 'monitor') tasks.push(renderMonitor());
     if (tab === 'audit') tasks.push(renderAudit());
@@ -977,7 +981,7 @@ const AUDIT_ACTIONS = {
   SITE_CREATE: '사이트 만들기', SITE_UPDATE: '사이트 수정', SITE_SUSPEND: '사이트 정지', SITE_RESUME: '사이트 재개', SITE_MAIL: '메일 · 봇확인 등록',
   ADMIN_CREATE: '관리자 계정 추가', ADMIN_DELETE: '관리자 계정 삭제', STAFF_ENTER: 'xms 들어가기',
   SEC_BLOCK: 'IP 차단', SEC_UNBLOCK: 'IP 차단 풀기', SEC_ALLOW: '막지 않을 IP 추가', SEC_UNALLOW: '막지 않을 IP 빼기',
-  REQUEST_REPLY: '수정요청 답변', REQUEST_STATUS: '수정요청 상태', REQUEST_DELETE: '수정요청 삭제', CONNECT: 'GitHub에서 연결',
+  REQUEST_REPLY: '수정요청 답변', REQUEST_STATUS: '수정요청 상태', REQUEST_DELETE: '수정요청 삭제', INQUIRY_UPDATE: '제작문의 상태', INQUIRY_DELETE: '제작문의 삭제', CONNECT: 'GitHub에서 연결',
   SITE_PORTFOLIO_ON: '포트폴리오 올림', SITE_PORTFOLIO_OFF: '포트폴리오 내림', PF2_CREATE: '포트폴리오2 추가', PF2_UPDATE: '포트폴리오2 수정', PF2_DELETE: '포트폴리오2 삭제',
 };
 let auditPage = 1;
@@ -994,11 +998,11 @@ const PRICE_DOCS = {
 // 매달 고정으로 나가는 돈 (사용자 지시 2026-11-12: plators.com Pro 월 $25 추가)
 const PRICE_FIXED = [
   { name: 'Workers Paid', what: '계정 전체 — 모든 사이트 · xim · xms 의 서버 · DB · 파일', usd: 5, since: '' },
-  { name: 'plators.com Pro', what: '도메인 플랜 — KT 에서 느려지지 않는 유료 IP 길. ○○.plators.com 전부 + xim "도메인 연결" 로 붙인 다른 도메인', usd: 25, since: '2026-11-12 부터' },
+  { name: 'plators.com Pro', what: '도메인 플랜 — KT 에서 느려지지 않는 유료 IP 길. ○○.plators.com 전부 + xim "도메인 부스터" 로 붙인 다른 도메인', usd: 25, since: '2026-11-12 부터' },
 ];
 const PRICING = [
   {
-    key: 'pro', title: '도메인 · plators.com Pro', use: 'KT 에서 느려지지 않는 유료 IP 길 — ○○.plators.com 과 xim "도메인 연결" 로 붙인 도메인',
+    key: 'pro', title: '도메인 · plators.com Pro', use: 'KT 에서 느려지지 않는 유료 IP 길 — ○○.plators.com 과 xim "도메인 부스터" 로 붙인 도메인',
     cols: ['무료', 'Pro'],
     rows: [
       ['월 요금', '0원', '<b>$25</b> (연 결제면 월 $20 꼴)'],
@@ -1006,7 +1010,7 @@ const PRICING = [
       ['적용 범위', '-', 'plators.com · ○○.plators.com 전부 자동'],
       ['다른 도메인 붙이기 (Cloudflare for SaaS)', '-', '100개까지 무료 · 넘으면 개당 월 $0.10'],
     ],
-    note: '다른 도메인(예: 나사렛장학회.kr)은 xim "도메인 연결" 에서 붙인다. SaaS 안내 문서: <a href="https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/plans/" target="_blank" rel="noopener">Cloudflare for SaaS 요금</a>',
+    note: '다른 도메인(예: 나사렛장학회.kr)은 xim "도메인 부스터" 에서 붙인다. SaaS 안내 문서: <a href="https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/plans/" target="_blank" rel="noopener">Cloudflare for SaaS 요금</a>',
   },
   {
     key: 'workers', title: '컴퓨트 · Workers', use: '모든 사이트 · xim · xms 가 돌아가는 서버 코드. 사이트 하나 = Worker 하나',

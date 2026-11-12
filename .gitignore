@@ -30,3 +30,8 @@ _src/
 
 # 폴더별 개발 도구(npm) 설치물
 node_modules/
+
+# bsf 고객 원본 자료(회사소개서 · 프로필 · 디자인 원본) — 공개 리포라 올리지 않는다
+bsf/*.pdf
+bsf/*.pptx
+bsf/*.ai

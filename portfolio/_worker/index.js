@@ -76,6 +76,15 @@ export default {
     const url = new URL(request.url);
     // 예전 비밀번호 화면 주소 → 첫 화면으로
     if (url.pathname === '/__unlock') return Response.redirect(new URL('/', url), 303);
+    // 제작문의 (사용자 지시 2026-11-12): 폼 → xim Engine.inquiry → xim '제작문의' 메뉴. 봇 확인 키도 xim 에서
+    const jsonRes = (d, status = 200) => new Response(JSON.stringify(d), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+    if (url.pathname === '/api/inquiry-key' && env.XIM) return jsonRes({ sitekey: await env.XIM.inquiryKey('portfolio').catch(() => '') });
+    if (url.pathname === '/api/inquiry' && env.XIM) {
+      if (request.method !== 'POST') return jsonRes({ error: 'POST 로 보내 주세요.' }, 405);
+      let raw = {}; try { raw = await request.json(); } catch { return jsonRes({ error: '내용을 읽지 못했습니다.' }, 400); }
+      const r = await env.XIM.inquiry('portfolio', raw, request.headers.get('CF-Connecting-IP') || '').catch((e) => ({ error: '잠시 뒤 다시 보내 주세요. (' + (e.message || e) + ')' }));
+      return r.error ? jsonRes({ error: r.error }, 400) : jsonRes({ ok: true });
+    }
     // 포트폴리오2 그림: xim 이 처음 한 번 받아 저장해 둔 것 (그 사이트 서버에는 다시 묻지 않는다)
     const pi = url.pathname.match(/^\/pf2-img\/([a-f0-9]{32})$/);
     if (pi && env.XIM) {

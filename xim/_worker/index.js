@@ -321,12 +321,44 @@ async function ximApi(request, env, url, ctx) {
     return json({ ok: true });
   }
 
+  // 제작문의 (포트폴리오 '제작문의' 폼 → Engine.inquiry 가 저장). 열어 보면 읽음
+  if (path === '/api/inquiries' && method === 'GET') {
+    const { results } = await db.prepare('SELECT id, site, name, contact, org, kind, substr(message, 1, 120) AS preview, created_at, read_at, done FROM inquiries ORDER BY id DESC LIMIT 300').all();
+    return json({ items: results, unread: results.filter((r) => !r.read_at).length });
+  }
+  {
+    const im = path.match(/^\/api\/inquiries\/(\d+)$/);
+    if (im) {
+      const id = +im[1];
+      if (method === 'GET') {
+        const row = await db.prepare('SELECT * FROM inquiries WHERE id = ?').bind(id).first();
+        if (!row) throw new HttpError(404, '없는 문의입니다.');
+        if (!row.read_at) { row.read_at = now(); await db.prepare('UPDATE inquiries SET read_at = ? WHERE id = ?').bind(row.read_at, id).run(); }
+        return json(row);
+      }
+      if (method === 'PATCH') {
+        const b = await body(request);
+        const done = b.done ? 1 : 0;
+        const unread = b.unread ? 1 : 0;
+        await db.prepare(`UPDATE inquiries SET done = ?${unread ? ', read_at = 0' : ''} WHERE id = ?`).bind(done, id).run();
+        await audit(db, request, 'INQUIRY_UPDATE', `제작문의 #${id}`, unread ? '안 읽음으로' : done ? '처리함' : '처리 안 함');
+        return json({ ok: true });
+      }
+      if (method === 'DELETE') {
+        await db.prepare('DELETE FROM inquiries WHERE id = ?').bind(id).run();
+        await audit(db, request, 'INQUIRY_DELETE', `제작문의 #${id}`);
+        return json({ ok: true });
+      }
+    }
+  }
+
   if (path === '/api/summary') {
     const r = await db.batch([
       db.prepare('SELECT COUNT(*) AS n FROM customers'),
       db.prepare("SELECT COUNT(*) AS n, SUM(status = 'suspended') AS off FROM sites"),
       db.prepare("SELECT COUNT(*) AS n FROM requests WHERE status != 'done'"),
       db.prepare("SELECT COUNT(*) AS n FROM requests r WHERE ((CASE WHEN r.created_at > r.op_seen_at THEN 1 ELSE 0 END) + (SELECT COUNT(*) FROM request_messages m WHERE m.request_id = r.id AND m.side = 'site' AND m.created_at > r.op_seen_at)) > 0"),
+      db.prepare('SELECT COUNT(*) AS n FROM inquiries WHERE read_at = 0'),
     ]);
     // 데이터베이스 전체 크기 (D1 이 돌려주는 size_after) · R2 에 올린 파일 합계
     const [ximMeta, xmsMeta, r2] = await Promise.all([
@@ -339,6 +371,7 @@ async function ximApi(request, env, url, ctx) {
       suspended: r[1].results[0].off || 0,
       openRequests: r[2].results[0].n,
       unreadRequests: r[3].results[0].n, // 업체가 새로 쓴 글이 있는 요청 (운영자가 아직 안 봄)
+      unreadInquiries: r[4].results[0].n, // 아직 안 열어 본 제작문의
       storage: { xim_db: ximMeta.meta.size_after || 0, xms_db: xmsMeta.meta.size_after || 0, r2: r2.n },
     });
   }
@@ -988,6 +1021,35 @@ export class Engine extends WorkerEntrypoint {
     return list.concat(links.map((l) => ({ slug: '', name: l.name, url: l.url, tag: l.tag || '', extra: { name: l.name, desc: l.description, image: l.image ? `/pf2-img/${l.image.slice(4)}` : '', tag: l.tag } })));
   }
 
+  // 제작문의 (포트폴리오 사이트가 부른다, 사용자 지시 2026-11-12)
+  //   inquiryKey(slug) → 그 사이트의 봇 확인(Turnstile) sitekey,  inquiry(slug, raw, ip) → { ok } | { error }
+  async inquiryKey(slug) {
+    const r = await this.env.DB.prepare('SELECT turnstile_sitekey AS k FROM sites WHERE slug = ?').bind(slug).first();
+    return r?.k || '';
+  }
+  async inquiry(slug, raw, ip) {
+    const db = this.env.DB;
+    const t = (v, n) => String(v ?? '').replace(/\r\n?/g, '\n').trim().slice(0, n);
+    const name = t(raw?.name, 60), contact = t(raw?.contact, 120), org = t(raw?.org, 80), kind = t(raw?.kind, 40), message = t(raw?.message, 5000);
+    if (!name) return { error: '이름을 넣어 주세요.' };
+    if (!contact) return { error: '연락처(전화 또는 이메일)를 넣어 주세요.' };
+    if (message.length < 5) return { error: '문의 내용을 조금 더 적어 주세요.' };
+    const site = await db.prepare('SELECT turnstile_secret AS s FROM sites WHERE slug = ?').bind(slug).first();
+    if (site?.s) {
+      if (!raw?.turnstile) return { error: '"사람입니다" 확인을 먼저 끝내 주세요.' };
+      const f = new FormData();
+      f.append('secret', site.s); f.append('response', String(raw.turnstile).slice(0, 2048)); if (ip) f.append('remoteip', ip);
+      const v = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: f }).then((x) => x.json()).catch(() => null);
+      if (!v?.success) return { error: '사람인지 확인하지 못했습니다. 확인 칸을 다시 해 주세요.' };
+    }
+    // 같은 곳에서 10분에 3번까지
+    const recent = await db.prepare('SELECT COUNT(*) AS n FROM inquiries WHERE ip = ? AND created_at > ?').bind(ip || '', now() - 600000).first();
+    if (recent.n >= 3) return { error: '잠시 뒤에 다시 보내 주세요.' };
+    await db.prepare('INSERT INTO inquiries (site, name, contact, org, kind, message, ip, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(slug, name, contact, org, kind, message, ip || '', now()).run();
+    return { ok: true };
+  }
+
   // 보안 감시: 이 IP 가 지금 막혀 있나 (사이트 Worker 가 IP 마다 60초 캐시)
   async secCheck(ip) {
     const db = this.env.DB;
@@ -1068,7 +1130,7 @@ export default {
 // 화면 파일: 배포 번호(?v=)를 붙여 한 번 받으면 브라우저가 다시 묻지 않게 (배포하면 번호가 바뀌어 새로 받음)
 //   index.html → css · js 주소에 ?v=번호,  js 안의 import './x.js' 에도 같은 번호.  번호 붙은 파일 = 1년, 첫 화면 = 매번 확인
 // 메뉴마다 주소(사용자 지시 2026-11-11: xim.plators.com/studio 처럼) — 이 주소들은 첫 화면(index.html)을 내주고, 화면(app.js)이 주소를 보고 그 메뉴를 연다
-const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'monitor', 'security', 'audit', 'pricing', 'studio', 'voice', 'pc', 'domains']);
+const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'monitor', 'security', 'audit', 'pricing', 'studio', 'voice', 'pc', 'domains']);
 async function staticFile(request, env, url) {
   const v = String(env.VER?.id || 'dev').slice(0, 8);
   const isNav = NAV_PATHS.has(url.pathname.slice(1));

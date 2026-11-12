@@ -1,31 +1,51 @@
-// 아래 문의 이메일을 누르면 복사
+// 제작문의: 위 · 아래 '제작문의' 버튼 → 창(폼) → /api/inquiry → xim '제작문의' 메뉴. 봇 확인 = Cloudflare Turnstile
 (function () {
-  var btn = document.querySelector('[data-copy]');
-  var toast = document.querySelector('.toast');
-  if (!btn) return;
-  var timer;
-  function done(ok) {
-    toast.textContent = ok ? '복사되었습니다.' : '복사하지 못했습니다.';
-    toast.classList.add('on');
-    clearTimeout(timer);
-    timer = setTimeout(function () { toast.classList.remove('on'); }, 1800);
+  var dlg = document.getElementById('ask');
+  var form = document.getElementById('ask-form');
+  if (!dlg || !form) return;
+  var bot = document.getElementById('ask-bot');
+  var err = document.getElementById('ask-err');
+  var send = document.getElementById('ask-send');
+  var done = document.getElementById('ask-done');
+  var widget = null, keyLoaded = false, sitekey = '';
+  function loadBot() {
+    if (keyLoaded) { if (widget !== null && window.turnstile) window.turnstile.reset(widget); return; }
+    keyLoaded = true;
+    fetch('/api/inquiry-key').then(function (r) { return r.json(); }).then(function (d) {
+      sitekey = d.sitekey || '';
+      if (!sitekey) return;
+      window.askBotReady = function () { widget = window.turnstile.render(bot, { sitekey: sitekey, language: 'ko', size: 'flexible' }); };
+      var sc = document.createElement('script');
+      sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=askBotReady';
+      sc.async = true; document.head.appendChild(sc);
+    }).catch(function () { keyLoaded = false; });
   }
-  function fallback(text) {
-    var t = document.createElement('textarea');
-    t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
-    document.body.appendChild(t); t.select();
-    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
-    document.body.removeChild(t);
-    return ok;
+  function open() {
+    form.hidden = false; done.hidden = true; err.textContent = '';
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+    loadBot();
+    setTimeout(function () { form.elements.name.focus(); }, 50);
   }
-  btn.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
-  });
-  btn.addEventListener('click', function () {
-    var text = btn.getAttribute('data-copy');
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallback(text)); });
-    } else done(fallback(text));
+  [].forEach.call(document.querySelectorAll('[data-ask]'), function (b) { b.addEventListener('click', open); });
+  dlg.addEventListener('click', function (e) { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
+  form.addEventListener('submit', function (e) {
+    e.preventDefault(); err.textContent = '';
+    var f = form.elements;
+    if (!f.name.value.trim()) { err.textContent = '이름을 넣어 주세요.'; f.name.focus(); return; }
+    if (!f.contact.value.trim()) { err.textContent = '연락처(전화 또는 이메일)를 넣어 주세요.'; f.contact.focus(); return; }
+    if (f.message.value.trim().length < 5) { err.textContent = '문의 내용을 조금 더 적어 주세요.'; f.message.focus(); return; }
+    var token = widget !== null && window.turnstile ? window.turnstile.getResponse(widget) : '';
+    if (sitekey && !token) { err.textContent = '"사람입니다" 확인을 먼저 끝내 주세요.'; return; }
+    send.disabled = true; send.textContent = '보내는 중…';
+    fetch('/api/inquiry', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: f.name.value, contact: f.contact.value, org: f.org.value, kind: f.kind.value, message: f.message.value, turnstile: token }) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (x) {
+        if (!x.ok) throw new Error(x.d.error || '보내지 못했습니다.');
+        form.reset(); form.hidden = true; done.hidden = false;
+      })
+      .catch(function (e2) { err.textContent = e2.message || '보내지 못했습니다. 잠시 뒤 다시 해 주세요.'; if (widget !== null && window.turnstile) window.turnstile.reset(widget); })
+      .then(function () { send.disabled = false; send.textContent = '보내기'; });
   });
 })();
 

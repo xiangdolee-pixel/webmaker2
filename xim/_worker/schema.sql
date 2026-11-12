@@ -236,3 +236,19 @@ CREATE TABLE IF NOT EXISTS studio_settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- 제작문의 (2026-11-12): 포트폴리오 사이트의 '제작문의' 폼 → xim '제작문의' 메뉴. read_at = 운영자가 열어 본 때(0 이면 새 문의)
+CREATE TABLE IF NOT EXISTS inquiries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  site TEXT NOT NULL DEFAULT '',
+  name TEXT NOT NULL,
+  contact TEXT NOT NULL,
+  org TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT '',
+  message TEXT NOT NULL,
+  ip TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  read_at INTEGER NOT NULL DEFAULT 0,
+  done INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS inquiries_created ON inquiries (created_at);
