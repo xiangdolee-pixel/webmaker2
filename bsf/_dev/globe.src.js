@@ -64,14 +64,15 @@
   // 보기 회전: 경도 lon0 이 가운데, 위도 tilt 만큼 숙여 북반구가 잘 보이게
   var lon0 = 112, tilt = 24, W = 0, R = 0, cx = 0, cy = 0, dpr = 1;
   var cl, sl, ct, st;
-  function setRot() { cl = Math.cos(lon0 * D2R); sl = Math.sin(lon0 * D2R); ct = Math.cos(tilt * D2R); st = Math.sin(tilt * D2R); }
+  var slct, stzz, clct;
+  function setRot() { cl = Math.cos(lon0 * D2R); sl = Math.sin(lon0 * D2R); ct = Math.cos(tilt * D2R); st = Math.sin(tilt * D2R); slct = sl * ct; stzz = st; clct = cl * ct; }
   function rot(v, o) {
     var x1 = v[0] * cl - v[2] * sl, z1 = v[0] * sl + v[2] * cl, y1 = v[1];
     o[0] = x1; o[1] = y1 * ct - z1 * st; o[2] = y1 * st + z1 * ct; return o;
   }
   var tmp = [0, 0, 0];
   function resize() {
-    W = box.clientWidth; dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = box.clientWidth; dpr = Math.min(1.75, window.devicePixelRatio || 1);
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(W * dpr);
     R = W * (W < 500 ? .42 : .4); cx = W / 2; cy = W / 2;
     labEls.forEach(function (el) { el._w = 0; el._h = 0; });
@@ -101,26 +102,23 @@
       }
       ctx.stroke();
     }
-    // 땅 점 — 가장자리로 갈수록 작고 옅게(둥근 느낌)
+    // 땅 점 — 가장자리로 갈수록 작고 옅게(둥근 느낌). 점마다 한 번만 돌려 깊이 4단계 길에 나눠 담는다
     var coarse = R < 230, size = Math.max(coarse ? 1.25 : .9, R / 300);
     for (var kind = 0; kind < 3; kind++) {
-      var list = dots[kind];
-      for (var b = 0; b < 4; b++) {    // 깊이 4단계로 묶어 칠한다
-        ctx.beginPath();
-        var z0 = b / 4, z1 = (b + 1) / 4, any = false;
-        for (var i = 0; i < list.length; i++) {
-          if (coarse && list[i].fine) continue;
-          rot(list[i], tmp);
-          var z = tmp[2];
-          if (z <= z0 || z > z1) continue;
-          var r = size * (kind ? 1.55 : 1.15) * (.45 + .55 * z);
-          var px = cx + R * tmp[0], py = cy - R * tmp[1];
-          ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, 6.2832); any = true;
-        }
-        if (!any) continue;
-        var a = .18 + .62 * (z0 + .125);
+      var list = dots[kind], bins = [new Path2D(), new Path2D(), new Path2D(), new Path2D()], k0 = size * (kind ? 1.55 : 1.15), sq = !kind && k0 < 1.6;
+      for (var i = 0; i < list.length; i++) {
+        var v = list[i];
+        if (coarse && v.fine) continue;
+        var z = v[0] * slct + v[1] * stzz + v[2] * clct;   // rot() 의 z 만 먼저 — 뒤쪽 점은 바로 건너뛴다
+        if (z <= 0) continue;
+        var x1 = v[0] * cl - v[2] * sl, z1 = v[0] * sl + v[2] * cl;
+        var px = cx + R * x1, py = cy - R * (v[1] * ct - z1 * st), r = k0 * (.45 + .55 * z), bin = bins[z > .75 ? 3 : z > .5 ? 2 : z > .25 ? 1 : 0];
+        if (sq) bin.rect(px - r, py - r, r * 2, r * 2); else { bin.moveTo(px + r, py); bin.arc(px, py, r, 0, 6.2832); }
+      }
+      for (var b = 0; b < 4; b++) {
+        var a = .18 + .62 * (b / 4 + .125);
         ctx.fillStyle = kind === 0 ? C.land + (a * .75).toFixed(3) + ')' : kind === 1 ? 'rgba(234, 107, 12, ' + (a + .15).toFixed(3) + ')' : 'rgba(226, 57, 43, ' + Math.min(1, a + .3).toFixed(3) + ')';
-        ctx.fill();
+        ctx.fill(bins[b]);
       }
     }
     // 선 · 움직이는 빛
@@ -190,24 +188,26 @@
   }
 
   // 돌리기: 저절로 천천히 + 끌면 따라 돈다(손을 떼면 다시 저절로)
-  var last = 0, running = false, onScreen = false, dragging = null, spin = 6;   // 초당 6도
+  var last = 0, running = false, onScreen = false, dragging = null, SPIN = 8, vel = SPIN;   // 초당 8도, vel = 지금 도는 속도(끌고 놓으면 관성)
   function frame(now) {
     if (!running) return;
     var dt = last ? Math.min(.05, (now - last) / 1000) : 0; last = now;
-    if (!dragging) lon0 -= spin * dt;
+    if (!dragging) { vel += (SPIN - vel) * Math.min(1, dt * 1.6); lon0 -= vel * dt; }
     draw(now);
     requestAnimationFrame(frame);
   }
   function play() { if (running || reduce || !onScreen || document.hidden) return; running = true; last = 0; requestAnimationFrame(frame); }
   function stop() { running = false; }
-  canvas.addEventListener('pointerdown', function (e) { dragging = { x: e.clientX, y: e.clientY, lon: lon0, tilt: tilt }; canvas.setPointerCapture(e.pointerId); box.classList.add('is-drag'); });
+  canvas.addEventListener('pointerdown', function (e) { dragging = { x: e.clientX, y: e.clientY, lon: lon0, tilt: tilt, px: e.clientX, pt: performance.now(), v: 0 }; canvas.setPointerCapture(e.pointerId); box.classList.add('is-drag'); });
   canvas.addEventListener('pointermove', function (e) {
     if (!dragging) return;
     lon0 = dragging.lon - (e.clientX - dragging.x) / R * 57;
+    var tn = performance.now(), dtm = Math.max(1, tn - dragging.pt);
+    dragging.v = dragging.v * .6 + ((e.clientX - dragging.px) / R * 57 / dtm * 1000) * .4; dragging.px = e.clientX; dragging.pt = tn;
     tilt = Math.max(-10, Math.min(55, dragging.tilt + (e.clientY - dragging.y) / R * 40));
     if (!running) draw(performance.now());
   });
-  function up() { dragging = null; box.classList.remove('is-drag'); }
+  function up() { if (dragging) vel = Math.max(-240, Math.min(240, dragging.v)) || SPIN; dragging = null; box.classList.remove('is-drag'); }
   canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
   if ('IntersectionObserver' in window) {
     new IntersectionObserver(function (en) { onScreen = en[0].isIntersecting; if (onScreen) play(); else stop(); }, { threshold: .05 }).observe(box);

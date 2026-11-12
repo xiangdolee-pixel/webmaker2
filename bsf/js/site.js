@@ -49,11 +49,12 @@
   function countUp(el) {
     var to = parseFloat(el.getAttribute('data-count')), dec = (el.getAttribute('data-count').split('.')[1] || '').length;
     if (reduce) { el.firstChild.nodeValue = dec ? to.toFixed(dec) : to.toLocaleString('en-US'); return; }
-    var t0 = null, dur = 1600;
+    var t0 = null, dur = 2000;
     function step(t) {
       if (!t0) t0 = t;
-      var p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
-      el.firstChild.nodeValue = dec ? (to * e).toFixed(dec) : Math.round(to * e).toLocaleString('en-US');
+      // 큰 숫자 · 작은 숫자 모두 같은 시간에 끝나게: 내림(floor)이라 마지막 순간에만 목표 숫자가 된다 (사용자 지시 2026-11-12)
+      var p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 2);
+      el.firstChild.nodeValue = dec ? (Math.floor(to * e * Math.pow(10, dec)) / Math.pow(10, dec)).toFixed(dec) : (p >= 1 ? to : Math.floor(to * e)).toLocaleString('en-US');
       if (p < 1) requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
@@ -64,7 +65,11 @@
       ents.forEach(function (en) {
         if (!en.isIntersecting) return;
         var el = en.target;
-        if (el.hasAttribute('data-count')) countUp(el); else el.classList.add('in');
+        if (el.hasAttribute('data-count')) {
+          // 같은 묶음(.stats 등)의 숫자는 함께 출발한다
+          var grp = el.closest('.stats, ul, .fac-cards') || el;
+          $$('[data-count]', grp).forEach(function (c) { if (!c._ran) { c._ran = true; io.unobserve(c); countUp(c); } });
+        } else el.classList.add('in');
         io.unobserve(el);
       });
     }, { rootMargin: '0px 0px -8% 0px', threshold: .12 });
@@ -126,7 +131,7 @@
     };
     sc.onerror = fallback;
     doc.head.appendChild(sc);
-  } else { photos(); if (slides.length > 1 && !reduce) slidesForever(); }
+  } else if (hero) { photos(); if (slides.length > 1 && !reduce) slidesForever(); }   // 하위 페이지엔 첫 화면 슬라이드가 없다
   if (bar && slides.length > 1) bar.classList.add('run');
 
   /* 선언문: 스크롤을 내리면 글자가 차례로 채워진다 */
@@ -202,8 +207,13 @@
     var h = Math.max(minH, Math.min(maxH, w / sum));
     imgs.forEach(function (im) { im.style.height = Math.floor(h) + 'px'; });
   }
+  // 사진 줄은 화면 가까이 왔을 때만 불러온다(처음부터 수십 장을 받지 않게)
+  var galIO = 'IntersectionObserver' in window ? new IntersectionObserver(function (en) {
+    en.forEach(function (e) { if (!e.isIntersecting) return; galIO.unobserve(e.target); $$('img', e.target).forEach(function (im) { im.loading = 'eager'; }); });
+  }, { rootMargin: '800px 0px' }) : null;
   $$('.gallery').forEach(function (g) {
-    $$('img', g).forEach(function (im) { im.loading = 'eager'; if (!im.complete) im.addEventListener('load', function () { fitGallery(g); }); });
+    $$('img', g).forEach(function (im) { if (!im.complete) im.addEventListener('load', function () { fitGallery(g); }); });
+    if (galIO) galIO.observe(g); else $$('img', g).forEach(function (im) { im.loading = 'eager'; });
     fitGallery(g);
     window.addEventListener('resize', function () { fitGallery(g); });
   });
@@ -215,6 +225,35 @@
       $$('.case', cases).forEach(function (c) { c.hidden = v !== 'all' && (' ' + c.getAttribute('data-k') + ' ').indexOf(' ' + v + ' ') < 0; });
     });
   }
+
+  /* 회사 약도: 카카오 지도(주소로 자리 찾기). JavaScript 키(data-key)가 있을 때만 지도를 그린다 — 없으면 주소 카드 + 카카오맵 · 네이버 지도 버튼 */
+  var mb = $('[data-kakao-map]');
+  if (mb && mb.getAttribute('data-key')) {
+    var ks = doc.createElement('script');
+    ks.src = 'https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&libraries=services&appkey=' + encodeURIComponent(mb.getAttribute('data-key'));
+    ks.onload = function () {
+      window.kakao.maps.load(function () {
+        var K = window.kakao.maps, box = $('.map-canvas', mb);
+        new K.services.Geocoder().addressSearch(mb.getAttribute('data-addr'), function (r, st) {
+          if (st !== K.services.Status.OK || !r[0]) return;
+          var at = new K.LatLng(r[0].y, r[0].x);
+          box.innerHTML = '';
+          var map = new K.Map(box, { center: at, level: 3 });
+          map.setZoomable(false);
+          new K.Marker({ map: map, position: at });
+          new K.CustomOverlay({ map: map, position: at, yAnchor: 2.4, content: '<div class="map-pin">' + mb.getAttribute('data-name') + '</div>' });
+          map.addControl(new K.ZoomControl(), K.ControlPosition.RIGHT);
+          mb.classList.add('is-live');
+        });
+      });
+    };
+    doc.head.appendChild(ks);
+  }
+
+  /* 날짜 칸은 어디를 눌러도 달력이 뜨게 (사용자 지시 2026-11-12) */
+  $$('input[type="date"], input[type="month"]').forEach(function (d) {
+    d.addEventListener('click', function () { try { if (d.showPicker) d.showPicker(); } catch (x) { /* 오래된 브라우저 */ } });
+  });
 
   /* 생산 문의 폼 → /site-api/inquiry (xim '제작문의' 로 모인다). 봇 확인 = Cloudflare Turnstile */
   var form = $('#inquiry');

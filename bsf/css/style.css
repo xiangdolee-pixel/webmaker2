@@ -24,6 +24,9 @@
   --gutter: clamp(20px, 5vw, 40px);   /* 폰 · 태블릿. PC 1024px~ 5%, 1280px~ 10% — 아래 미디어쿼리 */
   --hd: 76px;
 }
+/* 페이지를 옮길 때 부드럽게 겹쳐 바뀌게(크롬 · 엣지) */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .22s; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html { font-size: 17px; scroll-behavior: smooth; scroll-padding-top: var(--hd); }
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); font-size: 1rem; line-height: 1.7; word-break: keep-all; overflow-wrap: anywhere; -webkit-font-smoothing: antialiased; }
@@ -57,6 +60,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .sec-head { margin-bottom: clamp(48px, 6vw, 88px); }
 .sec-head.row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 24px 48px; }
 .sec-head.row .lead { margin: 0; max-width: 620px; }
+/* 제목 · 설명 두 칸 (사용자 지시 2026-11-12 "머리 배치가 아쉽다"): 설명은 제목 아래선에 맞추고, 앞에 주황 선을 세워 제목과 한 묶음으로 */
+@media (min-width: 1024px) {
+  .sec-head.row { display: grid; grid-template-columns: minmax(0, max-content) minmax(280px, 500px); justify-content: start; align-items: end; gap: 0 clamp(48px, 5vw, 96px); padding-bottom: clamp(28px, 3vw, 40px); border-bottom: 1px solid var(--line); }
+  .sec-head.row > .lead { position: relative; max-width: none; padding-left: 26px; font-size: clamp(17px, 1.2vw, 19px); }
+  .sec-head.row > .lead::before { content: ""; position: absolute; left: 0; top: .35em; bottom: .35em; width: 3px; border-radius: 2px; background: var(--accent); }
+  .sec-head.row > .btn, .sec-head.row > a.btn { justify-self: end; }
+  .dark .sec-head.row, .deep .sec-head.row, .ink .sec-head.row, .globe-sec .sec-head.row, .spot .sec-head.row, .brand-band .sec-head.row { border-bottom-color: var(--line-dark); }
+}
 
 /* 버튼 */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 58px; padding: 0 30px; border: 1.5px solid transparent; border-radius: 999px; font-size: 17px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: background-color .35s var(--ease), color .35s var(--ease), border-color .35s var(--ease), transform .25s var(--ease); }
@@ -285,12 +296,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .net .globe { width: min(100%, 900px); }
 .net .globe-legend { margin: 0 0 6px; }
 .net .countries { margin-top: 18px; gap: 0; grid-template-columns: minmax(0, 1fr) !important; }
-.net .country { display: grid; grid-template-columns: 150px minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "code list" "name list"; align-content: start; gap: 0 24px; padding: 20px 0; border: 0; border-top: 1px solid var(--line-dark); border-radius: 0; background: none; }
+.net .country { display: grid; grid-template-columns: 132px minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "code list" "name list"; align-content: start; gap: 0 24px; padding: 20px 0; border: 0; border-top: 1px solid var(--line-dark); border-radius: 0; background: none; }
 .net .country:hover { background: none; }
 .net .country:hover .code b { color: var(--accent-2); }
-.net .country .code { grid-area: code; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 10px; }
+.net .country .code { grid-area: code; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 6px; }
+.net .country .code b, .net .country .code span, .net .country h3 { white-space: nowrap; }
 .net .country .code b { font-size: 30px; line-height: 1; transition: color .3s; }
-.net .country .code span { font-size: 11.5px; }
+.net .country .code span { font-size: 11px; letter-spacing: .12em; }
 .net .country h3 { grid-area: name; align-self: start; margin: 8px 0 0; font-size: 17px; color: rgba(255, 255, 255, .82); }
 .net .country ul { grid-area: list; gap: 0; }
 .net .country li { padding: 8px 0; font-size: 15.5px; }
@@ -434,6 +446,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .brand-band .eyebrow { color: #e0d4a8; }
 .brand-band .lead { color: rgba(255, 255, 255, .86); }
 .brand-band .btn.line:hover { background: #fff; border-color: #fff; color: #1e2a1c; }
+.nt-strip-top { margin-top: 0 !important; }
 .nt-strip { position: relative; margin: 56px calc(var(--gutter) * -1) 0; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
 /* 제품 사진 띠: 화면 끝까지 천천히 흘러간다(같은 줄을 두 번 이어 끊김 없이), 올리면 멈춤 (사용자 지시 2026-11-12 "왼쪽으로 쏠려 하다 만 것 같다") */
 .nt-track { display: flex; width: max-content; animation: nt-flow 70s linear infinite; }
@@ -450,12 +463,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .nt-grid figure { margin: 0; border-radius: 16px; overflow: hidden; background: #fff; }
 .nt-grid img { width: 100%; height: auto; transition: transform .8s var(--ease); }
 .nt-grid figure:hover img { transform: scale(1.04); }
-.tm { display: grid; gap: 28px; align-items: center; }
-.tm img { max-width: 340px; width: 100%; border-radius: 14px; box-shadow: var(--shadow); }
-.tm dl { display: grid; margin: 0; }
-.tm dl div { display: grid; grid-template-columns: 120px 1fr; padding: 14px 0; border-bottom: 1px solid var(--line); }
-.tm dt { color: var(--mute); font-weight: 600; }
-.tm dd { margin: 0; font-weight: 700; }
+/* 상표 등록 (사용자 지시 2026-11-12 "레이아웃이 이상하다"): 등록증을 액자처럼 크게, 옆에 핵심 정보 네 칸 */
+.tm { display: grid; gap: 40px; align-items: center; }
+.tm-cert { margin: 0; padding: clamp(22px, 3vw, 44px); border-radius: var(--radius); background: var(--paper-2); display: grid; place-items: center; }
+.tm-cert img { width: 100%; height: auto; max-width: 420px; border-radius: 8px; box-shadow: 0 2px 4px rgba(10, 25, 38, .08), 0 30px 60px -28px rgba(10, 25, 38, .45); transform: rotate(-1.5deg); transition: transform .5s var(--ease); }
+.tm-cert:hover img { transform: rotate(0) scale(1.02); }
+.tm-body .lead { margin-top: 18px; max-width: 520px; }
+.tm-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 30px 0 0; max-width: 560px; }
+.tm-facts div { padding: 18px 20px; border-radius: 16px; background: #fff; box-shadow: var(--shadow); }
+.tm-facts dt { color: var(--mute); font-size: 13.5px; font-weight: 700; letter-spacing: .02em; }
+.tm-facts dd { margin: 6px 0 0; color: var(--navy); font-size: clamp(17px, 1.4vw, 20px); font-weight: 800; letter-spacing: -.02em; }
 
 /* ───── 회사소개 ───── */
 .about-intro { display: grid; gap: 40px; align-items: center; }
@@ -568,11 +585,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* 떠 있는 문의 버튼 */
 /* 생산 문의 동그라미 — 맨 위로 버튼(xim 공통 .xms-top)과 같은 크기 · 같은 자리. 스크롤을 내리면 한 칸 위로 비켜 주고, 그 자리에 맨 위로 버튼이 뜬다 (사용자 지시 2026-11-12) */
-.fab { --s: 52px; position: fixed; z-index: 45; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); display: grid; place-items: center; width: var(--s); height: var(--s); padding: 0; border-radius: 50%; background: var(--accent); color: #fff; font-size: 0; box-shadow: 0 10px 24px -8px rgba(234, 107, 12, .7); transition: transform .45s var(--ease), background-color .3s, color .3s; isolation: isolate; }
+.fab { --s: 52px; position: fixed; z-index: 45; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); display: grid; place-items: center; width: var(--s); height: var(--s); padding: 0; border-radius: 50%; background: var(--accent); color: #fff; font-size: 15px; font-weight: 800; letter-spacing: -.02em; line-height: 1; box-shadow: 0 10px 24px -8px rgba(234, 107, 12, .7); transition: transform .45s var(--ease), background-color .3s, color .3s; isolation: isolate; }
 .fab.up { transform: translateY(calc(var(--s) * -1 - 12px)); }
-.fab::after { content: "생산 문의"; position: absolute; right: calc(100% + 10px); top: 50%; padding: 7px 12px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 14px; font-weight: 700; white-space: nowrap; opacity: 0; transform: translate(6px, -50%); pointer-events: none; transition: opacity .25s, transform .25s var(--ease); }
+.fab::after { display: none; content: ""; position: absolute; right: calc(100% + 10px); top: 50%; padding: 7px 12px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 14px; font-weight: 700; white-space: nowrap; opacity: 0; transform: translate(6px, -50%); pointer-events: none; transition: opacity .25s, transform .25s var(--ease); }
 .fab:hover::after, .fab:focus-visible::after { opacity: 1; transform: translate(0, -50%); }
-@media (max-width: 640px) { .fab { --s: 46px; } }
+@media (max-width: 640px) { .fab { --s: 46px; font-size: 14px; } }
 .fab:hover { background: var(--accent-2); }
 .fab svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .fab i { position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: var(--accent); opacity: 0; animation: fab-wave 3.4s cubic-bezier(.2, .6, .3, 1) infinite; }
@@ -581,7 +598,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .fab.on-accent i { background: #fff; }
 
 /* 스크롤 등장 */
-.rv { opacity: 0; transform: translateY(36px); transition: opacity 1s var(--ease), transform 1s var(--ease); }
+.rv { opacity: 0; transform: translateY(28px); transition: opacity .7s var(--ease), transform .7s var(--ease); }
 .rv.in { opacity: 1; transform: none; }
 .rv.d1 { transition-delay: .08s; } .rv.d2 { transition-delay: .16s; } .rv.d3 { transition-delay: .24s; } .rv.d4 { transition-delay: .32s; }
 
@@ -649,7 +666,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .values { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .contact { grid-template-columns: 1.6fr 1fr; align-items: start; }
   .side-info { position: sticky; top: calc(var(--hd) + 24px); }
-  .tm { grid-template-columns: 340px 1fr; }
+  .tm { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(48px, 6vw, 110px); }
   .ft-top { grid-template-columns: 1.3fr 1fr; align-items: start; }
   .ft-nav { justify-content: flex-end; }
   .logo-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -696,3 +713,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .gallery > :first-child { margin-left: auto; } .gallery > :last-child { margin-right: auto; }
 @media (min-width: 1280px) { :root { --gutter: 10vw; } }   /* 1280px 이상(1400 · 1700 · 1920 모두) 좌우 각 10% */
+input[type="date"], input[type="month"] { cursor: pointer; }
+input[type="date"]::-webkit-calendar-picker-indicator, input[type="month"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+/* 회사 약도 (회사소개 › 회사 정보) */
+.map-box { grid-column: 2; margin-top: 28px; border-radius: var(--radius); overflow: hidden; background: #fff; box-shadow: var(--shadow); }
+.map-canvas { position: relative; height: clamp(280px, 34vw, 420px); background: linear-gradient(135deg, #e9eef2, #dfe6ec); }
+.map-ph { position: absolute; inset: 0; display: grid; place-content: center; gap: 6px; text-align: center; color: var(--sub); background-image: linear-gradient(rgba(21, 60, 84, .06) 1px, transparent 1px), linear-gradient(90deg, rgba(21, 60, 84, .06) 1px, transparent 1px); background-size: 32px 32px; }
+.map-ph b { color: var(--navy); font-family: var(--display); font-size: 20px; }
+.map-ph b::before { content: ""; display: block; width: 18px; height: 18px; margin: 0 auto 10px; border-radius: 50% 50% 50% 0; background: var(--accent); transform: rotate(-45deg); }
+.map-pin { padding: 6px 12px; border-radius: 999px; background: var(--navy); color: #fff; font: 700 13px var(--font); white-space: nowrap; box-shadow: 0 6px 16px -6px rgba(5, 15, 23, .5); }
+.map-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--line); }
+.map-links span { margin-right: auto; color: var(--sub); font-size: 14.5px; }
+.map-links .btn.sm { min-height: 40px; padding: 0 18px; font-size: 14px; }
+@media (max-width: 1023px) { .map-box { grid-column: auto; } }
