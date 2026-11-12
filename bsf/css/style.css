@@ -48,7 +48,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .eyebrow { display: inline-flex; align-items: center; gap: 12px; margin: 0 0 22px; color: var(--steel); font-family: var(--display); font-size: 14px; font-weight: 700; letter-spacing: .28em; text-transform: uppercase; }
 .eyebrow::before { content: ""; width: 34px; height: 2px; background: currentColor; }
 .dark .eyebrow, .deep .eyebrow, .ink .eyebrow { color: var(--steel-2); }
-.title { margin: 0; font-family: var(--display); font-size: clamp(38px, 6.2vw, 84px); font-weight: 800; line-height: 1.04; letter-spacing: -.035em; }
+.title { margin: 0; font-family: var(--display); font-size: clamp(38px, 5vw, 76px); font-weight: 800; line-height: 1.04; letter-spacing: -.035em; }
 .title .o { color: transparent; -webkit-text-stroke: 1.6px var(--o-stroke, var(--ink)); }
 .dark, .deep, .ink, .globe-sec, .page-hero, .spot, .brand-band, .hero { --o-stroke: #fff; }
 .title-ko { margin: 0; font-size: clamp(30px, 4.2vw, 54px); font-weight: 800; line-height: 1.28; letter-spacing: -.035em; }
@@ -121,7 +121,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .hero-in { position: relative; z-index: 2; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; padding-top: var(--hd); padding-bottom: clamp(96px, 14vh, 150px); }
 .hero-kicker { display: flex; align-items: center; gap: 14px; margin: 0 0 26px; color: var(--accent-2); font-family: var(--display); font-size: 14px; font-weight: 700; letter-spacing: .3em; }
 .hero-kicker::before { content: ""; width: 44px; height: 2px; background: currentColor; }
-.hero h1 { margin: 0; font-family: var(--display); font-size: clamp(44px, 8.6vw, 132px); font-weight: 800; line-height: .96; letter-spacing: -.045em; }
+.hero h1 { margin: 0; font-family: var(--display); font-size: clamp(44px, 5.4vw, 98px); font-weight: 800; line-height: .96; letter-spacing: -.045em; }
 .hero h1 .o { font-style: normal; color: transparent; -webkit-text-stroke: 2px rgba(255, 255, 255, .9); }
 .hero h1 > span { display: block; overflow: hidden; padding-bottom: .04em; }
 .hero h1 > span > i { display: block; font-style: normal; transform: translateY(105%); animation: rise 1.3s var(--ease) forwards; }
