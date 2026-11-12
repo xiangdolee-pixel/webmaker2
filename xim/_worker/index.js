@@ -269,6 +269,18 @@ async function ximApi(request, env, url, ctx) {
     out.headers.delete('Set-Cookie');
     return out;
   }
+  // 도메인 연결: Worker `domains`(Cloudflare for SaaS 등록 · 인증서 · 회색 CNAME 바꾸기)를 서비스 바인딩으로 대신 부른다
+  //   /api/dm/<x> → domains /api/<x>. 운영자 로그인은 위에서 확인했으니 도구 토큰(DOMAINS_TOKEN)으로 통과
+  if (path.startsWith('/api/dm/')) {
+    if (!env.DOMAINS || !env.DOMAINS_TOKEN) throw new HttpError(503, '도메인 연결(domains)이 아직 연결되지 않았습니다.');
+    const headers = new Headers({ 'X-Agent-Token': env.DOMAINS_TOKEN });
+    if (request.headers.has('Content-Type')) headers.set('Content-Type', request.headers.get('Content-Type'));
+    const res = await env.DOMAINS.fetch(new Request(`https://domains/api${path.slice('/api/dm'.length)}${url.search}`, { method, headers, body: method === 'GET' || method === 'HEAD' ? undefined : request.body }));
+    const out = new Response(res.body, res);
+    out.headers.delete('Set-Cookie');
+    if (method !== 'GET' && res.ok) await audit(db, request, 'DOMAIN', path.slice('/api/dm'.length), method);
+    return out;
+  }
   if (path.startsWith('/api/studio/') || path === '/api/studio') return studioApi(request, env, url, ctx, path, method, body, (a, t, d) => audit(db, request, a, t, d), (p, d) => github(env, p, d));
 
   // 구글 OTP 등록 · 해제
@@ -1056,7 +1068,7 @@ export default {
 // 화면 파일: 배포 번호(?v=)를 붙여 한 번 받으면 브라우저가 다시 묻지 않게 (배포하면 번호가 바뀌어 새로 받음)
 //   index.html → css · js 주소에 ?v=번호,  js 안의 import './x.js' 에도 같은 번호.  번호 붙은 파일 = 1년, 첫 화면 = 매번 확인
 // 메뉴마다 주소(사용자 지시 2026-11-11: xim.plators.com/studio 처럼) — 이 주소들은 첫 화면(index.html)을 내주고, 화면(app.js)이 주소를 보고 그 메뉴를 연다
-const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'monitor', 'security', 'audit', 'pricing', 'studio', 'voice', 'pc']);
+const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'monitor', 'security', 'audit', 'pricing', 'studio', 'voice', 'pc', 'domains']);
 async function staticFile(request, env, url) {
   const v = String(env.VER?.id || 'dev').slice(0, 8);
   const isNav = NAV_PATHS.has(url.pathname.slice(1));

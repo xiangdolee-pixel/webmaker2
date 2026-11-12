@@ -18,7 +18,7 @@ E:\ws\WebMaker2 작업 프로젝트 모음 — 폴더 하나 = 웹사이트 하�
 - rich/ — 머니로드 (직업 부자 레이스 보드게임, https://rich.xiangdolee.workers.dev) · 83칸 3겹 길(학교 → 직업 → 결혼 · 가족 → 중년 → 은퇴) · 판 가운데 전자룰렛 · 움직일 때 카메라가 차를 따라 확대, 크게 보기(끌어서 둘러보기) · 직업 카드 "○○의 길" 3단계 · 레벨업 찬스카드 · 찬스(직업 보너스 · 주식 · 부동산) · 돈 주고받는 장면 · 지폐 · LEVEL UP 카드 · 6인승 자동차에 가족 · 은퇴 주차장 · 1~4명(혼자면 PC) · 자동 모드 · 이어하기 · xim 연결됨
 - lastshot/ — 라스트샷 (세로 폰 달리기 슈팅 게임, https://lastshot.plators.com) · 시작 화면 닉네임(랜덤 기본, 고칠 수 있음) · 난이도 쉬움/중간/하드(중간이 기준, 적 수 · 체력 · 보스 · 문 값 배수) · 난이도별 랭킹 TOP 50 · 좌우로 끌어 문 고르기 · 문을 쏘면 숫자 +1 · 레벨마다 스테이지가 바뀜(기본 · 돌격전 · 문 미로 · 무기고 · 포위전, 색도 다름) · 거인 · 드럼통 · 바뀌는 문 · 세 갈래 문 · 보스 2종(근육 대장 / 포탄 쏘는 탱크) · 타이어 = 진급/연사/위력 · 레벨마다 세짐(결제 없음, 레벨은 브라우저 저장) · 규칙 js/core.js(node 로 균형 시험 가능), 3D(three.js r160 MIT, js/vendor) 그림 js/game.js, ?debug 로 자동 플레이 확인 · xim 연결됨
 - clone/ — 내 목소리 읽어주기 (https://clone.xiangdolee.workers.dev) · 운영자 개인용 TTS: 글을 넣으면 PC 처리기(리포 밖 D:\ws\clone, GPT-SoVITS 로 학습한 내 목소리)가 만들어 고른 음량(-16 LUFS)의 WAV 로 올림 · 대기열 D1 `clone` · 음성 R2 `clone-audio` · 비밀번호 로그인(Worker 비밀값) · xim 연결 안 함 · 자세한 건 clone/README.md
-- domains/ — 도메인 연결 도구 (https://domains.plators.com) · 다른 도메인을 plators.com(Pro) IP 로 태우는 Cloudflare for SaaS 등록 · 인증서 TXT · 회색 CNAME 바꾸기를 화면에서 · 비밀번호 = Worker 비밀값 DOMAINS_PASS · xim 연결 안 함 · 자세한 건 domains/README.md
+- domains/ — 도메인 연결 도구 (xim 메뉴 '도메인 연결', 따로 https://domains.plators.com) · 다른 도메인을 plators.com(Pro) IP 로 태우는 Cloudflare for SaaS 등록 · 인증서 TXT · 회색 CNAME 바꾸기를 화면에서 · 비밀번호 = Worker 비밀값 DOMAINS_PASS · xim 연결 안 함 · 자세한 건 domains/README.md
 - xim/ — 고객 사이트 통합 관리(고객·사이트·정지·용량·수정요청). https://xim.xiangdolee.workers.dev , 자세한 건 xim/README.md
 - xms/ — 업체별 홈페이지 관리(회원·게시판·메뉴). 각 사이트주소/admin/ , 자세한 건 xms/README.md
 

@@ -1,6 +1,9 @@
 # domains — 도메인 연결 도구
 
-https://domains.plators.com (Worker `domains`, xim 연결 안 함 — 자기 `_worker/index.js` 가 있음)
+**xim 메뉴 "도메인 연결"** (https://xim.plators.com/domains — xim 운영자 로그인 그대로). 따로 열 때는 https://domains.plators.com (Worker `domains`, 비밀번호 = 비밀값 DOMAINS_PASS).
+xim 은 `/api/dm/*` 를 서비스 바인딩 `DOMAINS` 로 넘긴다(xim 비밀값 DOMAINS_TOKEN = domains 비밀값 AGENT_TOKEN).
+
+**새 도메인을 붙일 때:** 평소처럼 Cloudflare 에서 그 Worker 에 도메인을 붙여(Custom Domain) 사이트가 열리는 걸 본 뒤, xim "도메인 연결" 에서 도메인 · Worker 고르고 연결하기. Cloudflare 에 있는 도메인은 TXT 로 호스트 확인이 안 돼서(회색 CNAME 을 걸어야 확인됨) 인증서가 Active 되면 바로 주소를 바꾼다 — 그 순간 1분 안쪽으로 끊긴다(나사렛장학회.kr 때 약 50초 522).
 
 ## 왜
 

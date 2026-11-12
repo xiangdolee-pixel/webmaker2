@@ -9,7 +9,7 @@
 //     예전 Workers Custom Domain 을 뗀다  ④ 넣었던 TXT 지우기.
 //   그 도메인이 이 계정 Cloudflare 에 있으면 ②~④ 를 자동으로, 다른 곳(가비아 등)이면 넣을 값을 화면에 보여 준다.
 //
-//   비밀값: DOMAINS_PASS(화면 비밀번호). Cloudflare API 토큰은 화면에서 붙여 넣어 KV 'token' 에 둔다.
+//   비밀값: DOMAINS_PASS(화면 비밀번호) · AGENT_TOKEN(xim 이 서비스 바인딩으로 부를 때, xim 쪽 DOMAINS_TOKEN 과 같은 값). Cloudflare API 토큰은 화면에서 붙여 넣어 KV 'token' 에 둔다.
 //   API(쿠키 dm_sess): POST /api/login {pass} · POST /api/logout · GET /api/me · POST /api/token {token}
 //     GET /api/status · POST /api/setup · GET /api/workers · GET /api/domains · POST /api/domains {host, www, worker}
 //     POST /api/domains/:host/check · PUT /api/domains/:host {worker} · POST /api/domains/:host/revert · DELETE /api/domains/:host
@@ -33,6 +33,9 @@ const sameText = (a, b) => { if (a.length !== b.length) return false; let r = 0;
 const cookieOf = (request, name) => (request.headers.get('Cookie') || '').split(/;\s*/).map((c) => c.split('=')).find((c) => c[0] === name)?.[1] || '';
 const sessionToken = (env) => hmac(env.DOMAINS_PASS, 'domains-session-v1');
 async function requireUser(request, env) {
+  // xim "도메인 연결" 메뉴가 서비스 바인딩으로 대신 부를 때 — xim 이 운영자 로그인을 이미 확인했다
+  const agent = request.headers.get('X-Agent-Token') || '';
+  if (agent && env.AGENT_TOKEN && sameText(agent, env.AGENT_TOKEN)) return;
   if (!env.DOMAINS_PASS) throw new HttpError(503, '비밀번호(DOMAINS_PASS)가 아직 설정되지 않았습니다.');
   const tok = cookieOf(request, COOKIE);
   if (!tok || !sameText(tok, await sessionToken(env))) throw new HttpError(401, '로그인이 필요합니다.');
@@ -43,6 +46,7 @@ async function body(request) { try { return (await request.json()) || {}; } catc
 function client(token) {
   const call = async (method, path, data) => {
     const r = await fetch(API + path, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: data === undefined ? undefined : JSON.stringify(data) });
+    if (r.status === 204) return { success: true, result: null }; // 지우기 등 본문 없는 성공
     let out; try { out = await r.json(); } catch { throw new HttpError(502, `Cloudflare 응답을 읽지 못했습니다 (HTTP ${r.status})`); }
     if (!out.success) {
       const msg = (out.errors || []).map((e) => `${e.message}${e.code ? ` (${e.code})` : ''}`).join(', ') || `HTTP ${r.status}`;
@@ -94,7 +98,9 @@ function normHost(v) {
   if (s === SAAS_ZONE || s.endsWith(`.${SAAS_ZONE}`)) throw new HttpError(400, `${SAAS_ZONE} 하위 주소는 이 도구가 필요 없습니다 — ${SAAS_ZONE} 존이 유료면 그대로 빠른 IP 로 나갑니다.`);
   return s;
 }
-const zoneOf = (zones, host) => zones.filter((z) => host === z.name || host.endsWith(`.${z.name}`)).sort((a, b) => b.name.length - a.name.length)[0] || null;
+// Cloudflare 는 한글 존 이름을 한글(나사렛장학회.kr)로 준다 → 퓨니코드로 바꿔 비교
+const ascii = (name) => { try { return new URL(`http://${name}`).hostname; } catch { return name; } };
+const zoneOf = (zones, host) => zones.map((z) => ({ ...z, name: ascii(z.name) })).filter((z) => host === z.name || host.endsWith(`.${z.name}`)).sort((a, b) => b.name.length - a.name.length)[0] || null;
 
 async function findHostname(cf, zid, host) {
   return (await cf.call('GET', `/zones/${zid}/custom_hostnames?hostname=${encodeURIComponent(host)}`)).result?.find((h) => h.hostname === host) || null;
@@ -113,9 +119,9 @@ function stageOf(ch, dns, entryIps) {
   const sslOk = ch?.ssl?.status === 'active';
   const hostOk = ch?.status === 'active';
   const pointed = dns.cname.includes(ENTRY) || (dns.ips.length > 0 && dns.ips.every((ip) => entryIps.includes(ip)));
+  // Cloudflare 에 있는 도메인은 호스트 확인이 회색 CNAME 을 건 뒤에야 된다 → 인증서만 준비되면 주소 바꾸기 단계
   let stage = 'cert';
-  if (sslOk && hostOk) stage = pointed ? 'done' : 'switch';
-  else if (pointed) stage = 'cert'; // 이미 가리키는데 인증서가 아직 — 곧 HTTP 로 확인됨
+  if (sslOk) stage = hostOk ? 'done' : 'switch'; // 호스트 Active = 실제로 이 존을 가리킨다는 Cloudflare 확인
   return { stage, sslOk, hostOk, pointed };
 }
 function viewOf(host, ch, route, zone, dns, entryIps, txtSaved) {
@@ -147,7 +153,7 @@ async function advance(env, cf, saas, zones, host, entryIps) {
   const zid = zone.id;
   const sslOk = ch.ssl?.status === 'active', hostOk = ch.status === 'active';
 
-  if (!sslOk || !hostOk) {
+  if (!sslOk) {
     const want = [];
     for (const v of ch.ssl?.validation_records || []) if (v.txt_name && v.txt_value) want.push({ name: v.txt_name, content: v.txt_value });
     if (!hostOk && ch.ownership_verification?.name) want.push({ name: ch.ownership_verification.name, content: ch.ownership_verification.value });
@@ -169,8 +175,8 @@ async function advance(env, cf, saas, zones, host, entryIps) {
   }
 
   // 인증서 Active → 주소 바꾸기 (예전 Workers Custom Domain 떼고 회색 CNAME)
-  const dns = await lookup(host);
-  if (!stageOf(ch, dns, entryIps).pointed) {
+  const cur = (await cf.call('GET', `/zones/${zid}/dns_records?name=${encodeURIComponent(host)}`)).result || [];
+  if (!cur.some((r) => r.type === 'CNAME' && r.content === ENTRY && !r.proxied)) {
     const wd = (await cf.call('GET', `/accounts/${ACCOUNT_ID}/workers/domains?hostname=${encodeURIComponent(host)}`)).result || [];
     for (const d of wd.filter((d) => d.hostname === host)) {
       await cf.call('DELETE', `/accounts/${ACCOUNT_ID}/workers/domains/${d.id}`);
@@ -188,16 +194,21 @@ async function advance(env, cf, saas, zones, host, entryIps) {
       log.push(`회색 CNAME → ${ENTRY} 를 넣었습니다.`);
     }
   }
-  // TXT 찌꺼기 지우기
+  // TXT 찌꺼기 지우기 (호스트까지 Active 된 뒤)
+  const now = (await findHostname(cf, saas.id, host)) || ch;
+  if (now.status !== 'active') { log.push('주소를 바꿨습니다 — 호스트 확인 기다리는 중(보통 1~2분).'); return { ch: now, log }; }
   if (saved.length) {
     for (const id of saved) await cf.call('DELETE', `/zones/${zid}/dns_records/${id}`).catch(() => {});
     await env.KV.delete(kvKey);
     log.push(`확인용 TXT ${saved.length}개를 지웠습니다.`);
   }
-  return { ch, log };
+  return { ch: now, log };
 }
 
-async function entryIpsOf() { return (await lookup(ENTRY)).ips; }
+async function entryIpsOf() { // 새로 만든 입구는 DNS 캐시에 늦게 잡힘 → plators.com 존 IP 도 함께
+  const [a, b] = await Promise.all([lookup(ENTRY), lookup(SAAS_ZONE)]);
+  return [...new Set([...a.ips, ...b.ips])];
+}
 
 async function handle(request, env) {
   const url = new URL(request.url);
@@ -240,7 +251,7 @@ async function handle(request, env) {
       const n = ((await cf.call('GET', `/accounts/${ACCOUNT_ID}/workers/scripts`)).result || []).length;
       if (!n) throw new HttpError(400, 'Worker 목록이 비어 있습니다 — 계정 정책이 xiangdolee 계정에 걸려 있는지 확인');
     });
-    if (checks.some((c) => !c.ok)) return json({ ok: false, checks }, 400);
+    if (checks.some((c) => !c.ok)) return json({ ok: false, checks, error: '빠진 권한: ' + checks.filter((c) => !c.ok).map((c) => c.name).join(', ') }, 400);
     await env.KV.put('token', token);
     return json({ ok: true, checks });
   }
@@ -349,6 +360,10 @@ async function handle(request, env) {
       return json({ ok: true, log });
     }
     if (!m[2] && method === 'DELETE') {
+      if (acctZone) { // 이 계정 도메인이면 넣어 둔 회색 CNAME 도 함께 정리(안 그러면 빈 입구를 가리킴)
+        const recs = (await cf.call('GET', `/zones/${acctZone.id}/dns_records?name=${encodeURIComponent(host)}`)).result || [];
+        if (recs.some((r) => r.type === 'CNAME' && r.content === ENTRY)) throw new HttpError(409, '이 도메인은 아직 이 길을 쓰고 있습니다. 지우면 사이트가 멈추니 "예전 방식으로 되돌리기" 를 쓰세요.');
+      }
       await removeSaas(env, cf, zone.id, routes, host, acctZone?.id);
       return json({ ok: true });
     }

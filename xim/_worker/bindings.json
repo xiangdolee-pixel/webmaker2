@@ -35,6 +35,10 @@
     {
       "binding": "CLONE",
       "service": "clone"
+    },
+    {
+      "binding": "DOMAINS",
+      "service": "domains"
     }
   ],
   "workflows": [
