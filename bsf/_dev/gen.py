@@ -505,7 +505,7 @@ CASES = [
     ('armed', 'street', 'STREET · FITNESS', 'MUSCLE ARMED — 무신사 판매 1위 저지 티셔츠', '피트니스 스트리트 브랜드 머슬암드의 23 저지 티셔츠는 무신사 실시간 랭킹 1위에 올랐습니다. 하프집 · 자켓 · 더플백도 함께 생산했습니다.',
      [('클라이언트', 'MUSCLE ARMED'), ('품목', '저지 티 · 하프집 · 자켓 · 더플백'), ('분류', 'KNIT · WOVEN · ACC')], ['works/armed-ai', 'works/armed-musinsa', 'works/armed-bag']),
     ('daegu', 'sports', 'FOOTBALL · GOALSTUDIO', '대구FC 트레이닝웨어', 'K리그 대구FC 선수단이 동계 훈련에서 입은 트레이닝 탑을 생산했습니다.',
-     [('클라이언트', 'GOALSTUDIO · 대구FC'), ('품목', '트레이닝 탑'), ('분류', 'KNIT')], ['works/daegu-ai']),
+     [('클라이언트', 'GOALSTUDIO · 대구FC'), ('품목', '트레이닝 탑'), ('분류', 'KNIT')], ['works/daegu-ai', 'works/daegu-kit', 'works/daegu-stretch']),
     ('nightwalk', 'event', 'EVENT · GOODS', '2023 한강 · 부산 나이트워크 티셔츠 · 양말', '수천 명이 함께 걷는 대규모 야간 걷기 행사의 참가자 티셔츠와 양말을 생산했습니다.',
      [('클라이언트', '나이트워크 (한강 · 부산)'), ('품목', '티셔츠 · 양말'), ('분류', 'KNIT · ACC')], ['works/nightwalk-ai', 'works/nightwalk-poster', 'works/nightwalk-goods']),
     ('naturetrail', 'brand', 'OWN BRAND', 'NATURE TRAIL — 캠핑 아웃도어 자체 브랜드', '다운 자켓 · 베스트 · 데님 · 조거 팬츠 · 맨투맨 · 그래픽 티셔츠까지, BSF가 직접 기획 · 생산 · 판매합니다.',
@@ -522,7 +522,7 @@ def cases():
     return ''.join(out)
 works = head('납품실적 | BSF COMPANY', 'T1 월즈 유니폼, 무신사 1위 MUSCLE ARMED, 대구FC, 나이트워크, DEWALT · VOLCOM · DEUS 등 BSF COMPANY 납품 실적.', 'has-page-hero') + f'''
 <main id="main">
-{page_hero('images/works/t1-team.webp', 'WORKS', 'Made by <span class="o">BSF.</span>', '세계 대회 무대의 선수단부터 수천 명이 걷는 행사, 무신사 랭킹 1위까지 — BSF가 만든 옷들입니다.')}
+{page_hero('images/hero-campaign.webp', 'WORKS', 'Made by <span class="o">BSF.</span>', '세계 대회 무대의 선수단부터 수천 명이 걷는 행사, 무신사 랭킹 1위까지 — BSF가 만든 옷들입니다.')}
 
   <section class="sec ink" style="padding-top:90px;padding-bottom:90px">
     <div class="wrap">{logo_rows()}</div>

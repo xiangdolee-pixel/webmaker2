@@ -154,6 +154,21 @@
     });
   }
 
+  /* 실적 사진 줄: 사진을 자르지 않고, 줄 높이를 맞춰 가로를 꽉 채운다(넘치면 옆으로 넘겨 보기) */
+  function fitGallery(g) {
+    var imgs = $$('img', g), sum = 0, gap = 6;
+    for (var i = 0; i < imgs.length; i++) { if (!imgs[i].naturalWidth) return; sum += imgs[i].naturalWidth / imgs[i].naturalHeight; }
+    var w = g.clientWidth - gap * (imgs.length - 1);
+    var maxH = window.innerWidth < 768 ? 320 : 560, minH = window.innerWidth < 768 ? 220 : 300;
+    var h = Math.max(minH, Math.min(maxH, w / sum));
+    imgs.forEach(function (im) { im.style.height = Math.floor(h) + 'px'; });
+  }
+  $$('.gallery').forEach(function (g) {
+    $$('img', g).forEach(function (im) { im.loading = 'eager'; if (!im.complete) im.addEventListener('load', function () { fitGallery(g); }); });
+    fitGallery(g);
+    window.addEventListener('resize', function () { fitGallery(g); });
+  });
+
   /* 실적 필터 */
   var cases = $('#cases');
   if (cases) {
