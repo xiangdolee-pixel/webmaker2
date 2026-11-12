@@ -8,8 +8,8 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="css/style.css?v=12">
-<script src="js/site.js?v=5" defer></script>
+<link rel="stylesheet" href="css/style.css?v=13">
+<script src="js/site.js?v=6" defer></script>
 </head>
 <body>
 <!-- 계정(로그인) 버튼 자리 — 이 사이트는 숨김 -->
@@ -82,17 +82,19 @@
   </ul>
 
   <footer class="foot">문의 · <span class="mail">master@plators.com</span></footer>
-  <button type="button" class="ask-fab" data-ask aria-label="제작문의 열기"><span class="ask-wave" aria-hidden="true"></span><span class="ask-wave" aria-hidden="true"></span><span class="ask-wave" aria-hidden="true"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg><b>제작문의</b></button>
+  <button type="button" class="ask-fab" data-ask aria-label="제작문의 열기"><span class="ask-wave" aria-hidden="true"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg><b>제작문의</b></button>
   <p class="toast" role="status" aria-live="polite"></p>
   <dialog class="ask" id="ask" aria-labelledby="ask-t">
     <form class="ask-form" id="ask-form" novalidate>
       <div class="ask-head"><h2 id="ask-t">제작문의</h2><button type="button" class="ask-x" data-close aria-label="닫기">×</button></div>
       <p class="ask-lead">만들고 싶은 것을 편하게 적어 주세요. 확인하고 연락드리겠습니다.</p>
       <label class="ask-f"><span>이름 <i>*</i></span><input name="name" maxlength="60" autocomplete="name" required></label>
-      <label class="ask-f"><span>연락처 <i>*</i></span><input name="contact" maxlength="120" autocomplete="tel" placeholder="전화번호 또는 이메일" required></label>
+      <label class="ask-f"><span>연락처 <i>*</i></span><input name="contact" maxlength="40" autocomplete="tel" inputmode="tel" placeholder="010-0000-0000" required></label>
+      <label class="ask-f"><span>이메일 <i>*</i></span><input name="email" type="email" maxlength="120" autocomplete="email" placeholder="name@example.com" required></label>
       <label class="ask-f"><span>업체 · 단체명</span><input name="org" maxlength="80" autocomplete="organization"></label>
       <label class="ask-f"><span>만들고 싶은 것</span><select name="kind"><option value="">고르세요</option><option>홈페이지</option><option>웹서비스</option><option>웹앱</option><option>웹게임</option><option>기타</option></select></label>
       <label class="ask-f"><span>문의 내용 <i>*</i></span><textarea name="message" rows="6" maxlength="5000" placeholder="어떤 사이트인지, 필요한 기능, 원하는 시기 등" required></textarea></label>
+      <label class="ask-agree"><input type="checkbox" name="agree"><span>문의 답변을 위해 이름 · 연락처 · 이메일 · 업체명을 수집하며, 답변이 끝나면 지체 없이 파기합니다. <b>개인정보 수집 · 이용에 동의합니다. (필수)</b></span></label>
       <div class="ask-bot" id="ask-bot"></div>
       <p class="ask-err" id="ask-err" role="alert"></p>
       <button type="submit" class="ask-send" id="ask-send">보내기</button>

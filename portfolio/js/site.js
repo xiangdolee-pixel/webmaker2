@@ -32,13 +32,15 @@
     e.preventDefault(); err.textContent = '';
     var f = form.elements;
     if (!f.name.value.trim()) { err.textContent = '이름을 넣어 주세요.'; f.name.focus(); return; }
-    if (!f.contact.value.trim()) { err.textContent = '연락처(전화 또는 이메일)를 넣어 주세요.'; f.contact.focus(); return; }
+    if (!f.contact.value.trim()) { err.textContent = '연락처를 넣어 주세요.'; f.contact.focus(); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.value.trim())) { err.textContent = '이메일 주소를 확인해 주세요.'; f.email.focus(); return; }
     if (f.message.value.trim().length < 5) { err.textContent = '문의 내용을 조금 더 적어 주세요.'; f.message.focus(); return; }
+    if (!f.agree.checked) { err.textContent = '개인정보 수집 · 이용에 동의해 주세요.'; f.agree.focus(); return; }
     var token = widget !== null && window.turnstile ? window.turnstile.getResponse(widget) : '';
     if (sitekey && !token) { err.textContent = '"사람입니다" 확인을 먼저 끝내 주세요.'; return; }
     send.disabled = true; send.textContent = '보내는 중…';
     fetch('/api/inquiry', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: f.name.value, contact: f.contact.value, org: f.org.value, kind: f.kind.value, message: f.message.value, turnstile: token }) })
+      body: JSON.stringify({ name: f.name.value, contact: f.contact.value, org: f.org.value, kind: f.kind.value, message: '이메일: ' + f.email.value.trim() + '\n\n' + f.message.value, turnstile: token }) })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (x) {
         if (!x.ok) throw new Error(x.d.error || '보내지 못했습니다.');
