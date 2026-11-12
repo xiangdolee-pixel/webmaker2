@@ -196,15 +196,27 @@
   var mx = $('#matrix');
   if (mx) {
     // 화면에 붙어 있는 동안 반을 넘게 내리면 KNIT, 다시 올리면 WOVEN (탭인 줄 모르고 지나치지 않게)
-    var mxSec = mx.closest('.mx-scroll');
+    var mxSec = mx.closest('.mx-scroll'), mxCol = $('.mx-col'), mxPin = $('.mx-pin');
     if (mxSec) {
+      var wideQ = window.matchMedia('(min-width: 1024px) and (min-height: 760px)'), wide = function () { return wideQ.matches; };
       var mxPick = function () {
-        if (getComputedStyle(mxSec).position === 'static' && mxSec.offsetHeight < innerHeight * 1.5) return;   // 붙여 두기가 꺼진 화면
-        var r = mxSec.getBoundingClientRect(), p = -r.top / Math.max(1, r.height - innerHeight);
-        if (p < 0 || p > 1) return;
-        var want = p > .5 ? 'knit' : 'woven', b = $('#matrix-seg button[data-v="' + want + '"]');
+        var p;
+        if (wide()) {   // PC: 구간 전체가 붙어 있는 동안 반을 넘게 내리면 KNIT
+          var r = mxSec.getBoundingClientRect(); p = -r.top / Math.max(1, r.height - innerHeight);
+          if (p < 0 || p > 1) return;
+          p = p > .5 ? 1 : 0;
+        } else if (mxCol && mxPin) {   // 폰: 표가 가운데 붙은 뒤로 내린 거리 — 60% 를 넘어야 KNIT (보기도 전에 넘어가지 않게)
+          var c = mxCol.getBoundingClientRect(), pr = mxPin.getBoundingClientRect(), run = c.height - pr.height;
+          if (run < 50) return;
+          p = (pr.top - c.top) / run;
+          p = p > .6 ? 1 : p < .3 ? 0 : -1;
+          if (p < 0) return;
+        } else return;
+        var want = p ? 'knit' : 'woven', b = $('#matrix-seg button[data-v="' + want + '"]');
         if (b && !b.classList.contains('on')) b.click();
       };
+      var pinH = function () { if (mxPin) mxSec.style.setProperty('--pin-h', mxPin.offsetHeight + 'px'); };
+      pinH(); window.addEventListener('resize', pinH); window.addEventListener('load', pinH);
       window.addEventListener('scroll', mxPick, { passive: true });
     }
     seg($('#matrix-seg'), function (v) {

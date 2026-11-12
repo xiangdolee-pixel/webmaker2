@@ -245,28 +245,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* ───── 세계지도 ───── */
 .globe-sec { position: relative; overflow: hidden; background: radial-gradient(ellipse at 70% 45%, #12354b 0%, var(--navy-3) 55%, var(--ink-dark) 100%); color: #fff; }
 .globe-sec .lead { color: rgba(255, 255, 255, .72); }
-.world-wrap { position: relative; margin: 0 calc(var(--gutter) * -1); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-.world-wrap::-webkit-scrollbar { display: none; }
-.world { position: relative; width: 100%; aspect-ratio: 1600 / 596; }
-.world > img, .world > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.arc { fill: none; stroke: url(#arc-grad); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 700; stroke-dashoffset: 700; }
-.world.in .arc { animation: draw 2.6s var(--ease) forwards; }
-.arc.ex { stroke: rgba(143, 191, 220, .85); stroke-width: 1.6; stroke-dasharray: 4 7; stroke-dashoffset: 0; opacity: 0; }
-.world.in .arc.ex { animation: fadeIn 1.4s 1.8s forwards, dash 40s linear infinite; }
-@keyframes draw { to { stroke-dashoffset: 0; } }
-@keyframes fadeIn { to { opacity: 1; } }
-@keyframes dash { to { stroke-dashoffset: -700; } }
-.pin .core { fill: var(--accent-2); }
-.pin .ring { fill: none; stroke: var(--accent-2); stroke-width: 1.2; transform-box: fill-box; transform-origin: center; animation: pin 2.8s var(--ease) infinite; }
-.pin.hq .core { fill: #fff; }
-.pin.hq .ring { stroke: #fff; }
-.pin.mk .core { fill: var(--steel-2); }
-.pin.mk .ring { stroke: var(--steel-2); }
-@keyframes pin { 0% { transform: scale(.7); opacity: .9; } 100% { transform: scale(3.6); opacity: 0; } }
-.callout line { stroke: rgba(255, 255, 255, .6); stroke-width: 1.2; }
-.callout text { fill: #fff; font: 800 19px var(--display); letter-spacing: .08em; paint-order: stroke; stroke: rgba(5, 15, 23, .7); stroke-width: 4px; }
-.callout text.ko { font: 600 15px var(--font); letter-spacing: 0; fill: rgba(255, 255, 255, .88); }
-.callout.mk text { fill: var(--steel-2); }
 /* 3D 지구본 (홈 GLOBAL NETWORK) — js/globe.js */
 .globe-wrap { position: relative; display: grid; justify-items: center; margin-top: clamp(8px, 2vw, 24px); }
 .globe { position: relative; width: min(100%, 880px); aspect-ratio: 1; touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; }
@@ -374,7 +352,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .matrix { position: relative; aspect-ratio: 1 / 1; max-width: 600px; width: 100%; margin-top: 24px; border-radius: var(--radius); background: #fff; box-shadow: var(--shadow); }
 .matrix-plot { position: absolute; inset: 14% 8% 14% 16%; border-left: 2px solid var(--navy); border-bottom: 2px solid var(--navy); background-image: linear-gradient(rgba(21, 60, 84, .06) 1px, transparent 1px), linear-gradient(90deg, rgba(21, 60, 84, .06) 1px, transparent 1px); background-size: 25% 25%; }
 .axis-y, .axis-x { position: absolute; color: var(--navy); font-family: var(--display); font-size: 12px; font-weight: 800; letter-spacing: .16em; }
-.axis-y { left: 4%; top: 6%; } .axis-x { right: 6%; bottom: 5%; text-align: right; }
+.axis-y { left: 4%; top: 6%; } .axis-x { right: 6%; bottom: 4%; text-align: right; line-height: 1.25; }
+@media (max-width: 767px) { .matrix-plot { bottom: max(14%, 58px); } .axis-x { bottom: 10px; letter-spacing: .1em; } .axis-y { letter-spacing: .1em; } }
 .axis-y small, .axis-x small { display: block; color: var(--mute); font-family: var(--font); font-size: 12px; letter-spacing: 0; font-weight: 600; }
 .mx { position: absolute; transform: translate(-50%, 50%); padding: 8px 14px; border-radius: 12px; background: var(--navy); color: #fff; font-size: 14px; font-weight: 700; line-height: 1.25; text-align: center; white-space: nowrap; box-shadow: 0 8px 20px -8px rgba(10, 25, 38, .55); transition: opacity .45s var(--ease), transform .55s var(--ease); }
 .mx small { display: block; color: var(--accent-2); font-family: var(--display); font-size: 10.5px; letter-spacing: .1em; }
@@ -631,7 +610,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .nav-open .hd .logo small { color: rgba(255, 255, 255, .6); }
   .nav-open .hd-account { --xa-bg: #fff; --xa-fg: var(--navy); }
   .nav-open { overflow: hidden; }
-  .world { width: 170%; }
 }
 @media (max-width: 767px) {
   html { font-size: 16.5px; }
@@ -686,7 +664,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 @media (min-width: 1024px) {
   /* 모든 페이지 · 모든 구간의 콘텐츠 폭을 하나로 (사용자 지시 2026-11-12) */
   :root { --gutter: 5vw; }   /* 1024~1279px 좌우 각 5%, 1280px 이상 10% — 맨 아래 (사용자 지시 2026-11-12) */
-  .world-wrap { margin: 0; overflow: visible; }
   .spot { padding: 0 var(--gutter); }
   .spot-body { padding: clamp(64px, 7vw, 120px) 0 clamp(64px, 7vw, 120px) clamp(40px, 5vw, 96px); background: none; }
   .spot-grid { grid-template-columns: 1fr 1fr; min-height: 100vh; }
@@ -720,8 +697,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .rv, .hero h1 > span > i, .hero-ko, .hero-cta { opacity: 1; transform: none; }
-  .arc { stroke-dashoffset: 0; }
-  .arc.ex { opacity: 1; }
 }
 .gallery > :first-child { margin-left: auto; } .gallery > :last-child { margin-right: auto; }
 @media (min-width: 1280px) { :root { --gutter: 10vw; } }   /* 1280px 이상(1400 · 1700 · 1920 모두) 좌우 각 10% */
@@ -752,6 +727,13 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="month"]::-web
 /* 머리에 버튼이 있으면(설명 대신) 버튼은 오른쪽 끝에 (사용자 지시 2026-11-12 "버튼 위치가 애매") */
 @media (min-width: 1024px) { .sec-head.row:has(> .btn) { grid-template-columns: minmax(0, 1fr) auto; } .sec-head.row > .btn { justify-self: end; align-self: end; } }
 /* 홈 자체 브랜드 카드(캠핑): 사진 위쪽이 더 보이게 */
+/* 소싱 전략(폰 · 작은 화면): 표가 화면 가운데에 오면 붙여 두고, 한참 더 내려야 KNIT 로 (사용자 지시 2026-11-13 "보기도 전에 바뀐다") */
+.mx-col { align-self: stretch; }
+@media not all and (min-width: 1024px) and (min-height: 760px) {
+  .mx-col::after { content: ''; display: block; height: 110vh; height: 110svh; }   /* 붙어 있는 동안 내릴 거리 */
+  .mx-pin { position: sticky; top: max(calc(var(--hd) + 8px), calc((100svh + var(--hd)) / 2 - var(--pin-h, 440px) / 2)); }
+  .mx-scroll { padding-bottom: 40px; }
+}
 /* 소싱 전략: 화면에 붙여 두고 스크롤하면 WOVEN → KNIT 로 넘어간다 (PC, 화면 높이가 넉넉할 때) */
 @media (min-width: 1024px) and (min-height: 760px) {
   .mx-scroll { height: 210vh; padding: 0; }
@@ -773,11 +755,6 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="month"]::-web
 /* 숫자 띠 아이콘 (사용자 지시 2026-11-12 "심심하다") */
 .stats li { transition: background-color .35s var(--ease); }
 .stats li:hover { background: rgba(255, 255, 255, .55); }
-.st-ic { position: absolute; top: 26px; right: 22px; display: grid; place-items: center; width: clamp(44px, 4vw, 58px); height: clamp(44px, 4vw, 58px); border-radius: 50%; background: #fff; box-shadow: var(--shadow); transition: transform .4s var(--ease), background-color .3s; }
-.st-ic svg { width: 46%; height: 46%; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: stroke .3s; }
-.stats li:hover .st-ic { transform: translateY(-3px) rotate(-6deg); background: var(--navy); }
-.stats li:hover .st-ic svg { stroke: #fff; }
-@media (max-width: 767px) { .st-ic { top: 22px; right: 10px; width: 38px; height: 38px; } }
 
 /* 게시판 · 회원(로그인 등) 화면 틀(_layout.html): 고정 머리 아래로 내용이 시작되게 */
 .xms-main { padding-top: calc(var(--hd) + 32px); min-height: 70vh; }
