@@ -73,8 +73,8 @@ a { color: inherit; text-decoration: none; }
 .wrap { padding-bottom: 104px; }
 
 /* 제작문의 — 오른쪽 아래에 떠서 따라다니는 버튼. 가운데서 바깥으로 신호(고리)가 퍼진다 */
-.ask-fab { position: fixed; z-index: 40; right: calc(clamp(12px, 1.6vw, 24px) + env(safe-area-inset-right, 0px)); bottom: calc(clamp(12px, 1.6vw, 24px) + env(safe-area-inset-bottom, 0px)); display: inline-flex; align-items: center; gap: 7px; height: 50px; padding: 0 18px 0 15px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-fg); font: inherit; font-size: 15px; font-weight: 800; letter-spacing: -.01em; cursor: pointer; box-shadow: 0 8px 22px -8px rgba(37, 99, 235, .55), 0 2px 6px rgba(16, 24, 40, .12); transition: transform .25s var(--ease), box-shadow .25s var(--ease); isolation: isolate; }
-.ask-fab svg { position: relative; z-index: 1; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ask-fab { position: fixed; z-index: 40; right: calc(clamp(12px, 1.6vw, 24px) + env(safe-area-inset-right, 0px)); bottom: calc(clamp(12px, 1.6vw, 24px) + env(safe-area-inset-bottom, 0px)); display: inline-flex; align-items: center; gap: 7px; height: 54px; padding: 0 21px 0 17px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-fg); font: inherit; font-size: 17px; font-weight: 800; letter-spacing: -.01em; cursor: pointer; box-shadow: 0 8px 22px -8px rgba(37, 99, 235, .55), 0 2px 6px rgba(16, 24, 40, .12); transition: transform .25s var(--ease), box-shadow .25s var(--ease); isolation: isolate; }
+.ask-fab svg { position: relative; z-index: 1; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .ask-fab b { position: relative; z-index: 1; }
 .ask-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 28px -8px rgba(37, 99, 235, .6), 0 2px 6px rgba(16, 24, 40, .12); }
 .ask-fab:active { transform: scale(.96); }
@@ -82,7 +82,7 @@ a { color: inherit; text-decoration: none; }
 .ask-wave { position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: var(--brand); opacity: 0; animation: ask-wave 3.6s cubic-bezier(.2, .6, .3, 1) infinite; }
 @keyframes ask-wave { 0% { transform: scale(1); opacity: .32; } 60%, 100% { transform: scale(1.3, 1.6); opacity: 0; } }
 @media (max-width: 560px) {
-  .ask-fab { height: 46px; padding: 0 15px 0 13px; font-size: 14px; }
+  .ask-fab { height: 50px; padding: 0 18px 0 15px; font-size: 16px; }
   .wrap { padding-bottom: 92px; }
 }
 @media (prefers-reduced-motion: reduce) { .ask-wave { animation: none; } }
@@ -102,10 +102,26 @@ a { color: inherit; text-decoration: none; }
 .ask-f i { color: #e5484d; font-style: normal; }
 .ask-f input, .ask-f select, .ask-f textarea { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--fg); font: inherit; font-size: 16px; }
 .ask-f textarea { resize: vertical; min-height: 120px; }
+.ask-count { justify-self: end; color: var(--sub); font-size: 12.5px; }
+.ask-count b { font-weight: 700; color: var(--fg); }
+.ask-count.full, .ask-count.full b { color: #e5484d; }
 .ask-f input:focus, .ask-f select:focus, .ask-f textarea:focus { outline: none; border-color: var(--brand); }
-.ask-agree { display: flex; gap: 9px; align-items: flex-start; margin: 2px 0 12px; color: var(--sub); font-size: 13.5px; line-height: 1.5; cursor: pointer; }
-.ask-agree input { flex: none; width: 19px; height: 19px; margin: 1px 0 0; accent-color: var(--brand); }
-.ask-agree b { color: var(--fg); font-weight: 700; }
+.ask-privacy { margin: 4px 0 14px; padding: 14px 14px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.ask-privacy-t { margin: 0 0 8px; color: var(--fg); font-size: 13.5px; font-weight: 700; }
+.ask-privacy dl { display: grid; gap: 4px; margin: 0 0 12px; }
+.ask-privacy dl div { display: grid; grid-template-columns: 64px 1fr; gap: 8px; font-size: 13px; line-height: 1.5; }
+.ask-privacy dt { color: var(--sub); }
+.ask-privacy dd { margin: 0; color: var(--fg); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ask-agree { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--fg); font-size: 14.5px; font-weight: 600; cursor: pointer; transition: border-color .2s var(--ease), background-color .2s var(--ease); }
+.ask-agree em { color: var(--brand); font-style: normal; font-weight: 700; }
+.ask-box { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1.5px solid var(--line); border-radius: 7px; background: var(--card); transition: background-color .2s var(--ease), border-color .2s var(--ease); }
+.ask-box svg { width: 15px; height: 15px; fill: none; stroke: var(--brand-fg); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transform: scale(.6); transition: opacity .2s var(--ease), transform .2s var(--ease); }
+.ask-agree:hover .ask-box { border-color: var(--brand); }
+.ask-agree:has(input:checked) { border-color: var(--brand); }
+input:checked + .ask-box { background: var(--brand); border-color: var(--brand); }
+input:checked + .ask-box svg { opacity: 1; transform: none; }
+input:focus-visible + .ask-box { outline: 2px solid var(--brand); outline-offset: 2px; }
 .ask-bot { margin: 4px 0 6px; }
 .ask-err { min-height: 1.4em; margin: 0 0 8px; color: #e5484d; font-size: 14px; }
 .ask-send { width: 100%; height: 48px; border: 0; border-radius: 12px; background: var(--brand); color: var(--brand-fg); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }

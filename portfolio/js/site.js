@@ -27,6 +27,9 @@
     setTimeout(function () { form.elements.name.focus(); }, 50);
   }
   [].forEach.call(document.querySelectorAll('[data-ask]'), function (b) { b.addEventListener('click', open); });
+  // 문의 내용 글자 수 (최대 1,000자)
+  var cnt = document.getElementById('ask-count');
+  form.elements.message.addEventListener('input', function () { var n = this.value.length; cnt.textContent = n.toLocaleString(); cnt.parentNode.classList.toggle('full', n >= 1000); });
   dlg.addEventListener('click', function (e) { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
   form.addEventListener('submit', function (e) {
     e.preventDefault(); err.textContent = '';
@@ -34,6 +37,7 @@
     if (!f.name.value.trim()) { err.textContent = '이름을 넣어 주세요.'; f.name.focus(); return; }
     if (!f.contact.value.trim()) { err.textContent = '연락처를 넣어 주세요.'; f.contact.focus(); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.value.trim())) { err.textContent = '이메일 주소를 확인해 주세요.'; f.email.focus(); return; }
+    if (f.message.value.length > 1000) { err.textContent = '문의 내용은 1,000자까지 적을 수 있습니다.'; f.message.focus(); return; }
     if (f.message.value.trim().length < 5) { err.textContent = '문의 내용을 조금 더 적어 주세요.'; f.message.focus(); return; }
     if (!f.agree.checked) { err.textContent = '개인정보 수집 · 이용에 동의해 주세요.'; f.agree.focus(); return; }
     var token = widget !== null && window.turnstile ? window.turnstile.getResponse(widget) : '';

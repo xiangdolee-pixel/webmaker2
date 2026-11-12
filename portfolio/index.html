@@ -8,8 +8,8 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="css/style.css?v=13">
-<script src="js/site.js?v=6" defer></script>
+<link rel="stylesheet" href="css/style.css?v=16">
+<script src="js/site.js?v=7" defer></script>
 </head>
 <body>
 <!-- 계정(로그인) 버튼 자리 — 이 사이트는 숨김 -->
@@ -93,8 +93,12 @@
       <label class="ask-f"><span>이메일 <i>*</i></span><input name="email" type="email" maxlength="120" autocomplete="email" placeholder="name@example.com" required></label>
       <label class="ask-f"><span>업체 · 단체명</span><input name="org" maxlength="80" autocomplete="organization"></label>
       <label class="ask-f"><span>만들고 싶은 것</span><select name="kind"><option value="">고르세요</option><option>홈페이지</option><option>웹서비스</option><option>웹앱</option><option>웹게임</option><option>기타</option></select></label>
-      <label class="ask-f"><span>문의 내용 <i>*</i></span><textarea name="message" rows="6" maxlength="5000" placeholder="어떤 사이트인지, 필요한 기능, 원하는 시기 등" required></textarea></label>
-      <label class="ask-agree"><input type="checkbox" name="agree"><span>문의 답변을 위해 이름 · 연락처 · 이메일 · 업체명을 수집하며, 답변이 끝나면 지체 없이 파기합니다. <b>개인정보 수집 · 이용에 동의합니다. (필수)</b></span></label>
+      <label class="ask-f"><span>문의 내용 <i>*</i></span><textarea name="message" rows="6" maxlength="1000" placeholder="어떤 사이트인지, 필요한 기능, 원하는 시기 등" required></textarea><small class="ask-count"><b id="ask-count">0</b> / 1,000자</small></label>
+      <div class="ask-privacy">
+        <p class="ask-privacy-t">개인정보 수집 · 이용 안내</p>
+        <dl><div><dt>수집 항목</dt><dd>이름 · 연락처 · 이메일 · 업체명</dd></div><div><dt>이용 목적</dt><dd>제작문의 확인 및 답변</dd></div><div><dt>보관 기간</dt><dd>답변이 끝나면 지체 없이 파기</dd></div></dl>
+        <label class="ask-agree"><input type="checkbox" name="agree" class="sr-only"><span class="ask-box" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7"/></svg></span><span>위 내용에 동의합니다 <em>(필수)</em></span></label>
+      </div>
       <div class="ask-bot" id="ask-bot"></div>
       <p class="ask-err" id="ask-err" role="alert"></p>
       <button type="submit" class="ask-send" id="ask-send">보내기</button>
