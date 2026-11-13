@@ -110,13 +110,19 @@ export function openDialog(html, setup) {
   return dlg;
 }
 
+// 단추에 data-busy="등록하는 중…" 이 있으면 그동안 그 글자로 바꾼다. fn 이 페이지를 옮기면(btn.dataset.leaving) 단추를 다시 풀지 않는다
+//   — 화면이 바뀌기 전에 또 눌러 두 번 등록되지 않게 (사용자 지시 2026-11-13)
 export async function busy(btn, errEl, fn) {
-  if (btn) btn.disabled = true;
+  const label = btn?.dataset.busy ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; if (label !== null) btn.textContent = btn.dataset.busy; }
   if (errEl) errEl.textContent = '';
   try { return await fn(); } catch (e) {
+    if (btn) delete btn.dataset.leaving;
     if (errEl) errEl.textContent = e.message; else toast(e.message);
     return undefined;
-  } finally { if (btn) btn.disabled = false; }
+  } finally {
+    if (btn && !btn.dataset.leaving) { btn.disabled = false; if (label !== null) btn.innerHTML = label; }
+  }
 }
 
 // 위험한 버튼: 누르면 그 자리에 무슨 일이 생기는지 보여 주고 한 번 더 확인

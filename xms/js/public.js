@@ -206,12 +206,15 @@ onForm('post', async (form, data) => {
   data.attachments = attach ? attach.ids() : [];
   data.mode = ed ? ed.mode() : 'editor';
   data.blocks = ed ? ed.blocks() : null;
-  const { board, id, after } = form.dataset;   // after = 게시판 '목록 주소'(사이트 안 목록 화면) — 있으면 저장 뒤 그리로
+  const { board, id, after } = form.dataset;
+  const btn = form.querySelector('[type=submit]');   // after = 게시판 '목록 주소'(사이트 안 목록 화면) — 있으면 저장 뒤 그리로
   if (id) {
     await api(`/posts/${id}`, { method: 'PUT', data });
+    if (btn) btn.dataset.leaving = '1';
     location.href = after || `/board/${board}/${id}`;
   } else {
     const r = await api(`/boards/${board}/posts`, { method: 'POST', data });
+    if (btn) btn.dataset.leaving = '1';
     location.href = after || `/board/${board}/${r.id}`;
   }
 });

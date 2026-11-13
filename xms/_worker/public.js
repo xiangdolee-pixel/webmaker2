@@ -507,7 +507,7 @@ async function postForm(ctx, b, id) {
         ${b.use_secret ? `<label class="check"><input type="checkbox" name="is_secret"${p?.is_secret ? ' checked' : ''}> 비밀글</label>` : ''}
       </div>` : ''}
       <p class="err" role="alert"></p>
-      <div class="actions end write-actions"><a class="btn big" href="${id ? `/board/${esc(b.slug)}/${id}` : `/board/${esc(b.slug)}`}">취소</a><button class="btn big dark" type="submit">${id ? '수정' : '등록'}</button></div>
+      <div class="actions end write-actions"><a class="btn big" href="${b.opt.list_url ? esc(b.opt.list_url) : id ? `/board/${esc(b.slug)}/${id}` : `/board/${esc(b.slug)}`}">취소</a><button class="btn big dark" type="submit" data-busy="${id ? '수정하는 중…' : '등록하는 중…'}">${id ? '수정' : '등록'}</button></div>
     </form>
   </section>`, { noindex: true });
 }
