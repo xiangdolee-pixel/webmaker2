@@ -508,6 +508,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* 제품 사진 띠: 화면 끝까지 천천히 흘러간다(같은 줄을 두 번 이어 끊김 없이), 올리면 멈춤 (사용자 지시 2026-11-12 "왼쪽으로 쏠려 하다 만 것 같다") */
 .nt-track { display: flex; width: max-content; animation: nt-flow 70s linear infinite; }
 .nt-strip:hover .nt-track { animation-play-state: paused; }
+.nt-strip.js-flow { touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; }   /* js 가 움직임(밀어서 넘기기) */
+.nt-strip.js-flow:active { cursor: grabbing; }
+.nt-strip.js-flow .nt-track { animation: none; will-change: transform; }
+.nt-strip.js-flow img { -webkit-user-drag: none; pointer-events: none; }
 .nt-track, .nt-dup { gap: 14px; } .nt-dup { display: flex; }
 .nt-track > figure, .nt-dup > figure { flex: none; margin: 0; border-radius: 16px; overflow: hidden; background: #fff; transition: transform .4s var(--ease); }
 .nt-track figure:hover { transform: translateY(-6px); }

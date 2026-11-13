@@ -354,6 +354,49 @@
     if (Array.isArray(first)) draw(first); else load();
   }
 
+  /* 제품 사진 띠: 천천히 흐르다가, 손가락 · 마우스로 밀면 따라오고 세게 밀면 관성으로 빨리 넘어간다 (사용자 지시 2026-11-13 "폰에서 스와이프로 빨리") */
+  $$('.nt-strip').forEach(function (strip) {
+    var track = $('.nt-track', strip); if (!track || reduce) return;
+    strip.classList.add('js-flow');
+    var x = 0, v = 0, half = 0, last = 0, drag = null, hover = false, moved = 0;
+    var SPEED = function () { return half / 70; };   // CSS 때와 같은 빠르기(한 바퀴 70초)
+    var measure = function () { half = track.scrollWidth / 2 + 7; };
+    measure(); window.addEventListener('resize', measure);
+    $$('img', track).forEach(function (im) { if (!im.complete) im.addEventListener('load', measure); });
+    var wrap = function () { if (!half) return; while (x <= -half) x += half; while (x > 0) x -= half; };
+    var tick = function (t) {
+      var dt = last ? Math.min(0.05, (t - last) / 1000) : 0; last = t;
+      if (!drag) {
+        if (Math.abs(v) > 5) { x += v * dt; v *= Math.pow(0.04, dt); }   // 던진 힘이 차츰 줄어든다
+        else { v = 0; if (!hover) x -= SPEED() * dt; }
+      }
+      wrap(); track.style.transform = 'translate3d(' + x + 'px,0,0)';
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    strip.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') hover = true; });
+    strip.addEventListener('pointerleave', function () { hover = false; });
+    strip.addEventListener('pointerdown', function (e) {
+      drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, t: performance.now(), on: false }; v = 0; moved = 0;
+    });
+    strip.addEventListener('pointermove', function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      var dx = e.clientX - drag.x, now = performance.now();
+      if (!drag.on) {   // 옆으로 밀 때만 잡는다(위아래로 내리면 페이지 스크롤)
+        if (Math.abs(e.clientX - drag.x0) < 6) return;
+        if (Math.abs(e.clientY - drag.y0) > Math.abs(e.clientX - drag.x0)) { drag = null; return; }
+        drag.on = true; try { strip.setPointerCapture(e.pointerId); } catch (er) { /* 오래된 브라우저 */ }
+      }
+      x += dx; moved += Math.abs(dx);
+      var dt = Math.max(1, now - drag.t); v = 0.8 * (dx / dt * 1000) + 0.2 * v;
+      drag.x = e.clientX; drag.t = now;
+    });
+    var up = function () { if (!drag) return; if (performance.now() - drag.t > 120) v = 0; drag = null; };
+    strip.addEventListener('pointerup', up); strip.addEventListener('pointercancel', up);
+    strip.addEventListener('click', function (e) { if (moved > 8) { e.preventDefault(); e.stopPropagation(); } moved = 0; }, true);
+    strip.addEventListener('dragstart', function (e) { e.preventDefault(); });
+  });
+
   /* 스크롤 등장 + 숫자 올라가기 */
   // 숫자 올라가기 (사용자 지시 2026-11-13 "더 세련되게"): 자리마다 숫자 띠가 굴러 올라가는 오도미터.
   //   일의 자리가 가장 많이 돌고 먼저 출발, 윗자리는 조금 늦게 덜 돈다. 한 묶음은 모두 같은 순간에 부드럽게 내려앉는다
