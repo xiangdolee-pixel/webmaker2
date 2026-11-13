@@ -15,7 +15,7 @@ import { adminApi } from './admin-api.js';
 import { publicApi, publicPage, menuAccess } from './public.js';
 import { serveFile, serveRobots, serveSitemap, serveRss, serveAdsTxt, headData } from './site-meta.js';
 import { livePopups } from './popups.js';
-import { uploadApi, serveUpload, avatarOf } from './uploads.js';
+import { uploadApi, directUploadApi, serveUpload, avatarOf } from './uploads.js';
 import { embedCss } from './css-scope.js';
 import { recordVisit } from './visits.js';
 import { publicCourses } from './courses.js';
@@ -143,6 +143,9 @@ export class Cms extends WorkerEntrypoint {
           { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
       }
       if (p === '/xms-api/uploads' && request.method === 'POST') return await timed(uploadApi(ctx));
+      if (p === '/xms-api/uploads/sign' && request.method === 'POST') return await timed(directUploadApi(ctx));
+      const dm = p.match(/^\/xms-api\/uploads\/([0-9a-f]{32})\/done$/);
+      if (dm && request.method === 'POST') return await timed(directUploadApi(ctx, dm[1]));
       if (p.startsWith('/xms-api/admin/')) return await timed(adminApi(ctx));
       if (/^\/xms-api\/(courses|lessons|my\/courses)(\/|$)/.test(p)) {
         return await timed((async () => (await publicCourses(ctx, p.slice(8).replace(/\/+$/, ''), request.method))

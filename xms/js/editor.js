@@ -53,6 +53,30 @@ export async function shrinkImage(file, { max = 1920, maxBytes = 900000 } = {}) 
 export async function uploadFile(board, kind, file, onProgress) {
   // board 가 '@request' 면 관리 화면 수정 요청용 (관리자만)
   const where = board.startsWith('@') ? `for=${board.slice(1)}` : `board=${encodeURIComponent(board)}`;
+  // 파일(FILE)은 R2 에 바로 올린다(서울로 가서 수십 배 빠르다 — uploads.js directUploadApi). 안 되면 아래 예전 길로
+  if (kind === 'FILE') {
+    const sign = await fetch(`/xms-api/uploads/sign?${where}&kind=FILE`, {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: file.name, size: file.size, type: file.type }),
+    });
+    const s = await sign.json().catch(() => null);
+    if (sign.ok && s?.put) {
+      await new Promise((resolve, reject) => {
+        const x = new XMLHttpRequest();
+        x.open('PUT', s.put);
+        if (file.type) x.setRequestHeader('Content-Type', file.type);
+        x.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+        x.onload = () => (x.status >= 200 && x.status < 300 ? resolve() : reject(new Error('올리지 못했습니다. 다시 올려 주세요.')));
+        x.onerror = () => reject(new Error('인터넷 연결이 끊겨 올리지 못했습니다.'));
+        x.send(file);
+      });
+      const done = await fetch(`/xms-api/uploads/${s.id}/done`, { method: 'POST', credentials: 'same-origin' });
+      const out = await done.json().catch(() => null);
+      if (!done.ok) throw new Error(out?.error || '올리지 못했습니다.');
+      return out;
+    }
+    if (sign.status !== 404) throw new Error(s?.error || '올리지 못했습니다.');
+  }
   // onProgress(0~1) 를 주면 올라간 만큼 알려 준다(큰 파일 — 첨부 목록에 '올리는 중 n%', 사용자 지시 2026-11-13)
   if (onProgress) {
     return new Promise((resolve, reject) => {

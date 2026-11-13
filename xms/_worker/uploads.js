@@ -201,3 +201,72 @@ export async function postAttachments(env, site, postId) {
     .bind(site, postId).all();
   return results.map((u) => ({ ...u, url: `/xms/upload/${u.id}` }));
 }
+
+// ───── 바로 올리기 (사용자 지시 2026-11-13 "1.8MB 올리는데 왜 이리 오래 걸려") ─────
+//   국내 통신사는 사이트 주소(Cloudflare)를 미국 서부로 보내 올리기가 느리다(2MB 5~27초). R2 S3 주소는 서울(ICN)로 가서 0.2초 안쪽.
+//   그래서 파일(FILE)은 브라우저가 미리 서명한 주소로 R2 에 바로 올리고, 다 올린 뒤 크기만 확인한다.
+//   POST /xms-api/uploads/sign?board=<주소>&kind=FILE  { name, size, type }  → { id, put, ... }
+//   POST /xms-api/uploads/<id>/done                      → 올린 파일 정보(uploadApi 와 같은 꼴)
+//   비밀값 R2_KEY_ID · R2_SECRET (R2 API 토큰 'xms-upload', 버킷 xms-files 읽기 · 쓰기), 버킷 CORS 는 PUT 허용.
+const R2_ACCOUNT = 'f225d506d8cf6ddf97704a36c69f5ce7';
+const R2_BUCKET = 'xms-files';
+const DIRECT_MAX = 200 * 1024 * 1024;
+const enc = new TextEncoder();
+const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+const sha256 = async (s) => hex(await crypto.subtle.digest('SHA-256', enc.encode(s)));
+async function hmac(key, s) {
+  const k = await crypto.subtle.importKey('raw', typeof key === 'string' ? enc.encode(key) : key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return crypto.subtle.sign('HMAC', k, enc.encode(s));
+}
+async function presignPut(env, key, seconds = 1800) {
+  const host = `${R2_ACCOUNT}.r2.cloudflarestorage.com`;
+  const path = `/${R2_BUCKET}/${key.split('/').map(encodeURIComponent).join('/')}`;
+  const t = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+  const day = t.slice(0, 8), scope = `${day}/auto/s3/aws4_request`;
+  const q = new URLSearchParams({
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256', 'X-Amz-Credential': `${env.R2_KEY_ID}/${scope}`, 'X-Amz-Date': t,
+    'X-Amz-Expires': String(seconds), 'X-Amz-SignedHeaders': 'host',
+  });
+  const qs = [...q.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+  const canonical = ['PUT', path, qs, `host:${host}\n`, 'host', 'UNSIGNED-PAYLOAD'].join('\n');
+  const toSign = ['AWS4-HMAC-SHA256', t, scope, await sha256(canonical)].join('\n');
+  let k = await hmac(`AWS4${env.R2_SECRET}`, day);
+  k = await hmac(k, 'auto'); k = await hmac(k, 's3'); k = await hmac(k, 'aws4_request');
+  return `https://${host}${path}?${qs}&X-Amz-Signature=${hex(await hmac(k, toSign))}`;
+}
+export async function directUploadApi(ctx, id) {
+  const { request, env, site, me, url } = ctx;
+  if (!env.R2_KEY_ID || !env.R2_SECRET || !env.FILES) throw notFound('바로 올리기를 쓸 수 없습니다.');
+  if (me.kind === 'guest') throw new HttpError(401, '파일은 로그인한 뒤 올릴 수 있습니다.');
+  if (id) {   // 다 올렸다 — 실제 크기를 R2 에서 확인
+    const u = await env.DB.prepare("SELECT * FROM uploads WHERE id = ? AND site = ? AND kind = 'FILE'").bind(id, site).first();
+    if (!u || (me.kind === 'member' && u.created_by !== me.member.id && me.level !== 1)) throw notFound('없는 파일입니다.');
+    const head = await env.FILES.head(u.r2_key);
+    if (!head) throw bad('파일이 다 올라가지 않았습니다. 다시 올려 주세요.');
+    await env.DB.prepare('UPDATE uploads SET size = ? WHERE id = ? AND site = ?').bind(head.size, id, site).run();
+    const used = await usage(env, site);
+    await env.XIM_DB.prepare('UPDATE sites SET used_mb = ? WHERE slug = ?').bind(Math.round((used / 1048576) * 10) / 10, site).run();
+    return json({ id, url: `/xms/upload/${id}`, name: u.name, size: head.size, mime: u.mime, kind: 'FILE' });
+  }
+  // 서명 받기 — 권한은 uploadApi 와 같다(게시판 쓰기 권한 · 관리 화면 수정 요청은 관리자)
+  if (url.searchParams.get('for') === 'request') { if (me.level !== 1) throw forbidden('관리자만 올릴 수 있습니다.'); }
+  else {
+    const board = await env.DB.prepare('SELECT * FROM boards WHERE site = ? AND slug = ? AND deleted_at IS NULL').bind(site, url.searchParams.get('board') || '').first();
+    if (!board || (!board.visible && me.level !== 1)) throw notFound('없는 게시판입니다.');
+    if (!canBy(board.write_levels, board.allow_guest_write, me, true)) throw forbidden('이 게시판에 글을 쓸 수 없습니다.');
+  }
+  let raw = {}; try { raw = await request.json(); } catch { raw = {}; }
+  const size = Math.max(0, Math.floor(Number(raw.size) || 0));
+  if (!size) throw bad('빈 파일입니다.');
+  if (size > DIRECT_MAX) throw bad(`파일이 너무 큽니다 (${DIRECT_MAX / 1048576}MB 까지).`);
+  const name = String(raw.name || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 120) || 'file';
+  const mime = String(raw.type || 'application/octet-stream').split(';')[0].trim().toLowerCase().slice(0, 100) || 'application/octet-stream';
+  const site_ = await env.XIM_DB.prepare('SELECT quota_mb FROM sites WHERE slug = ?').bind(site).first();
+  const used = await usage(env, site);
+  if (site_?.quota_mb && used + size > site_.quota_mb * 1024 * 1024) throw bad('저장 공간이 가득 찼습니다. 운영자에게 늘려 달라고 요청하세요.');
+  if (Math.random() < 0.2) await purgeOrphans(env, site).catch(() => {});
+  const nid = randomHex(16), key = `${site}/${nid}`;
+  await env.DB.prepare('INSERT INTO uploads (id, site, post_id, kind, name, mime, size, data, r2_key, created_by, created_at) VALUES (?, ?, NULL, ?, ?, ?, ?, NULL, ?, ?, ?)')
+    .bind(nid, site, 'FILE', name, mime, size, key, me.kind === 'member' ? me.member.id : null, now()).run();
+  return json({ id: nid, put: await presignPut(env, key) });
+}
