@@ -75,6 +75,8 @@ design 쪽 규칙(`E:\ws\WebMaker\CLAUDE.md`, `E:\ws\WebMaker\design\CLAUDE.md`)
 
 ## Cloudflare 배포: 폴더 하나 = Worker 하나
 
+- **Pages 는 절대 만들지 않는다. Workers 로만 만든다.** (사용자 지시 2026-11-13 "꼭 기억하고 그대로") Compute › Workers & Pages 에 새로 추가할 때 — wrangler · 대시보드(크롬) · API 어느 길이든 — Pages 프로젝트(`wrangler pages …`, Pages 만들기 버튼)는 쓰지 않고 Worker(정적 파일은 Workers assets)로 만든다. 옛 Pages 사이트를 옮길 때도 Worker 로(예: olivebasket · sugarbreak).
+
 - **계정: 반드시 xiangdolee@gmail.com 의 Cloudflare 계정**(account id `f225d506d8cf6ddf97704a36c69f5ce7`, https://dash.cloudflare.com/f225d506d8cf6ddf97704a36c69f5ce7/workers-and-pages). design 리포의 다른 계정(`7ce9…`, master-7ce.workers.dev)에는 절대 올리지 않는다. (사용자 지시, 2026-11-03 "매우 중요")
 - 그래서 `npx wrangler deploy` 를 그냥 치지 않는다(기본 로그인이 design 리포의 다른 계정). **항상 `node deploy.mjs <폴더>`** — xiangdolee 전용 로그인(`%USERPROFILE%\.wrangler-xiangdolee`, 리포 밖)으로 빌드 + 배포한다. `build.mjs` 가 wrangler.jsonc 에 account_id 를 박아 두어 다른 계정으로는 올라가지 않는다.
 - 로그인이 풀렸으면 `node deploy.mjs --login` (브라우저 승인 필요 — 엣지에 xiangdolee 계정이 로그인돼 있음, 계정 고르는 화면에서 xiangdolee 를 고르라고 사용자에게 한 줄로 안내). 확인은 `node deploy.mjs --whoami`.
