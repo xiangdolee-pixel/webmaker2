@@ -60,7 +60,7 @@
     var sizeOf = function (n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; };
     var DL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>';
     var EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
-    var slug = arc.getAttribute('data-archive'), admin = false;
+    var slug = arc.getAttribute('data-xms-files') || arc.getAttribute('data-archive'), admin = false;
     var draw = function (list) {
       var cnt = $('[data-arc-count]'); if (cnt) cnt.textContent = list.length ? list.length + ' FILES' : '';
       if (!list.length) { arc.innerHTML = '<li class="arc-empty">아직 올린 자료가 없습니다.</li>'; return; }
@@ -345,9 +345,13 @@
       fetch('/xms-api/boards/' + slug + '/files', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : []; })
         .then(draw).catch(function () { arc.innerHTML = '<li class="arc-empty">자료를 불러오지 못했습니다. 잠시 뒤 다시 열어 주세요.</li>'; });
     };
-    fetch('/xms-api/me', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (me) {
-      admin = !!me.admin; var b = $('[data-arc-admin]'); if (b && admin) b.hidden = false;
-    }).catch(function () {}).then(load);
+    // 관리자인지: 사이트 Worker 가 계정 버튼 자리(data-xa-me)에 넣어 둔 값 — 따로 묻지 않는다
+    try { admin = !!JSON.parse(($('[data-xms-account]') || {}).getAttribute ? $('[data-xms-account]').getAttribute('data-xa-me') || '{}' : '{}').admin; } catch (e) { admin = false; }
+    var ab = $('[data-arc-admin]'); if (ab && admin) ab.hidden = false;
+    // 목록: 사이트 Worker 가 페이지와 함께 넣어 준 것(script#xms-files)을 바로 그린다 — 없을 때만 따로 받는다 (xim 공통, 사용자 지시 2026-11-13)
+    var pre = document.getElementById('xms-files-' + slug), first = null;
+    try { first = pre ? JSON.parse(pre.textContent) : null; } catch (e) { first = null; }
+    if (Array.isArray(first)) draw(first); else load();
   }
 
   /* 스크롤 등장 + 숫자 올라가기 */
@@ -658,7 +662,8 @@
     fetch('/site-api/inquiry-key').then(function (r) { return r.json(); }).then(function (d) {
       sitekey = d.sitekey || '';
       if (!sitekey) return;
-      window.bsfBotReady = function () { widget = window.turnstile.render(bot, { sitekey: sitekey, language: 'ko', size: 'flexible' }); };
+      // 확인 상자는 300px 아래로 줄지 않는다 → 좁은 폰에서는 작은 모양(compact)으로 (가로 넘침 막기)
+      window.bsfBotReady = function () { widget = window.turnstile.render(bot, { sitekey: sitekey, language: 'ko', size: bot.clientWidth < 300 ? 'compact' : 'flexible' }); };
       var sc = doc.createElement('script');
       sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=bsfBotReady';
       sc.async = true; doc.head.appendChild(sc);

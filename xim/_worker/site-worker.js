@@ -320,6 +320,21 @@ async function withXms(res, request, env, data) {
   let pageTitle = '';
 
   let rw = new HTMLRewriter();
+  // 페이지 불러오기 가볍게 (xim 공통, 사용자 지시 2026-11-13 "쓸데없는 걸 미리 불러오지 말고"):
+  //   ① 그림은 앞의 4장만 바로, 나머지는 화면에 다가올 때 받는다(loading 이 따로 적힌 그림은 그대로)
+  //   ② [data-xms-files="<게시판>"] 목록(자료실 등)은 페이지와 함께 넣어 보낸다 — 페이지가 뜬 뒤 미국 서부를 한 번 더 오가지 않게
+  let imgN = 0;
+  rw = rw.on('img', { element(el) { imgN++; if (imgN > 4 && !el.getAttribute('loading')) el.setAttribute('loading', 'lazy'); if (!el.getAttribute('decoding')) el.setAttribute('decoding', 'async'); } });
+  rw = rw.on('[data-xms-files]', {
+    async element(el) {
+      const slug = el.getAttribute('data-xms-files') || '';
+      if (!/^[a-z0-9-]{1,40}$/.test(slug)) return;
+      try {
+        const r = await forward(env.XMS, new Request(request.url, { headers: request.headers }), env, `/xms-api/boards/${slug}/files`);
+        if (r.ok) el.after(`<script type="application/json" id="xms-files-${slug}">${(await r.text()).replace(/</g, '\\u003c')}</script>`, { html: true });
+      } catch { /* 페이지가 따로 받는다 */ }
+    },
+  });
   // 사진은 R2(서울) 서명 주소로 — 국내 접속이 미국 서부 가장자리로 가서 사진마다 1~2초 걸리던 것 (xms staticMap, 2026-11-13)
   const st = data?.st && typeof data.st === 'object' ? data.st : null;
   if (st) {

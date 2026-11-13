@@ -594,7 +594,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .f { display: grid; gap: 7px; }
 .f > span { color: var(--sub); font-size: 15px; font-weight: 700; }
 .f > span i { color: var(--accent); font-style: normal; }
-.f input, .f select, .f textarea { width: 100%; min-height: 54px; padding: 13px 16px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--paper); font-size: 17px; transition: border-color .2s, background-color .2s; }
+.f { min-width: 0; }
+.f input, .f select, .f textarea { width: 100%; min-width: 0; max-width: 100%; min-height: 54px; padding: 13px 16px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--paper); font-size: 17px; transition: border-color .2s, background-color .2s; }
 .f textarea { min-height: 170px; resize: vertical; }
 .f input:focus, .f select:focus, .f textarea:focus { outline: none; border-color: var(--steel); background: #fff; }
 .picks { display: flex; flex-wrap: wrap; gap: 8px; }
