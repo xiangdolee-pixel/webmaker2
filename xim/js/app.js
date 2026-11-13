@@ -208,13 +208,13 @@ function render() {
 }
 
 // ───────── 사이트 ─────────
-let siteQ = '', siteCat = '';
+let siteQ = '', siteCat = '', allSites = [];
 // 사이트 분류 = 포트폴리오 분류(sites.portfolio_tag, 사이트 수정 창). 포트폴리오와 같은 차례, 비어 있으면 '미분류'
 const CAT_ORDER = ['홈페이지', '웹서비스', '웹앱', '웹게임'];
 const catOf = (s) => (s.portfolio_tag || '').split(/\s*[,·]\s*/).filter(Boolean)[0] || '미분류';   // 분류가 여럿('웹앱, 홈페이지')이면 첫째로 묶는다
 async function renderSites() {
   const [sites, cs] = await Promise.all([api('/sites'), api('/customers')]);
-  customers = cs;
+  customers = cs; allSites = sites;
   view.innerHTML = `
     <div class="bar"><h2>사이트 ${sites.length}</h2>
       <input class="input search-q" type="search" placeholder="사이트 · 고객 · 도메인 · 연락처 찾기" value="${esc(siteQ)}" data-q>
@@ -562,6 +562,34 @@ function qrDialog(site) {
 const customerOptions = (selected) => `<option value="">— 고객 없음 —</option>${customers
   .map((c) => `<option value="${c.id}"${c.id === selected ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}`;
 
+// 포트폴리오 분류 고르기 (사용자 지시 2026-11-13): 기본 분류 + 다른 사이트에서 쓴 분류를 알약 버튼으로, 여러 개 고를 수 있고 직접 더할 수도 있다.
+//   고른 값은 hidden 칸에 '웹앱, 홈페이지' 꼴로 (sites.portfolio_tag — 포트폴리오 탭 · xim 사이트 분류 탭이 이 값을 쓴다)
+function pfCatPicker(box, hidden) {
+  const split = (v) => String(v || '').split(/\s*[,·]\s*/).filter(Boolean);
+  let picked = split(hidden.value);
+  const used = allSites.flatMap((x) => split(x.portfolio_tag));
+  const opts = [...new Set([...CAT_ORDER, ...used, ...picked])];
+  const draw = () => {
+    box.innerHTML = opts.map((c) => `<button type="button" class="pf-cat${picked.includes(c) ? ' on' : ''}" aria-pressed="${picked.includes(c)}" data-c="${esc(c)}">${esc(c)}</button>`).join('')
+      + '<input class="input pf-cat-new" placeholder="+ 새 분류" maxlength="12" aria-label="새 분류 더하기">';
+    hidden.value = picked.join(', ');
+  };
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('.pf-cat'); if (!b) return;
+    const c = b.dataset.c; picked = picked.includes(c) ? picked.filter((x) => x !== c) : [...picked, c];
+    b.classList.toggle('on'); b.setAttribute('aria-pressed', picked.includes(c)); hidden.value = picked.join(', ');
+  });
+  box.addEventListener('keydown', (e) => {
+    if (!e.target.matches('.pf-cat-new') || e.key !== 'Enter') return;
+    e.preventDefault();
+    const c = e.target.value.trim().replace(/[,·]/g, '');
+    if (c && !opts.includes(c)) opts.push(c);
+    if (c && !picked.includes(c)) picked.push(c);
+    draw(); box.querySelector('.pf-cat-new').focus();
+  });
+  draw();
+}
+
 function siteDialog(site) {
   const s = site || { quota_mb: 500, status: 'active' };
   openDialog(`
@@ -579,18 +607,21 @@ function siteDialog(site) {
         <label class="field"><span>저장 용량 (MB)</span><input class="input" name="quota_mb" type="number" min="0" value="${esc(s.quota_mb)}" required></label>
       </div>
       <label class="field"><span>메모</span><textarea class="input" name="memo">${esc(s.memo)}</textarea></label>
-      ${site ? `<label class="field"><span>포트폴리오 분류</span><input class="input" name="portfolio_tag" value="${esc(s.portfolio_tag)}" maxlength="20" placeholder="홈페이지" list="pf-tags">${PF_TAGS}<small>포트폴리오에서 이 분류 탭으로 묶여 보입니다. 여러 개면 쉼표로 (예: 웹앱, 홈페이지)</small></label>` : ''}
+      <div class="field"><span>포트폴리오 분류</span><div class="pf-cats" data-pf-cats></div><input type="hidden" name="portfolio_tag" value="${esc(s.portfolio_tag)}">
+        <small>눌러서 고르세요(여러 개 가능). 포트폴리오에서 고른 분류 탭에 나옵니다.</small></div>
       <p class="err" role="alert"></p>
       <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">저장</button></div>
     </form>`, (dlg) => {
     const form = dlg.querySelector('form');
+    pfCatPicker(form.querySelector('[data-pf-cats]'), form.portfolio_tag);
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       busy(form.querySelector('[type=submit]'), form.querySelector('.err'), async () => {
         const { portfolio_tag: pfTag, ...rest } = formData(form);
         const data = { ...rest, status: s.status };
         const r = site ? await api(`/sites/${site.id}`, { method: 'PUT', data }) : await api('/sites', { method: 'POST', data });
-        if (site && pfTag !== undefined && pfTag.trim() !== (s.portfolio_tag || '')) await api(`/sites/${site.id}/portfolio`, { method: 'POST', data: { tag: pfTag } });
+        const sid = site ? site.id : r?.id;
+        if (sid && pfTag !== undefined && pfTag.trim() !== (s.portfolio_tag || '')) await api(`/sites/${sid}/portfolio`, { method: 'POST', data: { tag: pfTag } });
         dlg.close();
         const mail = r?.mail ? ` 메일: ${r.mail.message}` : '';
         toast(site ? `저장했습니다.${mail}` : `사이트를 만들었습니다.${mail}`);

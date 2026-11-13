@@ -48,6 +48,12 @@ a.btn { text-decoration: none; }
 .field > span { font-size: 14px; font-weight: 600; color: var(--sub); }
 .field small { color: var(--mute); font-size: 13px; }
 .field .req { color: var(--danger); font-style: normal; }
+/* 포트폴리오 분류 고르기 (사이트 수정 창) — 여러 개 고르는 알약 버튼 */
+.pf-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.pf-cat { padding: 7px 14px; border: 1px solid var(--line); border-radius: 99px; background: var(--surface); color: var(--sub); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color .2s, border-color .2s, color .2s; }
+.pf-cat:hover { border-color: var(--brand); color: var(--brand); }
+.pf-cat.on { border-color: var(--brand); background: var(--brand); color: #fff; }
+.pf-cats .pf-cat-new { width: 120px; padding: 6px 12px; border-radius: 99px; font-size: 14px; }
 .choice-set { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
 .choice-set legend { padding: 0; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--sub); }
 .choices { display: flex; flex-wrap: wrap; gap: 6px 16px; }
