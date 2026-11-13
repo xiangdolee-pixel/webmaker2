@@ -611,7 +611,7 @@ contact = head('생산 문의 | BSF COMPANY', '품목 · 수량 · 납기를 알
           <fieldset class="f-step"><legend><b>02</b>수량과 일정</legend>
             <div class="f-grid two">
               <label class="f"><span>예상 수량</span><select name="qty"><option value="">고르세요</option><option>300장 미만</option><option>300 ~ 1,000장</option><option>1,000 ~ 5,000장</option><option>5,000 ~ 20,000장</option><option>20,000장 이상</option><option>아직 미정</option></select></label>
-              <label class="f"><span>희망 납기</span><input name="due" type="month" aria-label="희망 납기 (년-월)"></label>
+              <label class="f"><span>희망 납기</span><input name="due" type="date" aria-label="희망 납기 (년-월-일)"></label>
             </div>
             <label class="f" style="margin-top:16px"><span>준비된 것</span><select name="ready"><option value="">고르세요</option><option>아이디어 · 레퍼런스만</option><option>디자인 스케치</option><option>작업지시서(테크팩)</option><option>샘플(실물)</option></select></label>
           </fieldset>

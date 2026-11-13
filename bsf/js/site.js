@@ -647,6 +647,8 @@
   /* 날짜 칸은 어디를 눌러도 달력이 뜨게 (사용자 지시 2026-11-12) */
   $$('input[type="date"], input[type="month"]').forEach(function (d) {
     d.addEventListener('click', function () { try { if (d.showPicker) d.showPicker(); } catch (x) { /* 오래된 브라우저 */ } });
+    // 희망 납기는 오늘부터 고를 수 있게 (날짜까지 — 사용자 지시 2026-11-13)
+    if (d.name === 'due' && d.type === 'date') { var t = new Date(); t.setMinutes(t.getMinutes() - t.getTimezoneOffset()); d.min = t.toISOString().slice(0, 10); }
   });
 
   /* 생산 문의 폼 → /site-api/inquiry (xim '제작문의' 로 모인다). 봇 확인 = Cloudflare Turnstile */
