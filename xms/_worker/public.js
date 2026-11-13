@@ -557,7 +557,7 @@ export async function publicApi(ctx) {
   if (path === '/apply' || path === '/apply/draft') return publicApply(ctx, path); // 신청서 내기 · 임시 저장 (apply.js)
 
   // 게시판 최신 글 — 사이트 첫 화면 등에서 사이트 디자인 그대로 그릴 때 쓴다 (예: sjccc 홈 "포토")
-  // 글 관리 (관리자): 고른 글 숨김 · 보이기 · 삭제(deleted_at — DB 에는 남아 운영자가 되살릴 수 있다)
+  // 글 관리 (관리자): 고른 글 숨김 · 보이기 · 삭제(첨부 파일 · 댓글 · 글 기록까지 DB 에서 지운다 — 사용자 지시 2026-11-13)
   if ((m = path.match(/^\/boards\/([a-z0-9-]+)\/manage$/)) && method === 'POST') {
     if (me.level !== 1) throw forbidden('관리자만 할 수 있습니다.');
     const b = await loadBoard(db, site, m[1]);
@@ -567,9 +567,20 @@ export async function publicApi(ctx) {
     if (!ids.length) throw bad('글을 골라 주세요.');
     const SQL = { hide: 'is_hidden = 1', show: 'is_hidden = 0', delete: 'deleted_at = ?' };
     if (!SQL[raw.action]) throw bad('할 일을 알 수 없습니다.');
-    const q = `UPDATE posts SET ${SQL[raw.action]} WHERE board_id = ? AND deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`;
-    const r = await db.prepare(q).bind(...(raw.action === 'delete' ? [now()] : []), b.id, ...ids).run();
-    if (raw.action === 'delete') await removePostFiles(env, site, ids);
+    const inIds = ids.map(() => '?').join(',');
+    let r;
+    if (raw.action === 'delete') {
+      const { results: mine } = await db.prepare(`SELECT id FROM posts WHERE site = ? AND board_id = ? AND id IN (${inIds})`).bind(site, b.id, ...ids).all();
+      const del = mine.map((x) => x.id);
+      await removePostFiles(env, site, del);
+      if (del.length) {
+        const q2 = del.map(() => '?').join(',');
+        await db.prepare(`DELETE FROM comments WHERE site = ? AND post_id IN (${q2})`).bind(site, ...del).run();
+        r = await db.prepare(`DELETE FROM posts WHERE site = ? AND id IN (${q2})`).bind(site, ...del).run();
+      } else r = { meta: { changes: 0 } };
+    } else {
+      r = await db.prepare(`UPDATE posts SET ${SQL[raw.action]} WHERE board_id = ? AND deleted_at IS NULL AND id IN (${inIds})`).bind(b.id, ...ids).run();
+    }
     const label = { hide: '숨김', show: '보이기', delete: '삭제' }[raw.action];
     await audit(db, site, me, request, 'POSTS_MANAGE', b.name, `${label} ${r.meta.changes}개`);
     return json({ ok: true, changed: r.meta.changes });
@@ -754,8 +765,12 @@ export async function publicApi(ctx) {
       return json({ ok: true });
     }
     if (method === 'DELETE') {
-      await db.prepare('UPDATE posts SET deleted_at = ? WHERE id = ?').bind(now(), p.id).run();
+      // 글을 지우면 첨부 파일(R2 · uploads)과 글 · 댓글 기록까지 DB 에서 모두 지운다 (사용자 지시 2026-11-13)
       await removePostFiles(env, site, [p.id]);
+      await db.batch([
+        db.prepare('DELETE FROM comments WHERE site = ? AND post_id = ?').bind(site, p.id),
+        db.prepare('DELETE FROM posts WHERE site = ? AND id = ?').bind(site, p.id),
+      ]);
       return json({ ok: true });
     }
   }

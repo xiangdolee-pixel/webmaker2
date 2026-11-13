@@ -50,9 +50,26 @@ export async function shrinkImage(file, { max = 1920, maxBytes = 900000 } = {}) 
   const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
   return new File([blob], `${file.name.replace(/\.\w+$/, '')}.${ext}`, { type: blob.type });
 }
-export async function uploadFile(board, kind, file) {
+export async function uploadFile(board, kind, file, onProgress) {
   // board 가 '@request' 면 관리 화면 수정 요청용 (관리자만)
   const where = board.startsWith('@') ? `for=${board.slice(1)}` : `board=${encodeURIComponent(board)}`;
+  // onProgress(0~1) 를 주면 올라간 만큼 알려 준다(큰 파일 — 첨부 목록에 '올리는 중 n%', 사용자 지시 2026-11-13)
+  if (onProgress) {
+    return new Promise((resolve, reject) => {
+      const x = new XMLHttpRequest();
+      x.open('POST', `/xms-api/uploads?${where}&kind=${kind}`);
+      x.withCredentials = true;
+      x.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      x.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
+      x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+      x.onload = () => {
+        let out = null; try { out = JSON.parse(x.responseText); } catch { /* 본문 없음 */ }
+        if (x.status >= 200 && x.status < 300 && out) resolve(out); else reject(new Error(out?.error || '올리지 못했습니다.'));
+      };
+      x.onerror = () => reject(new Error('인터넷 연결이 끊겨 올리지 못했습니다.'));
+      x.send(file);
+    });
+  }
   const res = await fetch(`/xms-api/uploads?${where}&kind=${kind}`, {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) },
@@ -314,8 +331,11 @@ export function mountAttach(box, { ed = null, target, files = [] }) {
       <button type="button" class="att-x" aria-label="본문에서 빼기" title="본문에서 빼기">✕</button></div>`).join('')
       + files.map((u, i) => `<div class="att" data-i="${i}">${u.kind === 'IMAGE' ? `<img src="${esc(u.url)}" alt="">` : '<span class="att-ico">📄</span>'}
       <span class="att-name">${esc(u.name)}<small>${sizeText(u.size)}</small></span>
-      <button type="button" class="att-x" aria-label="빼기" title="빼기">✕</button></div>`).join('');
+      <button type="button" class="att-x" aria-label="빼기" title="빼기">✕</button></div>`).join('')
+      + pending.map((p) => `<div class="att att-up" aria-live="polite"><span class="att-spin" aria-hidden="true"></span>
+      <span class="att-name">${esc(p.name)}<small>올리는 중… ${Math.round(p.pct * 100)}% · ${sizeText(p.size)}</small><i class="att-bar"><b style="width:${Math.round(p.pct * 100)}%"></b></i></span></div>`).join('');
   };
+  const pending = [];   // 올리는 중인 파일 — 다 올라갈 때까지 목록에 '올리는 중' 줄로 보인다
   list.addEventListener('click', (e) => {
     const row = e.target.closest('.att-x')?.closest('.att');
     if (!row) return;
@@ -330,17 +350,22 @@ export function mountAttach(box, { ed = null, target, files = [] }) {
     input.type = 'file'; input.multiple = true;
     if (kind === 'IMAGE') input.accept = 'image/png,image/jpeg,image/gif,image/webp';
     input.onchange = async () => {
-      for (const f of input.files) {
+      const picked = [...input.files].map((f) => ({ f, name: f.name, size: f.size, pct: 0 }));
+      pending.push(...picked); draw();
+      const submit = box.closest('form')?.querySelector('[type=submit]');
+      if (submit) submit.disabled = true;   // 다 올라가기 전에 등록하면 파일이 빠진다
+      for (const p of picked) {
+        const prog = (v) => { p.pct = v; draw(); };
         try {
-          toast(`${f.name} 올리는 중…`);
           if (kind === 'IMAGE' && ed && ed.mode() === 'editor') {
-            ed.addImage(await uploadFile(target, 'INLINE', await shrinkImage(f)));
+            ed.addImage(await uploadFile(target, 'INLINE', await shrinkImage(p.f), prog));
           } else {
-            files.push(await uploadFile(target, kind, kind === 'IMAGE' ? await shrinkImage(f) : f));
-            draw();
+            files.push(await uploadFile(target, kind, kind === 'IMAGE' ? await shrinkImage(p.f) : p.f, prog));
           }
-        } catch (er) { toast(er.message); }
+        } catch (er) { toast(`${p.name}: ${er.message}`); }
+        pending.splice(pending.indexOf(p), 1); draw();
       }
+      if (submit && !pending.length) submit.disabled = false;
     };
     input.click();
   }));

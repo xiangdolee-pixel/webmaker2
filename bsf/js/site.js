@@ -76,9 +76,18 @@
           }).join('') + '</div></li>';
       }).join('');
     };
-    /* PDF 뷰어 (사용자 지시 2026-11-13): 화면 위에 띄워 보고 닫는다. 폰(iOS · 안드로이드)도 같게 PDF.js 로 쪽마다 그린다(보이는 쪽만) */
+    /* PDF 뷰어 (사용자 지시 2026-11-13): 화면 위에 띄워 보고 닫는다. 폰(iOS · 안드로이드)도 같게 PDF.js 로 그린다.
+       보기 방식 = 스크롤(쪽을 이어서) · 한 쪽씩(슬라이드쇼) · 책(좌우 펼침, 쪽 넘김), 전체화면 */
     var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
-    var pdfLib = null, pv = null, pvDoc = null, pvIO = null, pvOpen = false;
+    var pdfLib = null, pv = null, pvDoc = null, pvIO = null, pvOpen = false, pvMode = 'scroll', pvCur = 1, pvBusy = false, pvCache = {}, pvRatio = 1.414;
+    try { pvMode = localStorage.getItem('pv-mode') || 'scroll'; } catch (e) {}
+    var MODES = [['scroll', '스크롤'], ['slide', '한 쪽씩'], ['book', '전자책']];
+    var ICO = {
+      full: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>',
+      unfull: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg>',
+      prev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+      next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>'
+    };
     var loadLib = function () {
       if (pdfLib) return pdfLib;
       pdfLib = new Promise(function (ok, no) {
@@ -89,74 +98,217 @@
       });
       return pdfLib;
     };
+    // n 쪽을 화면 폭 w(px)로 그린 캔버스 (같은 크기면 다시 쓰고, 그릴 때마다 새 캔버스로 복사해 준다)
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var pageCanvas = function (n, w) {
+      var key = n + '@' + Math.round(w);
+      if (!pvCache[key]) {
+        pvCache[key] = pvDoc.getPage(n).then(function (pg) {
+          var vp = pg.getViewport({ scale: w / pg.getViewport({ scale: 1 }).width * dpr }), c = document.createElement('canvas');
+          c.width = vp.width; c.height = vp.height;
+          return pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise.then(function () { return c; });
+        });
+      }
+      return pvCache[key].then(function (src) {
+        var c = document.createElement('canvas'); c.width = src.width; c.height = src.height; c.getContext('2d').drawImage(src, 0, 0);
+        c.style.width = w + 'px'; c.style.height = (w * src.height / src.width) + 'px'; return c;
+      });
+    };
+    var bodyEl, pagesEl, stageEl, msgEl;
+    var setPage = function () { $('.pv-page', pv).textContent = pvDoc ? (spreadOf(pvCur).length > 1 ? spreadOf(pvCur).join('–') : pvCur) + ' / ' + pvDoc.numPages : ''; };
+    var narrow = function () { return stageEl.clientWidth < 760; };
+    // 전자책: 1쪽은 표지(가운데 한 장), 그 뒤로 2–3, 4–5 … 마지막이 홀로 남으면 가운데 (좁은 화면은 한 장씩)
+    var spreadOf = function (n) {
+      if (pvMode !== 'book' || narrow()) return [n];
+      if (n === 1) return [1];
+      var a = n % 2 === 0 ? n : n - 1;
+      return a + 1 <= pvDoc.numPages ? [a, a + 1] : [a];
+    };
+    var fitW = function (count) {   // 무대 안에 쪽이 다 들어가는 폭
+      var W = stageEl.clientWidth - (narrow() ? 24 : 140), H = stageEl.clientHeight - 32;
+      return Math.max(120, Math.min(W / count, H / pvRatio));
+    };
+    var drawStage = function () {
+      var sp = spreadOf(pvCur), w = fitW(pvMode === 'book' && !narrow() ? 2 : 1);
+      return Promise.all(sp.map(function (n) { return pageCanvas(n, w); })).then(function (cs) {
+        var row = document.createElement('div'); row.className = 'pv-spread' + (sp.length === 1 && pvMode === 'book' && !narrow() ? ' cover' : '');
+        cs.forEach(function (c, i) { var f = document.createElement('div'); f.className = 'pv-leafpage' + (sp.length > 1 ? (i ? ' r' : ' l') : ''); f.appendChild(c); row.appendChild(f); });
+        var old = $('.pv-spread', stageEl); if (old) stageEl.removeChild(old);
+        stageEl.appendChild(row); setPage(); navState();
+      });
+    };
+    var navState = function () {
+      var last = spreadOf(pvCur); $('.pv-prev', pv).disabled = pvCur <= 1; $('.pv-next', pv).disabled = last[last.length - 1] >= pvDoc.numPages;
+    };
+    var stepOf = function (dir) {   // 다음 · 앞 펼침의 첫 쪽
+      var sp = spreadOf(pvCur);
+      if (dir > 0) return Math.min(pvDoc.numPages, sp[sp.length - 1] + 1);
+      var p = sp[0] - 1; if (p < 1) return 1;
+      return spreadOf(p)[0];
+    };
+    var reduce2 = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var go = function (dir) {
+      if (!pvDoc || pvBusy || pvMode === 'scroll') return;
+      var to = stepOf(dir); if (to === pvCur || (dir < 0 && pvCur <= 1)) return;
+      if (pvMode === 'slide' || reduce2) {
+        var cur = $('.pv-spread', stageEl);
+        if (cur && !reduce2) { cur.style.transition = 'opacity .18s, transform .18s'; cur.style.opacity = '0'; cur.style.transform = 'translateX(' + (dir > 0 ? -24 : 24) + 'px)'; }
+        pvBusy = true; pvCur = to;
+        setTimeout(function () {
+          drawStage().then(function () {
+            var nw = $('.pv-spread', stageEl);
+            if (nw && !reduce2) { nw.style.opacity = '0'; nw.style.transform = 'translateX(' + (dir > 0 ? 24 : -24) + 'px)'; nw.offsetWidth; nw.style.transition = 'opacity .22s, transform .22s'; nw.style.opacity = '1'; nw.style.transform = 'none'; }
+            pvBusy = false;
+          });
+        }, reduce2 ? 0 : 160);
+        return;
+      }
+      // 책: 넘기는 장(앞면 = 지금 쪽, 뒷면 = 다음 쪽)이 책등을 축으로 돌아간다
+      pvBusy = true;
+      var sp = spreadOf(pvCur), nsp = (function () { var k = pvCur; pvCur = to; var r = spreadOf(to); pvCur = k; return r; })();
+      var one = narrow(), w = fitW(one ? 1 : 2);
+      var frontN = dir > 0 ? sp[sp.length - 1] : sp[0], backN = dir > 0 ? nsp[0] : nsp[nsp.length - 1];
+      Promise.all([pageCanvas(frontN, w), pageCanvas(backN, w), Promise.all(nsp.map(function (n) { return pageCanvas(n, w); }))]).then(function (r) {
+        var row = $('.pv-spread', stageEl);
+        var under = document.createElement('div'); under.className = 'pv-spread under' + (nsp.length === 1 && !one ? ' cover' : '');
+        r[2].forEach(function (c, i) { var f = document.createElement('div'); f.className = 'pv-leafpage' + (nsp.length > 1 ? (i ? ' r' : ' l') : ''); f.appendChild(c); under.appendChild(f); });
+        // 넘기는 동안 아래에는: 다음으로 가면 지금 왼쪽 + 다음 오른쪽, 앞으로 가면 앞 왼쪽 + 지금 오른쪽이 보인다
+        if (!one && nsp.length > 1 && sp.length > 1) {
+          var keepSide = dir > 0 ? $('.pv-leafpage.l', row) : $('.pv-leafpage.r', row), hideSide = dir > 0 ? $('.pv-leafpage.l', under) : $('.pv-leafpage.r', under);
+          if (keepSide && hideSide) hideSide.style.visibility = 'hidden', under._swap = [hideSide, keepSide];
+        }
+        stageEl.insertBefore(under, row);
+        if (!one) { var face = dir > 0 ? $('.pv-leafpage.r', row) || $('.pv-leafpage', row) : $('.pv-leafpage.l', row) || $('.pv-leafpage', row); if (face) face.style.visibility = 'hidden'; }
+        else row.style.visibility = 'hidden';
+        var leaf = document.createElement('div'); leaf.className = 'pv-leaf ' + (dir > 0 ? 'fwd' : 'back') + (one ? ' one' : '');
+        var f1 = document.createElement('div'), f2 = document.createElement('div'); f1.className = 'pv-face front'; f2.className = 'pv-face backface';
+        f1.appendChild(r[0]); f2.appendChild(r[1]); leaf.appendChild(f1); leaf.appendChild(f2);
+        var ref = (one ? row : (dir > 0 ? $('.pv-leafpage.r', row) || $('.pv-leafpage', row) : $('.pv-leafpage.l', row) || $('.pv-leafpage', row))).getBoundingClientRect(), sr = stageEl.getBoundingClientRect();
+        leaf.style.left = (ref.left - sr.left) + 'px'; leaf.style.top = (ref.top - sr.top) + 'px'; leaf.style.width = ref.width + 'px'; leaf.style.height = ref.height + 'px';
+        stageEl.appendChild(leaf); leaf.offsetWidth; leaf.classList.add('turn');
+        setTimeout(function () {
+          pvCur = to; stageEl.removeChild(leaf); stageEl.removeChild(row);
+          if (under._swap) under._swap[0].style.visibility = '';
+          under.classList.remove('under'); setPage(); navState(); pvBusy = false;
+        }, 720);
+      });
+    };
+    var mountScroll = function () {
+      pagesEl.innerHTML = '';
+      if (pvIO) pvIO.disconnect();
+      var w = Math.min(bodyEl.clientWidth - 28, 1100);
+      pvIO = new IntersectionObserver(function (ents) {
+        ents.forEach(function (en) {
+          var box = en.target; if (!en.isIntersecting || box._done) return;
+          box._done = true; pageCanvas(+box.getAttribute('data-n'), w).then(function (c) { c.style.width = '100%'; c.style.height = 'auto'; box.appendChild(c); }).catch(function () {});
+        });
+      }, { root: bodyEl, rootMargin: '600px 0px' });
+      for (var n = 1; n <= pvDoc.numPages; n++) {
+        var box = document.createElement('div'); box.className = 'pv-p'; box.setAttribute('data-n', n);
+        box.style.width = w + 'px'; box.style.aspectRatio = '1 / ' + pvRatio;
+        pagesEl.appendChild(box); pvIO.observe(box);
+      }
+      var target = $('.pv-p[data-n="' + pvCur + '"]', pagesEl); if (target) bodyEl.scrollTop = target.offsetTop - 16;
+      onScrollV();
+    };
+    var onScrollV = function () {
+      if (pvMode !== 'scroll' || !pvDoc) return;
+      var top = bodyEl.getBoundingClientRect().top + 40, cur = 1;
+      $$('.pv-p', pagesEl).forEach(function (bx) { if (bx.getBoundingClientRect().top <= top) cur = +bx.getAttribute('data-n'); });
+      pvCur = cur; setPage();
+    };
+    var applyMode = function () {
+      pv.setAttribute('data-mode', pvMode);
+      $$('.pv-mode', pv).forEach(function (b) { var on = b.getAttribute('data-m') === pvMode; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+      moveInd();
+      if (!pvDoc) return;
+      if (pvMode === 'scroll') { stageEl.innerHTML = ''; mountScroll(); }
+      else { if (pvIO) pvIO.disconnect(); pagesEl.innerHTML = ''; if (pvMode === 'book') pvCur = spreadOf(pvCur)[0]; drawStage(); }
+    };
+    var moveInd = function () {   // 고른 칸 배경이 미끄러지듯 옮겨 간다 (탭 규칙)
+      var on = $('.pv-mode.on', pv), ind = $('.pv-ind', pv); if (!on || !ind || !on.offsetWidth) return;
+      ind.style.width = on.offsetWidth + 'px'; ind.style.transform = 'translateX(' + on.offsetLeft + 'px)';
+    };
+    var isFull = function () { return document.fullscreenElement || document.webkitFullscreenElement; };
+    var fullBtn = function () { var b = $('.pv-full', pv); b.innerHTML = isFull() ? ICO.unfull : ICO.full; b.setAttribute('aria-label', isFull() ? '전체화면 끄기' : '전체화면'); b.title = b.getAttribute('aria-label'); };
+    var toggleFull = function () {
+      if (isFull()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      else if (pv.requestFullscreen) pv.requestFullscreen().catch(function () {});
+      else if (pv.webkitRequestFullscreen) pv.webkitRequestFullscreen();
+    };
     var closeV = function (fromPop) {
       if (!pvOpen) return; pvOpen = false;
+      if (isFull()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
       pv.classList.remove('on'); document.documentElement.classList.remove('pv-lock');
       if (pvIO) pvIO.disconnect();
       if (pvDoc) { pvDoc.destroy(); pvDoc = null; }
-      setTimeout(function () { if (!pvOpen) $('.pv-pages', pv).innerHTML = ''; }, 300);
+      pvCache = {};
+      setTimeout(function () { if (!pvOpen) { pagesEl.innerHTML = ''; stageEl.innerHTML = ''; } }, 300);
       if (!fromPop && history.state && history.state.pv) history.back();
       if (pv._from) pv._from.focus();
     };
+    var build = function () {
+      pv = document.createElement('div'); pv.className = 'pv'; pv.setAttribute('role', 'dialog'); pv.setAttribute('aria-modal', 'true');
+      pv.innerHTML = '<div class="pv-bar"><b class="pv-title"></b><span class="pv-page"></span>'
+        + '<div class="pv-modes" role="group" aria-label="보기 방식"><span class="pv-ind" aria-hidden="true"></span>' + MODES.map(function (m) { return '<button type="button" class="pv-mode" data-m="' + m[0] + '" aria-pressed="false">' + m[1] + '</button>'; }).join('') + '</div>'
+        + '<button type="button" class="pv-full pv-ic"></button>'
+        + '<a class="pv-dl" download>' + DL + '<span>내려받기</span></a>'
+        + '<button type="button" class="pv-x pv-ic" aria-label="닫기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>'
+        + '<div class="pv-body"><div class="pv-pages"></div><div class="pv-stage"></div><p class="pv-msg"></p>'
+        + '<button type="button" class="pv-nav pv-prev" aria-label="앞 쪽">' + ICO.prev + '</button><button type="button" class="pv-nav pv-next" aria-label="다음 쪽">' + ICO.next + '</button></div>';
+      document.body.appendChild(pv);
+      bodyEl = $('.pv-body', pv); pagesEl = $('.pv-pages', pv); stageEl = $('.pv-stage', pv); msgEl = $('.pv-msg', pv);
+      $('.pv-x', pv).addEventListener('click', function () { closeV(); });
+      $('.pv-full', pv).addEventListener('click', toggleFull);
+      $('.pv-prev', pv).addEventListener('click', function () { go(-1); });
+      $('.pv-next', pv).addEventListener('click', function () { go(1); });
+      $$('.pv-mode', pv).forEach(function (b) { b.addEventListener('click', function () {
+        pvMode = b.getAttribute('data-m'); try { localStorage.setItem('pv-mode', pvMode); } catch (e) {}
+        applyMode();
+      }); });
+      bodyEl.addEventListener('scroll', onScrollV);
+      stageEl.addEventListener('click', function (e) {   // 쪽 오른쪽 절반을 누르면 다음, 왼쪽 절반은 앞
+        if (pvMode === 'scroll') return; var r = stageEl.getBoundingClientRect(); go(e.clientX - r.left > r.width / 2 ? 1 : -1);
+      });
+      var tx = null;
+      stageEl.addEventListener('touchstart', function (e) { tx = e.touches[0].clientX; }, { passive: true });
+      stageEl.addEventListener('touchend', function (e) { if (tx === null) return; var dx = e.changedTouches[0].clientX - tx; tx = null; if (Math.abs(dx) > 45) go(dx < 0 ? 1 : -1); });
+      document.addEventListener('keydown', function (e) {
+        if (!pvOpen) return;
+        if (e.key === 'Escape' && !isFull()) closeV();
+        else if (e.key === 'ArrowRight' || e.key === 'PageDown') { go(1); }
+        else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { go(-1); }
+      });
+      document.addEventListener('fullscreenchange', function () { fullBtn(); setTimeout(applyMode, 120); });
+      document.addEventListener('webkitfullscreenchange', function () { fullBtn(); setTimeout(applyMode, 120); });
+      window.addEventListener('popstate', function () { closeV(true); });
+      var rz = 0; window.addEventListener('resize', function () { if (!pvOpen) return; clearTimeout(rz); rz = setTimeout(function () { pvCache = {}; applyMode(); }, 200); });
+      if (!(pv.requestFullscreen || pv.webkitRequestFullscreen)) $('.pv-full', pv).hidden = true;   // 아이폰 사파리 등은 전체화면이 없다
+    };
     var openV = function (btn) {
-      if (!pv) {
-        pv = document.createElement('div'); pv.className = 'pv'; pv.setAttribute('role', 'dialog'); pv.setAttribute('aria-modal', 'true');
-        pv.innerHTML = '<div class="pv-bar"><b class="pv-title"></b><span class="pv-page"></span><a class="pv-dl" download>' + DL + '<span>내려받기</span></a>'
-          + '<button type="button" class="pv-x" aria-label="닫기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>'
-          + '<div class="pv-body"><div class="pv-pages"></div><p class="pv-msg"></p></div>';
-        document.body.appendChild(pv);
-        $('.pv-x', pv).addEventListener('click', function () { closeV(); });
-        pv.addEventListener('click', function (e) { if (e.target === pv || e.target.classList.contains('pv-body')) closeV(); });
-        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeV(); });
-        window.addEventListener('popstate', function () { closeV(true); });
-      }
-      pv._from = btn; pvOpen = true;
+      if (!pv) build();
+      pv._from = btn; pvOpen = true; pvCur = 1; pvCache = {};
       $('.pv-title', pv).textContent = btn.getAttribute('data-title');
       $('.pv-dl', pv).href = btn.getAttribute('data-dl');
       $('.pv-page', pv).textContent = '';
-      var msg = $('.pv-msg', pv), pages = $('.pv-pages', pv);
-      pages.innerHTML = ''; msg.textContent = '불러오는 중…'; msg.hidden = false;
-      document.documentElement.classList.add('pv-lock'); pv.classList.add('on');
+      pagesEl.innerHTML = ''; stageEl.innerHTML = ''; msgEl.textContent = '불러오는 중…'; msgEl.hidden = false;
+      document.documentElement.classList.add('pv-lock'); pv.classList.add('on'); fullBtn();
+      pv.setAttribute('data-mode', pvMode); applyMode();
       history.pushState({ pv: 1 }, '');
       $('.pv-x', pv).focus();
       loadLib().then(function (lib) {
         var task = lib.getDocument({ url: btn.getAttribute('data-view'), withCredentials: true });
-        task.onProgress = function (p) { if (p.total) msg.textContent = '불러오는 중… ' + Math.round(p.loaded / p.total * 100) + '%'; };
+        task.onProgress = function (p) { if (p.total) msgEl.textContent = '불러오는 중… ' + Math.round(p.loaded / p.total * 100) + '%'; };
         return task.promise;
       }).then(function (doc) {
         if (!pvOpen) { doc.destroy(); return; }
-        pvDoc = doc; msg.hidden = true;
-        var w = Math.min(pages.clientWidth, 1100), dpr = Math.min(window.devicePixelRatio || 1, 2);
+        pvDoc = doc;
         return doc.getPage(1).then(function (p1) {
-          var v1 = p1.getViewport({ scale: 1 }), ratio = v1.width + ' / ' + v1.height;
-          pvIO = new IntersectionObserver(function (ents) {
-            ents.forEach(function (en) {
-              var box = en.target;
-              if (!en.isIntersecting || box._done) return;
-              box._done = true;
-              doc.getPage(+box.getAttribute('data-n')).then(function (pg) {
-                var vp = pg.getViewport({ scale: w / pg.getViewport({ scale: 1 }).width * dpr }), c = document.createElement('canvas');
-                c.width = vp.width; c.height = vp.height; box.style.aspectRatio = vp.width + ' / ' + vp.height; box.appendChild(c);
-                return pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
-              }).catch(function () {});
-            });
-          }, { root: $('.pv-body', pv), rootMargin: '600px 0px' });
-          var bodyEl = $('.pv-body', pv), onPv = function () {
-            var top = bodyEl.getBoundingClientRect().top + 40, cur = 1;
-            $$('.pv-p', pages).forEach(function (bx) { if (bx.getBoundingClientRect().top <= top) cur = +bx.getAttribute('data-n'); });
-            $('.pv-page', pv).textContent = cur + ' / ' + doc.numPages;
-          };
-          bodyEl.onscroll = onPv;
-          for (var n = 1; n <= doc.numPages; n++) {
-            var box = document.createElement('div'); box.className = 'pv-p'; box.setAttribute('data-n', n);
-            box.style.width = w + 'px'; box.style.aspectRatio = ratio;
-            pages.appendChild(box); pvIO.observe(box);
-          }
-          onPv();
+          var v = p1.getViewport({ scale: 1 }); pvRatio = v.height / v.width; msgEl.hidden = true; applyMode();
         });
       }).catch(function () {
-        msg.hidden = false;
-        msg.innerHTML = '이 화면에서 열지 못했습니다. <a href="' + escA(btn.getAttribute('data-dl')) + '" download>내려받아 보기</a>';
+        msgEl.hidden = false;
+        msgEl.innerHTML = '이 화면에서 열지 못했습니다. <a href="' + escA(btn.getAttribute('data-dl')) + '" download>내려받아 보기</a>';
       });
     };
     arc.addEventListener('click', function (e) { var b = e.target.closest('[data-view]'); if (b) openV(b); });
@@ -214,7 +366,7 @@
     });
     el.classList.add('go');
   }
-  $$('.st-dots').forEach(function (v) { var it = $$('i', v); it.forEach(function (i, n) { i.style.transitionDelay = Math.round(200 + n * 1700 / it.length) + 'ms'; }); });
+  $$('.st-vis').forEach(function (v) { var it = $$('i', v); it.forEach(function (i, n) { i.style.transitionDelay = Math.round(200 + n * 1700 / it.length) + 'ms'; }); });
   var rvs = $$('.rv, .world'), counts = $$('[data-count]');
   if ('IntersectionObserver' in window) {
     var io = new IntersectionObserver(function (ents) {

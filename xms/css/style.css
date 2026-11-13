@@ -748,6 +748,13 @@ p.meta, small.meta { display: block; }
 .att-ico { width: 48px; text-align: center; font-size: 24px; }
 .att-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .att-name small { display: block; color: var(--mute); }
+.att-up { border-style: dashed; }
+.att-spin { flex: none; width: 48px; height: 28px; background: no-repeat center / 24px 24px; }
+.att-spin::before { content: ''; display: block; width: 22px; height: 22px; margin: 3px auto; border: 2.5px solid var(--line); border-top-color: var(--brand, #111); border-radius: 50%; animation: att-spin .8s linear infinite; }
+@keyframes att-spin { to { transform: rotate(360deg); } }
+.att-bar { display: block; height: 4px; margin-top: 6px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.att-bar b { display: block; height: 100%; background: var(--brand, #111); transition: width .2s; }
+@media (prefers-reduced-motion: reduce) { .att-spin::before { animation-duration: 2.4s; } }
 .att-x { width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; color: var(--mute); cursor: pointer; }
 .att-x:hover { background: var(--danger-soft); color: var(--danger); }
 .content-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
