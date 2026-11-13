@@ -184,6 +184,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .stats b { display: flex; align-items: flex-start; font-family: var(--display); font-size: clamp(54px, 7.4vw, 112px); font-weight: 800; line-height: 1; letter-spacing: -.045em; color: var(--navy); font-variant-numeric: tabular-nums; }
 .stats b sup { margin: .06em 0 0 4px; font-size: .42em; line-height: 1; color: var(--accent); }
 .stats li > span { display: block; margin-top: 14px; color: var(--sub); font-size: clamp(15px, 1.15vw, 18px); font-weight: 600; letter-spacing: -.01em; }
+/* 숫자 오도미터 (js countUp) — 자리마다 띠가 굴러 올라가 부드럽게 멈춤, 도는 동안 살짝 흐림 */
+.odo { display: inline-flex; }
+.odo-d { display: inline-block; height: 1em; overflow: hidden; }
+.odo-s { display: block; transition-property: transform; transition-timing-function: cubic-bezier(.16, .84, .22, 1); will-change: transform; }
+.odo-s i { display: block; height: 1em; font-style: normal; }
+.odo.go .odo-s { animation: odo-blur 2.2s cubic-bezier(.3, 0, .2, 1) both; }
+@keyframes odo-blur { 0% { filter: blur(0); opacity: .35; } 18% { filter: blur(2.5px); opacity: 1; } 70% { filter: blur(.6px); } 100% { filter: blur(0); } }
+.stats li::before { transform-origin: left; transform: scaleX(0); transition: transform 1.2s cubic-bezier(.22, .8, .24, 1) .2s; }
+.stats.counted li::before { transform: scaleX(1); }
+.stats b sup { opacity: 0; transform: translateY(.4em) scale(.6); transition: opacity .5s ease 2s, transform .6s cubic-bezier(.3, 1.6, .5, 1) 2s; }
+.stats.counted b sup { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .stats li::before, .stats b sup { transform: none; opacity: 1; transition: none; } }
 /* 선언문 붙여 두기: 이 칸 높이만큼 스크롤하는 동안 글자가 채워진다 */
 .state-track { position: relative; height: 230vh; }
 .state-pin { position: sticky; top: 0; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: calc(var(--hd) + 20px) 0 40px; }
@@ -217,9 +229,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .spot-facts dd { margin: 4px 0 0; font-size: 16.5px; font-weight: 700; overflow-wrap: normal; }
 .spot-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 0 36px; }
 .spot-thumbs figure { margin: 0; border-radius: 12px; overflow: hidden; background: #111; }
-.spot-thumbs img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; object-position: 50% 50%; transition: transform .8s var(--ease); }
+.spot-thumbs img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: 50% 50%; transition: transform .8s var(--ease); }
 .spot-thumbs figure:hover img { transform: scale(1.06); }
-.spot-thumbs .fit img { object-fit: contain; }
 
 /* ───── 품목 ───── */
 .cats { display: grid; gap: 18px; }

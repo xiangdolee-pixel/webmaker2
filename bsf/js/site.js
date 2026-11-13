@@ -48,20 +48,34 @@
   }
 
   /* 스크롤 등장 + 숫자 올라가기 */
-  // 숫자 올라가기 (사용자 지시 2026-11-12): 한 묶음의 숫자는 모두 같은 속도(같은 수만큼)로 가장 큰 숫자까지 오른다.
-  //   작은 숫자는 제 숫자에 닿으면 0부터 다시 돌고, 마지막 순간에 모두 함께 제 숫자로 멈춘다
-  function countUp(el, max) {
-    var to = parseFloat(el.getAttribute('data-count')), dec = (el.getAttribute('data-count').split('.')[1] || '').length;
-    if (reduce || dec) { el.firstChild.nodeValue = dec ? to.toFixed(dec) : to.toLocaleString('en-US'); return; }
-    max = Math.max(to, max || to);
-    var t0 = null, dur = 1500;
-    function step(t) {
-      if (!t0) t0 = t;
-      var p = Math.min(1, (t - t0) / dur), c = Math.floor(p * max);
-      el.firstChild.nodeValue = (p >= 1 ? to : c % (to + 1)).toLocaleString('en-US');
-      if (p < 1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
+  // 숫자 올라가기 (사용자 지시 2026-11-13 "더 세련되게"): 자리마다 숫자 띠가 굴러 올라가는 오도미터.
+  //   일의 자리가 가장 많이 돌고 먼저 출발, 윗자리는 조금 늦게 덜 돈다. 한 묶음은 모두 같은 순간에 부드럽게 내려앉는다
+  var ODO_T = 2200;
+  function countUp(el) {
+    var raw = el.getAttribute('data-count'), to = parseFloat(raw), dec = (raw.split('.')[1] || '').length;
+    var txt = dec ? to.toFixed(dec) : to.toLocaleString('en-US');
+    el.setAttribute('aria-label', txt);
+    if (reduce || dec) { el.textContent = txt; return; }
+    var chars = txt.split(''), n = 0, html = '';
+    chars.forEach(function (ch) { if (/\d/.test(ch)) n++; });
+    var k = 0;
+    chars.forEach(function (ch) {
+      if (!/\d/.test(ch)) { html += '<span class="odo-c" aria-hidden="true">' + ch + '</span>'; return; }
+      var pos = n - 1 - k++;                      // 0 = 일의 자리
+      var spins = Math.max(1, 3 - pos), strip = '';
+      for (var i = 0; i <= spins * 10 + +ch; i++) strip += '<i>' + (i % 10) + '</i>';
+      html += '<span class="odo-d" aria-hidden="true"><span class="odo-s" data-to="' + (spins * 10 + +ch) + '" data-delay="' + pos * 140 + '">' + strip + '</span></span>';
+    });
+    el.innerHTML = html;
+    el.classList.add('odo');
+    el.offsetWidth;                                   // 시작 위치를 먼저 그리게
+    $$('.odo-s', el).forEach(function (s) {
+      var d = +s.getAttribute('data-delay');
+      s.style.transitionDelay = d + 'ms';
+      s.style.transitionDuration = (ODO_T - d) + 'ms';
+      s.style.transform = 'translateY(-' + s.getAttribute('data-to') + 'em)';
+    });
+    el.classList.add('go');
   }
   var rvs = $$('.rv, .world'), counts = $$('[data-count]');
   if ('IntersectionObserver' in window) {
@@ -72,8 +86,8 @@
         if (el.hasAttribute('data-count')) {
           // 같은 묶음(.stats 등)의 숫자는 함께 출발한다
           var grp = el.closest('.stats, ul, .fac-cards') || el, all = $$('[data-count]', grp);
-          var big = Math.max.apply(null, all.map(function (c) { return parseFloat(c.getAttribute('data-count')) || 0; }));
-          all.forEach(function (c) { if (!c._ran) { c._ran = true; io.unobserve(c); countUp(c, big); } });
+          all.forEach(function (c) { if (!c._ran) { c._ran = true; io.unobserve(c); countUp(c); } });
+          if (grp.classList) grp.classList.add('counted');
         } else el.classList.add('in');
         io.unobserve(el);
       });
