@@ -752,18 +752,21 @@ async function inquiriesPage(qs) {
     ${shown.length ? `<ul class="inq-list">${shown.map((r) => {
       const { facts } = inqParse(r.preview);
       const pv = (r.preview || '').replace(/\s+/g, ' ').trim();
-      return `<li><a class="inq-row${r.read_at ? '' : ' is-new'}" href="#/inquiries/${r.id}">
+      return `<li><div class="inq-item"><a class="inq-row${r.read_at ? '' : ' is-new'}" href="#/inquiries/${r.id}">
         <span class="inq-av" aria-hidden="true">${esc((r.org || r.name || '?').trim().slice(0, 1))}</span>
         <span class="inq-main">
           <span class="inq-line1"><b class="inq-who">${esc(inqWho(r))}</b>${r.kind ? `<span class="inq-kind">${esc(r.kind)}</span>` : ''}${r.read_at ? '' : '<span class="inq-newtag">새 문의</span>'}</span>
           <span class="inq-pv">${esc(facts.length ? facts.filter((f) => f[0] !== '품목').slice(0, 3).map((f) => `${f[0]} ${f[1]}`).join('  ·  ') : pv.slice(0, 90))}</span>
         </span>
         <span class="inq-side"><time>${inqAgo(r.created_at)}</time><span>${esc(r.contact)}</span></span>
-      </a></li>`;
+      </a><button class="inq-del" type="button" data-del="${r.id}" data-who="${esc(inqWho(r))}" aria-label="이 문의 지우기" title="지우기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button></div></li>`;
     }).join('')}</ul>`
     : `<div class="panel">${empty(only ? '새 문의가 없습니다' : '아직 들어온 문의가 없습니다', only ? '모두 확인했습니다.' : '홈페이지 문의 폼으로 글이 들어오면 여기에 쌓입니다.')}</div>`}
     ${pager(page, INQ_PAGE, rows.length, (n) => `#/inquiries?${new URLSearchParams({ ...(only ? { only: 'new' } : {}), page: n })}`)}`;
   main.querySelector('[data-mail]').onclick = () => inquiryMailDialog(mail.emails, () => inquiriesPage(qs));
+  main.querySelectorAll('[data-del]').forEach((b) => { b.onclick = () => confirmInline(b, `<b>${esc(b.dataset.who)}</b> 문의를 지웁니다. 지우면 되돌릴 수 없습니다.`, '지우기', async () => {
+    await api(`/inquiries/${b.dataset.del}`, { method: 'DELETE' }); toast('문의를 지웠습니다.'); inquiriesPage(qs);
+  }); });
 }
 
 // 새 문의 알림 메일 받을 주소 (최대 3개)
@@ -824,11 +827,15 @@ async function inquiryView(id) {
           ${mail ? `<a class="btn${tel.length >= 9 ? '' : ' primary'}" href="mailto:${esc(mail)}">메일 쓰기</a>` : ''}
           <button class="btn" type="button" data-copy>연락처 복사</button>
           <button class="btn inq-unread" type="button" data-unread>안 읽음으로 표시</button>
+          <button class="btn danger" type="button" data-del-inq>삭제</button>
         </div>
       </aside>
     </div>`;
   main.querySelector('[data-copy]').onclick = () => navigator.clipboard.writeText(r.contact).then(() => toast('연락처를 복사했습니다.'));
   main.querySelector('[data-unread]').onclick = async () => { await api(`/inquiries/${id}`, { method: 'PATCH', data: {} }); toast('안 읽음으로 바꿨습니다.'); go('#/inquiries'); };
+  main.querySelector('[data-del-inq]').onclick = (e) => confirmInline(e.currentTarget, '이 문의를 지웁니다. 지우면 되돌릴 수 없습니다.', '지우기', async () => {
+    await api(`/inquiries/${id}`, { method: 'DELETE' }); toast('문의를 지웠습니다.'); go('#/inquiries');
+  });
 }
 
 // ───────── 수정 요청 ─────────

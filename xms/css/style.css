@@ -1329,6 +1329,12 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .inq-mailbtn:hover b { color: var(--brand); }
 .inq-list { margin: 0; padding: 0; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
 .inq-list li + li { border-top: 1px solid var(--line); }
+.inq-item { position: relative; }
+.inq-item .inq-row { padding-right: 64px; }
+.inq-del { position: absolute; top: 27px; right: 14px; width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--mute); cursor: pointer; transition: background-color .2s, color .2s; }
+.inq-del svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.inq-del:hover { background: var(--danger-soft); color: var(--danger); }
+.inq-item > .confirm { margin: 0 22px 16px; }
 .inq-row { position: relative; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 18px 22px; color: var(--ink); text-decoration: none; transition: background-color .15s; }
 .inq-row:hover { background: #f7f8fb; }
 .inq-row.is-new::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 0 3px 3px 0; background: var(--brand); }

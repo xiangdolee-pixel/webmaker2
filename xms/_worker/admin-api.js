@@ -432,6 +432,11 @@ export async function adminApi(ctx) {
       await db.prepare('UPDATE site_inquiries SET read_at = 0 WHERE id = ? AND site = ?').bind(row.id, site).run();
       return json({ ok: true });
     }
+    if (method === 'DELETE') {   // 지우기 (사용자 지시 2026-11-13) — 그 사이트 문의만
+      await db.prepare('DELETE FROM site_inquiries WHERE id = ? AND site = ?').bind(row.id, site).run();
+      await audit(db, site, me, request, '문의 삭제', row.org || row.name || `#${row.id}`, '');
+      return json({ ok: true });
+    }
   }
   // 왼쪽 메뉴 숫자: 운영자가 새로 답한 요청 수
   if (path === '/requests/unread' && method === 'GET') {
