@@ -427,7 +427,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .mx[data-k="knit"] small { color: var(--navy); }
 .mx[hidden] { display: block; opacity: 0; transform: translate(-50%, 50%) scale(.6); pointer-events: none; }
 .matrix-points ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
-.matrix-points li { padding: 20px 22px; border-left: 3px solid var(--accent); background: #fff; border-radius: 0 16px 16px 0; box-shadow: var(--shadow); }
+.matrix-points li { padding: 20px 22px; border-left: 3px solid var(--navy); background: #fff; border-radius: 0 16px 16px 0; box-shadow: var(--shadow); }
 .matrix-points b { display: block; color: var(--navy); font-size: 18px; }
 .matrix-points span { color: var(--sub); font-size: 16px; }
 
