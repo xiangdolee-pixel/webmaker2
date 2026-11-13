@@ -66,3 +66,11 @@ node deploy.mjs --wrangler secret put XIM_ADMIN_PASSWORD --name xim     # 운영
 
 - 연결된 사이트는 모든 요청에서 Worker 가 돈다(정지 확인 때문). 무료 한도: 계정 전체 하루 10만 요청.
 - 비밀번호 해시(PBKDF2)는 무료 CPU 10ms 에 맞춰 반복 횟수를 낮게 잡았다. 유료로 가면 올린다.
+
+## 빠르게: 사진 · 첨부는 R2(서울)에서 (2026-11-13)
+
+국내 통신사는 Cloudflare 사이트 주소를 미국 서부(SEA/LAX)로 보내 사진 · 파일이 느리다(1MB 10초). R2 S3 주소(<계정>.r2.cloudflarestorage.com)는 서울(ICN)이라 0.2초.
+- **홈페이지 사진 · 글꼴 · 동영상**: `node deploy.mjs <폴더>` 가 R2 `xms-files/static/<사이트>/<hash 12자>/<경로>` 에 올리고(바뀐 것만, `r2-static.mjs`) xms D1 `site_static` 을 바꾼다. 사이트 Worker 가 html 의 img · srcset · poster · style url() 을 xms 가 서명한 주소로 바꾼다(그날 0시로 서명 고정 → 하루 동안 같은 주소). CSS · JS 는 그대로 사이트에서. 열쇠는 이 PC `%USERPROFILE%\.wrangler-xiangdolee2.json`(없으면 건너뜀 — GitHub Actions 배포 등).
+- **사진 · CSS · JS 는 사이트 Worker 를 거치지 않는다**(build.mjs run_worker_first 예외 + `_headers` 캐시) — html 만 Worker.
+- **게시판 첨부**: 올리기 = 브라우저 → R2 바로(xms `/xms-api/uploads/sign` · `/done`), 내려받기 · 보기 · 본문 그림 · 목록 썸네일 = 공개 글이면 R2 서명 주소, 아니면 `/xms/upload/<id>`(권한 확인 뒤 R2 로 넘김).
+- 열쇠: R2 계정 토큰 `xms-upload`(xms-files 읽기 · 쓰기) → xms 비밀값 `R2_KEY_ID` · `R2_SECRET`. 버킷 CORS: PUT · GET · HEAD 허용.

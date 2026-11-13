@@ -447,3 +447,5 @@ CREATE TABLE IF NOT EXISTS site_inquiries (
 CREATE INDEX IF NOT EXISTS site_inquiries_site ON site_inquiries (site, id);
 -- 새 문의 알림 메일 받을 주소 (사이트마다 최대 3개)
 CREATE TABLE IF NOT EXISTS site_inquiry_mail (site TEXT PRIMARY KEY, emails TEXT NOT NULL DEFAULT '[]', updated_at INTEGER NOT NULL DEFAULT 0);
+-- 홈페이지 사진 지도 (deploy.mjs 가 R2 static/ 에 올린 파일) — r2-static.mjs
+CREATE TABLE IF NOT EXISTS site_static (site TEXT NOT NULL, path TEXT NOT NULL, hash TEXT NOT NULL, PRIMARY KEY (site, path));

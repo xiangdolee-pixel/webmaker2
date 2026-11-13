@@ -13,6 +13,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, domainToUnicode } from 'node:url';
 import { ensureMailDomain } from './mail-domain.mjs';
+import { syncStatic, staticSql } from './r2-static.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const ACCOUNT_ID = 'f225d506d8cf6ddf97704a36c69f5ce7';
@@ -49,6 +50,17 @@ else {
   const slug = arg.replace(/[\/]+$/, '');
   run('node', ['build.mjs', slug], { XIM_DEPLOY: '1' });
   registerInXim(slug);
+  // xim 사이트면 사진을 R2(서울)에 올리고 xms 지도(site_static)를 바꾼다 — 사이트 Worker 가 html 의 사진 주소를 그리로 바꿔 준다
+  const connectFile = path.join(ROOT, `.deploy/${slug}.xim-connect.json`);
+  if (fs.existsSync(connectFile)) {
+    const site = JSON.parse(fs.readFileSync(connectFile, 'utf8')).slug;
+    const list = await syncStatic(site, path.join(ROOT, '.deploy', slug), AUTH_HOME);
+    if (list) {
+      const f = path.join(AUTH_HOME, `site-static-${site}.sql`);
+      fs.writeFileSync(f, staticSql(site, list));
+      run('npx', ['wrangler', 'd1', 'execute', 'xms', '--remote', '--file', `"${f}"`, '-y']);
+    }
+  }
   run('npx', ['wrangler', 'deploy', '--config', `.deploy-${slug}.wrangler.jsonc`]);
   if (fs.existsSync(path.join(ROOT, `.deploy/${slug}.xim-connect.json`))) await fillDomain(slug);
 }

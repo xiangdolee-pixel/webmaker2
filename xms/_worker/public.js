@@ -5,7 +5,7 @@ import {
   memberValues, uniqueProblem,
 } from './lib.js';
 import { boardOptions } from './admin-api.js';
-import { postAttachments, syncPostFiles, removePostFiles, setAvatar, avatarOf } from './uploads.js';
+import { postAttachments, syncPostFiles, removePostFiles, setAvatar, avatarOf, directGetUrl, directUrls, uploadIdsIn } from './uploads.js';
 import { sendSignupCode, verifySignupCode, takeTicket, turnstileKeys } from './signup.js';
 import { applyPage, applicantsPage, applicantPage, publicApply, applyOn, openRound } from './apply.js';
 
@@ -66,8 +66,23 @@ function navHtml(items, depth = 0) {
   }).join('')}</ul>`;
 }
 
+// 게시판 목록 · 카드 썸네일 · 글 아래 최신글처럼 화면에 남은 /xms/upload/<id> 그림도, 아무나 볼 수 있는 글의 그림이면 R2(서울) 주소로
+//   (serveUpload 의 공개 판단과 같다: 지운 · 숨긴 · 예약 · 비밀 글이 아니고, 비회원도 목록이나 읽기를 볼 수 있는 게시판 — 사용자 지시 2026-11-13)
+async function openImages(env, site, html) {
+  const ids = [...new Set([...String(html).matchAll(/\/xms\/upload\/([0-9a-f]{32})(?!\?dl=1)/g)].map((m) => m[1]))].slice(0, 200);
+  if (!ids.length || !env.R2_KEY_ID) return html;
+  const { results } = await env.DB.prepare(`SELECT u.id FROM uploads u JOIN posts p ON p.id = u.post_id JOIN boards b ON b.id = p.board_id
+    WHERE u.site = ? AND u.id IN (${ids.map(() => '?').join(',')}) AND p.deleted_at IS NULL AND p.is_hidden = 0 AND p.is_secret = 0 AND p.published_at <= ?
+      AND b.deleted_at IS NULL AND b.visible = 1 AND ((b.allow_guest_list = 1 AND (u.kind = 'IMAGE' OR (u.kind = 'INLINE' AND u.mime LIKE 'image/%'))) OR b.allow_guest_read = 1)`)
+    .bind(site, ...ids, now()).all();
+  if (!results.length) return html;
+  const map = await directUrls(env, site, results.map((r) => r.id));
+  return String(html).replace(/\/xms\/upload\/([0-9a-f]{32})(?!\?dl=1)/g, (all, id) => map[id] || all);
+}
+
 async function page(ctx, title, content, opts = {}) {
   const { env, site, me } = ctx;
+  content = await openImages(env, site, content).catch(() => content);
   const info = await siteInfo(env, site);
   // 사이트 안에 끼워 넣을 때(사이트 Worker 가 X-Xms-Embed 로 부름): 본문만 돌려주고, 머리 · 꼬리 · CSS 는 사이트 것을 그대로 쓴다
   if (ctx.request.headers.get('X-Xms-Embed') === '1') {
@@ -414,6 +429,15 @@ async function postView(ctx, b, id) {
   }
   const mine = me.level === 1 || isMine(p, me);
   const [atts, more] = await Promise.all([postAttachments(env, ctx.site, p.id), moreList(ctx, b, p)]);
+  // 아무나 볼 수 있는 글이면 그림 · 첨부를 R2(서울) 에서 바로 (비밀 · 숨김 · 예약 · 권한 있는 글은 예전처럼 사이트 주소로 — 거기서 권한을 본다)
+  const openPost = !p.is_secret && !p.is_hidden && p.published_at <= now() && canRead(b, { kind: 'guest', level: 0 });
+  let bodyHtml = p.content_html;
+  if (openPost) {
+    const ids = [...uploadIdsIn(p.content_html), ...atts.map((u) => u.id)];
+    const [view, dl] = await Promise.all([directUrls(env, ctx.site, ids), directUrls(env, ctx.site, atts.filter((u) => u.kind === 'FILE').map((u) => u.id), true)]);
+    bodyHtml = bodyHtml.replace(/\/xms\/upload\/([0-9a-f]{32})(\?dl=1)?/g, (all, id, d) => (d ? null : view[id]) || all);
+    for (const u of atts) { if (view[u.id]) u.url = view[u.id]; if (dl[u.id]) u.dl = dl[u.id]; }
+  }
   const imgs = atts.filter((u) => u.kind === 'IMAGE');
   const files = atts.filter((u) => u.kind === 'FILE');
   return page(ctx, p.title, `<section class="pub-box wide">
@@ -423,8 +447,8 @@ async function postView(ctx, b, id) {
       <div class="meta">${vs.writer ? `<span>${esc(writerOf(b, p, me))}</span>` : ''}${vs.date ? `<span>${fmtDate(p.published_at, true)}</span>` : ''}${vs.views ? `<span>조회 ${p.view_count + 1}</span>` : ''}
         ${p.published_at > now() ? `<span class="tag warn">${fmtDate(p.published_at, true)} 공개 예약</span>` : ''}</div>
       ${imgs.length ? `<div class="post-photos">${imgs.map((u) => `<a href="${u.url}" target="_blank" rel="noopener"><img src="${u.url}" alt="${esc(u.name)}" loading="lazy"></a>`).join('')}</div>` : ''}
-      <div class="prose">${p.content_html}</div>
-      ${files.length ? `<div class="post-files"><b>첨부파일</b>${files.map((u) => `<a href="${u.url}?dl=1">${esc(u.name)} <small>${fmtSize(u.size)}</small></a>`).join('')}</div>` : ''}
+      <div class="prose">${bodyHtml}</div>
+      ${files.length ? `<div class="post-files"><b>첨부파일</b>${files.map((u) => `<a href="${u.dl || `${u.url}?dl=1`}">${esc(u.name)} <small>${fmtSize(u.size)}</small></a>`).join('')}</div>` : ''}
     </article>
     <div class="actions"><a class="btn" href="${b.opt.list_url || `/board/${b.slug}`}">목록</a>${mine ? `<a class="btn" href="/board/${b.slug}/${p.id}/edit">수정</a>
       <button class="btn danger" type="button" data-del-post="${p.id}" data-back="${b.opt.list_url || `/board/${b.slug}`}">삭제</button>` : ''}</div>
@@ -594,11 +618,16 @@ export async function publicApi(ctx) {
     const { results } = await db.prepare(`SELECT id, title, content_html, published_at FROM posts
       WHERE board_id = ? AND deleted_at IS NULL AND is_secret = 0 AND is_hidden = 0 AND published_at <= ? ORDER BY is_notice DESC, published_at DESC, id DESC LIMIT 100`).bind(b.id, now()).all();
     const ids = results.map((p) => p.id);
-    const ups = ids.length ? (await db.prepare(`SELECT post_id, id, name, size FROM uploads WHERE site = ? AND kind = 'FILE' AND post_id IN (${ids.map(() => '?').join(',')}) ORDER BY sort, created_at`).bind(site, ...ids).all()).results : [];
-    const out = results.map((p) => ({
+    const ups = ids.length ? (await db.prepare(`SELECT post_id, id, name, size, mime, r2_key FROM uploads WHERE site = ? AND kind = 'FILE' AND post_id IN (${ids.map(() => '?').join(',')}) ORDER BY sort, created_at`).bind(site, ...ids).all()).results : [];
+    // 공개 게시판이면 R2(서울) 에서 바로 받는 주소(dl · view)도 함께 — 국내에서 사이트 주소를 거치면 1MB 에 10초 넘게 걸린다
+    const open = canRead(b, { kind: 'guest', level: 0 });
+    const out = await Promise.all(results.map(async (p) => ({
       id: p.id, title: p.title, desc: plainText(p.content_html).slice(0, 200), date: fmtDate(p.published_at), url: `/board/${b.slug}/${p.id}`,
-      files: ups.filter((u) => u.post_id === p.id).map((u) => ({ name: u.name, size: u.size, url: `/xms/upload/${u.id}?dl=1` })),
-    }));
+      files: await Promise.all(ups.filter((u) => u.post_id === p.id).map(async (u) => ({
+        name: u.name, size: u.size, url: `/xms/upload/${u.id}?dl=1`,
+        dl: open ? await directGetUrl(env, u, true) : '', view: open ? await directGetUrl(env, u, false) : '',
+      }))),
+    })));
     return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });   // 올리고 지운 것이 바로 보이게
   }
   //   GET /xms-api/boards/<주소>/latest?n=4  → [{ id, title, date, url, thumb }]  (비밀글 · 예약 글 · 볼 권한 없는 글은 빠짐)

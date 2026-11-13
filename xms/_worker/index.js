@@ -15,7 +15,7 @@ import { adminApi } from './admin-api.js';
 import { publicApi, publicPage, menuAccess } from './public.js';
 import { serveFile, serveRobots, serveSitemap, serveRss, serveAdsTxt, headData } from './site-meta.js';
 import { livePopups } from './popups.js';
-import { uploadApi, directUploadApi, serveUpload, avatarOf } from './uploads.js';
+import { uploadApi, directUploadApi, serveUpload, avatarOf, staticMap } from './uploads.js';
 import { embedCss } from './css-scope.js';
 import { recordVisit } from './visits.js';
 import { publicCourses } from './courses.js';
@@ -139,7 +139,7 @@ export class Cms extends WorkerEntrypoint {
         const who = me.kind === 'guest' ? { guest: true } : me.kind === 'staff' ? { staff: true, admin: true } : { name: me.member.name, admin: me.level === 1, avatar: avatarOf(me.member) };
         const texts = await pageTexts(env.DB, site, url.searchParams.get('path') || '', me.level === 1);
         if (who.admin) { try { who.inq = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_inquiries WHERE site = ? AND read_at = 0').bind(site).first()).n; } catch { who.inq = 0; } }   // 관리자에게만: 새 문의 수
-        return new Response(JSON.stringify({ menu: data.menu, blocked: data.blocked, head: data.head, popups: data.popups, me: who, texts, top: data.top, account_css: await accountCss(env), ver: verOf(env) }),
+        return new Response(JSON.stringify({ menu: data.menu, blocked: data.blocked, head: data.head, popups: data.popups, me: who, texts, top: data.top, account_css: await accountCss(env), ver: verOf(env), st: await staticMap(env, site).catch(() => null) }),
           { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
       }
       if (p === '/xms-api/uploads' && request.method === 'POST') return await timed(uploadApi(ctx));

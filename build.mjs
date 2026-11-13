@@ -252,7 +252,27 @@ if (CONNECT) {
   fs.writeFileSync(CONNECT_FILE, JSON.stringify({ slug: name, name: title.slice(0, 80), static_bytes: bytes, favicon: faviconFrom(index), icons: siteIcons(index), menus: menusFrom(index) }, null, 2));
   config.main = './xim/_worker/site-worker.js';
   config.assets.binding = 'ASSETS';
-  config.assets.run_worker_first = true;
+  // html 만 Worker 를 거치고(계정 버튼 · 메뉴 · 방문 통계 · 정지 화면), 사진 · CSS · JS 같은 정적 파일은 Worker 없이 가장자리에서 바로 준다.
+  //   Worker 는 xim · xms DB 가까이(서울)에 두었는데, 국내 접속은 미국 서부 가장자리로 들어와 사진 하나마다 서울을 한 번 더 왕복했다
+  //   (bsf 58KB 사진 첫 바이트 1.2~1.9초 — 2026-11-13). html 이 없는 맨 위 폴더와 맨 위의 html 아닌 파일만 뺀다.
+  const RESERVED_TOP = new Set(['xms', 'xms-api', 'member', 'board', 'site-api', 'admin', 'cdn-cgi']);
+  const hasHtml = (dir) => fs.readdirSync(dir, { withFileTypes: true }).some((e) => (e.isDirectory() ? hasHtml(path.join(dir, e.name)) : /\.html?$/i.test(e.name)));
+  const skip = [];
+  for (const e of fs.readdirSync(OUT, { withFileTypes: true })) {
+    if (e.name.startsWith('.') || e.name.startsWith('_') || RESERVED_TOP.has(e.name)) continue;
+    if (e.isDirectory()) { if (!hasHtml(path.join(OUT, e.name))) skip.push(`!/${e.name}/*`); }
+    else if (!/\.html?$/i.test(e.name) && !/^(robots\.txt|sitemap\.xml)$/i.test(e.name)) skip.push(`!/${e.name}`);
+  }
+  config.assets.run_worker_first = skip.length ? ['/*', ...skip] : true;
+  // Worker 가 붙이던 캐시 시간(cacheStatic)을 _headers 로 똑같이 — 그림 · 글꼴 하루(+7일 묵은 것 먼저), CSS · JS 5분(+하루)
+  if (skip.length) {
+    const rule = (p) => (/^!\/(css|js|scripts?|styles?)(\/|$)/i.test(p) || /\.(css|js|mjs)$/i.test(p)
+      ? 'public, max-age=300, stale-while-revalidate=86400' : 'public, max-age=86400, stale-while-revalidate=604800');
+    const hf = path.join(OUT, '_headers');
+    const prev = fs.existsSync(hf) ? fs.readFileSync(hf, 'utf8').trimEnd() + '\n\n' : '';
+    fs.writeFileSync(hf, prev + skip.map((p) => `${p.slice(1)}\n  Cache-Control: ${rule(p)}`).join('\n') + '\n');
+  }
+  if (skip.length) console.log(`[build] Worker 를 거치지 않는 정적 파일: ${skip.join(' ')}`);
   // 게시판 · 회원 화면을 끼워 넣을 틀: 사이트의 기존 페이지 하나(머리 · 꼬리 · CSS 그대로, <main> 자리에만 게시판).
   //   _layout.html 이 있으면 그것, 없으면 <main> 이 있는 첫 하위 페이지(index 말고), 그것도 없으면 첫 화면.
   const htmls = fs.readdirSync(OUT).filter((f) => /\.html?$/i.test(f) && f !== '404.html').sort();

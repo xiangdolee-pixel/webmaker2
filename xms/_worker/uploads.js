@@ -167,6 +167,17 @@ export async function serveUpload(env, site, id, download, request) {
       }
     }
   }
+  // R2 에 있는 파일은 서명한 R2 주소로 보낸다 — 국내에서 사이트 주소(미국 서부 경유)로 받으면 1MB 에 10초, R2(서울) 로 바로 받으면 0.2초
+  //   (사용자 지시 2026-11-13). 주소는 2시간 쓸 수 있고, 이 넘겨주기 응답은 1시간만 묵힌다. 글 · 권한 확인은 위에서 이미 끝났다.
+  if (u.r2_key && env.R2_KEY_ID && env.R2_SECRET) {
+    const inl = !download && SAFE_INLINE.test(u.mime);
+    const to = await presign(env, 'GET', u.r2_key, 7200, {
+      'response-content-type': inl ? u.mime : 'application/octet-stream',
+      'response-content-disposition': `${inl ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(u.name)}`,
+      'response-cache-control': 'private, max-age=86400',
+    });
+    return new Response(null, { status: 302, headers: { Location: to, 'Cache-Control': cache === 'public, max-age=86400' ? 'public, max-age=3600' : 'private, no-store' } });
+  }
   let body;
   if (u.r2_key && env.FILES) {
     const o = await env.FILES.get(u.r2_key);
@@ -218,17 +229,19 @@ async function hmac(key, s) {
   const k = await crypto.subtle.importKey('raw', typeof key === 'string' ? enc.encode(key) : key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return crypto.subtle.sign('HMAC', k, enc.encode(s));
 }
-async function presignPut(env, key, seconds = 1800) {
+async function presign(env, method, key, seconds = 1800, extra = {}, at = null) {
   const host = `${R2_ACCOUNT}.r2.cloudflarestorage.com`;
-  const path = `/${R2_BUCKET}/${key.split('/').map(encodeURIComponent).join('/')}`;
-  const t = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+  // SigV4 는 RFC 3986 인코딩(encodeURIComponent 가 남기는 ! ' ( ) * 도 바꾼다) — 안 그러면 R2 가 서명을 거절(403)
+  const rfc = (v) => encodeURIComponent(v).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+  const path = `/${R2_BUCKET}/${key.split('/').map(rfc).join('/')}`;
+  const t = (at || new Date()).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
   const day = t.slice(0, 8), scope = `${day}/auto/s3/aws4_request`;
   const q = new URLSearchParams({
     'X-Amz-Algorithm': 'AWS4-HMAC-SHA256', 'X-Amz-Credential': `${env.R2_KEY_ID}/${scope}`, 'X-Amz-Date': t,
-    'X-Amz-Expires': String(seconds), 'X-Amz-SignedHeaders': 'host',
+    'X-Amz-Expires': String(seconds), 'X-Amz-SignedHeaders': 'host', ...extra,
   });
-  const qs = [...q.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
-  const canonical = ['PUT', path, qs, `host:${host}\n`, 'host', 'UNSIGNED-PAYLOAD'].join('\n');
+  const qs = [...q.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([k, v]) => `${rfc(k)}=${rfc(v)}`).join('&');
+  const canonical = [method, path, qs, `host:${host}\n`, 'host', 'UNSIGNED-PAYLOAD'].join('\n');
   const toSign = ['AWS4-HMAC-SHA256', t, scope, await sha256(canonical)].join('\n');
   let k = await hmac(`AWS4${env.R2_SECRET}`, day);
   k = await hmac(k, 'auto'); k = await hmac(k, 's3'); k = await hmac(k, 'aws4_request');
@@ -268,5 +281,57 @@ export async function directUploadApi(ctx, id) {
   const nid = randomHex(16), key = `${site}/${nid}`;
   await env.DB.prepare('INSERT INTO uploads (id, site, post_id, kind, name, mime, size, data, r2_key, created_by, created_at) VALUES (?, ?, NULL, ?, ?, ?, ?, NULL, ?, ?, ?)')
     .bind(nid, site, 'FILE', name, mime, size, key, me.kind === 'member' ? me.member.id : null, now()).run();
-  return json({ id: nid, put: await presignPut(env, key) });
+  return json({ id: nid, put: await presign(env, 'PUT', key) });
+}
+
+// R2(서울) 에서 바로 받는 서명 주소 — 보기(inline) · 내려받기(attachment). 서명 키가 없으면 ''
+export async function directGetUrl(env, u, download, seconds = 7200) {
+  if (!u.r2_key || !env.R2_KEY_ID || !env.R2_SECRET) return '';
+  const inl = !download && SAFE_INLINE.test(u.mime);
+  return presign(env, 'GET', u.r2_key, seconds, {
+    'response-content-type': inl ? u.mime : 'application/octet-stream',
+    'response-content-disposition': `${inl ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(u.name)}`,
+    'response-cache-control': 'private, max-age=86400',
+  });
+}
+
+// ───── 홈페이지 정적 파일(사진)도 R2(서울) 에서 (사용자 지시 2026-11-13 "속도가 빨라야 해") ─────
+//   deploy.mjs 가 사이트의 사진 파일을 R2 xms-files/static/<사이트>/<내용 hash 12자>/<경로> 에 올리고 site_static 표에 적는다.
+//   사이트 Worker 가 html 을 내보낼 때 이 지도(경로 → 서명 주소)로 img · srcset · style url() 을 바꾼다.
+//   서명 시각을 그날 0시(UTC)로 고정 → 하루 동안 주소가 같아 브라우저 캐시가 그대로 듣는다. 주소는 7일 쓸 수 있다.
+const staticMem = new Map();   // site → { day, map }
+export async function staticMap(env, site) {
+  if (!env.R2_KEY_ID || !env.R2_SECRET) return null;
+  const day = new Date().toISOString().slice(0, 10);
+  const hit = staticMem.get(site);
+  if (hit && hit.day === day && Date.now() - hit.at < 300000) return hit.map;
+  let rows = [];
+  try { rows = (await env.DB.prepare('SELECT path, hash FROM site_static WHERE site = ?').bind(site).all()).results; } catch { rows = []; }
+  const at = new Date(`${day}T00:00:00Z`), map = {};
+  for (const r of rows) {
+    map[r.path] = await presign(env, 'GET', `static/${site}/${r.hash.slice(0, 12)}${r.path}`, 604800, { 'response-cache-control': 'public, max-age=604800, immutable' }, at);   // 내용이 바뀌면 hash 가 바뀌어 주소도 바뀐다
+  }
+  staticMem.set(site, { day, at: Date.now(), map });
+  return map;
+}
+
+// 글 보기 화면: 아무나 볼 수 있는 글이면 본문 그림 · 첨부의 /xms/upload/<id> 를 R2(서울) 서명 주소로 바꾼다
+//   — 사이트 주소를 거치면 국내에서 그림마다 1~2초 더 걸린다 (사용자 지시 2026-11-13). 서명 시각은 그날 0시로 고정(하루 동안 같은 주소).
+export async function directUrls(env, site, ids, download = false) {
+  const out = {};
+  if (!ids.length || !env.R2_KEY_ID || !env.R2_SECRET) return out;
+  const list = [...new Set(ids)].filter((x) => /^[0-9a-f]{32}$/.test(x)).slice(0, 200);
+  if (!list.length) return out;
+  const { results } = await env.DB.prepare(`SELECT id, name, mime, r2_key FROM uploads WHERE site = ? AND id IN (${list.map(() => '?').join(',')})`).bind(site, ...list).all();
+  const day = new Date().toISOString().slice(0, 10), at = new Date(`${day}T00:00:00Z`);
+  for (const u of results) {
+    if (!u.r2_key) continue;
+    const inl = !download && SAFE_INLINE.test(u.mime);
+    out[u.id] = await presign(env, 'GET', u.r2_key, 604800, {
+      'response-content-type': inl ? u.mime : 'application/octet-stream',
+      'response-content-disposition': `${inl ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(u.name)}`,
+      'response-cache-control': 'public, max-age=86400',
+    }, at);
+  }
+  return out;
 }

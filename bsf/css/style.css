@@ -417,6 +417,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .axis-y small, .axis-x small { display: block; color: var(--mute); font-family: var(--font); font-size: 12px; letter-spacing: 0; font-weight: 600; }
 .mx { position: absolute; transform: translate(-50%, 50%); padding: 8px 14px; border-radius: 12px; background: var(--navy); color: #fff; font-size: 14px; font-weight: 700; line-height: 1.25; text-align: center; white-space: nowrap; box-shadow: 0 8px 20px -8px rgba(10, 25, 38, .55); transition: opacity .45s var(--ease), transform .55s var(--ease); }
 .mx small { display: block; color: var(--accent-2); font-family: var(--display); font-size: 10.5px; letter-spacing: .1em; }
+@media (min-width: 1024px) {   /* PC 에서는 표 글자를 키운다 (사용자 지시 2026-11-13 "너무 작다") */
+  .mx { padding: 10px 18px; border-radius: 14px; font-size: 17px; }
+  .mx small { font-size: 12.5px; }
+  .axis-y, .axis-x { font-size: 14px; }
+  .axis-y small, .axis-x small { font-size: 14px; }
+}
 /* KNIT 로 바뀌면 남색 ↔ 주황을 뒤집어 바뀐 걸 티 나게 (사용자 지시 2026-11-13) */
 .mx[data-k="knit"] { background: var(--accent); box-shadow: 0 8px 20px -8px rgba(200, 80, 10, .6); }
 .mx[data-k="knit"] small { color: var(--navy); }

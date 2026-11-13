@@ -320,6 +320,24 @@ async function withXms(res, request, env, data) {
   let pageTitle = '';
 
   let rw = new HTMLRewriter();
+  // 사진은 R2(서울) 서명 주소로 — 국내 접속이 미국 서부 가장자리로 가서 사진마다 1~2초 걸리던 것 (xms staticMap, 2026-11-13)
+  const st = data?.st && typeof data.st === 'object' ? data.st : null;
+  if (st) {
+    const swap = (v) => {
+      if (!v || /^(data:|https?:|\/\/|#)/i.test(v)) return v;
+      try { const u = new URL(v, url); if (u.origin !== url.origin) return v; return st[decodeURI(u.pathname)] || v; } catch { return v; }
+    };
+    const swapSet = (v) => v.split(',').map((part) => { const m = part.trim().match(/^(\S+)(\s+.+)?$/); return m ? swap(m[1]) + (m[2] || '') : part; }).join(', ');
+    const swapCss = (v) => v.replace(/url\((['"]?)([^'")]+)\1\)/g, (all, q, u) => { const n = swap(u); return n === u ? all : `url("${n}")`; });
+    rw = rw.on('img[src], video[poster], [data-src], [data-bg], link[rel="preload"][as="image"][href], [srcset], [style*="url("]', {
+      element(el) {
+        for (const a of ['src', 'poster', 'data-src', 'data-bg']) { const v = el.getAttribute(a); if (v) el.setAttribute(a, swap(v)); }
+        if (el.tagName === 'link') el.setAttribute('href', swap(el.getAttribute('href')));
+        const ss = el.getAttribute('srcset'); if (ss) el.setAttribute('srcset', swapSet(ss));
+        const sy = el.getAttribute('style'); if (sy && sy.includes('url(')) el.setAttribute('style', swapCss(sy));
+      },
+    });
+  }
   if (data) {
     rw = rw.on('[data-xms-account]', {
       element(el) {

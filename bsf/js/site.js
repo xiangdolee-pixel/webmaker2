@@ -71,8 +71,8 @@
           + '<span class="arc-meta">' + (f0 ? escA(ext) + ' · ' + sizeOf(f0.size) : '첨부 파일 없음') + ' · ' + escA(p.date) + (admin ? '<a href="' + escA(p.url) + '/edit">고치기</a><button type="button" class="arc-del" data-del="' + p.id + '">삭제</button>' : '') + '</span></div>'
           + '<div class="arc-dls">' + p.files.map(function (f) {
             var pdf = /\.pdf$/i.test(f.name);
-            return '<span class="arc-btns">' + (pdf ? '<button type="button" class="arc-view" data-view="' + escA(f.url.replace(/\?dl=1$/, '')) + '" data-dl="' + escA(f.url) + '" data-title="' + escA(p.title) + '">' + EYE + '보기</button>' : '')
-              + '<a class="arc-dl" href="' + escA(f.url) + '" download aria-label="' + escA(f.name) + ' 내려받기">' + (p.files.length > 1 ? escA(f.name) : '내려받기') + DL + '</a></span>';
+            return '<span class="arc-btns">' + (pdf ? '<button type="button" class="arc-view" data-view="' + escA(f.view || f.url.replace(/\?dl=1$/, '')) + '" data-dl="' + escA(f.dl || f.url) + '" data-title="' + escA(p.title) + '">' + EYE + '보기</button>' : '')
+              + '<a class="arc-dl" href="' + escA(f.dl || f.url) + '" download aria-label="' + escA(f.name) + ' 내려받기">' + (p.files.length > 1 ? escA(f.name) : '내려받기') + DL + '</a></span>';
           }).join('') + '</div></li>';
       }).join('');
     };
@@ -307,7 +307,7 @@
       history.pushState({ pv: 1 }, '');
       $('.pv-x', pv).focus();
       loadLib().then(function (lib) {
-        var task = lib.getDocument({ url: btn.getAttribute('data-view'), withCredentials: true });
+        var task = lib.getDocument({ url: btn.getAttribute('data-view'), withCredentials: false });   // 서울 R2 로 넘겨받는다(쿠키 없이)
         task.onProgress = function (p) { if (p.total) msgEl.textContent = '불러오는 중… ' + Math.round(p.loaded / p.total * 100) + '%'; };
         return task.promise;
       }).then(function (doc) {
