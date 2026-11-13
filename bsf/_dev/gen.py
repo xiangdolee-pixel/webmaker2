@@ -263,7 +263,7 @@ home = head('BSF COMPANY — 글로벌 의류 OEM · ODM 소싱 파트너', '17�
         <a class="btn line rv d2" href="capability.html#factories">협력 공장 자세히</a>
       </div>
       <div class="fac-cards">
-        <a class="fac-card rv" href="capability.html#ningbo"><img src="images/factory/ningbo-sewing.webp" alt="" loading="lazy"><div class="in-c"><div><span class="where">NINGBO · CHINA · KNIT</span><h3>HUAHE KNITWEAR</h3></div><div><span class="big"><span data-count="2">0</span>M+<small>장 / 연</small></span><p>2003년부터 · 400명 · WRAP 골드 · adidas · Disney 인증</p></div></div></a>
+        <a class="fac-card rv" href="capability.html#ningbo"><img src="images/factory/ningbo-sewing-d.webp" alt="" loading="lazy"><div class="in-c"><div><span class="where">NINGBO · CHINA · KNIT</span><h3>HUAHE KNITWEAR</h3></div><div><span class="big"><span data-count="2">0</span>M+<small>장 / 연</small></span><p>2003년부터 · 400명 · WRAP 골드 · adidas · Disney 인증</p></div></div></a>
         <a class="fac-card rv d1" href="capability.html#yangon"><img src="images/factory/yangon-line2.webp" alt="" loading="lazy"><div class="in-c"><div><span class="where">YANGON · MYANMAR · OUTER</span><h3>SUJIN CO., LTD.</h3></div><div><span class="big"><span data-count="1150">0</span><small>명</small></span><p>11개 라인 · 다운 · 패딩 · 레인 자켓 · ZARA · E-LAND 생산</p></div></div></a>
         <a class="fac-card rv d2" href="capability.html#yangzhou"><img src="images/factory/yangzhou-line.webp" alt="" loading="lazy"><div class="in-c"><div><span class="where">YANGZHOU · CHINA · CAP</span><h3>HEHAN CLOTHING</h3></div><div><span class="big"><span data-count="100">0</span>K<small>개 / 월</small></span><p>7개 라인 · 볼캡 · 니트 모자 · 버킷햇 · adidas · Patagonia 생산</p></div></div></a>
       </div>
@@ -382,15 +382,15 @@ def mx_pts():
     return ''.join(out)
 
 FACTS = [
-    ('ningbo', 'NINGBO HUAHE KNITWEAR', '중국 저장성 닝보 · 니트 전문 · 2003년 설립', 'images/factory/ningbo-sewing.webp', '20년 넘게 니트 의류만 만들어 온 공장입니다. adidas · Disney 공장 인증을 받았고, 2006년부터 해마다 WRAP 골드 인증을 유지하고 있습니다.',
+    ('ningbo', 'NINGBO HUAHE KNITWEAR', '중국 저장성 닝보 · 니트 전문 · 2003년 설립', 'images/factory/ningbo-sewing-d.webp', '20년 넘게 니트 의류만 만들어 온 공장입니다. adidas · Disney 공장 인증을 받았고, 2006년부터 해마다 WRAP 골드 인증을 유지하고 있습니다.',
      [('공장 면적', '15,000', '㎡'), ('인원', '400+', '명'), ('연 생산', '2,000,000', '장'), ('봉제 라인', '7', '개')],
-     ['WRAP Gold', 'adidas 인증', 'Disney 인증', 'adidas · New Balance · Mizuno · Reebok · E-LAND · SPAO 생산'], ['ningbo-cutting', 'ningbo-detail', 'ningbo-packing']),
+     ['WRAP Gold', 'adidas 인증', 'Disney 인증', 'adidas · New Balance · Mizuno · Reebok · E-LAND · SPAO 생산'], ['ningbo-cutting-d', 'ningbo-detail-d', 'ningbo-packing-d']),
     ('yangon', 'SUJIN CO., LTD.', '미얀마 양곤 공업단지 · 아우터 전문 · 2018년 설립', 'images/factory/yangon-line2.webp', '다운 자켓 · 레인 자켓 · 스노 자켓 · 코트 같은 아우터를 대량으로 만드는, 한국인 관리진이 운영하는 공장입니다. 11개 라인, 1,150명이 일합니다.',
      [('인원', '1,150', '명'), ('봉제 라인', '11', '개'), ('월 생산', '50,000+', '장(점퍼)'), ('연 생산', '600,000', '장')],
-     ['한국 · 유럽 수출', 'ZARA · Teenie Weenie · E-LAND 생산', '단침 미싱 600대'], ['yangon-cutting', 'yangon-fabric', 'yangon-pattern']),
+     ['한국 · 유럽 수출', 'ZARA · Teenie Weenie · E-LAND 생산', '단침 미싱 600대'], ['yangon-cutting-d', 'yangon-fabric-d', 'yangon-pattern-d']),
     ('yangzhou', 'YANGZHOU HEHAN CLOTHING', '중국 장쑤성 양저우 · 모자 전문', 'images/factory/yangzhou-line.webp', '볼캡 · 니트 모자 · 버킷햇 · 베레모까지 원단 모자 전 품목을 만듭니다. 자동 재단기와 자수실, 검침 · 성형 라인을 갖췄습니다.',
      [('월 생산', '100,000', '개'), ('라인', '7', '개'), ('인원', '110', '명'), ('컴퓨터 미싱', '90', '대')],
-     ['adidas · Patagonia · Alpha Industries · Teenie Weenie · E-LAND 생산'], ['yangzhou-cutting', 'yangzhou-cap']),
+     ['adidas · Patagonia · Alpha Industries · Teenie Weenie · E-LAND 생산'], ['yangzhou-cutting-d', 'yangzhou-cap-d']),
 ]
 def facs():
     out = []
@@ -479,10 +479,10 @@ cap = head('생산역량 | BSF COMPANY', '우븐 · 니트 · 하의 · 잡화 2
     <div class="wrap">
       <div class="sec-head row"><div><p class="eyebrow rv">QUALITY CONTROL</p><h2 class="title-ko rv d1">공정마다 확인합니다</h2></div><p class="lead rv d2">자동 재단부터 검품 · 검침 · 포장까지, 현지 상주 관리자가 직접 확인합니다.</p></div>
       <div class="qc">
-        <figure class="rv"><img src="images/factory/ningbo-cutting.webp" alt="자동 재단기로 원단을 재단하는 모습" loading="lazy"><figcaption>자동 재단</figcaption></figure>
-        <figure class="rv d1"><img src="images/factory/ningbo-detail.webp" alt="봉제 작업 모습" loading="lazy"><figcaption>봉제 공정 관리</figcaption></figure>
+        <figure class="rv"><img src="images/factory/ningbo-cutting-d.webp" alt="자동 재단기로 원단을 재단하는 모습" loading="lazy"><figcaption>자동 재단</figcaption></figure>
+        <figure class="rv d1"><img src="images/factory/ningbo-detail-d.webp" alt="봉제 작업 모습" loading="lazy"><figcaption>봉제 공정 관리</figcaption></figure>
         <figure class="rv d2"><img src="images/factory/ningbo-inspection.webp" alt="완성품을 검품하는 모습" loading="lazy"><figcaption>검품 · 다림질</figcaption></figure>
-        <figure class="rv d3"><img src="images/factory/ningbo-packing.webp" alt="완성품을 포장하는 모습" loading="lazy"><figcaption>검침 · 포장</figcaption></figure>
+        <figure class="rv d3"><img src="images/factory/ningbo-packing-d.webp" alt="완성품을 포장하는 모습" loading="lazy"><figcaption>검침 · 포장</figcaption></figure>
       </div>
     </div>
   </section>
