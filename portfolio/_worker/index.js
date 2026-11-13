@@ -14,7 +14,7 @@ async function readSite(env, slug, origin) {
     const r = await env.XMS.fetch(new Request(`${origin}/xms-api/site-head`, { headers: { 'X-Xim-Site': slug } }));
     if (!r.ok) return {};
     const h = (await r.json()).head || {};
-    return { name: h.title || '', desc: h.share_description || '', image: h.og_image ? new URL(h.og_image, origin).href : '' };
+    return { name: h.title || '', desc: h.share_description || '', image: h.og_direct || (h.og_image ? new URL(h.og_image, origin).href : '') };
   } catch { return {}; } // 못 읽으면 index.html 에 적힌 그대로
 }
 // 카드 목록 = xim 에서 "포트폴리오" 를 켜 둔 사이트 (만든 차례).
@@ -40,21 +40,38 @@ function cardHtml(site, d, st) {
   return `<li${st.tag ? ` data-tag="${st.tag}"` : ''}><a class="card" href="${escHtml(site.url)}"${site.slug ? ` data-xim="${escHtml(site.slug)}"` : ''} target="_blank" rel="noopener">${thumb}
 <span class="body">${st.tag ? `<span class="tag">${st.tag}</span>` : ''}<strong class="name">${name}</strong><span class="desc">${desc}</span><span class="go">바로가기</span></span></a></li>`;
 }
-async function fillCards(res, env, ctx) {
-  const html = await res.text();
+// 카드 목록: 만든 것을 이 Worker 메모리에 두고 바로 보낸 뒤, 20초가 지났으면 뒤에서 새로 만든다
+//   (사이트 13곳의 xms 값을 매번 다 읽고 보내느라 첫 바이트가 2초 넘게 걸렸다 — 2026-11-13 "빨리 불러오게")
+let cardMem = null;   // { list, at }
+async function buildList(html, env) {
   let sites = null;
   try { if (env.XIM) sites = await env.XIM.portfolio(); } catch { sites = null; }
-  if (!sites || !env.XMS) return new Response(html, res);
+  if (!sites || !env.XMS) return null;
   const st = staticCards(html);
-  // 포트폴리오2(xim 밖의 사이트, slug 없음)는 xim 이 저장해 둔 카톡 미리보기 값 그대로
   const info = await Promise.all(sites.map((s) => (s.extra ? s.extra : readSite(env, s.slug, new URL(s.url).origin))));
-  //   분류(tag) = xim 에 적은 값, 비어 있으면 index.html 카드 값
-  const list = sites.map((s, i) => {
+  return sites.map((s, i) => {
     const base = s.extra ? {} : st[s.slug] || {};
-    // 분류는 여러 개(쉼표로, 예: '웹앱, 홈페이지') → 카드에는 '웹앱 · 홈페이지', 탭은 각각에 (사용자 지시 2026-11-11)
     const tags = String(s.tag || '').split(/\s*[,·]\s*/).filter(Boolean).map(escHtml).join(' · ');
     return cardHtml(s, info[i] || {}, { ...base, tag: tags || base.tag || '' });
   }).join('\n');
+}
+//   Worker 가 새로 뜨면 메모리가 비므로 Cloudflare 캐시(서울 자리)에도 둔다 — 없을 때만 새로 만든다
+const CARD_KEY = 'https://portfolio-cards.invalid/v1';
+async function cachedList(html, env, ctx) {
+  try { const hit = await caches.default.match(CARD_KEY); if (hit) return await hit.text(); } catch { /* 캐시 없음 */ }
+  const l = await buildList(html, env);
+  if (l !== null) ctx.waitUntil(caches.default.put(CARD_KEY, new Response(l, { headers: { 'Cache-Control': 'public, max-age=300' } })).catch(() => {}));
+  return l;
+}
+async function fillCards(res, env, ctx) {
+  const html = await res.text();
+  let list = cardMem?.list ?? null;
+  if (list === null) { list = await cachedList(html, env, ctx); if (list !== null) cardMem = { list, at: Date.now() }; }
+  else if (Date.now() - cardMem.at > 20000) {
+    cardMem.at = Date.now();   // 한 번만 새로 만들게
+    ctx.waitUntil(buildList(html, env).then((l) => { if (l !== null) { cardMem = { list: l, at: Date.now() }; return caches.default.put(CARD_KEY, new Response(l, { headers: { 'Cache-Control': 'public, max-age=300' } })); } }).catch(() => {}));
+  }
+  if (list === null) return new Response(html, res);
   return new HTMLRewriter()
     .on('ul.grid', { element(e) { e.setInnerContent(list || '<li class="none">아직 올린 사이트가 없습니다.</li>', { html: true }); } })
     .transform(new Response(html, res));

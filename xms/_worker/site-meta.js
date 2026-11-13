@@ -1,6 +1,7 @@
 // 파비콘 · 검색엔진 · 카카오톡 미리보기 — 관리 API, 공개 파일, robots.txt · sitemap.xml, 페이지 머리(head)에 넣을 값
 import { now, bad, notFound, json, str, body, audit, esc, canBy } from './lib.js';
 import { visibleMenus } from './public.js';
+import { siteFileDirect } from './uploads.js';
 
 const FAV_SIZES = [32, 180, 192, 512];
 const ENGINES = {
@@ -206,6 +207,7 @@ export async function headData(env, site) {
     verify: Object.entries(seo.verify).map(([k, v]) => ({ name: ENGINES[k]?.meta, content: v })).filter((x) => x.name),
     favicon: fv ? FAV_SIZES.map((n) => ({ size: n, href: `/xms/file/favicon-${n}.png?v=${fv}` })) : null,
     og_image: files.og ? `/xms/file/og?v=${files.og.updated_at}` : null,
+    og_direct: files.og ? await siteFileDirect(env, site, 'og', files.og.updated_at).catch(() => '') : '',   // 서울 R2 에서 바로 (포트폴리오 카드 그림)
     adsense: seo.adsense,
   };
 }

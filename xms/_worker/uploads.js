@@ -335,3 +335,20 @@ export async function directUrls(env, site, ids, download = false) {
   }
   return out;
 }
+
+// 사이트 설정 그림(카톡 공유 그림 og 등 — D1 site_files)을 R2 에 한 번 옮겨 두고 서울에서 바로 받는 서명 주소 (포트폴리오 카드 등, 2026-11-13)
+const sfKnown = new Set();
+export async function siteFileDirect(env, site, kind, updatedAt) {
+  if (!env.R2_KEY_ID || !env.R2_SECRET || !env.FILES || !updatedAt) return '';
+  const key = `sitefile/${site}/${kind}-${updatedAt}`;
+  if (!sfKnown.has(key)) {
+    if (!(await env.FILES.head(key))) {
+      const f = await env.DB.prepare('SELECT mime, data FROM site_files WHERE site = ? AND kind = ?').bind(site, kind).first();
+      if (!f) return '';
+      await env.FILES.put(key, Uint8Array.from(atob(f.data), (c) => c.charCodeAt(0)), { httpMetadata: { contentType: f.mime } });
+    }
+    sfKnown.add(key);
+  }
+  const day = new Date().toISOString().slice(0, 10);
+  return presign(env, 'GET', key, 604800, { 'response-cache-control': 'public, max-age=604800, immutable' }, new Date(`${day}T00:00:00Z`));
+}
