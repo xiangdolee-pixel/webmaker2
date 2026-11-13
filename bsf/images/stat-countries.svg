@@ -1,0 +1,10 @@
+<svg viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g id="globe" stroke="#153c54" stroke-width="21.333" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="502" cy="558" r="326" />
+    <path d="M502 232C416 232 347 378 347 558S416 884 502 884" />
+    <path d="M502 232C588 232 657 378 657 558S588 884 502 884" />
+    <path d="M176 558H828" />
+  </g>
+  <path id="flight-arc" d="M158 374C232 205 382 126 536 136C647 139 733 179 799 241" stroke="#153c54" stroke-width="12" stroke-linecap="round" stroke-dasharray="30 39" />
+  <circle id="destination" cx="838" cy="277" r="32" fill="#ea6b0c" />
+</svg>

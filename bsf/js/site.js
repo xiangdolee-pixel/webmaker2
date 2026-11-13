@@ -11,11 +11,17 @@
   var darkTop = body.classList.contains('has-hero') || body.classList.contains('has-page-hero');
   var fab = $('.fab');
   var accents = $$('.cta-band');
+  var darks = $$('.hero, .page-hero, .sec.dark, .sec.deep, .sec.ink, .spot, .globe-sec, .brand-band, .cta-band, .ft');
   // 처음 그릴 때는 색 바뀜 움직임 없이 바로 제 모습으로, 그 뒤 스크롤할 때만 부드럽게
   requestAnimationFrame(function () { requestAnimationFrame(function () { doc.documentElement.classList.add('hd-ready'); }); });
   function onScroll() {
     var y = window.pageYOffset || doc.documentElement.scrollTop;
     if (hd && darkTop) hd.classList.toggle('on-dark', y < 40);
+    if (hd) {   // 유리 탑메뉴 아래가 어두운 구간이면 글자를 흰색으로
+      var hb = hd.offsetHeight / 2, od = false;
+      darks.forEach(function (d) { var q = d.getBoundingClientRect(); if (q.top <= hb && q.bottom >= hb) od = true; });
+      hd.classList.toggle('over-dark', od);
+    }
     if (fab) {
       fab.classList.toggle('up', y > 400);   // 맨 위로 버튼(400px 넘으면 뜸)에게 자리를 비켜 준다
       // 주황 띠 위에 오면 버튼 색을 뒤집는다(같은 색끼리 겹치지 않게)
@@ -53,20 +59,122 @@
     var escA = function (t) { return String(t).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); };
     var sizeOf = function (n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; };
     var DL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>';
+    var EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
     var slug = arc.getAttribute('data-archive'), admin = false;
     var draw = function (list) {
       var cnt = $('[data-arc-count]'); if (cnt) cnt.textContent = list.length ? list.length + ' FILES' : '';
       if (!list.length) { arc.innerHTML = '<li class="arc-empty">아직 올린 자료가 없습니다.</li>'; return; }
       arc.innerHTML = list.map(function (p) {
-        var f0 = p.files[0], ext = (f0.name.split('.').pop() || 'FILE').toUpperCase().slice(0, 4);
+        var f0 = p.files[0], ext = f0 ? (f0.name.split('.').pop() || 'FILE').toUpperCase().slice(0, 4) : 'DOC';
         return '<li class="arc-row"><span class="arc-type' + (ext === 'AI' ? ' ai' : '') + '" aria-hidden="true">' + escA(ext) + '</span>'
           + '<div class="arc-txt"><h3>' + escA(p.title) + '</h3>' + (p.desc ? '<p>' + escA(p.desc) + '</p>' : '')
-          + '<span class="arc-meta">' + escA(ext) + ' · ' + sizeOf(f0.size) + ' · ' + escA(p.date) + (admin ? '<a href="' + escA(p.url) + '">고치기</a>' : '') + '</span></div>'
+          + '<span class="arc-meta">' + (f0 ? escA(ext) + ' · ' + sizeOf(f0.size) : '첨부 파일 없음') + ' · ' + escA(p.date) + (admin ? '<a href="' + escA(p.url) + '/edit">고치기</a><button type="button" class="arc-del" data-del="' + p.id + '">삭제</button>' : '') + '</span></div>'
           + '<div class="arc-dls">' + p.files.map(function (f) {
-            return '<a class="arc-dl" href="' + escA(f.url) + '" download aria-label="' + escA(f.name) + ' 내려받기">' + (p.files.length > 1 ? escA(f.name) : '내려받기') + DL + '</a>';
+            var pdf = /\.pdf$/i.test(f.name);
+            return '<span class="arc-btns">' + (pdf ? '<button type="button" class="arc-view" data-view="' + escA(f.url.replace(/\?dl=1$/, '')) + '" data-dl="' + escA(f.url) + '" data-title="' + escA(p.title) + '">' + EYE + '보기</button>' : '')
+              + '<a class="arc-dl" href="' + escA(f.url) + '" download aria-label="' + escA(f.name) + ' 내려받기">' + (p.files.length > 1 ? escA(f.name) : '내려받기') + DL + '</a></span>';
           }).join('') + '</div></li>';
       }).join('');
     };
+    /* PDF 뷰어 (사용자 지시 2026-11-13): 화면 위에 띄워 보고 닫는다. 폰(iOS · 안드로이드)도 같게 PDF.js 로 쪽마다 그린다(보이는 쪽만) */
+    var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+    var pdfLib = null, pv = null, pvDoc = null, pvIO = null, pvOpen = false;
+    var loadLib = function () {
+      if (pdfLib) return pdfLib;
+      pdfLib = new Promise(function (ok, no) {
+        var sc = document.createElement('script'); sc.src = PDFJS + 'pdf.min.js';
+        sc.onload = function () { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; ok(window.pdfjsLib); };
+        sc.onerror = function () { pdfLib = null; no(new Error('lib')); };
+        document.head.appendChild(sc);
+      });
+      return pdfLib;
+    };
+    var closeV = function (fromPop) {
+      if (!pvOpen) return; pvOpen = false;
+      pv.classList.remove('on'); document.documentElement.classList.remove('pv-lock');
+      if (pvIO) pvIO.disconnect();
+      if (pvDoc) { pvDoc.destroy(); pvDoc = null; }
+      setTimeout(function () { if (!pvOpen) $('.pv-pages', pv).innerHTML = ''; }, 300);
+      if (!fromPop && history.state && history.state.pv) history.back();
+      if (pv._from) pv._from.focus();
+    };
+    var openV = function (btn) {
+      if (!pv) {
+        pv = document.createElement('div'); pv.className = 'pv'; pv.setAttribute('role', 'dialog'); pv.setAttribute('aria-modal', 'true');
+        pv.innerHTML = '<div class="pv-bar"><b class="pv-title"></b><span class="pv-page"></span><a class="pv-dl" download>' + DL + '<span>내려받기</span></a>'
+          + '<button type="button" class="pv-x" aria-label="닫기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>'
+          + '<div class="pv-body"><div class="pv-pages"></div><p class="pv-msg"></p></div>';
+        document.body.appendChild(pv);
+        $('.pv-x', pv).addEventListener('click', function () { closeV(); });
+        pv.addEventListener('click', function (e) { if (e.target === pv || e.target.classList.contains('pv-body')) closeV(); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeV(); });
+        window.addEventListener('popstate', function () { closeV(true); });
+      }
+      pv._from = btn; pvOpen = true;
+      $('.pv-title', pv).textContent = btn.getAttribute('data-title');
+      $('.pv-dl', pv).href = btn.getAttribute('data-dl');
+      $('.pv-page', pv).textContent = '';
+      var msg = $('.pv-msg', pv), pages = $('.pv-pages', pv);
+      pages.innerHTML = ''; msg.textContent = '불러오는 중…'; msg.hidden = false;
+      document.documentElement.classList.add('pv-lock'); pv.classList.add('on');
+      history.pushState({ pv: 1 }, '');
+      $('.pv-x', pv).focus();
+      loadLib().then(function (lib) {
+        var task = lib.getDocument({ url: btn.getAttribute('data-view'), withCredentials: true });
+        task.onProgress = function (p) { if (p.total) msg.textContent = '불러오는 중… ' + Math.round(p.loaded / p.total * 100) + '%'; };
+        return task.promise;
+      }).then(function (doc) {
+        if (!pvOpen) { doc.destroy(); return; }
+        pvDoc = doc; msg.hidden = true;
+        var w = Math.min(pages.clientWidth, 1100), dpr = Math.min(window.devicePixelRatio || 1, 2);
+        return doc.getPage(1).then(function (p1) {
+          var v1 = p1.getViewport({ scale: 1 }), ratio = v1.width + ' / ' + v1.height;
+          pvIO = new IntersectionObserver(function (ents) {
+            ents.forEach(function (en) {
+              var box = en.target;
+              if (!en.isIntersecting || box._done) return;
+              box._done = true;
+              doc.getPage(+box.getAttribute('data-n')).then(function (pg) {
+                var vp = pg.getViewport({ scale: w / pg.getViewport({ scale: 1 }).width * dpr }), c = document.createElement('canvas');
+                c.width = vp.width; c.height = vp.height; box.style.aspectRatio = vp.width + ' / ' + vp.height; box.appendChild(c);
+                return pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+              }).catch(function () {});
+            });
+          }, { root: $('.pv-body', pv), rootMargin: '600px 0px' });
+          var bodyEl = $('.pv-body', pv), onPv = function () {
+            var top = bodyEl.getBoundingClientRect().top + 40, cur = 1;
+            $$('.pv-p', pages).forEach(function (bx) { if (bx.getBoundingClientRect().top <= top) cur = +bx.getAttribute('data-n'); });
+            $('.pv-page', pv).textContent = cur + ' / ' + doc.numPages;
+          };
+          bodyEl.onscroll = onPv;
+          for (var n = 1; n <= doc.numPages; n++) {
+            var box = document.createElement('div'); box.className = 'pv-p'; box.setAttribute('data-n', n);
+            box.style.width = w + 'px'; box.style.aspectRatio = ratio;
+            pages.appendChild(box); pvIO.observe(box);
+          }
+          onPv();
+        });
+      }).catch(function () {
+        msg.hidden = false;
+        msg.innerHTML = '이 화면에서 열지 못했습니다. <a href="' + escA(btn.getAttribute('data-dl')) + '" download>내려받아 보기</a>';
+      });
+    };
+    arc.addEventListener('click', function (e) { var b = e.target.closest('[data-view]'); if (b) openV(b); });
+    // 관리자: 삭제 → 그 줄에서 한 번 더 묻고 지운다 (사용자 지시 2026-11-13)
+    arc.addEventListener('click', function (e) {
+      var d = e.target.closest('[data-del]'), no = e.target.closest('[data-no]'), yes = e.target.closest('[data-yes]');
+      if (d) {
+        var meta = d.parentNode; meta._keep = meta.innerHTML;
+        meta.innerHTML = '<span class="arc-ask">이 자료를 지울까요? 내려받는 파일도 함께 지워집니다.<button type="button" class="arc-yes" data-yes="' + d.getAttribute('data-del') + '">지우기</button><button type="button" class="arc-no" data-no>취소</button></span>';
+      } else if (no) {
+        var m = no.closest('.arc-meta'); m.innerHTML = m._keep;
+      } else if (yes) {
+        yes.disabled = true; yes.textContent = '지우는 중…';
+        fetch('/xms-api/posts/' + yes.getAttribute('data-yes'), { method: 'DELETE', credentials: 'same-origin' })
+          .then(function (r) { if (!r.ok) throw new Error(); load(); })
+          .catch(function () { yes.disabled = false; yes.textContent = '다시 지우기'; });
+      }
+    });
     var load = function () {
       fetch('/xms-api/boards/' + slug + '/files', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : []; })
         .then(draw).catch(function () { arc.innerHTML = '<li class="arc-empty">자료를 불러오지 못했습니다. 잠시 뒤 다시 열어 주세요.</li>'; });
@@ -106,6 +214,7 @@
     });
     el.classList.add('go');
   }
+  $$('.st-dots').forEach(function (v) { var it = $$('i', v); it.forEach(function (i, n) { i.style.transitionDelay = Math.round(200 + n * 1700 / it.length) + 'ms'; }); });
   var rvs = $$('.rv, .world'), counts = $$('[data-count]');
   if ('IntersectionObserver' in window) {
     var io = new IntersectionObserver(function (ents) {

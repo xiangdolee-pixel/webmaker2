@@ -332,8 +332,8 @@ about = head('회사소개 | BSF COMPANY', 'BSF COMPANY — 17년 의류 해외�
     <div class="wrap">
       <div class="sec-head"><p class="eyebrow rv">OUR VALUES</p><h2 class="title-ko rv d1">작지만 깊게, 끝까지</h2></div>
       <div class="values">
-        <div class="value rv"><figure class="value-img"><img src="images/v-manager.webp" alt="문의부터 입고까지 함께하는 소싱 담당자가 원단 견본을 보며 통화하는 모습" loading="lazy" decoding="async" width="1024" height="688"></figure><i>{VAL_ICONS['person']}</i><h3>바뀌지 않는 담당자</h3><p>문의부터 입고까지 같은 소싱팀이 맡습니다. 처음 나눈 이야기가 끝까지 이어집니다.</p></div>
-        <div class="value rv d1"><figure class="value-img"><img src="images/v-field.webp" alt="생산 현장 관리자가 봉제 라인에서 자켓 봉제선을 확인하는 모습" loading="lazy" decoding="async" width="1024" height="688"></figure><i>{VAL_ICONS['factory']}</i><h3>현장에 있는 관리자</h3><p>해외 생산지에 상주하는 관리자가 공정을 직접 보고, 문제가 생기기 전에 잡습니다.</p></div>
+        <div class="value rv"><figure class="value-img"><img src="images/v-manager2.webp" alt="문의부터 입고까지 함께하는 소싱 담당자가 원단 견본을 보며 통화하는 모습" loading="lazy" decoding="async" width="1024" height="688"></figure><i>{VAL_ICONS['person']}</i><h3>바뀌지 않는 담당자</h3><p>문의부터 입고까지 같은 소싱팀이 맡습니다. 처음 나눈 이야기가 끝까지 이어집니다.</p></div>
+        <div class="value rv d1"><figure class="value-img"><img src="images/v-field2.webp" alt="생산 현장 관리자가 손으로 자켓 봉제선을 확인하는 모습" loading="lazy" decoding="async" width="1024" height="688"></figure><i>{VAL_ICONS['factory']}</i><h3>현장에 있는 관리자</h3><p>해외 생산지에 상주하는 관리자가 공정을 직접 보고, 문제가 생기기 전에 잡습니다.</p></div>
         <div class="value rv d2"><figure class="value-img"><img src="images/v-cost.webp" alt="원가표와 원단 견본 · 지퍼 · 단추를 놓고 원가를 정리하는 모습" loading="lazy" decoding="async" width="1024" height="688"></figure><i>{VAL_ICONS['cost']}</i><h3>숨기지 않는 원가</h3><p>원부자재와 생산지 조합별 원가를 함께 보며 정합니다. 왜 이 가격인지 설명할 수 있습니다.</p></div>
       </div>
     </div>

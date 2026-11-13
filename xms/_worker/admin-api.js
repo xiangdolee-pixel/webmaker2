@@ -652,6 +652,8 @@ export function boardOptions(o = {}) {
     writer_mode: o.writer_mode === 'HIDDEN' ? 'HIDDEN' : 'NAME',
     page_size: [10, 20, 30].includes(Number(o.page_size)) ? Number(o.page_size) : 20,
     new_hours: 72,
+    // 목록 주소: 사이트 디자인 안에 따로 만든 목록 화면(예: bsf /archive.html) — 있으면 글 등록 · 수정 · 삭제 뒤, '목록' 단추가 그리로 간다 (사용자 지시 2026-11-13)
+    list_url: /^\/[a-z0-9._\/-]{0,80}$/i.test(String(o.list_url || '')) ? String(o.list_url) : '',
   };
 }
 async function boardFields(db, site, raw, cur) {
@@ -671,7 +673,7 @@ async function boardFields(db, site, raw, cur) {
     write_levels: lv('write_levels', 1), comment_levels: lv('comment_levels', ALL_LEVELS),
     allow_guest_list: yes('allow_guest_list', 1), allow_guest_read: yes('allow_guest_read', 1), allow_guest_write: yes('allow_guest_write', 0),
     guest_menu: yes('guest_menu', 1), use_comment: yes('use_comment', 1), use_secret: yes('use_secret', 0),
-    options: JSON.stringify(boardOptions(raw.options || {})),
+    options: JSON.stringify(boardOptions({ list_url: cur ? JSON.parse(cur.options || '{}').list_url : '', ...(raw.options || {}) })),
   };
 }
 

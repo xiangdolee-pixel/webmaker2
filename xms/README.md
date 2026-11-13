@@ -57,6 +57,11 @@ Worker `xms` + D1 `xms` (xiangdolee 계정). 업체 구분은 모든 표의 `sit
 - 사이트 원본 글자를 바꿔 다시 배포하면 그 자리의 고친 글자는 더 이상 붙지 않는다(엉뚱한 곳에 붙지 않게).
 - 구현: 사이트 Worker(`xim/_worker/site-worker.js` XE_APPLY)가 페이지 끝에서 글자를 넣고, `js/edit.js` 가 편집 화면, `POST /xms-api/admin/page-texts` 가 저장.
 
+## 사이트 안 자료 목록 (게시판 '목록 주소')
+
+- 게시판 options.list_url (예: bsf 자료실 `/archive.html`): 있으면 글 등록 · 수정 · 삭제 뒤와 '목록' 단추가 그리로 가고, 관리자가 아닌 사람이 `/board/<주소>` 를 열면 그리로 보낸다. 관리 화면에 아직 칸이 없어 D1 로 넣는다(관리 화면에서 게시판을 저장해도 지워지지 않음).
+- `GET /xms-api/boards/<주소>/files` → [{ id, title, desc, date, url, files: [{ name, size, url }] }] — 사이트 디자인 안에서 '자료 이름 + 보기 · 내려받기' 로 그릴 때 (bsf `js/site.js` 자료실).
+
 ## 2차로 미룬 것
 
 접수함 · 번역 다듬기 · 솔루션 공지, 사진/파일 올리기(R2) + 저장 공간 집계, 설교 게시판 · 전자책, 비밀번호 찾기 메일, 답글, 태그, 사이트 디자인 안에 메뉴 끼워 넣기(지금은 /board · /member 화면 위쪽에만 메뉴가 나온다).

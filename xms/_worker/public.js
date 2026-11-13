@@ -323,6 +323,7 @@ const firstImage = (h) => (String(h).match(/<img[^>]+src="([^"]+)"/i) || [])[1] 
 
 async function boardList(ctx, b) {
   const { env, me, url } = ctx;
+  if (b.opt.list_url && me.level !== 1) return Response.redirect(new URL(b.opt.list_url, url).href, 302);
   if (!canList(b, me)) return me.level ? noRight(ctx) : needLogin(ctx, url.pathname);
   const q = str(url.searchParams.get('q'), 50);
   const size = [10, 20, 30].includes(Number(url.searchParams.get('size'))) ? Number(url.searchParams.get('size')) : b.opt.page_size;
@@ -425,8 +426,8 @@ async function postView(ctx, b, id) {
       <div class="prose">${p.content_html}</div>
       ${files.length ? `<div class="post-files"><b>첨부파일</b>${files.map((u) => `<a href="${u.url}?dl=1">${esc(u.name)} <small>${fmtSize(u.size)}</small></a>`).join('')}</div>` : ''}
     </article>
-    <div class="actions"><a class="btn" href="/board/${b.slug}">목록</a>${mine ? `<a class="btn" href="/board/${b.slug}/${p.id}/edit">수정</a>
-      <button class="btn danger" type="button" data-del-post="${p.id}" data-back="/board/${b.slug}">삭제</button>` : ''}</div>
+    <div class="actions"><a class="btn" href="${b.opt.list_url || `/board/${b.slug}`}">목록</a>${mine ? `<a class="btn" href="/board/${b.slug}/${p.id}/edit">수정</a>
+      <button class="btn danger" type="button" data-del-post="${p.id}" data-back="${b.opt.list_url || `/board/${b.slug}`}">삭제</button>` : ''}</div>
     ${comments}
     ${more}
   </section>`);
@@ -479,8 +480,8 @@ async function postForm(ctx, b, id) {
   const writer = p ? p.writer_name : me.kind === 'member' ? (me.member.nickname || me.member.name) : me.kind === 'staff' ? '관리자' : '';
   const guest = me.kind === 'guest';
   return page(ctx, id ? '글 수정' : '글쓰기', `<section class="pub-box wide write-box">
-    <header class="write-head"><h1>${id ? '글 수정' : '글쓰기'}</h1><a class="write-board" href="/board/${esc(b.slug)}">${esc(b.name)}</a></header>
-    <form data-form="post" data-board="${esc(b.slug)}" data-id="${id || ''}">
+    <header class="write-head"><h1>${id ? '글 수정' : '글쓰기'}</h1><a class="write-board" href="${esc(b.opt.list_url || `/board/${b.slug}`)}">${esc(b.name)}</a></header>
+    <form data-form="post" data-board="${esc(b.slug)}" data-id="${id || ''}"${b.opt.list_url ? ` data-after="${esc(b.opt.list_url)}"` : ''}>
       <label class="field"><span>제목</span><input class="input big" name="title" maxlength="200" required value="${esc(p?.title)}"></label>
       ${guest
         ? '<label class="field"><span>이름</span><input class="input half" name="writer_name" maxlength="20" required><small>비회원으로 남기는 글입니다. 수정·삭제는 관리자에게 문의해 주세요.</small></label>'
@@ -586,7 +587,7 @@ export async function publicApi(ctx) {
     const out = results.map((p) => ({
       id: p.id, title: p.title, desc: plainText(p.content_html).slice(0, 200), date: fmtDate(p.published_at), url: `/board/${b.slug}/${p.id}`,
       files: ups.filter((u) => u.post_id === p.id).map((u) => ({ name: u.name, size: u.size, url: `/xms/upload/${u.id}?dl=1` })),
-    })).filter((p) => p.files.length);
+    }));
     return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=30' } });
   }
   //   GET /xms-api/boards/<주소>/latest?n=4  → [{ id, title, date, url, thumb }]  (비밀글 · 예약 글 · 볼 권한 없는 글은 빠짐)
