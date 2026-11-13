@@ -211,14 +211,14 @@ home = head('BSF COMPANY — 글로벌 의류 OEM · ODM 소싱 파트너', '17�
 
   <section class="spot">
     <div class="spot-grid">
-      <div class="spot-main"><img src="images/works/t1-stars.webp" alt="T1 월즈 유니폼 자켓을 입은 페이커" loading="lazy" width="682" height="681">
+      <div class="spot-main"><img src="images/works/t1-jacket-closeup.webp" alt="T1 2023 월즈 유니폼 자켓 클로즈업" loading="lazy" width="1477" height="1065">
         <div class="spot-tag"><small>2023 WORLDS</small><strong>페이커와 T1 선수단이<br>월즈 무대에서 입은 유니폼</strong></div></div>
       <div class="spot-body">
         <p class="eyebrow rv">WORN ON THE WORLD STAGE</p>
         <h2 class="title rv d1">Made for<br>the <span class="gold">world stage.</span></h2>
         <p class="lead rv d2">2023 리그 오브 레전드 월드 챔피언십. 페이커와 T1 선수단이 세계 무대에서 입은 유니폼 자켓과 팬츠를 BSF가 생산했습니다. 스폰서 로고가 빼곡한 기능성 유니폼을 대회 일정에 맞춰 만들었습니다.</p>
         <dl class="spot-facts rv d2"><div><dt>클라이언트</dt><dd>T1 × GOALSTUDIO</dd></div><div><dt>품목</dt><dd>유니폼 자켓 · 팬츠</dd></div><div><dt>무대</dt><dd>2023 월드 챔피언십</dd></div></dl>
-        <div class="spot-thumbs rv d3"><figure><img src="images/works/t1-jacket.webp" alt="T1 2023 월즈 유니폼 자켓" loading="lazy"></figure><figure><img src="images/works/t1-pants.webp" alt="T1 2023 월즈 유니폼 팬츠" loading="lazy"></figure><figure><img src="images/works/t1-team.webp" alt="월즈 무대의 T1 선수단 뒷모습" loading="lazy"></figure></div>
+        <div class="spot-thumbs rv d3"><figure><img src="images/works/t1-pants-pair.webp" alt="T1 2023 월즈 유니폼 팬츠 앞 · 뒤" loading="lazy"></figure><figure><img src="images/works/t1-windbreaker.webp" alt="T1 2023 월즈 유니폼 후드 자켓 앞 · 뒤" loading="lazy"></figure><figure><img src="images/works/t1-team-stage.webp" alt="월즈 무대의 T1 선수단 뒷모습" loading="lazy"></figure></div>
         <div class="rv d3"><a class="btn line" href="works.html#t1">납품실적 보기</a></div>
       </div>
     </div>
@@ -501,7 +501,7 @@ write('capability.html', cap)
 # ═════════════ WORKS ═════════════
 CASES = [
     ('t1', 'sports', 'E-SPORTS · GOALSTUDIO', 'T1 2023 월즈 유니폼 자켓 · 팬츠', '2023 리그 오브 레전드 월드 챔피언십. 페이커와 T1 선수단이 세계 무대에서 입은 유니폼 자켓과 팬츠를 생산했습니다. 스폰서 로고가 많은 기능성 유니폼을 대회 일정에 맞췄습니다.',
-     [('클라이언트', 'T1 × GOALSTUDIO'), ('품목', '유니폼 자켓 · 팬츠'), ('분류', 'WOVEN')], ['works/t1-stars', 'works/t1-jacket', 'works/t1-pants', 'works/t1-team']),
+     [('클라이언트', 'T1 × GOALSTUDIO'), ('품목', '유니폼 자켓 · 팬츠'), ('분류', 'WOVEN')], ['works/t1-jacket-closeup', 'works/t1-pants-pair', 'works/t1-windbreaker', 'works/t1-team-stage']),
     ('armed', 'street', 'STREET · FITNESS', 'MUSCLE ARMED — 무신사 판매 1위 저지 티셔츠', '피트니스 스트리트 브랜드 머슬암드의 23 저지 티셔츠는 무신사 실시간 랭킹 1위에 올랐습니다. 하프집 · 자켓 · 더플백도 함께 생산했습니다.',
      [('클라이언트', 'MUSCLE ARMED'), ('품목', '저지 티 · 하프집 · 자켓 · 더플백'), ('분류', 'KNIT · WOVEN · ACC')], ['works/armed-ai', 'works/armed-musinsa', 'works/armed-bag']),
     ('daegu', 'sports', 'FOOTBALL · GOALSTUDIO', '대구FC 트레이닝웨어', 'K리그 대구FC 선수단이 동계 훈련에서 입은 트레이닝 탑을 생산했습니다.',
