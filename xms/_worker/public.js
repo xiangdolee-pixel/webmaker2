@@ -573,6 +573,22 @@ export async function publicApi(ctx) {
     await audit(db, site, me, request, 'POSTS_MANAGE', b.name, `${label} ${r.meta.changes}개`);
     return json({ ok: true, changed: r.meta.changes });
   }
+  //   GET /xms-api/boards/<주소>/files  → [{ id, title, desc, date, files: [{ name, size, url }] }]
+  //   자료실처럼 사이트 디자인 안에서 '자료 이름 + 내려받기 버튼' 으로 보여 줄 때 (bsf archive.html, 사용자 지시 2026-11-13).
+  //   첨부 파일(FILE)이 있는 글만, 비밀글 · 예약 글 · 숨긴 글 · 읽을 권한 없는 게시판은 빠진다
+  if ((m = path.match(/^\/boards\/([a-z0-9-]+)\/files$/)) && method === 'GET') {
+    const b = await loadBoard(db, site, m[1]);
+    if (!b || !b.visible || !canList(b, me) || !canRead(b, me)) return json([]);
+    const { results } = await db.prepare(`SELECT id, title, content_html, published_at FROM posts
+      WHERE board_id = ? AND deleted_at IS NULL AND is_secret = 0 AND is_hidden = 0 AND published_at <= ? ORDER BY is_notice DESC, published_at DESC, id DESC LIMIT 100`).bind(b.id, now()).all();
+    const ids = results.map((p) => p.id);
+    const ups = ids.length ? (await db.prepare(`SELECT post_id, id, name, size FROM uploads WHERE site = ? AND kind = 'FILE' AND post_id IN (${ids.map(() => '?').join(',')}) ORDER BY sort, created_at`).bind(site, ...ids).all()).results : [];
+    const out = results.map((p) => ({
+      id: p.id, title: p.title, desc: plainText(p.content_html).slice(0, 200), date: fmtDate(p.published_at), url: `/board/${b.slug}/${p.id}`,
+      files: ups.filter((u) => u.post_id === p.id).map((u) => ({ name: u.name, size: u.size, url: `/xms/upload/${u.id}?dl=1` })),
+    })).filter((p) => p.files.length);
+    return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=30' } });
+  }
   //   GET /xms-api/boards/<주소>/latest?n=4  → [{ id, title, date, url, thumb }]  (비밀글 · 예약 글 · 볼 권한 없는 글은 빠짐)
   if ((m = path.match(/^\/boards\/([a-z0-9-]+)\/latest$/)) && method === 'GET') {
     const b = await loadBoard(db, site, m[1]);

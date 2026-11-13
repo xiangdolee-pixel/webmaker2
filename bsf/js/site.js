@@ -47,6 +47,35 @@
     window.addEventListener('keydown', function (e) { if (e.key === 'Escape') body.classList.remove('nav-open'); });
   }
 
+  /* 자료실: xms 게시판(archive)의 첨부 파일을 '자료 이름 + 내려받기' 줄로 (사용자 지시 2026-11-13) */
+  var arc = $('[data-archive]');
+  if (arc) {
+    var escA = function (t) { return String(t).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); };
+    var sizeOf = function (n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; };
+    var DL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>';
+    var slug = arc.getAttribute('data-archive'), admin = false;
+    var draw = function (list) {
+      var cnt = $('[data-arc-count]'); if (cnt) cnt.textContent = list.length ? list.length + ' FILES' : '';
+      if (!list.length) { arc.innerHTML = '<li class="arc-empty">아직 올린 자료가 없습니다.</li>'; return; }
+      arc.innerHTML = list.map(function (p) {
+        var f0 = p.files[0], ext = (f0.name.split('.').pop() || 'FILE').toUpperCase().slice(0, 4);
+        return '<li class="arc-row"><span class="arc-type' + (ext === 'AI' ? ' ai' : '') + '" aria-hidden="true">' + escA(ext) + '</span>'
+          + '<div class="arc-txt"><h3>' + escA(p.title) + '</h3>' + (p.desc ? '<p>' + escA(p.desc) + '</p>' : '')
+          + '<span class="arc-meta">' + escA(ext) + ' · ' + sizeOf(f0.size) + ' · ' + escA(p.date) + (admin ? '<a href="' + escA(p.url) + '">고치기</a>' : '') + '</span></div>'
+          + '<div class="arc-dls">' + p.files.map(function (f) {
+            return '<a class="arc-dl" href="' + escA(f.url) + '" download aria-label="' + escA(f.name) + ' 내려받기">' + (p.files.length > 1 ? escA(f.name) : '내려받기') + DL + '</a>';
+          }).join('') + '</div></li>';
+      }).join('');
+    };
+    var load = function () {
+      fetch('/xms-api/boards/' + slug + '/files', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : []; })
+        .then(draw).catch(function () { arc.innerHTML = '<li class="arc-empty">자료를 불러오지 못했습니다. 잠시 뒤 다시 열어 주세요.</li>'; });
+    };
+    fetch('/xms-api/me', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (me) {
+      admin = !!me.admin; var b = $('[data-arc-admin]'); if (b && admin) b.hidden = false;
+    }).catch(function () {}).then(load);
+  }
+
   /* 스크롤 등장 + 숫자 올라가기 */
   // 숫자 올라가기 (사용자 지시 2026-11-13 "더 세련되게"): 자리마다 숫자 띠가 굴러 올라가는 오도미터.
   //   일의 자리가 가장 많이 돌고 먼저 출발, 윗자리는 조금 늦게 덜 돈다. 한 묶음은 모두 같은 순간에 부드럽게 내려앉는다

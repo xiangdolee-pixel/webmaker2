@@ -198,14 +198,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .stats b sup { opacity: 0; transform: translateY(.4em) scale(.6); transition: opacity .5s ease 2s, transform .6s cubic-bezier(.3, 1.6, .5, 1) 2s; }
 .stats.counted b sup { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .stats li::before, .stats b sup { transform: none; opacity: 1; transition: none; } }
-/* 숫자 칸 아이콘 (사용자 지시 2026-11-13): 품목 아이콘과 같은 선 아이콘, 숫자가 돌 때 선이 그려지고 주황 한 군데 */
-.st-ic { display: block; width: 56px; height: 56px; margin-left: -4px; margin-bottom: clamp(18px, 2vw, 28px); fill: none; stroke: var(--navy); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform .5s var(--ease); }
-.st-ic * { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1.4s cubic-bezier(.45, 0, .2, 1); }
-.st-ic .a { stroke: var(--accent); stroke-width: 2; transition-delay: 1.1s; }
-.counted .st-ic * { stroke-dashoffset: 0; }
-.stats li:hover .st-ic { transform: translateY(-3px) rotate(-4deg); }
+/* 숫자 칸 아이콘 (사용자 지시 2026-11-13): 회사소개 카드와 같은 연한 네모 칸 아이콘(달력 · 지구 · 위치 · 옷), 마우스를 올리면 남색으로 반전 */
+.st-ic { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; margin-bottom: clamp(18px, 2vw, 26px); border-radius: 16px; background: var(--steel-soft); color: var(--steel); transition: background-color .35s var(--ease), color .35s var(--ease), transform .35s var(--ease); }
+.st-ic svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.stats li:hover .st-ic { background: var(--navy); color: #fff; transform: translateY(-3px); }
 .stats li > small { display: block; margin-top: 8px; color: var(--mute); font-size: 14px; line-height: 1.5; word-break: keep-all; }
-@media (prefers-reduced-motion: reduce) { .st-ic * { stroke-dashoffset: 0; transition: none; } }
 /* 선언문 붙여 두기: 이 칸 높이만큼 스크롤하는 동안 글자가 채워진다 */
 .state-track { position: relative; height: 230vh; }
 .state-pin { position: sticky; top: 0; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: calc(var(--hd) + 20px) 0 40px; }
@@ -801,3 +798,32 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="month"]::-web
 
 /* 게시판 · 회원(로그인 등) 화면 틀(_layout.html): 고정 머리 아래로 내용이 시작되게 */
 .xms-main { padding-top: calc(var(--hd) + 32px); min-height: 70vh; }
+
+/* 자료실 (archive.html) — 자료 이름 + 내려받기 버튼. 자료는 xms 게시판 archive 에서 레벨1이 올린다 (사용자 지시 2026-11-13) */
+.arc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-bottom: 26px; }
+.arc-head .eyebrow { margin: 0; }
+.arc-count { color: var(--mute); font-family: var(--display); font-size: 14px; font-weight: 700; letter-spacing: .08em; }
+.arc-admin { margin-left: auto; }
+.arc { margin: 0; padding: 0; list-style: none; border-top: 1.5px solid var(--navy); }
+.arc-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 18px 30px; padding: 30px 12px; border-bottom: 1px solid var(--line); transition: background-color .35s var(--ease); }
+.arc-row:hover { background: #fff; }
+.arc-type { position: relative; display: flex; align-items: flex-end; justify-content: center; width: 56px; height: 68px; padding-bottom: 12px; border: 1.5px solid var(--navy); border-radius: 3px 16px 3px 3px; color: var(--navy); font-family: var(--display); font-size: 13px; font-weight: 800; letter-spacing: .06em; }
+.arc-type::before { content: ''; position: absolute; top: 14px; left: 12px; right: 12px; height: 1.5px; background: currentColor; opacity: .25; box-shadow: 0 7px 0 currentColor, 0 14px 0 currentColor; }
+.arc-type.ai { border-color: var(--accent); color: var(--accent); }
+.arc-txt h3 { margin: 0 0 6px; color: var(--navy); font-size: clamp(18px, 1.6vw, 22px); line-height: 1.4; }
+.arc-txt p { margin: 0; color: var(--sub); font-size: 15.5px; line-height: 1.6; }
+.arc-meta { display: block; margin-top: 10px; color: var(--mute); font-family: var(--display); font-size: 12.5px; font-weight: 600; letter-spacing: .06em; }
+.arc-meta a { margin-left: 10px; color: var(--steel); }
+.arc-dls { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.arc-dl { display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 999px; background: var(--navy); color: #fff; font-size: 15px; font-weight: 700; white-space: nowrap; transition: background-color .3s var(--ease); }
+.arc-dl svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .3s var(--ease); }
+.arc-dl:hover { background: var(--accent); }
+.arc-dl:hover svg { transform: translateY(2px); }
+.arc-empty { padding: 48px 12px; color: var(--mute); border-bottom: 1px solid var(--line); }
+@media (max-width: 699px) {
+  .arc-row { grid-template-columns: 48px minmax(0, 1fr); gap: 14px 16px; padding: 24px 4px; }
+  .arc-type { align-self: start; margin-top: 4px; width: 44px; height: 54px; padding-bottom: 8px; font-size: 11px; border-radius: 3px 12px 3px 3px; }
+  .arc-type::before { top: 11px; left: 9px; right: 9px; box-shadow: 0 6px 0 currentColor, 0 12px 0 currentColor; }
+  .arc-dls { grid-column: 2; align-items: flex-start; }
+  .arc-dl { padding: 11px 18px; font-size: 14.5px; }
+}
