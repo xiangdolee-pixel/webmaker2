@@ -715,10 +715,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   :root { --hd: 84px; }
   .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .stats li, .stats li:nth-child(odd), .stats li:nth-child(-n+2) { padding: 40px 0 36px 32px; border-right: 1px solid var(--line); border-bottom: 0; }
-  .stats li:first-child { padding-left: 0; }
   .stats li:last-child { border-right: 0; }
   .stats li:nth-child(even)::before, .stats li::before { left: 32px; }
-  .stats li:first-child::before { left: 0; }
           .scroll-cue { display: block; }
   .flow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .step { grid-template-columns: 1fr; align-items: start; padding: 16px 16px 26px; }
