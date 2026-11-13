@@ -507,7 +507,7 @@ CASES = [
     ('daegu', 'sports', 'FOOTBALL · GOALSTUDIO', '대구FC 트레이닝웨어', 'K리그 대구FC 선수단이 동계 훈련에서 입은 트레이닝 탑을 생산했습니다.',
      [('클라이언트', 'GOALSTUDIO · 대구FC'), ('품목', '트레이닝 탑'), ('분류', 'KNIT')], ['works/daegu-ai', 'works/daegu-kit', 'works/daegu-stretch']),
     ('nightwalk', 'event', 'EVENT · GOODS', '2023 한강 · 부산 나이트워크 티셔츠 · 양말', '수천 명이 함께 걷는 대규모 야간 걷기 행사의 참가자 티셔츠와 양말을 생산했습니다.',
-     [('클라이언트', '나이트워크 (한강 · 부산)'), ('품목', '티셔츠 · 양말'), ('분류', 'KNIT · ACC')], ['works/nightwalk-ai', 'works/nightwalk-poster', 'works/nightwalk-goods']),
+     [('클라이언트', '나이트워크 (한강 · 부산)'), ('품목', '티셔츠 · 양말'), ('분류', 'KNIT · ACC')], ['works/nightwalk-ai', 'works/nightwalk-poster2', 'works/nightwalk-goods2']),
     ('naturetrail', 'brand', 'OWN BRAND', 'NATURE TRAIL — 캠핑 아웃도어 자체 브랜드', '다운 자켓 · 베스트 · 데님 · 조거 팬츠 · 맨투맨 · 그래픽 티셔츠까지, BSF가 직접 기획 · 생산 · 판매합니다.',
      [('브랜드', 'NATURE TRAIL'), ('품목', '아우터 · 하의 · 니트'), ('분류', 'WOVEN · KNIT · BOTTOM')], ['brand/p24', 'brand/p20', 'brand/p18', 'brand/p14', 'brand/p15']),
 ]
