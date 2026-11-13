@@ -599,7 +599,7 @@ export async function publicApi(ctx) {
       id: p.id, title: p.title, desc: plainText(p.content_html).slice(0, 200), date: fmtDate(p.published_at), url: `/board/${b.slug}/${p.id}`,
       files: ups.filter((u) => u.post_id === p.id).map((u) => ({ name: u.name, size: u.size, url: `/xms/upload/${u.id}?dl=1` })),
     }));
-    return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=30' } });
+    return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });   // 올리고 지운 것이 바로 보이게
   }
   //   GET /xms-api/boards/<주소>/latest?n=4  → [{ id, title, date, url, thumb }]  (비밀글 · 예약 글 · 볼 권한 없는 글은 빠짐)
   if ((m = path.match(/^\/boards\/([a-z0-9-]+)\/latest$/)) && method === 'GET') {

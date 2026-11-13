@@ -163,34 +163,44 @@
         }, reduce2 ? 0 : 160);
         return;
       }
-      // 책: 넘기는 장(앞면 = 지금 쪽, 뒷면 = 다음 쪽)이 책등을 축으로 돌아간다
+      // 전자책: 넘기는 장(앞면 = 지금 쪽, 뒷면 = 다음(앞) 쪽)이 책등을 축으로 돌아간다.
+      //   한 장(표지 · 마지막 쪽)은 가운데 있다가 넘기기 전에 제 쪽 자리로 슥 옮겨 가고, 넘긴 뒤 한 장이 남으면 가운데로 슥 돌아온다
       pvBusy = true;
       var sp = spreadOf(pvCur), nsp = (function () { var k = pvCur; pvCur = to; var r = spreadOf(to); pvCur = k; return r; })();
-      var one = narrow(), w = fitW(one ? 1 : 2);
+      var one = narrow(), w = fitW(one ? 1 : 2), SLIDE = 380;
+      var single = function (s) { return !one && s.length === 1; };
+      var sideOf = function (s) { return s[0] === 1 ? 1 : -1; };   // 표지는 오른쪽 쪽 자리, 끝에 홀로 남은 쪽은 왼쪽 쪽 자리
+      var slide = function (el, x, ms) { el.style.transition = ms ? 'transform ' + ms + 'ms cubic-bezier(.22, .8, .24, 1)' : 'none'; el.style.transform = x ? 'translateX(' + x + 'px)' : ''; };
       var frontN = dir > 0 ? sp[sp.length - 1] : sp[0], backN = dir > 0 ? nsp[0] : nsp[nsp.length - 1];
       Promise.all([pageCanvas(frontN, w), pageCanvas(backN, w), Promise.all(nsp.map(function (n) { return pageCanvas(n, w); }))]).then(function (r) {
-        var row = $('.pv-spread', stageEl);
-        var under = document.createElement('div'); under.className = 'pv-spread under' + (nsp.length === 1 && !one ? ' cover' : '');
-        r[2].forEach(function (c, i) { var f = document.createElement('div'); f.className = 'pv-leafpage' + (nsp.length > 1 ? (i ? ' r' : ' l') : ''); f.appendChild(c); under.appendChild(f); });
-        // 넘기는 동안 아래에는: 다음으로 가면 지금 왼쪽 + 다음 오른쪽, 앞으로 가면 앞 왼쪽 + 지금 오른쪽이 보인다
-        if (!one && nsp.length > 1 && sp.length > 1) {
-          var keepSide = dir > 0 ? $('.pv-leafpage.l', row) : $('.pv-leafpage.r', row), hideSide = dir > 0 ? $('.pv-leafpage.l', under) : $('.pv-leafpage.r', under);
-          if (keepSide && hideSide) hideSide.style.visibility = 'hidden', under._swap = [hideSide, keepSide];
-        }
-        stageEl.insertBefore(under, row);
-        if (!one) { var face = dir > 0 ? $('.pv-leafpage.r', row) || $('.pv-leafpage', row) : $('.pv-leafpage.l', row) || $('.pv-leafpage', row); if (face) face.style.visibility = 'hidden'; }
-        else row.style.visibility = 'hidden';
-        var leaf = document.createElement('div'); leaf.className = 'pv-leaf ' + (dir > 0 ? 'fwd' : 'back') + (one ? ' one' : '');
-        var f1 = document.createElement('div'), f2 = document.createElement('div'); f1.className = 'pv-face front'; f2.className = 'pv-face backface';
-        f1.appendChild(r[0]); f2.appendChild(r[1]); leaf.appendChild(f1); leaf.appendChild(f2);
-        var ref = (one ? row : (dir > 0 ? $('.pv-leafpage.r', row) || $('.pv-leafpage', row) : $('.pv-leafpage.l', row) || $('.pv-leafpage', row))).getBoundingClientRect(), sr = stageEl.getBoundingClientRect();
-        leaf.style.left = (ref.left - sr.left) + 'px'; leaf.style.top = (ref.top - sr.top) + 'px'; leaf.style.width = ref.width + 'px'; leaf.style.height = ref.height + 'px';
-        stageEl.appendChild(leaf); leaf.offsetWidth; leaf.classList.add('turn');
+        var row = $('.pv-spread', stageEl), curPage = $('.pv-leafpage', row);
+        var pre = single(sp) ? SLIDE : 0;
+        if (pre) slide(curPage, sideOf(sp) * w / 2, SLIDE);
         setTimeout(function () {
-          pvCur = to; stageEl.removeChild(leaf); stageEl.removeChild(row);
-          if (under._swap) under._swap[0].style.visibility = '';
-          under.classList.remove('under'); setPage(); navState(); pvBusy = false;
-        }, 720);
+          var under = document.createElement('div'); under.className = 'pv-spread under';
+          r[2].forEach(function (c, i) { var f = document.createElement('div'); f.className = 'pv-leafpage' + (nsp.length > 1 ? (i ? ' r' : ' l') : ''); f.appendChild(c); under.appendChild(f); });
+          var underPage = $('.pv-leafpage', under);
+          if (single(nsp)) slide(underPage, sideOf(nsp) * w / 2, 0);
+          stageEl.insertBefore(under, row);
+          var face;
+          if (one) { row.style.visibility = 'hidden'; face = row; }
+          else {
+            face = single(sp) ? curPage : (dir > 0 ? $('.pv-leafpage.r', row) : $('.pv-leafpage.l', row));
+            face.style.visibility = 'hidden';
+          }
+          var leaf = document.createElement('div'); leaf.className = 'pv-leaf ' + (dir > 0 ? 'fwd' : 'back') + (one ? ' one' : '');
+          var f1 = document.createElement('div'), f2 = document.createElement('div'); f1.className = 'pv-face front'; f2.className = 'pv-face backface';
+          f1.appendChild(r[0]); f2.appendChild(r[1]); leaf.appendChild(f1); leaf.appendChild(f2);
+          var ref = (one ? row : face).getBoundingClientRect(), sr = stageEl.getBoundingClientRect();
+          leaf.style.left = (ref.left - sr.left) + 'px'; leaf.style.top = (ref.top - sr.top) + 'px'; leaf.style.width = ref.width + 'px'; leaf.style.height = ref.height + 'px';
+          stageEl.appendChild(leaf); leaf.offsetWidth; leaf.classList.add('turn');
+          setTimeout(function () {
+            pvCur = to; stageEl.removeChild(leaf); stageEl.removeChild(row);
+            under.classList.remove('under'); setPage(); navState();
+            if (single(nsp)) { slide(underPage, 0, SLIDE); setTimeout(function () { pvBusy = false; }, SLIDE); }
+            else pvBusy = false;
+          }, 720);
+        }, pre);
       });
     };
     var mountScroll = function () {
@@ -323,12 +333,16 @@
       } else if (yes) {
         yes.disabled = true; yes.textContent = '지우는 중…';
         fetch('/xms-api/posts/' + yes.getAttribute('data-yes'), { method: 'DELETE', credentials: 'same-origin' })
-          .then(function (r) { if (!r.ok) throw new Error(); load(); })
+          .then(function (r) {
+            if (!r.ok) throw new Error();
+            var row = yes.closest('.arc-row'); row.style.transition = 'opacity .3s, transform .3s'; row.style.opacity = '0'; row.style.transform = 'translateX(16px)';
+            setTimeout(load, 300);   // 지운 줄은 바로 사라지고, 목록 · 개수는 새로 읽는다
+          })
           .catch(function () { yes.disabled = false; yes.textContent = '다시 지우기'; });
       }
     });
     var load = function () {
-      fetch('/xms-api/boards/' + slug + '/files', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : []; })
+      fetch('/xms-api/boards/' + slug + '/files', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : []; })
         .then(draw).catch(function () { arc.innerHTML = '<li class="arc-empty">자료를 불러오지 못했습니다. 잠시 뒤 다시 열어 주세요.</li>'; });
     };
     fetch('/xms-api/me', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (me) {

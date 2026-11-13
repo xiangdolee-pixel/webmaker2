@@ -900,7 +900,6 @@ html.pv-lock .fab, html.pv-lock .xms-top { visibility: hidden; }
 .pv:not([data-mode="scroll"]) .pv-body { overflow: hidden; }
 .pv:not([data-mode="scroll"]) .pv-stage { display: block; }
 .pv-spread { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-.pv-spread.cover { padding-left: 0; }
 .pv-leafpage { position: relative; line-height: 0; background: #fff; box-shadow: 0 14px 44px rgba(0, 0, 0, .45); }
 .pv-leafpage.l { box-shadow: -10px 14px 44px rgba(0, 0, 0, .45); }
 .pv-leafpage.r { box-shadow: 10px 14px 44px rgba(0, 0, 0, .45); }
