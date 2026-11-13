@@ -428,6 +428,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .mx[hidden] { display: block; opacity: 0; transform: translate(-50%, 50%) scale(.6); pointer-events: none; }
 .matrix-points ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
 .matrix-points li { padding: 20px 22px; border-left: 3px solid var(--navy); background: #fff; border-radius: 0 16px 16px 0; box-shadow: var(--shadow); }
+.matrix-points [data-mk="knit"] li { border-left-color: var(--accent); }   /* WOVEN 은 남색, KNIT 은 주황 — 위 탭 색과 맞춤 */
 .matrix-points b { display: block; color: var(--navy); font-size: 18px; }
 .matrix-points span { color: var(--sub); font-size: 16px; }
 
