@@ -277,7 +277,7 @@ home = head('BSF COMPANY — 글로벌 의류 OEM · ODM 소싱 파트너', '17�
         <a class="btn line rv d2" href="works.html">납품실적 전체 보기</a>
       </div>
       <div class="works">
-        <a class="work w-a rv" href="works.html#armed"><img src="images/works/armed-ai.webp" alt="" loading="lazy"><div class="work-txt"><small>무신사 판매 1위</small><h3>MUSCLE ARMED 23 저지 티셔츠</h3><p>스트리트 · 피트니스 · 하프집 · 자켓 · 더플백</p></div></a>
+        <a class="work w-a rv" href="works.html#armed"><img class="at-top" src="images/works/armed-jersey.webp" alt="" loading="lazy"><div class="work-txt"><small>무신사 판매 1위</small><h3>MUSCLE ARMED 23 저지 티셔츠</h3><p>스트리트 · 피트니스 · 하프집 · 자켓 · 더플백</p></div></a>
         <a class="work w-b rv d1" href="works.html#daegu"><img src="images/works/daegu-ai.webp" alt="" loading="lazy"><div class="work-txt"><small>FOOTBALL</small><h3>대구FC 트레이닝웨어</h3><p>GOALSTUDIO</p></div></a>
         <a class="work w-c rv d2" href="works.html#nightwalk"><img src="images/works/nightwalk-ai.webp" alt="" loading="lazy"><div class="work-txt"><small>EVENT</small><h3>한강 · 부산 나이트워크</h3><p>참가자 티셔츠 · 양말</p></div></a>
         <a class="work w-d rv" href="brand.html"><img src="images/brand/camp.webp" alt="" loading="lazy"><div class="work-txt"><small>OWN BRAND</small><h3>NATURE TRAIL — 캠핑 아웃도어 자체 브랜드</h3><p>기획 · 생산 · 판매까지 직접</p></div></a>
@@ -503,7 +503,7 @@ CASES = [
     ('t1', 'sports', 'E-SPORTS · GOALSTUDIO', 'T1 2023 월즈 유니폼 자켓 · 팬츠', '2023 리그 오브 레전드 월드 챔피언십. 페이커와 T1 선수단이 세계 무대에서 입은 유니폼 자켓과 팬츠를 생산했습니다. 스폰서 로고가 많은 기능성 유니폼을 대회 일정에 맞췄습니다.',
      [('클라이언트', 'T1 × GOALSTUDIO'), ('품목', '유니폼 자켓 · 팬츠'), ('분류', 'WOVEN')], ['works/t1-jacket-closeup', 'works/t1-pants-pair', 'works/t1-windbreaker', 'works/t1-team-stage']),
     ('armed', 'street', 'STREET · FITNESS', 'MUSCLE ARMED — 무신사 판매 1위 저지 티셔츠', '피트니스 스트리트 브랜드 머슬암드의 23 저지 티셔츠는 무신사 실시간 랭킹 1위에 올랐습니다. 하프집 · 자켓 · 더플백도 함께 생산했습니다.',
-     [('클라이언트', 'MUSCLE ARMED'), ('품목', '저지 티 · 하프집 · 자켓 · 더플백'), ('분류', 'KNIT · WOVEN · ACC')], ['works/armed-ai', 'works/armed-musinsa', 'works/armed-bag']),
+     [('클라이언트', 'MUSCLE ARMED'), ('품목', '저지 티 · 하프집 · 자켓 · 더플백'), ('분류', 'KNIT · WOVEN · ACC')], ['works/armed-jersey', 'works/armed-musinsa', 'works/armed-gymbag']),
     ('daegu', 'sports', 'FOOTBALL · GOALSTUDIO', '대구FC 트레이닝웨어', 'K리그 대구FC 선수단이 동계 훈련에서 입은 트레이닝 탑을 생산했습니다.',
      [('클라이언트', 'GOALSTUDIO · 대구FC'), ('품목', '트레이닝 탑'), ('분류', 'KNIT')], ['works/daegu-ai', 'works/daegu-kit', 'works/daegu-stretch']),
     ('nightwalk', 'event', 'EVENT · GOODS', '2023 한강 · 부산 나이트워크 티셔츠 · 양말', '수천 명이 함께 걷는 대규모 야간 걷기 행사의 참가자 티셔츠와 양말을 생산했습니다.',

@@ -401,6 +401,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .work-txt h3 { margin: 0; font-size: clamp(21px, 2vw, 27px); line-height: 1.35; }
 .work-txt p { margin: 6px 0 0; color: rgba(255, 255, 255, .78); font-size: 15.5px; }
 .work:hover img { transform: scale(1.05); }
+.work img.at-top { object-position: 50% 0; transform-origin: 50% 0; }
 
 /* 로고 띠 (두 줄, 반대 방향) */
 .logos { overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
