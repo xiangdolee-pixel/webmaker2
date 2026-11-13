@@ -77,8 +77,6 @@
     });
     el.classList.add('go');
   }
-  // 숫자 칸 그래픽은 숫자가 도는 동안 차례로 채워진다
-  $$('.st-vis').forEach(function (v) { var it = $$('i', v), step = 1700 / it.length; it.forEach(function (i, n) { i.style.transitionDelay = Math.round(200 + n * step) + 'ms'; }); });
   var rvs = $$('.rv, .world'), counts = $$('[data-count]');
   if ('IntersectionObserver' in window) {
     var io = new IntersectionObserver(function (ents) {
