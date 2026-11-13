@@ -195,7 +195,48 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .stats.counted li::before { transform: scaleX(1); }
 .stats b sup { opacity: 0; transform: translateY(.4em) scale(.6); transition: opacity .5s ease 2s, transform .6s cubic-bezier(.3, 1.6, .5, 1) 2s; }
 .stats.counted b sup { opacity: 1; transform: none; }
-@media (prefers-reduced-motion: reduce) { .stats li::before, .stats b sup { transform: none; opacity: 1; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .stats li::before, .stats b sup, .st-vis i, .st-vis i::after { transform: none; opacity: 1; transition: none; } }
+/* 숫자 칸 꾸밈 (사용자 지시 2026-11-13 "심심해, 고급 디자이너가 한 것처럼"): 번호 · 영문 이름 + 숫자의 뜻을 그리는 작은 그래픽 */
+.st-top { display: flex; align-items: center; gap: 10px; margin-bottom: clamp(16px, 1.8vw, 26px); color: var(--mute); font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-no { display: inline-flex; align-items: center; gap: 10px; color: var(--navy); transition: color .35s var(--ease); }
+.st-no::after { content: ''; width: 18px; height: 1px; background: currentColor; opacity: .45; }
+.stats li:hover .st-no { color: var(--accent); }
+.st-vis { display: flex; align-items: flex-end; min-height: 34px; margin-top: clamp(18px, 2vw, 28px); }
+.st-vis i { font-style: normal; transition: background-color .4s var(--ease), border-color .4s var(--ease), color .4s var(--ease), height .5s var(--ease), opacity .5s var(--ease); }
+/* 01 연차 눈금: 한 해에 한 칸, 마지막 칸(올해)은 주황으로 길게 */
+.st-ticks { gap: 4px; }
+.st-ticks i { flex: 1; max-width: 5px; height: 12px; border-radius: 1px; background: var(--line); }
+.counted .st-ticks i { background: var(--navy); }
+.counted .st-ticks i:last-child { height: 24px; background: var(--accent); }
+/* 02 나라: 막대가 왼쪽부터 채워지고 아래 나라 부호 */
+.st-seg { gap: 6px; }
+.st-seg i { position: relative; flex: 1; min-width: 0; max-width: 46px; padding-top: 11px; color: var(--mute); font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: .12em; }
+.st-seg i::before, .st-seg i::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--line); }
+.st-seg i::after { background: var(--navy); transform: scaleX(0); transform-origin: left; transition: transform .6s var(--ease); transition-delay: inherit; }
+.counted .st-seg i { color: var(--navy); }
+.counted .st-seg i::after { transform: scaleX(1); }
+/* 03 도시: 점 16개가 차례로 켜짐, 첫 점(서울 본사)은 주황 */
+.st-dots { display: grid; grid-template-columns: repeat(8, 7px); gap: 6px; align-content: end; }
+.st-dots i { width: 7px; height: 7px; border: 1.5px solid var(--line); border-radius: 50%; }
+.counted .st-dots i { background: var(--navy); border-color: var(--navy); }
+.counted .st-dots i:first-child { background: var(--accent); border-color: var(--accent); }
+/* 04 품목: 대표 품목 이름이 차례로 또렷해짐 */
+.st-words { flex-wrap: wrap; align-content: flex-end; gap: 5px 12px; max-width: 230px; }
+.st-words i { color: var(--mute); opacity: .35; font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.counted .st-words i { color: var(--navy); opacity: 1; }
+.st-words i::after { content: '/'; margin-left: 12px; color: var(--line); }
+.st-words i:last-child::after { content: none; }
+@media (max-width: 599px) {
+  .st-top { align-items: flex-start; white-space: normal; font-size: 10px; letter-spacing: .14em; line-height: 1.5; }
+  .st-no::after { width: 10px; margin-top: .75em; align-self: flex-start; }
+  .st-no { align-items: flex-start; gap: 6px; }
+  .st-top { gap: 6px; }
+  .st-words { gap: 4px 8px; }
+  .st-words i { letter-spacing: .08em; font-size: 10px; }
+  .st-words i::after { margin-left: 8px; }
+  .st-seg { gap: 4px; }
+  .st-seg i { font-size: 10px; letter-spacing: .06em; }
+}
 /* 선언문 붙여 두기: 이 칸 높이만큼 스크롤하는 동안 글자가 채워진다 */
 .state-track { position: relative; height: 230vh; }
 .state-pin { position: sticky; top: 0; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: calc(var(--hd) + 20px) 0 40px; }
@@ -229,7 +270,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .spot-facts dd { margin: 4px 0 0; font-size: 16.5px; font-weight: 700; overflow-wrap: normal; }
 .spot-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 0 36px; }
 .spot-thumbs figure { margin: 0; border-radius: 12px; overflow: hidden; background: #111; }
-.spot-thumbs img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: 50% 50%; transition: transform .8s var(--ease); }
+.spot-thumbs img { width: 100%; aspect-ratio: 5 / 4; object-fit: cover; object-position: 50% 50%; transition: transform .8s var(--ease); }
 .spot-thumbs figure:hover img { transform: scale(1.06); }
 
 /* ───── 품목 ───── */
