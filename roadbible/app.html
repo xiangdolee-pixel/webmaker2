@@ -303,7 +303,7 @@ main{
   background:var(--paper);box-shadow:0 2px 8px rgba(30,25,15,.08);
 }
 .planbtn:active{transform:scale(.97)}
-/* 창세기 1장 듣기 (사용자 지시 2026-11-14, 내 목소리로 읽음) — 이 장을 보는 동안 하단 메뉴 바로 위에 떠 있는 작은 재생기. 쪽을 넘겨도 계속 */
+/* 장 듣기 — 창세기 1장 · 잠언 (사용자 지시 2026-11-14, 내 목소리로 읽음, Opus 20k) — 이 장을 보는 동안 하단 메뉴 바로 위에 떠 있는 작은 재생기. 쪽을 넘겨도 계속 */
 .listen{position:fixed;left:50%;bottom:calc(var(--barh) + 10px);z-index:40;display:none;align-items:center;gap:8px;padding:6px 8px 6px 6px;border:1px solid var(--line);border-radius:999px;background:var(--paper);box-shadow:0 6px 20px rgba(30,25,15,.16);transform:translateX(-50%);font-family:var(--ui);color:var(--ink)}
 .listen.on{display:flex}
 body.has-listen main{padding-bottom:calc(44px + env(safe-area-inset-bottom) + var(--py) + 64px)}   /* 재생기가 마지막 줄을 가리지 않게 */
@@ -316,6 +316,12 @@ body.has-listen main{padding-bottom:calc(44px + env(safe-area-inset-bottom) + va
 .listen .ls-speed{min-width:52px;height:32px;padding:0 10px;border:1px solid var(--line);border-radius:999px;font-size:14px;font-weight:700}
 .listen button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 @media (max-width:380px){.listen .ls-bar{display:none}}
+/* 속도 고르기: 속도 버튼을 누르면 재생기 위로 알약들이 펼쳐지고 하나 고르면 닫힘 (사용자 지시 2026-11-14) */
+.ls-menu{position:absolute;right:0;bottom:calc(100% + 8px);display:flex;gap:4px;padding:5px;border:1px solid var(--line);border-radius:999px;background:var(--paper);box-shadow:0 6px 20px rgba(30,25,15,.16);opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .18s,transform .18s,visibility .18s}
+.ls-menu.open{opacity:1;visibility:visible;transform:none}
+.ls-menu button{min-width:48px;height:36px;padding:0 10px;border-radius:999px;font-size:14px;font-weight:700;color:var(--ink)}
+.ls-menu button.on{background:var(--ink);color:var(--paper)}
+@media (prefers-reduced-motion:reduce){.ls-menu{transition:none}}
 .pp-grid button.cur{box-shadow:inset 0 0 0 2px var(--panel-ink)}   /* 지금 읽던 장 표시 */
 .colophon{
   margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
@@ -879,7 +885,7 @@ body.has-listen main{padding-bottom:calc(44px + env(safe-area-inset-bottom) + va
   </div>
 </div>
 
-<div class="listen" id="listen" role="group" aria-label="창세기 1장 듣기"><button type="button" class="ls-play" id="lsPlay" aria-label="듣기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button><span class="ls-bar" aria-hidden="true"><i id="lsBar"></i></span><span class="ls-time" id="lsTime">창세기 1장 듣기</span><button type="button" class="ls-speed" id="lsSpeed" aria-label="읽는 속도">1.0×</button><audio id="lsAudio" preload="none"><source src="assets/audio/genesis-1.webm" type="audio/webm; codecs=opus"><source src="assets/audio/genesis-1.m4a" type="audio/mp4"></audio></div>
+<div class="listen" id="listen" role="group" aria-label="이 장 듣기"><button type="button" class="ls-play" id="lsPlay" aria-label="듣기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button><span class="ls-bar" aria-hidden="true"><i id="lsBar"></i></span><span class="ls-time" id="lsTime">창세기 1장 듣기</span><button type="button" class="ls-speed" id="lsSpeed" aria-label="읽는 속도" aria-haspopup="true" aria-expanded="false">1.0×</button><div class="ls-menu" id="lsMenu" role="menu" aria-label="읽는 속도 고르기"></div><audio id="lsAudio" preload="none"></audio></div>
 <script src="bible-data.js"></script>
 <script>
 /* ── 성경 목록 (66권, 장 수) ─────────────────────── */
@@ -3000,25 +3006,44 @@ window.addEventListener("online",()=>{updateNet();toast("인터넷 연결됨 —
 })();
 </script>
 <script>
-/* 창세기 1장 듣기: 이 장(성경 본문)에서만 재생기를 보여 준다. 속도는 눌러서 0.8 → 1.0 → 1.25 → 1.5 → 2.0 (음 높이는 그대로) */
+/* 장 듣기: 음성이 있는 장(LISTEN)에서만 재생기를 보여 준다. 음성은 Opus 20k(webm) 하나. 속도는 눌러서 0.8 → 1.0 → 1.25 → 1.5 → 2.0 (음 높이는 그대로) */
 (function(){
   const box=document.getElementById("listen"),au=document.getElementById("lsAudio"),btn=document.getElementById("lsPlay"),sp=document.getElementById("lsSpeed"),tm=document.getElementById("lsTime"),bar=document.getElementById("lsBar");
-  const SPEEDS=[0.8,1,1.25,1.5,2];let si=1;
+  const SPEEDS=[0.8,1,1.25,1.5,2];let si=1,label="이 장 듣기",now="",bad=false;
+  /* 음성이 있는 장 → 파일 이름 (assets/audio/<이름>.webm) */
+  const LISTEN={"창세기/1":"genesis-1"},HAS={};
+  for(let i=1;i<=31;i++)LISTEN["잠언/"+i]="proverbs-"+i;
   try{const v=+localStorage.getItem("lsSpeed");if(SPEEDS.includes(v))si=SPEEDS.indexOf(v)}catch(e){}
   const ICON={play:'<path d="M8 5v14l11-7z"/>',pause:'<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>'};
   const fmt=t=>isFinite(t)?Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0"):"0:00";
   const paint=()=>{btn.querySelector("svg").innerHTML=au.paused?ICON.play:ICON.pause;btn.setAttribute("aria-label",au.paused?"듣기":"멈춤");
-    sp.textContent=SPEEDS[si].toFixed(SPEEDS[si]%1?2:1).replace(/0$/,"")+"×";
-    tm.textContent=au.currentTime||!au.paused?fmt(au.currentTime)+" / "+fmt(au.duration):"창세기 1장 듣기";
+    sp.textContent=(SPEEDS[si]%1?String(SPEEDS[si]):SPEEDS[si].toFixed(1))+"×";
+    tm.textContent=bad?"이 기기에선 재생이 안 돼요":au.currentTime||!au.paused?fmt(au.currentTime)+" / "+fmt(au.duration):label;
     bar.style.setProperty("--p",au.duration?au.currentTime/au.duration:0)};
   au.preservesPitch=true;
   btn.addEventListener("click",()=>{if(au.paused){au.playbackRate=SPEEDS[si];au.play().catch(()=>{})}else au.pause()});
-  sp.addEventListener("click",()=>{si=(si+1)%SPEEDS.length;au.playbackRate=SPEEDS[si];try{localStorage.setItem("lsSpeed",SPEEDS[si])}catch(e){}paint()});
+  const menu=document.getElementById("lsMenu"),sx=v=>(v%1?String(v):v.toFixed(1))+"×";
+  menu.innerHTML=SPEEDS.map((v,i)=>`<button type="button" role="menuitemradio" data-i="${i}">${sx(v)}</button>`).join("");
+  const openMenu=o=>{menu.classList.toggle("open",o);sp.setAttribute("aria-expanded",o);menu.querySelectorAll("button").forEach((b,i)=>{b.classList.toggle("on",i===si);b.setAttribute("aria-checked",i===si)});};
+  sp.addEventListener("click",e=>{e.stopPropagation();openMenu(!menu.classList.contains("open"))});
+  menu.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;e.stopPropagation();si=+b.dataset.i;au.playbackRate=SPEEDS[si];try{localStorage.setItem("lsSpeed",SPEEDS[si])}catch(err){}paint();openMenu(false)});
+  document.addEventListener("click",e=>{if(menu.classList.contains("open")&&!e.target.closest("#listen"))openMenu(false)},true);
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")openMenu(false)});
   ["play","pause","timeupdate","loadedmetadata","ended"].forEach(ev=>au.addEventListener(ev,paint));
+  au.addEventListener("error",()=>{if(au.getAttribute("src")){bad=true;paint()}});   // 오래된 기기(Opus 못 읽음)
   au.addEventListener("ratechange",()=>{if(au.playbackRate!==SPEEDS[si])au.playbackRate=SPEEDS[si]});
   window.updateListen=function(){
-    const here=typeof cur!=="undefined"&&cur.book==="창세기"&&+cur.chap===1&&!(typeof qtMode!=="undefined"&&qtMode);
+    const key=typeof cur!=="undefined"?cur.book+"/"+(+cur.chap):"";
+    let here=!!LISTEN[key]&&!(typeof qtMode!=="undefined"&&qtMode);
+    if(here&&HAS[key]===undefined){   // 아직 만들어지지 않은 장은 재생기를 숨긴다(파일이 있는지 한 번만 확인)
+      HAS[key]=null;fetch("assets/audio/"+LISTEN[key]+".webm",{method:"HEAD"}).then(r=>{HAS[key]=r.ok;updateListen()}).catch(()=>{HAS[key]=false});
+    }
+    if(HAS[key]!==true)here=false;
     box.classList.toggle("on",here);
+    if(here&&now!==key){   // 다른 장으로 오면 그 장 음성으로 바꾼다
+      now=key;bad=false;au.pause();au.src="assets/audio/"+LISTEN[key]+".webm";
+      label=cur.book+" "+cur.chap+(cur.book==="시편"?"편":"장")+" 듣기";box.setAttribute("aria-label",label);paint();
+    }
     if(!here&&!au.paused)au.pause();
     if(document.body.classList.contains("has-listen")!==here){document.body.classList.toggle("has-listen",here);if(typeof render==="function")render(typeof curPage!=="undefined"?curPage:0);}   // 본문 칸이 줄었으니 쪽을 다시 나눈다
   };
