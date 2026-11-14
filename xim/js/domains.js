@@ -61,6 +61,11 @@ export async function renderDomains(d) {
       <div class="dm-setup" id="dm-setup" hidden><p>다른 도메인이 가리킬 입구(<code>sites.plators.com</code>)가 아직 없습니다.</p><button type="button" class="btn primary sm" id="dm-setup-go">준비하기</button></div>
       <p class="err" id="dm-status-err" role="alert"></p>
     </div>
+    <div class="card dm-card">
+      <div class="dm-h"><h2>속도 설정</h2><button type="button" class="btn sm" id="dm-speed-go">모두 켜기</button></div>
+      <p class="dm-desc">이 계정의 모든 도메인에 <b>HTTP/3 · 0-RTT · Early Hints</b> 를 켭니다(첫 접속 · 다시 온 방문자가 왕복 한 번씩 빨라짐). 이 화면을 열 때마다 꺼진 것이 있으면 저절로 켭니다.</p>
+      <ul class="dm-checks" id="dm-speed"><li>확인 중…</li></ul><p class="err" id="dm-speed-err" role="alert"></p>
+    </div>
     <div class="card dm-card" id="dm-token" hidden>
       <h2>Cloudflare API 토큰</h2>
       <p class="dm-desc">도메인 부스터 도구에 Cloudflare 토큰이 없습니다. 토큰 값을 붙여 넣어 주세요(권한: 계정 Workers 스크립트 편집 · 영역 읽기 · DNS 편집 · SSL 및 인증서 편집 · Workers 경로 편집, 모든 영역).</p>
@@ -105,6 +110,7 @@ export async function renderDomains(d) {
       schedule();
     }, '연결하는 중…');
   });
+  $('#dm-speed-go').addEventListener('click', () => busy($('#dm-speed-go'), $('#dm-speed-err'), () => loadSpeed(true), '켜는 중…'));
   $('#dm-list').addEventListener('click', onListClick);
   $('#dm-list').addEventListener('change', onListChange);
 
@@ -114,7 +120,19 @@ export async function renderDomains(d) {
   await loadAll();
 }
 
-async function loadAll() { await Promise.all([loadStatus(), loadWorkers(), loadDomains()]); }
+async function loadAll() { await Promise.all([loadStatus(), loadWorkers(), loadDomains(), loadSpeed(true)]); }
+
+// 속도 설정: 꺼진 게 있으면 켠다(POST), 결과를 도메인마다 한 줄로
+async function loadSpeed(apply) {
+  const box = $('#dm-speed'), err = $('#dm-speed-err');
+  if (!box) return;
+  err.textContent = '';
+  try {
+    const r = await deps.api('/dm/speed', apply ? { method: 'POST', data: {} } : undefined);
+    const on = (v) => v === 'on';
+    box.innerHTML = r.zones.map((z) => `<li class="${on(z.http3) && on(z['0rtt']) && on(z.early_hints) ? 'ok' : 'warn'}"><b>${esc(z.zone)}</b> <small>${esc(z.plan)}</small> — HTTP/3 ${esc(z.http3)} · 0-RTT ${esc(z['0rtt'])} · Early Hints ${esc(z.early_hints)}${z.error ? ` <small>(${esc(z.error)})</small>` : ''}</li>`).join('') || '<li>도메인이 없습니다.</li>';
+  } catch (e) { err.textContent = e.message; box.innerHTML = ''; }
+}
 
 async function loadStatus() {
   const { api } = deps;

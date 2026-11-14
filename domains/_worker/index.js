@@ -284,9 +284,28 @@ async function handle(request, env) {
     log.push(`Fallback Origin 을 ${ENTRY} 로 정했습니다.`);
     return json({ ok: true, log });
   }
+  // 속도 설정 (2026-11-14 "0.1초라도"): 계정의 모든 영역에 HTTP/3 · 0-RTT · Early Hints 를 한 번에.
+  //   부스터로 plators.com 을 타는 도메인은 plators.com 설정을 따르고, 따로 있는 영역은 그 영역 설정을 바꾼다
+  if (path === '/api/speed' && (method === 'GET' || method === 'POST')) {
+    const KEYS = ['http3', '0rtt', 'early_hints'];
+    const zones = await cf.all(`/zones?account.id=${ACCOUNT_ID}`);
+    const out = [];
+    for (const z of zones) {
+      const row = { zone: z.name, plan: z.plan?.name || '' };
+      for (const k of KEYS) {
+        try {
+          let v = (await cf.call('GET', `/zones/${z.id}/settings/${k}`)).result?.value;
+          if (method === 'POST' && v !== 'on') v = (await cf.call('PATCH', `/zones/${z.id}/settings/${k}`, { value: 'on' })).result?.value;
+          row[k] = v;
+        } catch (e) { row[k] = 'error'; row.error = e.message; }
+      }
+      out.push(row);
+    }
+    return json({ zones: out });
+  }
   if (path === '/api/workers' && method === 'GET') {
     const list = (await cf.call('GET', `/accounts/${ACCOUNT_ID}/workers/scripts`)).result || [];
-    return json({ workers: list.map((s) => s.id).filter((n) => n !== 'domains').sort() });
+    return json({ workers: list.map((s) => s.id).filter((n) => n !== 'domains' && !n.endsWith('-core')).sort() });
   }
 
   if (path === '/api/domains' && method === 'GET') {
