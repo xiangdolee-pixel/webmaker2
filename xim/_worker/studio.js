@@ -509,7 +509,7 @@ export async function studioHelper(request, env, url, path, method) {
       // 새 발표자료 "유튜브 채널에 올리기"(yt_auto): 영상(clone)이 끝났는지 보고 끝났으면 유튜브 대기열에 올린다
       if (env.CLONE && env.CLONE_TOKEN) {
         // yt 가 '영상 실패' 로 적혔어도 영상 작업을 다시 돌려 성공하면 유튜브도 되살린다 (2026-11-11: TTS 실패 → 재시도 성공했는데 업로드가 안 되던 것)
-        const auto = (await db.prepare("SELECT id FROM studio_jobs WHERE status = 'done' AND json_extract(options, '$.yt_auto') = 1 AND json_extract(options, '$.video_job') IS NOT NULL AND (json_extract(options, '$.yt') IS NULL OR (json_extract(options, '$.yt.auto') = 1 AND json_extract(options, '$.yt.status') = 'failed' AND COALESCE(json_extract(options, '$.yt.url'), '') = '')) ORDER BY created_at DESC LIMIT 3").all()).results;
+        const auto = (await db.prepare("SELECT id FROM studio_jobs WHERE status = 'done' AND json_extract(options, '$.yt_auto') = 1 AND json_extract(options, '$.video_job') IS NOT NULL AND (json_extract(options, '$.yt') IS NULL OR json_extract(options, '$.yt.video_fail') = 1) ORDER BY created_at DESC LIMIT 3").all()).results;
         for (const a of auto) {
           const job = await getJob(db, a.id); const jo = JSON.parse(job.options || '{}');
           const hadFailed = jo.yt?.status === 'failed';
@@ -529,7 +529,7 @@ export async function studioHelper(request, env, url, path, method) {
               if (jo.yt?.status === 'failed') delete jo.yt;
               await setJob(db, job.id, { options: JSON.stringify(jo) });
             } else if (v && (v.status === 'failed' || v.video_status === 'failed') && !hadFailed) {
-              jo.yt = { status: 'failed', error: '영상이 3번 다시 만들어도 실패해 유튜브에 올리지 못했습니다 — 내 목소리에서 영상을 다시 만들면 자동으로 다시 올립니다', at: now(), auto: true }; await setJob(db, job.id, { options: JSON.stringify(jo) });
+              jo.yt = { status: 'failed', video_fail: 1, error: '영상이 3번 다시 만들어도 실패해 유튜브에 올리지 못했습니다 — 내 목소리에서 영상을 다시 만들면 자동으로 다시 올립니다', at: now(), auto: true }; await setJob(db, job.id, { options: JSON.stringify(jo) });
             }
           } catch { /* 다음 폴링 때 */ }
         }
@@ -552,7 +552,6 @@ export async function studioHelper(request, env, url, path, method) {
       if (yrow) {
         const job = await getJob(db, yrow.id);
         const jo = JSON.parse(job.options || '{}');
-        if ((jo.yt.attempts || 0) >= 1) { jo.yt = { ...jo.yt, status: 'failed', halt: 1, error: '이미 한 번 올리기를 시도했습니다 — 중복을 막으려고 자동으로 다시 올리지 않습니다. 유튜브 스튜디오를 확인한 뒤 카드에서 다시 올려 주세요', finished_at: now() }; await setJob(db, job.id, { options: JSON.stringify(jo) }); return json({ job: null }); }
         jo.yt = { ...jo.yt, status: 'running', attempts: (jo.yt.attempts || 0) + 1, started_at: now(), error: '', phase: 'download', download_at: now(), upload_at: null };
         await setJob(db, job.id, { options: JSON.stringify(jo) });
         const summary = docJson(await latestDoc(db, job.id, 'summary')) || {};
@@ -643,7 +642,9 @@ export async function studioHelper(request, env, url, path, method) {
         jo.yt = n >= 3 ? { ...y, status: 'done', error: `공개 전환 실패: ${String(d.error || '').slice(0, 200)} — 유튜브에서 직접 공개로 바꿔 주세요`, finished_at: now() } : { ...y, status: 'review', fails: n, next_check: now() + 5 * 60000, error: String(d.error || '').slice(0, 300) };
       } else if (y.halt) {   // 운영자가 멈춘 올리기는 늦게 온 보고로 되살리지 않는다 (2026-11-14 중복 업로드 사고)
         jo.yt = { ...y, status: 'failed', finished_at: now() };
-      } else if (false) {   // 업로드 자동 재시도 금지(2026-11-14): 다시 올리면 유튜브에 같은 영상이 또 생긴다(중복 19개 사고). 실패하면 카드에서 사람이 다시 올린다
+      } else if (st === 'failed' && (d.sent || y.sent)) {   // 영상 파일이 이미 유튜브로 넘어간 뒤의 실패는 다시 올리지 않는다(다시 올리면 같은 영상이 또 생김 — 2026-11-14 중복 사고)
+        jo.yt = { ...y, status: 'failed', sent: 1, error: `유튜브에 영상이 이미 올라갔을 수 있어 다시 올리지 않았습니다 — 스튜디오 콘텐츠에서 확인해 주세요: ${String(d.error || '').slice(0, 200)}`, finished_at: now() };
+      } else if (st === 'failed' && (y.retries || (y.retried ? 1 : 0)) < 3) {   // 파일을 보내기 전 실패(로그인 화면 · 버튼 못 찾음 등)만 3번까지 다시
         const n = (y.retries || (y.retried ? 1 : 0)) + 1;   // 업로드 중 일시 오류(파일 선택 시간 초과 · 연결 끊김 등)는 3번까지 자동으로 다시 (2026-11-11: 1번 → 3번)
         jo.yt = { ...y, status: 'queued', retried: true, retries: n, at: now(), error: `${n}차 실패(다시 시도): ${String(d.error || '').slice(0, 200)}` };
       } else {

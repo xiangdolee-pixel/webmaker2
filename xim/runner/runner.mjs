@@ -494,7 +494,7 @@ async function runYoutube(payload, work) {
     const lines = (r.out || '').trim().split(/\r?\n/).filter(Boolean);
     let res = null; for (let i = lines.length - 1; i >= 0 && !res; i--) { try { if (lines[i].startsWith('{')) res = JSON.parse(lines[i]); } catch { /* 다음 줄 */ } }
     if (r.code === 2 || res?.error === 'LOGIN_REQUIRED') { log('  유튜브: 로그인 필요'); notify('yt-login', '유튜브 로그인이 풀려 영상을 못 올리고 있습니다 — PC 에서 docs/tools/유튜브로그인.bat 로 로그인해 주세요.', 60); await report('login', { error: '자동화 프로필에 유튜브 로그인이 필요합니다 — PC 에서 docs\\tools\\유튜브로그인.bat 실행 후 다시' }); return; }
-    if (r.code !== 0 || !res?.ok) { const err = res?.error || lines.slice(-3).join(' | ').slice(0, 300) || `exit ${r.code}`; log('  유튜브: 실패', err); await report('failed', { error: err }); return; }
+    if (r.code !== 0 || !res?.ok) { const err = res?.error || lines.slice(-3).join(' | ').slice(0, 300) || `exit ${r.code}`; log('  유튜브: 실패', err); await report('failed', { error: err, sent: !!res?.sent || /전송 시작/.test(r.out || '') }); return; }
     log(`  유튜브: 완료 ${res.url || ''} (${res.took || 0}초)`);
     notify(`yt-done-${job.id}`, `유튜브에 올렸습니다(비공개 → 검토 끝나면 자동 공개): ${y.title || job.title}
 ${res.url || ''}`, 600);
