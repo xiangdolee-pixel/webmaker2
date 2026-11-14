@@ -13,6 +13,7 @@ design 쪽 규칙(`E:\ws\WebMaker\CLAUDE.md`, `E:\ws\WebMaker\design\CLAUDE.md`)
 xim 에서 만드는 모든 서비스(고객 사이트 · xim · xms)는 **보이는 것은 그대로 두고 0.1초라도 빠르게**. 만들 때 · 고칠 때 따로 말하지 않아도 챙기고, 바꾼 뒤엔 재서 확인한다.
 - 국내(KT 등) 접속은 Cloudflare 해외 가장자리(시애틀 SEA)로 들어온다 → 왕복 1번 ≈ 0.13초. **왕복 수를 줄이는 것**이 가장 크다.
 - 구조(이미 됨): 사이트 = 가장자리 Worker `<이름>`(placement 없음, `xim/_worker/site-edge.js`: 로그인 안 한 방문자의 html 을 가장자리 캐시에서 바로, 30초 지나면 뒤에서 새로) + 본체 `<이름>-core`(서울 placement, 게시판 · 회원 · 관리 · 로그인한 사람). build.mjs · deploy.mjs 가 알아서 둘 다 올린다. html 응답 0.33 → 0.15초.
+- **xim 에 연결되는 모든 사이트가 이 구조**(사용자 지시 2026-11-15 "앞으로 내가 만드는 모든 사이트들은"). 자기 Worker(`_worker/index.js` + bindings `"xim": true`)가 있는 사이트도 같다 — /api · /ws · html 이 아닌 주소는 가장자리가 곧장 본체로, Durable Object 는 옮기지 않고 `<이름>` 에 그대로(본체가 script_name 으로 부름, `.deploy/<폴더>.edge.js`). 빠지는 것: xim · xms 자신, `.xim-off` 폴더, xim 연결이 아닌 자기 Worker 폴더.
 - 링크는 `.html` 없이(307 왕복 금지 — site-worker `cleanHref` 가 고침), 모든 페이지는 마우스 · 손가락이 닿으면 미리 그림(speculationrules prerender, 방문 통계는 /site-api/visit 비콘으로).
 - 사진은 R2 서울 서명 주소, 앞 4장만 바로 · 나머지 lazy, css · js 는 `?v=` 번호. 페이지가 뜬 뒤 따로 받는 요청(API · 목록)은 Worker 가 html 에 함께 넣는다.
 - 렌더를 막는 외부 CSS · 폰트 · 스크립트를 늘리지 않는다. 큰 영상 · 지도 · 위젯은 늦게(lazy · 첫 화면 뒤).

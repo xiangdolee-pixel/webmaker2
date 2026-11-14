@@ -339,13 +339,31 @@ if ((!CONNECT || OWN_XIM) && fs.existsSync(WORKER)) {
 }
 // 가장자리 + 본체로 나누기 (2026-11-14 "0.1초라도"): 본체(<이름>-core, 서울 placement, 공개 주소 없음) 앞에 가장자리 Worker(<이름>, placement 없음)를 둔다.
 //   사용자 도메인은 지금처럼 <이름> 에 붙어 있다. 정적 파일 규칙(run_worker_first · _headers)은 둘 다 같음. site-edge.js 참고
-if (CONNECT && !OWN_XIM && DEPLOY) {
+//   자기 Worker 가 있는 사이트(OWN_XIM: roadbible · xip …)도 같게 (2026-11-15 "앞으로 내가 만드는 모든 사이트들은 이런 구조로").
+//   단 Durable Object(회원별 저장 등)는 옮기면 자료가 새 칸으로 갈라지므로 지금 Worker(<이름>)에 그대로 두고,
+//   가장자리 Worker 가 그 클래스를 내보내며, 본체는 script_name 으로 그것을 부른다.
+if (CONNECT && DEPLOY) {
   const core = { ...config, name: `${name}-core`, workers_dev: false, preview_urls: false };
   delete core.routes;
+  const doClasses = (config.durable_objects?.bindings || []).filter((b) => !b.script_name).map((b) => b.class_name);
+  if (doClasses.length) {
+    delete core.migrations;
+    core.durable_objects = { bindings: config.durable_objects.bindings.map((b) => (b.script_name ? b : { ...b, script_name: name })) };
+  }
   fs.writeFileSync(path.join(ROOT, `.deploy-${slug}.core.wrangler.jsonc`), `// node build.mjs ${slug} 가 만든 파일입니다. 직접 고치지 마세요.
 ${JSON.stringify(core, null, 2)}
 `);
   config.main = './xim/_worker/site-edge.js';
+  if (doClasses.length) {
+    // 가장자리 = site-edge + 이 사이트 Durable Object 클래스 (main 은 설정 파일 기준 경로)
+    const edgeFile = path.join(ROOT, '.deploy', `${slug}.edge.js`);
+    fs.mkdirSync(path.dirname(edgeFile), { recursive: true });
+    fs.writeFileSync(edgeFile, `// node build.mjs ${slug} 가 만든 파일입니다. 직접 고치지 마세요.
+export { default } from '../xim/_worker/site-edge.js';
+export { ${doClasses.join(', ')} } from '../${slug}/_worker/index.js';
+`);
+    config.main = `./.deploy/${slug}.edge.js`;
+  }
   config.version_metadata = { binding: 'VER' };   // 배포하면 캐시 열쇠가 바뀐다
   config.placement = { mode: 'off' };   // 지우기만 하면 전 배포의 서울 placement 가 남는다
   config.services = [...(config.services || []), { binding: 'CORE', service: `${name}-core` }];
