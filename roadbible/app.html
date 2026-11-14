@@ -303,6 +303,19 @@ main{
   background:var(--paper);box-shadow:0 2px 8px rgba(30,25,15,.08);
 }
 .planbtn:active{transform:scale(.97)}
+/* 창세기 1장 듣기 (사용자 지시 2026-11-14, 내 목소리로 읽음) — 이 장을 보는 동안 하단 메뉴 바로 위에 떠 있는 작은 재생기. 쪽을 넘겨도 계속 */
+.listen{position:fixed;left:50%;bottom:calc(var(--barh) + 10px);z-index:40;display:none;align-items:center;gap:8px;padding:6px 8px 6px 6px;border:1px solid var(--line);border-radius:999px;background:var(--paper);box-shadow:0 6px 20px rgba(30,25,15,.16);transform:translateX(-50%);font-family:var(--ui);color:var(--ink)}
+.listen.on{display:flex}
+body.has-listen main{padding-bottom:calc(44px + env(safe-area-inset-bottom) + var(--py) + 64px)}   /* 재생기가 마지막 줄을 가리지 않게 */
+.listen button{display:inline-flex;align-items:center;justify-content:center;border:0;background:none;color:inherit;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.listen .ls-play{width:40px;height:40px;border-radius:50%;background:var(--ink);color:var(--paper)}
+.listen .ls-play svg{width:18px;height:18px;fill:currentColor}
+.listen .ls-time{min-width:84px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--ink-soft);text-align:center}
+.listen .ls-bar{position:relative;width:90px;height:4px;border-radius:4px;background:var(--line);overflow:hidden}
+.listen .ls-bar i{position:absolute;inset:0;background:var(--ink);transform-origin:left;transform:scaleX(var(--p,0))}
+.listen .ls-speed{min-width:52px;height:32px;padding:0 10px;border:1px solid var(--line);border-radius:999px;font-size:14px;font-weight:700}
+.listen button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+@media (max-width:380px){.listen .ls-bar{display:none}}
 .pp-grid button.cur{box-shadow:inset 0 0 0 2px var(--panel-ink)}   /* 지금 읽던 장 표시 */
 .colophon{
   margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
@@ -866,6 +879,7 @@ main{
   </div>
 </div>
 
+<div class="listen" id="listen" role="group" aria-label="창세기 1장 듣기"><button type="button" class="ls-play" id="lsPlay" aria-label="듣기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button><span class="ls-bar" aria-hidden="true"><i id="lsBar"></i></span><span class="ls-time" id="lsTime">창세기 1장 듣기</span><button type="button" class="ls-speed" id="lsSpeed" aria-label="읽는 속도">1.0×</button><audio id="lsAudio" preload="none"><source src="assets/audio/genesis-1.webm" type="audio/webm; codecs=opus"><source src="assets/audio/genesis-1.m4a" type="audio/mp4"></audio></div>
 <script src="bible-data.js"></script>
 <script>
 /* ── 성경 목록 (66권, 장 수) ─────────────────────── */
@@ -1142,6 +1156,7 @@ function jump(){ /* 재조판·장 이동 직후: 애니메이션 없이 제자�
 }
 function updateNav(){
   $("rhPage").textContent=`(${curPage+1}/${pageCount}쪽)`;
+  if(window.updateListen)updateListen();
   /* 이 장(또는 큐티) 안에서의 진행 — 첫 쪽부터 차올라 마지막 쪽에서 꽉 참 */
   $("rhFill").style.transform=`scaleX(${(curPage+1)/pageCount})`;
   $("ribbonBtn").style.display=qtMode?"none":"";   // 큐티 모드에선 가름끈 숨김
@@ -1276,6 +1291,22 @@ readArea.addEventListener("pointerup",e=>{
   }
 },{passive:true});
 readArea.addEventListener("pointercancel",()=>{swX=null},{passive:true});
+/* 태블릿 · PC: 본문(640px) 바깥 좌우 빈 곳도 누르면 쪽 넘김 · 밀어도 넘김 (사용자 지시 2026-11-14) — 빈 바탕을 눌렀을 때만 */
+const isBare=t=>t===document.body||t===document.documentElement;
+let obX=null,obY=null,obMoved=false;
+document.addEventListener("pointerdown",e=>{if(!isBare(e.target)||(e.pointerType==="mouse"&&e.button!==0))return;obX=e.clientX;obY=e.clientY;obMoved=false},{passive:true});
+document.addEventListener("pointerup",e=>{
+  if(obX===null)return;
+  const dx=e.clientX-obX,dy=e.clientY-obY;obX=null;
+  if(Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)*1.4){obMoved=true;(dx<0?$("nextBtn"):$("prevBtn")).onclick();}
+},{passive:true});
+document.addEventListener("click",e=>{
+  if(!isBare(e.target))return;
+  if(obMoved){obMoved=false;return}
+  const r=readArea.getBoundingClientRect();
+  if(e.clientX<r.left)$("prevBtn").onclick();
+  else if(e.clientX>r.right)$("nextBtn").onclick();
+});
 
 /* ── 형광펜 칠한 절 길게 누르면 복사 ─────────────────── */
 function copyText(text){
@@ -2966,6 +2997,32 @@ window.addEventListener("online",()=>{updateNet();toast("인터넷 연결됨 —
   setInterval(()=>{ if(user&&!document.hidden&&navigator.onLine!==false)pull().catch(()=>{}); },60000);
   /* 인터넷이 다시 붙으면 오프라인 동안 바꾼 것을 올림 */
   window.addEventListener("online",()=>{ if(user)pull().then(()=>push()).catch(()=>{}); else start(); });
+})();
+</script>
+<script>
+/* 창세기 1장 듣기: 이 장(성경 본문)에서만 재생기를 보여 준다. 속도는 눌러서 0.8 → 1.0 → 1.25 → 1.5 → 2.0 (음 높이는 그대로) */
+(function(){
+  const box=document.getElementById("listen"),au=document.getElementById("lsAudio"),btn=document.getElementById("lsPlay"),sp=document.getElementById("lsSpeed"),tm=document.getElementById("lsTime"),bar=document.getElementById("lsBar");
+  const SPEEDS=[0.8,1,1.25,1.5,2];let si=1;
+  try{const v=+localStorage.getItem("lsSpeed");if(SPEEDS.includes(v))si=SPEEDS.indexOf(v)}catch(e){}
+  const ICON={play:'<path d="M8 5v14l11-7z"/>',pause:'<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>'};
+  const fmt=t=>isFinite(t)?Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0"):"0:00";
+  const paint=()=>{btn.querySelector("svg").innerHTML=au.paused?ICON.play:ICON.pause;btn.setAttribute("aria-label",au.paused?"듣기":"멈춤");
+    sp.textContent=SPEEDS[si].toFixed(SPEEDS[si]%1?2:1).replace(/0$/,"")+"×";
+    tm.textContent=au.currentTime||!au.paused?fmt(au.currentTime)+" / "+fmt(au.duration):"창세기 1장 듣기";
+    bar.style.setProperty("--p",au.duration?au.currentTime/au.duration:0)};
+  au.preservesPitch=true;
+  btn.addEventListener("click",()=>{if(au.paused){au.playbackRate=SPEEDS[si];au.play().catch(()=>{})}else au.pause()});
+  sp.addEventListener("click",()=>{si=(si+1)%SPEEDS.length;au.playbackRate=SPEEDS[si];try{localStorage.setItem("lsSpeed",SPEEDS[si])}catch(e){}paint()});
+  ["play","pause","timeupdate","loadedmetadata","ended"].forEach(ev=>au.addEventListener(ev,paint));
+  au.addEventListener("ratechange",()=>{if(au.playbackRate!==SPEEDS[si])au.playbackRate=SPEEDS[si]});
+  window.updateListen=function(){
+    const here=typeof cur!=="undefined"&&cur.book==="창세기"&&+cur.chap===1&&!(typeof qtMode!=="undefined"&&qtMode);
+    box.classList.toggle("on",here);
+    if(!here&&!au.paused)au.pause();
+    if(document.body.classList.contains("has-listen")!==here){document.body.classList.toggle("has-listen",here);if(typeof render==="function")render(typeof curPage!=="undefined"?curPage:0);}   // 본문 칸이 줄었으니 쪽을 다시 나눈다
+  };
+  paint();updateListen();
 })();
 </script>
 </body>

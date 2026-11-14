@@ -51,9 +51,9 @@ async function videoPace(db) {
   return v.length ? v[Math.floor(v.length / 2)] : 0.5;
 }
 // 보관 규칙(사용자 지시 2026-11-11): 만든 지 3일 지난 작업은 음성 · 영상 파일(R2)과 줄까지 지운다. 대기 · 진행 중은 그대로
-const KEEP_DAYS = 3;
+const KEEP_DAYS = 3;   // 제목이 '[길성경]' 으로 시작하는 음성은 지우지 않는다(길성경 앱 듣기에 쓰임 — 사용자 지시 2026-11-14)
 async function purgeOld(env) {
-  const { results } = await env.DB.prepare("SELECT id FROM jobs WHERE created_at < ? AND status NOT IN ('queued', 'running') AND NOT (video = 1 AND video_status = 'pending' AND status = 'done') ORDER BY created_at ASC LIMIT 30").bind(now() - KEEP_DAYS * 86400000).all();
+  const { results } = await env.DB.prepare("SELECT id FROM jobs WHERE created_at < ? AND status NOT IN ('queued', 'running') AND NOT (video = 1 AND video_status = 'pending' AND status = 'done') AND title NOT LIKE '[길성경]%' ORDER BY created_at ASC LIMIT 30").bind(now() - KEEP_DAYS * 86400000).all();
   for (const { id } of results) {
     await Promise.all([env.AUDIO.delete(`audio/${id}.wav`), env.AUDIO.delete(`video/${id}.mp4`)]).catch(() => {});
     await env.DB.prepare('DELETE FROM jobs WHERE id = ?').bind(id).run();
