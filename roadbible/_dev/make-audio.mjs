@@ -13,7 +13,7 @@ const SEC = JSON.parse(fs.readFileSync(path.join(ROOT, '_pc', 'clone', 'secrets.
 const API = SEC.worker_url.replace(/\/$/, '');
 const H = { 'X-Agent-Token': SEC.agent_token, 'Content-Type': 'application/json' };
 const OUT = path.join(ROOT, 'roadbible', 'assets', 'audio');
-const SLUG = { 창세기: 'genesis', 잠언: 'proverbs', 시편: 'psalms', 전도서: 'ecclesiastes', 아가: 'song', 로마서: 'romans' };
+const SLUG = { 창세기: 'genesis', 출애굽기: 'exodus', 레위기: 'leviticus', 민수기: 'numbers', 신명기: 'deuteronomy', 잠언: 'proverbs', 시편: 'psalms', 전도서: 'ecclesiastes', 아가: 'song', 로마서: 'romans' };
 const log = (...a) => console.log(new Date().toLocaleTimeString('ko-KR'), ...a);
 
 const src = fs.readFileSync(path.join(ROOT, 'roadbible', 'bible-data.js'), 'utf8');

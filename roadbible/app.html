@@ -3019,6 +3019,7 @@ window.AUDIO_MARK='<span class="au-mark" aria-label="음성 있음" title="듣�
   const SPEEDS=[0.8,1,1.25,1.5,2];let si=1,label="이 장 듣기",now="",bad=false;
   /* 음성이 있는 장 → 파일 이름 (assets/audio/<이름>.webm) */
   const LISTEN={"창세기/1":"genesis-1"},HAS={},AV="2";   // AV: 음성을 다시 만들면 올린다(브라우저가 하루 동안 옛 파일을 들고 있어서 — 2026-11-14 '창세기 한장' 으로 들린 일)
+  [["창세기","genesis",50],["출애굽기","exodus",40],["레위기","leviticus",27],["민수기","numbers",36],["신명기","deuteronomy",34]].forEach(([b,s,n])=>{for(let i=1;i<=n;i++)LISTEN[b+"/"+i]=s+"-"+i});
   for(let i=1;i<=31;i++)LISTEN["잠언/"+i]="proverbs-"+i;
   for(let i=1;i<=12;i++)LISTEN["전도서/"+i]="ecclesiastes-"+i;
   for(let i=1;i<=8;i++)LISTEN["아가/"+i]="song-"+i;
