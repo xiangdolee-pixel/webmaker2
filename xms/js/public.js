@@ -208,12 +208,14 @@ onForm('post', async (form, data) => {
   data.blocks = ed ? ed.blocks() : null;
   const { board, id, after } = form.dataset;
   const btn = form.querySelector('[type=submit]');   // after = 게시판 '목록 주소'(사이트 안 목록 화면) — 있으면 저장 뒤 그리로
+  // 저장 뒤 화면이 바뀌므로 안내는 다음 화면에서(account.js 가 보여 줌). 홈페이지 화면은 가장자리 캐시라 다른 방문자에겐 30초 안팎 걸릴 수 있다 (사용자 지시 2026-11-14)
+  const saved = () => { try { sessionStorage.setItem('xms-flash', '저장했습니다. 다른 방문자 화면에는 최대 30초 정도 뒤에 반영될 수 있어요.'); } catch { /* 저장 안 되는 브라우저 */ } };
   if (id) {
-    await api(`/posts/${id}`, { method: 'PUT', data });
+    await api(`/posts/${id}`, { method: 'PUT', data }); saved();
     if (btn) btn.dataset.leaving = '1';
     location.href = after || `/board/${board}/${id}`;
   } else {
-    const r = await api(`/boards/${board}/posts`, { method: 'POST', data });
+    const r = await api(`/boards/${board}/posts`, { method: 'POST', data }); saved();
     if (btn) btn.dataset.leaving = '1';
     location.href = after || `/board/${board}/${r.id}`;
   }

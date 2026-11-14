@@ -122,5 +122,16 @@
     });
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  // 앞 화면에서 남긴 한 줄 안내(예: 글 저장 뒤 '다른 방문자에겐 30초 안팎') — 사이트 화면 · 게시판 어디서든 아래쪽에 4초
+  function flash() {
+    let m = ''; try { m = sessionStorage.getItem('xms-flash') || ''; sessionStorage.removeItem('xms-flash'); } catch { return; }
+    if (!m) return;
+    const el = document.createElement('div');
+    el.setAttribute('role', 'status'); el.textContent = m;
+    el.style.cssText = 'position:fixed;left:50%;bottom:24px;z-index:2147483000;max-width:calc(100% - 32px);padding:12px 18px;border-radius:12px;background:rgba(17,24,39,.94);color:#fff;font:600 15px/1.5 Pretendard,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;box-shadow:0 10px 30px -10px rgba(0,0,0,.5);transform:translate(-50%,12px);opacity:0;transition:opacity .3s,transform .3s;word-break:keep-all;text-align:center';
+    document.body.append(el);
+    requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translate(-50%,0)'; });
+    setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }, 4200);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { start(); flash(); }); else { start(); flash(); }
 })();

@@ -650,7 +650,7 @@ async function menusPage() {
       const hiddenRows = $$('.tree-row[hidden]', tree);
       if (hiddenRows.length) { toast('접힌 메뉴를 모두 편 뒤에 옮겨 주세요.'); return route(); }
       await api('/menus/tree', { method: 'PUT', data: { items: treeFromDepths(list) } });
-      toast('메뉴 순서를 저장했습니다.');
+      toast('메뉴 순서를 저장했습니다. 방문자 화면에는 최대 30초 정도 뒤에 반영돼요.');
       await new Promise((r) => setTimeout(r, 280)); // 내려앉는 애니메이션이 끝난 뒤 다시 그린다
       route();
     }),
@@ -707,7 +707,7 @@ async function menuPage(id) {
       read_levels: (f.read_levels || []).length ? f.read_levels : null, allow_guest_read: f.allow_guest_read };
     busy(form.querySelector('[type=submit]'), form.querySelector('.err'), async () => {
       if (m) await api(`/menus/${m.id}`, { method: 'PUT', data }); else await api('/menus', { method: 'POST', data });
-      toast(m ? '메뉴를 저장했습니다.' : '메뉴를 추가했습니다.'); go('#/menus');
+      toast((m ? '메뉴를 저장했습니다.' : '메뉴를 추가했습니다.') + ' 방문자 화면에는 최대 30초 정도 뒤에 반영돼요.'); go('#/menus');
     });
   });
 }
