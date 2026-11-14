@@ -97,10 +97,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .logo span { font-family: var(--display); font-size: 20px; font-weight: 800; letter-spacing: .02em; line-height: 1.1; }
 .logo small { display: block; margin-top: 2px; color: var(--mute); font-size: 9.5px; font-weight: 700; letter-spacing: .26em; transition: color .4s; }
 .gnb { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-.gnb a { position: relative; padding: 10px 16px; font-size: 20px; font-weight: 600; border-radius: 999px; transition: color .3s, background-color .3s; }
+.gnb a { position: relative; padding: 10px clamp(10px, 1vw, 16px); font-size: clamp(16px, 1.45vw, 20px); white-space: nowrap; font-weight: 600; border-radius: 999px; transition: color .3s, background-color .3s; }
 .gnb a:not(.cta)::after { content: ""; position: absolute; left: 16px; right: 16px; bottom: 5px; height: 2px; background: var(--accent); border-radius: 2px; transform: scaleX(0); transform-origin: left; transition: transform .35s var(--ease); }
 .gnb a:not(.cta):hover::after, .gnb a.on:not(.cta)::after { transform: scaleX(1); }
-.gnb a.cta { margin-left: 14px; padding: 12px 24px; background: var(--navy); color: #fff; }
+.gnb a.cta { margin-left: clamp(6px, 1vw, 14px); padding: 12px clamp(18px, 1.6vw, 24px); background: var(--navy); color: #fff; }
 .gnb a.cta:hover { background: var(--accent); }
 .hd-account { --xa-bg: var(--navy); --xa-fg: #fff; display: inline-flex; align-items: center; margin-left: 10px; }
 /* 계정 버튼 (사용자 지시 2026-11-12): 로그인 전 = 볼록한(양각) 사람 동그라미, 로그인 뒤 = 눌린(음각) 사람 동그라미 */
@@ -128,7 +128,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .hd.on-dark .hd-account, .hd.over-dark .hd-account { --xa-bg: #fff; --xa-fg: var(--navy); }
 
 /* ───── 첫 화면 (슬라이드) ───── */
-.hero { position: relative; height: 100svh; min-height: 660px; overflow: hidden; background: var(--ink-dark); color: #fff; }
+/* 첫 화면 글 크기 = 화면 폭과 높이 중 "작은 쪽" 기준(--hu). 폭(vw)만 보면 배율 125·150% 노트북 · 태블릿 가로 · 폰 가로처럼 낮은 화면에서 글이 화면을 덮는다.
+   1920x940(100%) 에서는 폭이 작은 쪽이라 크기가 그대로다. (사용자 지시 2026-11-14) */
+.hero { --hu: min(1vw, 2.05vh); --hu: min(1vw, 2.05svh); position: relative; height: 100svh; min-height: 360px; overflow: hidden; background: var(--ink-dark); color: #fff; }
 .slides { position: absolute; inset: 0; }
 .slide { position: absolute; inset: 0; opacity: 0; transition: opacity 1.6s var(--ease); }
 .slide picture, .slide img { width: 100%; height: 100%; }
@@ -144,18 +146,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .hero-video iframe.loaded { opacity: 1; }
 .hero.has-video .hero-cap { display: none; }
 .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5, 15, 23, .6) 0%, rgba(5, 15, 23, .05) 30%, rgba(5, 15, 23, .2) 60%, rgba(5, 15, 23, .92) 100%), linear-gradient(90deg, rgba(5, 15, 23, .7) 0%, rgba(5, 15, 23, 0) 65%); pointer-events: none; }
-.hero-in { position: relative; z-index: 2; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; padding-top: var(--hd); padding-bottom: clamp(60px, 9vh, 104px); }   /* 글 묶음을 살짝 아래로 (사용자 지시 2026-11-12) */
-.hero-kicker { display: flex; align-items: center; gap: 14px; margin: 0 0 26px; color: var(--accent-2); font-family: var(--display); font-size: 14px; font-weight: 700; letter-spacing: .3em; }
+.hero-in { position: relative; z-index: 2; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; padding-top: var(--hd); padding-bottom: clamp(24px, 9svh, 104px); }   /* 글 묶음을 살짝 아래로 (사용자 지시 2026-11-12) */
+.hero-kicker { display: flex; align-items: center; gap: 14px; margin: 0 0 clamp(12px, calc(1.35 * var(--hu)), 26px); color: var(--accent-2); font-family: var(--display); font-size: clamp(11px, calc(.73 * var(--hu)), 14px); font-weight: 700; letter-spacing: .3em; }
 .hero-kicker::before { content: ""; width: 44px; height: 2px; background: currentColor; }
-.hero h1 { margin: 0; font-family: var(--display); font-size: clamp(44px, 5.4vw, 98px); font-weight: 800; line-height: .96; letter-spacing: -.045em; }
+.hero h1 { margin: 0; font-family: var(--display); font-size: clamp(30px, calc(5.4 * var(--hu)), 98px); font-weight: 800; line-height: .96; letter-spacing: -.045em; }
 .hero h1 .o { font-family: "Montserrat Line", var(--display); font-style: normal; color: transparent; -webkit-text-stroke: 2px rgba(255, 255, 255, .9); }
 .hero h1 > span { display: block; overflow: hidden; padding-bottom: .04em; }
 .hero h1 > span > i { display: block; font-style: normal; transform: translateY(105%); animation: rise 1.3s var(--ease) forwards; }
 .hero h1 > span:nth-child(2) > i { animation-delay: .14s; }
 @keyframes rise { to { transform: none; } }
-.hero-ko { margin: 30px 0 0; max-width: 700px; font-size: clamp(18px, 1.8vw, 23px); font-weight: 500; line-height: 1.65; color: rgba(255, 255, 255, .86); opacity: 0; animation: fade 1.2s .5s var(--ease) forwards; }
+.hero-ko { margin: clamp(12px, calc(1.56 * var(--hu)), 30px) 0 0; max-width: 700px; font-size: clamp(16px, calc(1.2 * var(--hu)), 23px); font-weight: 500; line-height: 1.65; color: rgba(255, 255, 255, .86); opacity: 0; animation: fade 1.2s .5s var(--ease) forwards; }
 .hero-ko b { color: #fff; font-weight: 700; }
-.hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 38px; opacity: 0; animation: fade 1.2s .7s var(--ease) forwards; }
+.hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: clamp(16px, calc(2 * var(--hu)), 38px); opacity: 0; animation: fade 1.2s .7s var(--ease) forwards; }
+.hero-cta .btn { min-height: clamp(44px, calc(3 * var(--hu)), 58px); padding: 0 clamp(20px, calc(1.56 * var(--hu)), 30px); font-size: clamp(15px, calc(.9 * var(--hu)), 17px); }
 @keyframes fade { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .hero-cap { position: absolute; z-index: 2; right: var(--gutter); top: calc(var(--hd) + 44px); display: flex; align-items: center; gap: 16px; font-family: var(--display); font-size: 12.5px; font-weight: 700; letter-spacing: .22em; color: rgba(255, 255, 255, .75); }
 .hero-cap .count { color: #fff; }
