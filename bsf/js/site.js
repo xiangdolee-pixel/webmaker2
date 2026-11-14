@@ -625,26 +625,13 @@
 
   /* 회사 약도: 카카오 지도(주소로 자리 찾기). JavaScript 키(data-key)가 있을 때만 지도를 그린다 — 없으면 주소 카드 + 카카오맵 · 네이버 지도 버튼 */
   var mb = $('[data-kakao-map]');
-  if (mb && mb.getAttribute('data-naver')) {
-    // 네이버 지도(NCP Maps): 주소 → 좌표는 geocoder 로. 클라이언트 ID 는 서비스 URL(이 사이트 주소)이 등록돼 있어야 동작한다
-    var ns = doc.createElement('script');
-    ns.src = 'https://oapi.map.naver.com/openapi/v3/maps.js?submodules=geocoder&ncpKeyId=' + encodeURIComponent(mb.getAttribute('data-naver'));
-    var nTry = 0;
-    ns.onload = function draw() {
-      var N = window.naver && window.naver.maps, box = $('.map-canvas', mb);
-      if (!N || !N.Service || !N.Service.geocode) { if (++nTry < 60) setTimeout(draw, 100); return; }   // 주소 찾기 모듈은 지도 스크립트 뒤에 따로 온다
-      N.Service.geocode({ query: mb.getAttribute('data-addr') }, function (st, res) {
-        var a = (st === N.Service.Status.OK || st === 200) && res && res.v2 && res.v2.addresses && res.v2.addresses[0];
-        if (!a) return;
-        var at = new N.LatLng(+a.y, +a.x);
-        box.innerHTML = '';
-        var map = new N.Map(box, { center: at, zoom: mb.classList.contains('map-mini') ? 16 : 17, scrollWheel: false, zoomControl: true, zoomControlOptions: { position: N.Position.RIGHT_CENTER } });
-        new N.Marker({ map: map, position: at, icon: { content: '<div class="map-pin">' + mb.getAttribute('data-name') + '</div>', anchor: new N.Point(50, 40) } });
-        if (innerWidth > 767 && !mb.classList.contains('map-mini')) map.panBy(new N.Point(-Math.min(220, box.clientWidth * .18), 0));
-        mb.classList.add('is-live');
-      });
-    };
-    doc.head.appendChild(ns);
+  if (mb && mb.getAttribute('data-naver') !== null) {
+    // 네이버 지도: xim 공용 지도(한 주소에서 그림)를 iframe 으로 — 네이버에 이 사이트 주소를 따로 등록하지 않아도 된다 (사용자 지시 2026-11-14)
+    var fr = doc.createElement('iframe'), box0 = $('.map-canvas', mb);
+    fr.src = 'https://xim.plators.com/map?addr=' + encodeURIComponent(mb.getAttribute('data-addr')) + '&name=' + encodeURIComponent(mb.getAttribute('data-name') || '') + '&zoom=' + (mb.classList.contains('map-mini') ? 16 : 17) + (mb.classList.contains('map-mini') ? '' : '&shift=1');
+    fr.title = (mb.getAttribute('data-name') || '') + ' 위치 지도'; fr.loading = 'lazy';
+    fr.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0';
+    box0.appendChild(fr); mb.classList.add('is-live');
   } else if (mb && mb.getAttribute('data-key')) {
     var ks = doc.createElement('script');
     ks.src = 'https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&libraries=services&appkey=' + encodeURIComponent(mb.getAttribute('data-key'));

@@ -1,5 +1,5 @@
 // xim 네이버 지도 — 네이버 클라우드 Maps Application 정보와 등록된 사이트 주소 (사용자 지시 2026-11-13)
-//   홈페이지에 네이버 지도가 나오려면 그 사이트 주소가 Application 의 'Web 서비스 URL' 에 있어야 한다(최대 10개).
+//   고객 사이트는 xim 공용 지도(/map, _worker/index.js sharedMap)를 iframe 으로 붙인다 — 사이트마다 네이버 등록 불필요(2026-11-14).
 //   여기 값은 기록용(xim DB settings.naver_map) — 네이버 쪽 등록은 콘솔에서 바꾼다.
 import { $, esc, toast, openDialog, busy } from './common.js';
 
@@ -17,13 +17,11 @@ export async function renderNaverMap(d) {
       <a class="btn primary" href="${CONSOLE}" target="_blank" rel="noopener">네이버 클라우드 콘솔 열기 ↗</a>
       <button class="btn" type="button" data-edit>정보 고치기</button></div>
     <div class="card nm-how">
-      <h3>사이트에 네이버 지도를 띄우려면</h3>
+      <h3>사이트에 네이버 지도를 띄우려면 — 등록 없이, 사이트 수 제한 없음</h3>
       <ol>
-        <li>홈페이지에 네이버 지도가 나오려면 <b>그 사이트 주소가 아래 'Web 서비스 URL' 에 등록</b>돼 있어야 합니다. 등록되지 않은 주소에서는 지도가 뜨지 않습니다.</li>
-        <li>주소는 <b>Application 하나에 최대 ${MAX_URLS}개</b>까지 넣을 수 있습니다. 새로 가입하거나 결제를 다시 등록할 필요 없이 이 Application 에 추가하면 됩니다.</li>
-        <li>추가하는 곳: 위 <b>콘솔 열기</b> → Maps › Application 에서 <b>${esc(m.name || 'Application')}</b> 을 고르고 <b>변경</b> → 서비스 환경 등록 › Web 서비스 URL 에 <code>https://사이트주소</code> 를 넣고 <b>+ 추가</b> → 저장.</li>
-        <li>정식 도메인을 붙이면 workers.dev 주소와 정식 도메인을 <b>둘 다</b> 넣어 두면 좋습니다. plators.com 하나만 넣는다고 다른 도메인이 되지는 않습니다.</li>
-        <li>콘솔에서 바꾼 뒤 아래 <b>정보 고치기</b>로 여기 목록도 맞춰 두세요(여기를 고쳐도 네이버 쪽은 바뀌지 않습니다).</li>
+        <li>네이버 키는 등록한 주소에서만 동작하므로, 지도는 <b>xim 공용 지도(https://xim.plators.com/map) 한 곳</b>에서 그립니다. 이 주소는 네이버에 이미 등록돼 있습니다(plators.com).</li>
+        <li>고객 사이트에는 지도 자리에 이렇게 붙이면 끝입니다 — 네이버 콘솔에 사이트 주소를 추가할 필요가 없습니다:<br><code>&lt;iframe src="https://xim.plators.com/map?addr=주소&amp;name=회사이름" loading="lazy"&gt;&lt;/iframe&gt;</code><br>(선택: <code>&amp;zoom=16</code> 확대 정도, <code>&amp;c=153c54</code> 이름표 색, <code>&amp;shift=1</code> 왼쪽 카드만큼 지도를 오른쪽으로)</li>
+        <li>아래 Web 서비스 URL 목록은 옛 방식(사이트마다 등록) 기록입니다. 새로 등록하지 않아도 됩니다.</li>
       </ol>
     </div>
     <div class="card nm-info">

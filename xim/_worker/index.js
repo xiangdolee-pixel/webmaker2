@@ -1176,6 +1176,11 @@ export default {
     if (url.pathname.startsWith('/device/')) {
       try { return await deviceLogin(request, env, url); } catch (e) { return fail(e); }
     }
+    // 공용 네이버 지도(사용자 지시 2026-11-14): 네이버 키는 등록한 주소(Web 서비스 URL)에서만 동작한다 → 지도는 이 주소(xim) 한 곳에서 그리고,
+    //   고객 사이트는 <iframe src="https://xim.plators.com/map?addr=주소&name=이름"> 으로 붙인다. 사이트가 몇 개든 네이버에 따로 등록할 필요 없음
+    if (url.pathname === '/map') {
+      try { return await sharedMap(env, url); } catch (e) { return fail(e); }
+    }
     // 스튜디오 공개 주소(그림 · 방송용 슬라이드쇼) — 주소를 아는 사람만, 로그인 없음
     if (url.pathname.startsWith('/studio/')) {
       try { const r = await studioPublic(request, env, url); if (r) return r; } catch (e) { return fail(e); }
@@ -1211,4 +1216,21 @@ async function staticFile(request, env, url) {
   } else r = new Response(res.body, res);
   r.headers.set('Cache-Control', url.searchParams.has('v') ? 'public, max-age=31536000, immutable' : 'public, max-age=60');
   return r;
+}
+
+async function sharedMap(env, url) {
+  let m = {}; try { m = JSON.parse((await getSetting(env.DB, 'naver_map')) || '{}'); } catch { m = {}; }
+  const q = (k, n) => String(url.searchParams.get(k) || '').slice(0, n);
+  const cfg = { key: m.client_id || '', addr: q('addr', 200), name: q('name', 60), zoom: Math.min(20, Math.max(6, +q('zoom', 2) || 17)), shift: q('shift', 1) === '1', color: /^[0-9a-f]{3,8}$/i.test(q('c', 8)) ? '#' + q('c', 8) : '#153c54' };
+  const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>지도</title>
+<style>html,body,#m{margin:0;width:100%;height:100%;overflow:hidden;background:#e4eaef}.pin{padding:6px 12px;border-radius:999px;background:${cfg.color};color:#fff;font:700 13px/1.4 Pretendard,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;white-space:nowrap;box-shadow:0 6px 16px -6px rgba(0,0,0,.5)}</style></head>
+<body><div id="m"></div><script>var C=${JSON.stringify(cfg).replace(/</g, '\u003c')};
+var s=document.createElement('script');s.src='https://oapi.map.naver.com/openapi/v3/maps.js?submodules=geocoder&ncpKeyId='+encodeURIComponent(C.key);var n=0;
+s.onload=function d(){var N=window.naver&&naver.maps;if(!N||!N.Service||!N.Service.geocode){if(++n<60)setTimeout(d,100);return;}
+N.Service.geocode({query:C.addr},function(st,res){var a=res&&res.v2&&res.v2.addresses&&res.v2.addresses[0];if(!a)return;var at=new N.LatLng(+a.y,+a.x),box=document.getElementById('m');
+var map=new N.Map(box,{center:at,zoom:C.zoom,scrollWheel:false,zoomControl:true,zoomControlOptions:{position:N.Position.RIGHT_CENTER}});
+var p=document.createElement('div');p.className='pin';p.textContent=C.name||'';new N.Marker({map:map,position:at,icon:C.name?{content:p.outerHTML,anchor:new N.Point(50,40)}:undefined});
+if(C.shift&&innerWidth>767)map.panBy(new N.Point(-Math.min(220,box.clientWidth*.18),0));parent.postMessage({ximMap:'live'},'*');});};
+document.head.appendChild(s);</script></body></html>`;
+  return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=3600' } });
 }
