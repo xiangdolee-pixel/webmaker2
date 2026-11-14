@@ -337,6 +337,22 @@ if ((!CONNECT || OWN_XIM) && fs.existsSync(WORKER)) {
   }
   console.log(`[build] ${slug}/_worker/index.js 를 Worker 로 함께 올립니다.`);
 }
+// 가장자리 + 본체로 나누기 (2026-11-14 "0.1초라도"): 본체(<이름>-core, 서울 placement, 공개 주소 없음) 앞에 가장자리 Worker(<이름>, placement 없음)를 둔다.
+//   사용자 도메인은 지금처럼 <이름> 에 붙어 있다. 정적 파일 규칙(run_worker_first · _headers)은 둘 다 같음. site-edge.js 참고
+if (CONNECT && !OWN_XIM && DEPLOY) {
+  const core = { ...config, name: `${name}-core`, workers_dev: false, preview_urls: false };
+  delete core.routes;
+  fs.writeFileSync(path.join(ROOT, `.deploy-${slug}.core.wrangler.jsonc`), `// node build.mjs ${slug} 가 만든 파일입니다. 직접 고치지 마세요.
+${JSON.stringify(core, null, 2)}
+`);
+  config.main = './xim/_worker/site-edge.js';
+  config.version_metadata = { binding: 'VER' };   // 배포하면 캐시 열쇠가 바뀐다
+  config.placement = { mode: 'off' };   // 지우기만 하면 전 배포의 서울 placement 가 남는다
+  config.services = [...(config.services || []), { binding: 'CORE', service: `${name}-core` }];
+  console.log(`[build] 가장자리 Worker ${name} + 본체 ${name}-core`);
+} else if (DEPLOY) {
+  try { fs.unlinkSync(path.join(ROOT, `.deploy-${slug}.core.wrangler.jsonc`)); } catch { /* 없음 */ }
+}
 fs.writeFileSync(
   path.join(ROOT, DEPLOY ? `.deploy-${slug}.wrangler.jsonc` : 'wrangler.jsonc'),
   `// node build.mjs ${slug} 가 만든 파일입니다. 직접 고치지 마세요.\n${JSON.stringify(config, null, 2)}\n`,

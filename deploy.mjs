@@ -61,6 +61,8 @@ else {
       run('npx', ['wrangler', 'd1', 'execute', 'xms', '--remote', '--file', `"${f}"`, '-y']);
     }
   }
+  // 본체(<이름>-core)가 있으면 먼저 — 가장자리 Worker 가 서비스 바인딩으로 부른다
+  if (fs.existsSync(path.join(ROOT, `.deploy-${slug}.core.wrangler.jsonc`))) run('npx', ['wrangler', 'deploy', '--config', `.deploy-${slug}.core.wrangler.jsonc`]);
   run('npx', ['wrangler', 'deploy', '--config', `.deploy-${slug}.wrangler.jsonc`]);
   if (fs.existsSync(path.join(ROOT, `.deploy/${slug}.xim-connect.json`))) await fillDomain(slug);
 }

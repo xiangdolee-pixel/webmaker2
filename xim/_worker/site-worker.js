@@ -120,7 +120,7 @@ export default {
         return new Response('Not found', { status: 404 });
       }
     }
-    let res = await handle(request, env);
+    let res = await handle(request, env, ctx);
     if (env.XMS) res = countVisit(request, env, ctx, res);
     if (ip && env.XIM && res.status === 404 && !BENIGN.test(url.pathname) && !GOOD_BOT.test(request.headers.get('User-Agent') || '')) {
       ctx.waitUntil(secReport(env, request, ip, '404'));
@@ -135,11 +135,12 @@ const BOT = /bot|crawl|spider|slurp|scrap|preview|fetch|curl|wget|python|java\/|
 const MOBILE = /Mobi|Android|iPhone|iPad|iPod/i;
 const SEARCH_HOST = /^search\.|^google\.|^bing\.com$|yahoo\.|^duckduckgo\.com$|^yandex\.|^baidu\.com$|^ecosia\.org$/;
 const kstDay = () => new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
-function countVisit(request, env, ctx, res) {
+export function countVisit(request, env, ctx, res) {
+  if (request.headers.get('X-Edge-Fill')) return res;   // 가장자리(site-edge)가 캐시를 채우려고 부른 것 — 방문이 아님
   if (request.method !== 'GET' || (res.status !== 200 && res.status !== 304)) return res;
   const url = new URL(request.url);
   const p = url.pathname;
-  if (!looksHtml(p) || /^\/(admin|xms|xms-api)(\/|$)/.test(p) || /^\/member\/(logout|verify)/.test(p)) return res;
+  if (!looksHtml(p) || /^\/(admin|xms|xms-api|site-api)(\/|$)/.test(p) || /^\/member\/(logout|verify)/.test(p)) return res;
   if (res.status === 200 && !(res.headers.get('Content-Type') || '').includes('text/html')) return res;
   const h = request.headers;
   const ua = h.get('User-Agent') || '';
@@ -167,7 +168,7 @@ function countVisit(request, env, ctx, res) {
 const vq = (data) => (data?.ver && /^[\w-]+$/.test(data.ver) ? `?v=${data.ver}` : '');
 function decodeURIComponentSafe(s) { try { return decodeURIComponent(s); } catch { return s; } }
 
-async function handle(request, env) {
+async function handle(request, env, ctx) {
   {
     const url = new URL(request.url);
     const { pathname } = url;
@@ -185,6 +186,13 @@ async function handle(request, env) {
     if (!isAdmin && (await siteStatus(env, request)) === 'suspended') return forward(env.XIM, request, env, '/__suspended');
     // 문의 받기 (모든 xim 사이트 공통, 2026-11-12): 사이트 문의 폼 → xim '제작문의' 메뉴. 봇 확인(Turnstile) 키도 xim 에서
     //   GET /site-api/inquiry-key → { sitekey },  POST /site-api/inquiry { name, contact, org, kind, message, turnstile } → { ok } | { error }
+    // 미리 그려 둔(prerender) 페이지가 실제로 열렸다는 알림 → 방문으로 센다 (첫 방문 쿠키도 여기서)
+    if (pathname === '/site-api/visit' && request.method === 'POST') {
+      const pg = (url.searchParams.get('p') || '/').slice(0, 300);
+      const h = new Headers(request.headers); h.delete('Sec-Purpose'); h.delete('Purpose');
+      const r = countVisit(new Request(new URL(pg, url.origin), { headers: h }), env, ctx, new Response(null, { status: 200, headers: { 'Content-Type': 'text/html' } }));
+      return new Response(null, { status: 204, headers: r.headers.get('Set-Cookie') ? { 'Set-Cookie': r.headers.get('Set-Cookie') } : {} });
+    }
     if (pathname === '/site-api/inquiry-key' || pathname === '/site-api/inquiry') {
       const j = (d, status = 200) => new Response(JSON.stringify(d), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
       if (pathname === '/site-api/inquiry-key') return j({ sitekey: await env.XIM.inquiryKey(env.XIM_SITE).catch(() => '') });
@@ -414,7 +422,10 @@ async function withXms(res, request, env, data) {
       if (data?.account_css) tags.push(`<style id="xa-style">${data.account_css}</style>`);
       tags.push(`<script src="/xms/js/account.js${vq(data)}" defer></script>`);
       // 내 정보 · 관리 · 로그인 · 게시판 링크에 손가락(마우스)이 닿으면 그 화면을 미리 준비해 둔다 → 누르면 바로 뜬다 (크롬 · 엣지 · 안드로이드)
-      tags.push('<script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/member/*"},{"href_matches":"/board/*"},{"href_matches":"/xms/"}]},"eagerness":"moderate"}]}</script>');
+      // 사이트 안 모든 페이지도 손가락 · 마우스가 닿는 순간 미리 그려 둔다 → 누르면 즉시 (2026-11-14 "0.1초라도"). 로그아웃 · 파일 받기는 뺀다
+      tags.push('<script type="speculationrules">{"prerender":[{"where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":"/xms/*"}},{"not":{"href_matches":"/xms-api/*"}},{"not":{"href_matches":"/member/logout*"}},{"not":{"href_matches":"/site-api/*"}},{"not":{"href_matches":"/*.(pdf|zip|hwp|docx?|xlsx?|pptx?)"}},{"not":{"selector_matches":"[download],[target=_blank],[rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script>');
+      // 미리 그린 페이지는 서버가 방문으로 세지 않는다 → 실제로 열렸을 때 한 번 알린다
+      tags.push('<script>if(document.prerendering)document.addEventListener("prerenderingchange",function(){navigator.sendBeacon("/site-api/visit?p="+encodeURIComponent(location.pathname))},{once:true})</script>');
       tags.push('<link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml">');
       for (const v of h.verify || []) tags.push(`<meta name="${attr(v.name)}" content="${attr(v.content)}">`);
       if (h.favicon) {

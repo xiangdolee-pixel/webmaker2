@@ -8,6 +8,16 @@ design 쪽 규칙(`E:\ws\WebMaker\CLAUDE.md`, `E:\ws\WebMaker\design\CLAUDE.md`)
 
 ---
 
+## 0. 속도가 최우선 (사용자 지시 2026-11-14, "매우 중요하게 최우선순위로", "0.1초라도")
+
+xim 에서 만드는 모든 서비스(고객 사이트 · xim · xms)는 **보이는 것은 그대로 두고 0.1초라도 빠르게**. 만들 때 · 고칠 때 따로 말하지 않아도 챙기고, 바꾼 뒤엔 재서 확인한다.
+- 국내(KT 등) 접속은 Cloudflare 해외 가장자리(시애틀 SEA)로 들어온다 → 왕복 1번 ≈ 0.13초. **왕복 수를 줄이는 것**이 가장 크다.
+- 구조(이미 됨): 사이트 = 가장자리 Worker `<이름>`(placement 없음, `xim/_worker/site-edge.js`: 로그인 안 한 방문자의 html 을 가장자리 캐시에서 바로, 30초 지나면 뒤에서 새로) + 본체 `<이름>-core`(서울 placement, 게시판 · 회원 · 관리 · 로그인한 사람). build.mjs · deploy.mjs 가 알아서 둘 다 올린다. html 응답 0.33 → 0.15초.
+- 링크는 `.html` 없이(307 왕복 금지 — site-worker `cleanHref` 가 고침), 모든 페이지는 마우스 · 손가락이 닿으면 미리 그림(speculationrules prerender, 방문 통계는 /site-api/visit 비콘으로).
+- 사진은 R2 서울 서명 주소, 앞 4장만 바로 · 나머지 lazy, css · js 는 `?v=` 번호. 페이지가 뜬 뒤 따로 받는 요청(API · 목록)은 Worker 가 html 에 함께 넣는다.
+- 렌더를 막는 외부 CSS · 폰트 · 스크립트를 늘리지 않는다. 큰 영상 · 지도 · 위젯은 늦게(lazy · 첫 화면 뒤).
+- 확인: CDP 로 ttfb · FCP · 요청 목록(스크래치 perf.mjs 방식), curl 로 연결 재사용 응답 시간.
+
 ## 웹페이지 공통 제작 규칙 (사용자가 따로 말하지 않아도 모두 적용)
 
 ### 1. 모바일 화면 깨짐 없음

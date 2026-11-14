@@ -1,0 +1,49 @@
+// 사이트 가장자리 Worker (사용자 지시 2026-11-14 "0.1초라도 더 빨리")
+//   국내 접속은 Cloudflare 시애틀(SEA) 등 해외 가장자리로 들어온다. 본체(site-worker, <이름>-core)는 DB 가까이 서울에서 돌아서
+//   html 하나마다 가장자리 → 서울 → 가장자리 왕복(≈0.13~0.15초)이 더 붙었다.
+//   → 로그인 안 한 방문자의 html 은 이 가장자리 캐시에서 바로 준다. 30초가 지난 것은 먼저 주고 뒤에서 본체로 새로 받는다(메뉴 · 글 고친 것은 30초 안팎에 반영).
+//   게시판 · 회원 · 관리 · API · 로그인한 사람 · 처음 받는 페이지는 지금처럼 본체로.
+import { countVisit } from './site-worker.js';
+
+const DYN = /^\/(xms|xms-api|member|board|site-api|admin|cdn-cgi|rss\.xml|sitemap\.xml|robots\.txt)(\/|$)/;
+const TRACK = /^(utm_|fbclid$|gclid$|n_|nclid$|_ga$|ref$)/;
+const FRESH_MS = 30000;
+
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const p = url.pathname;
+    const cookie = request.headers.get('Cookie') || '';
+    const pageLike = /(^|\/)[^./]*$/.test(p) || /\.html?$/i.test(p) || p.endsWith('/');
+    if (request.method !== 'GET' || !pageLike || DYN.test(p) || /(^|;\s*)xms_sess=/.test(cookie) || request.headers.get('X-Edge-Fill')) return env.CORE.fetch(request);
+    const qs = [...url.searchParams.keys()].filter((k) => !TRACK.test(k));
+    if (qs.length) return env.CORE.fetch(request);   // 검색어 같은 물음표 주소는 본체로
+    const ver = env.VER?.id || '0';
+    const key = new Request(`https://edge-cache.xim/${ver}/${url.host}${p}`);
+    const cache = caches.default;
+    const fill = async () => {
+      const h = new Headers(request.headers);
+      h.delete('Cookie'); h.delete('Sec-Purpose'); h.delete('Purpose'); h.set('X-Edge-Fill', '1');
+      const r = await env.CORE.fetch(new Request(request.url, { headers: h }));
+      if (r.status !== 200 || !(r.headers.get('Content-Type') || '').includes('text/html') || r.headers.get('Set-Cookie')) return null;
+      const body = await r.arrayBuffer();
+      const out = new Response(body, r);
+      out.headers.set('Cache-Control', 'public, max-age=86400');
+      out.headers.set('X-Edge-At', String(Date.now()));
+      await cache.put(key, out.clone());
+      return out;
+    };
+    const hit = await cache.match(key).catch(() => null);
+    if (!hit) {
+      // 처음 받는 페이지: 본체가 그대로 응답(방문 · 쿠키 포함), 캐시는 뒤에서 따로 채운다
+      ctx.waitUntil(fill().catch(() => {}));
+      return env.CORE.fetch(request);
+    }
+    if (Date.now() - +(hit.headers.get('X-Edge-At') || 0) > FRESH_MS) ctx.waitUntil(fill().catch(() => {}));
+    const res = new Response(hit.body, hit);
+    res.headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+    res.headers.delete('X-Edge-At'); res.headers.delete('Cf-Placement');
+    res.headers.set('X-Edge', 'hit');
+    return countVisit(request, env, ctx, res);   // 방문 통계 · 첫 방문 쿠키는 그대로(기다리지 않음)
+  },
+};
