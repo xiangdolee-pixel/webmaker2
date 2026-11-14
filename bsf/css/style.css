@@ -149,7 +149,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .hero-in { position: relative; z-index: 2; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; padding-top: var(--hd); padding-bottom: clamp(24px, 9svh, 104px); }   /* 글 묶음을 살짝 아래로 (사용자 지시 2026-11-12) */
 .hero-kicker { display: flex; align-items: center; gap: 14px; margin: 0 0 clamp(12px, calc(1.35 * var(--hu)), 26px); color: var(--accent-2); font-family: var(--display); font-size: clamp(11px, calc(.73 * var(--hu)), 14px); font-weight: 700; letter-spacing: .3em; }
 .hero-kicker::before { content: ""; width: 44px; height: 2px; background: currentColor; }
-.hero h1 { margin: 0; font-family: var(--display); font-size: clamp(30px, calc(6.2 * var(--hu) - 20px), 98px); font-weight: 800; line-height: .96; letter-spacing: -.045em; }
+.hero h1 { margin: 0; font-family: var(--display); font-size: clamp(34px, calc(7.8 * var(--hu) - 52px), 98px); font-weight: 800; line-height: .96; letter-spacing: -.045em; }
 .hero h1 .o { font-family: "Montserrat Line", var(--display); font-style: normal; color: transparent; -webkit-text-stroke: 2px rgba(255, 255, 255, .9); }
 @media (min-width: 768px) and (orientation: portrait) { .hero h1 { font-size: clamp(44px, 5.4vw, 64px); } }   /* 태블릿 세로: 높이가 넉넉해 폭 기준 */
 .hero h1 > span { display: block; overflow: hidden; padding-bottom: .04em; }
