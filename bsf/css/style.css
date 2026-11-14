@@ -249,7 +249,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .state-cue i { position: relative; width: 120px; height: 3px; border-radius: 3px; background: rgba(21, 60, 84, .12); overflow: hidden; }
 .state-cue i::after { content: ""; position: absolute; inset: 0; background: currentColor; transform-origin: left; transform: scaleX(var(--p, 0)); }
 .state-cue span::after { content: ""; display: inline-block; width: 8px; height: 8px; margin: 0 0 3px 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); animation: cue-down 1.4s var(--ease) infinite; }
-.state-pin.done .state-cue { color: var(--accent); }
+.state-pin.done .state-cue, .mx-cue.done { color: var(--accent); }
+.mx-cue { position: static; transform: none; margin: 22px auto 0; width: max-content; }   /* 생산역량 표(붙어 있는 구간)도 같은 표시 — 사용자 지시 2026-11-14 "멈추는 화면이 있을 때는 필수" */
 @keyframes cue-down { 50% { transform: translateY(4px) rotate(45deg); } }
 @media (prefers-reduced-motion: reduce), (max-height: 480px) { .state-track { height: auto; } .state-pin { position: static; min-height: 0; padding: 0; } .state-cue { display: none; } }   /* 폰 가로처럼 아주 낮은 화면은 붙이지 않고 그냥 지나가며 채운다 */
 .statement { margin: 0; font-size: clamp(24px, min(3.6vw, 6.2vh), 50px); font-weight: 700; line-height: 1.5; letter-spacing: -.035em; max-width: 1180px; }

@@ -569,16 +569,19 @@
     var mxSec = mx.closest('.mx-scroll'), mxCol = $('.mx-col'), mxPin = $('.mx-pin');
     if (mxSec) {
       var wideQ = window.matchMedia('(min-width: 1024px) and (min-height: 760px)'), wide = function () { return wideQ.matches; };
+      var mxCue = $('.mx-cue'), cueP = function (v) { if (!mxCue) return; v = Math.min(1, Math.max(0, v)); mxCue.style.setProperty('--p', v.toFixed(3)); mxCue.classList.toggle('done', v >= 1); };
       var mxPick = function () {
         var p;
         if (wide()) {   // PC: 구간 전체가 붙어 있는 동안 반을 넘게 내리면 KNIT
           var r = mxSec.getBoundingClientRect(); p = -r.top / Math.max(1, r.height - innerHeight);
           if (p < 0 || p > 1) return;
+          cueP(p / .6);
           p = p > .5 ? 1 : 0;
         } else if (mxCol && mxPin) {   // 폰: 표가 가운데 붙은 뒤로 내린 거리 — 60% 를 넘어야 KNIT (보기도 전에 넘어가지 않게)
           var c = mxCol.getBoundingClientRect(), pr = mxPin.getBoundingClientRect(), run = c.height - pr.height;
           if (run < 50) return;
           p = (pr.top - c.top) / run;
+          cueP(p / .7);
           p = p > .6 ? 1 : p < .3 ? 0 : -1;
           if (p < 0) return;
         } else return;

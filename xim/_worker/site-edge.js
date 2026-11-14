@@ -28,6 +28,8 @@ export default {
       if (r.status !== 200 || !(r.headers.get('Content-Type') || '').includes('text/html') || r.headers.get('Set-Cookie')) return null;
       const body = await r.arrayBuffer();
       const out = new Response(body, r);
+      const link = hintsOf(new TextDecoder().decode(body.slice(0, 60000)), url);
+      if (link) out.headers.set('Link', link);
       out.headers.set('Cache-Control', 'public, max-age=86400');
       out.headers.set('X-Edge-At', String(Date.now()));
       await cache.put(key, out.clone());
@@ -47,3 +49,26 @@ export default {
     return countVisit(request, env, ctx, res);   // 방문 통계 · 첫 방문 쿠키는 그대로(기다리지 않음)
   },
 };
+
+// Early Hints (2026-11-14): html 의 <head> 에서 렌더를 막는 CSS · 미리 연결할 곳 · 먼저 받을 그림을 Link 헤더로 →
+//   Cloudflare 가 이 헤더를 기억해 다음 방문 때 페이지를 만들기도 전에 '103 Early Hints' 로 먼저 알려 준다(브라우저가 그동안 연결 · CSS 받기 시작)
+function hintsOf(html, url) {
+  const head = html.slice(0, Math.max(0, html.search(/<\/head>/i)) || 60000);
+  const attr = (tag, n) => { const m = tag.match(new RegExp(`\\s${n}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i')); return m ? (m[1] ?? m[2] ?? m[3]) : null; };
+  const out = [], origins = new Map();
+  const abs = (h) => { try { return new URL(h.replace(/&amp;/g, '&'), url); } catch { return null; } };
+  const addOrigin = (u, cors) => { if (u && u.origin !== url.origin && !origins.has(u.origin)) origins.set(u.origin, cors); };
+  for (const tag of head.match(/<link\b[^>]*>/gi) || []) {
+    const rel = (attr(tag, 'rel') || '').toLowerCase(), href = attr(tag, 'href');
+    if (!href) continue;
+    const u = abs(href);
+    if (!u) continue;
+    if (rel === 'stylesheet' && !attr(tag, 'media')) { out.push(`<${u.origin === url.origin ? u.pathname + u.search : u.href}>; rel=preload; as=style`); addOrigin(u, false); }
+    else if (rel === 'preconnect') addOrigin(u, /crossorigin/i.test(tag));
+    else if (rel === 'preload' && /^(image|font)$/i.test(attr(tag, 'as') || '')) { const md = attr(tag, 'media'); out.push(`<${u.href}>; rel=preload; as=${attr(tag, 'as').toLowerCase()}${/font/i.test(attr(tag, 'as')) ? '; crossorigin' : ''}${md ? `; media="${md}"` : ''}`); addOrigin(u, false); }
+  }
+  const r2 = html.match(/https:\/\/[a-z0-9]+\.r2\.cloudflarestorage\.com/);
+  if (r2) addOrigin(abs(r2[0]), false);   // 사진 저장소(서울)
+  const pre = [...origins].slice(0, 6).map(([o, cors]) => `<${o}>; rel=preconnect${cors ? '; crossorigin' : ''}`);
+  return [...pre, ...out.slice(0, 6)].join(', ');
+}
