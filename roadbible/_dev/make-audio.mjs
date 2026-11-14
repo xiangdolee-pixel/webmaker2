@@ -35,14 +35,14 @@ for (const a of process.argv.slice(2)) {
 }
 
 async function call(method, p, body) {
-  const r = await fetch(API + p, { method, headers: H, body: body && JSON.stringify(body) });
+  const r = await fetch(API + p, { method, headers: H, body: body && JSON.stringify(body), signal: AbortSignal.timeout(p.startsWith('/audio/') ? 900000 : 120000) });   // 음성 원본(10MB 안팎)은 넉넉히   // 걸려서 멈추지 않게
   if (!r.ok) throw new Error(`${method} ${p} → ${r.status} ${(await r.text()).slice(0, 200)}`);
   return r.headers.get('content-type')?.includes('json') ? r.json() : r;
 }
 
-// 1) 작업 넣기 (이미 만든 파일이 있으면 건너뜀)
-const jobs = [];
-for (const t of targets) {
+// 1) 작업 넣기 (이미 만든 파일이 있으면 건너뜀). RESUME=<audio-jobs-….json> 이면 새로 넣지 않고 그 작업들을 이어서 받는다
+const jobs = process.env.RESUME ? JSON.parse(fs.readFileSync(process.env.RESUME, 'utf8')).filter((j) => !fs.existsSync(path.join(OUT, `${j.name}.webm`))) : [];
+for (const t of process.env.RESUME ? [] : targets) {
   const name = `${SLUG[t.book]}-${t.chap}`;
   if (fs.existsSync(path.join(OUT, `${name}.webm`)) && !process.env.FORCE) { log('있음, 건너뜀', name); continue; }
   const verses = (BIBLE[`${t.book}/${t.chap}`] || []).filter(Boolean).map((v) => v.replace(/[⟪⟫]/g, ''));
@@ -53,9 +53,9 @@ for (const t of targets) {
   jobs.push({ ...t, name, id: job.id, head });
   log('넣음', name, job.id, head, `${text.length}자`);
 }
-fs.writeFileSync(path.join(OUT, '..', '..', '_dev', `audio-jobs-${Date.now()}.json`), JSON.stringify(jobs, null, 2));
+if (!process.env.RESUME) fs.writeFileSync(path.join(OUT, '..', '..', '_dev', `audio-jobs-${Date.now()}.json`), JSON.stringify(jobs, null, 2));
 // 제목을 [길성경] … 으로 — clone 의 자동 삭제(purgeOld)에서 빠진다
-if (jobs.length) {
+if (jobs.length && !process.env.RESUME) {
   const sql = jobs.map((j) => `UPDATE jobs SET title='[길성경] ${j.book} ${j.chap}${j.book === '시편' ? '편' : '장'}' WHERE id='${j.id}';`).join(' ');
   const f = path.join(tmpdir(), 'rb-audio-title.sql'); fs.writeFileSync(f, sql);
   execFileSync('node', ['deploy.mjs', '--wrangler', 'd1', 'execute', 'clone', '--remote', '--file', f, '-y'], { cwd: ROOT, stdio: 'ignore', shell: true });
@@ -68,19 +68,22 @@ const left = new Set(jobs.map((j) => j.id));
 while (left.size) {
   for (const j of jobs) {
     if (!left.has(j.id)) continue;
-    const { job } = await call('GET', '/api/jobs/' + j.id);
+    let job; try { ({ job } = await call('GET', '/api/jobs/' + j.id)); } catch (e) { log('확인 실패(다음에 다시)', j.name, e.message); continue; }
     if (job.status === 'failed') { log('실패', j.name, job.error || ''); left.delete(j.id); continue; }
     if (job.status !== 'done') continue;
+    try {
     const wav = path.join(tmp, `${j.name}.wav`);
-    const r = await call('GET', `/audio/${j.id}.wav`);
-    fs.writeFileSync(wav, Buffer.from(await r.arrayBuffer()));
+    // 원본 받기는 curl 로(끊긴 연결에서 몇 분씩 매달리던 것 — 2026-11-14): 5분 제한 · 3번 다시
+    execFileSync('curl', ['-sS', '-f', '--retry', '3', '--retry-all-errors', '-m', '300', '-H', `X-Agent-Token: ${SEC.agent_token}`, '-o', wav, `${API}/audio/${j.id}.wav`]);
     const err = (() => { try { return execFileSync('ffmpeg', ['-hide_banner', '-i', wav, '-af', 'loudnorm=I=-16:TP=-1.5:LRA=7:print_format=json', '-f', 'null', '-'], { encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'] }); } catch (e) { return String(e.stderr || ''); } })();
     let jn = {}; try { jn = JSON.parse((err.match(/\{[\s\S]*?\}/g) || []).pop()); } catch { /* 1패스로 */ }
     const af = jn.input_i ? `loudnorm=I=-16:TP=-1.5:LRA=7:measured_I=${jn.input_i}:measured_TP=${jn.input_tp}:measured_LRA=${jn.input_lra}:measured_thresh=${jn.input_thresh}:offset=${jn.target_offset}:linear=true` : 'loudnorm=I=-16:TP=-1.5:LRA=7';
-    execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', wav, '-af', af, '-ar', '48000', '-ac', '1', '-c:a', 'libopus', '-b:a', '20k', '-application', 'audio', path.join(OUT, `${j.name}.webm`)]);
+    execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', wav, '-af', af, '-ar', '48000', '-ac', '1', '-c:a', 'libopus', '-b:a', '20k', '-application', 'audio', '-f', 'webm', path.join(OUT, `${j.name}.webm.part`)]);
+    fs.renameSync(path.join(OUT, `${j.name}.webm.part`), path.join(OUT, `${j.name}.webm`));   // 다 만든 뒤에만 이름을 바꿔 반쯤 된 파일이 남지 않게
     fs.unlinkSync(wav);
     left.delete(j.id);
     log('완료', j.name, `${Math.round(fs.statSync(path.join(OUT, `${j.name}.webm`)).size / 1024)}KB`, `남은 ${left.size}`);
+    } catch (e) { log('받기 · 압축 실패(다음에 다시)', j.name, e.message); }   // 한 장이 실패해도 전체가 멈추지 않게
   }
   if (left.size) await new Promise((r) => setTimeout(r, 30000));
 }

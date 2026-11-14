@@ -6,7 +6,7 @@
      별도 캐시(roadbible-cdn)에 담아 앱 버전이 올라가도 지워지지 않음 — 배포 직후 오프라인 사고 방지
    - 필수 CDN(기본 폰트 CSS)은 설치 때 미리 받아 둠(실패해도 설치는 계속)
    - /qt(오늘의 묵상)·회원 로그인·동기화(/api/sync) 등 실시간 요청엔 개입하지 않음 */
-const APP_CACHE="roadbible-v147";
+const APP_CACHE="roadbible-v148";
 const CDN_CACHE="roadbible-cdn";   // 배포마다 지우지 않는다 (폰트·SDK 보존)
 const ASSETS=["/app","bible-data.js","icon.png","icon-32.png","icon-180.png","icon-192.png","manifest.json","privacy.html"];
 const CDN_HOSTS=["cdn.jsdelivr.net"];
