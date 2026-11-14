@@ -3011,7 +3011,7 @@ window.addEventListener("online",()=>{updateNet();toast("인터넷 연결됨 —
   const box=document.getElementById("listen"),au=document.getElementById("lsAudio"),btn=document.getElementById("lsPlay"),sp=document.getElementById("lsSpeed"),tm=document.getElementById("lsTime"),bar=document.getElementById("lsBar");
   const SPEEDS=[0.8,1,1.25,1.5,2];let si=1,label="이 장 듣기",now="",bad=false;
   /* 음성이 있는 장 → 파일 이름 (assets/audio/<이름>.webm) */
-  const LISTEN={"창세기/1":"genesis-1"},HAS={};
+  const LISTEN={"창세기/1":"genesis-1"},HAS={},AV="2";   // AV: 음성을 다시 만들면 올린다(브라우저가 하루 동안 옛 파일을 들고 있어서 — 2026-11-14 '창세기 한장' 으로 들린 일)
   for(let i=1;i<=31;i++)LISTEN["잠언/"+i]="proverbs-"+i;
   try{const v=+localStorage.getItem("lsSpeed");if(SPEEDS.includes(v))si=SPEEDS.indexOf(v)}catch(e){}
   const ICON={play:'<path d="M8 5v14l11-7z"/>',pause:'<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>'};
@@ -3036,12 +3036,12 @@ window.addEventListener("online",()=>{updateNet();toast("인터넷 연결됨 —
     const key=typeof cur!=="undefined"?cur.book+"/"+(+cur.chap):"";
     let here=!!LISTEN[key]&&!(typeof qtMode!=="undefined"&&qtMode);
     if(here&&HAS[key]===undefined){   // 아직 만들어지지 않은 장은 재생기를 숨긴다(파일이 있는지 한 번만 확인)
-      HAS[key]=null;fetch("assets/audio/"+LISTEN[key]+".webm",{method:"HEAD"}).then(r=>{HAS[key]=r.ok;updateListen()}).catch(()=>{HAS[key]=false});
+      HAS[key]=null;fetch("assets/audio/"+LISTEN[key]+".webm?v="+AV,{method:"HEAD"}).then(r=>{HAS[key]=r.ok;updateListen()}).catch(()=>{HAS[key]=false});
     }
     if(HAS[key]!==true)here=false;
     box.classList.toggle("on",here);
     if(here&&now!==key){   // 다른 장으로 오면 그 장 음성으로 바꾼다
-      now=key;bad=false;au.pause();au.src="assets/audio/"+LISTEN[key]+".webm";
+      now=key;bad=false;au.pause();au.src="assets/audio/"+LISTEN[key]+".webm?v="+AV;
       label=cur.book+" "+cur.chap+(cur.book==="시편"?"편":"장")+" 듣기";box.setAttribute("aria-label",label);paint();
     }
     if(!here&&!au.paused)au.pause();
