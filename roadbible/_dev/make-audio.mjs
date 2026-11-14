@@ -13,7 +13,7 @@ const SEC = JSON.parse(fs.readFileSync(path.join(ROOT, '_pc', 'clone', 'secrets.
 const API = SEC.worker_url.replace(/\/$/, '');
 const H = { 'X-Agent-Token': SEC.agent_token, 'Content-Type': 'application/json' };
 const OUT = path.join(ROOT, 'roadbible', 'assets', 'audio');
-const SLUG = { 창세기: 'genesis', 잠언: 'proverbs', 시편: 'psalms' };
+const SLUG = { 창세기: 'genesis', 잠언: 'proverbs', 시편: 'psalms', 전도서: 'ecclesiastes', 아가: 'song', 로마서: 'romans' };
 const log = (...a) => console.log(new Date().toLocaleTimeString('ko-KR'), ...a);
 
 const src = fs.readFileSync(path.join(ROOT, 'roadbible', 'bible-data.js'), 'utf8');
@@ -53,7 +53,7 @@ for (const t of targets) {
   jobs.push({ ...t, name, id: job.id, head });
   log('넣음', name, job.id, head, `${text.length}자`);
 }
-fs.writeFileSync(path.join(OUT, '..', '..', '_dev', 'audio-jobs.json'), JSON.stringify(jobs, null, 2));
+fs.writeFileSync(path.join(OUT, '..', '..', '_dev', `audio-jobs-${Date.now()}.json`), JSON.stringify(jobs, null, 2));
 // 제목을 [길성경] … 으로 — clone 의 자동 삭제(purgeOld)에서 빠진다
 if (jobs.length) {
   const sql = jobs.map((j) => `UPDATE jobs SET title='[길성경] ${j.book} ${j.chap}${j.book === '시편' ? '편' : '장'}' WHERE id='${j.id}';`).join(' ');

@@ -383,6 +383,12 @@ body.has-listen main{padding-bottom:calc(44px + env(safe-area-inset-bottom) + va
   box-shadow:0 -7px 16px rgba(30,25,15,.10);            /* 목록 위로 살짝 떠 보이게 */
 }
 .book-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+/* 음성(듣기)이 있는 책 · 장 표시 — 이름 옆 작은 헤드폰 (사용자 지시 2026-11-14) */
+.au-mark{display:inline-flex;flex:none;margin-left:3px;opacity:.75}
+.au-mark svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.chap-grid .au-mark{position:absolute;top:2px;right:3px;margin:0}
+.chap-grid .au-mark svg{width:10px;height:10px}
+.chap-grid button{position:relative}
 .book-grid button{
   padding:13px 6px;border:1px solid var(--gilt-soft);border-radius:10px;
   font-family:var(--display);font-size:14px;font-weight:700;text-align:center;
@@ -2575,7 +2581,7 @@ function renderBookList(){
   wrap.innerHTML=`${legendHtml()}<div class="book-grid">`+BOOKS[testament].map(([n])=>{
     const lvl=bookReadLevel(n);   // 모든 장 읽으면 책 이름도 색칠
     const st=lvl?`style="background:${READ_COLORS[lvl]};border-color:${READ_COLORS[lvl]};color:#3a2f22"`:"";
-    return `<button data-book="${esc(n)}" ${st}>${esc(n)}</button>`;
+    return `<button data-book="${esc(n)}" ${st}>${esc(n)}${window.hasAudio&&hasAudio(n)?AUDIO_MARK:""}</button>`;
   }).join("")+`</div>`;
   wrap.querySelectorAll("[data-book]").forEach(b=>b.onclick=()=>{pickedBook=b.dataset.book;renderSheet();pushSheetState(2)});
 }
@@ -2609,7 +2615,7 @@ function renderSheet(){
         }else{
           cls=now?"now":has?"has":"";
         }
-        return `<button data-chap="${c}" class="${cls}" ${st}>${c}</button>`;
+        return `<button data-chap="${c}" class="${cls}" ${st}>${c}${window.hasAudio&&hasAudio(pickedBook,c)?AUDIO_MARK:""}</button>`;
       }).join("")+`</div>`;
     $("backBtn").onclick=()=>{if(sheetDepth>1)history.back();else{pickedBook=null;renderSheet()}};
     body.querySelectorAll("[data-chap]").forEach(b=>b.onclick=()=>{
@@ -3006,6 +3012,7 @@ window.addEventListener("online",()=>{updateNet();toast("인터넷 연결됨 —
 })();
 </script>
 <script>
+window.AUDIO_MARK='<span class="au-mark" aria-label="음성 있음" title="듣기 있음"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="5" height="7" rx="2"/><rect x="16" y="14" width="5" height="7" rx="2"/></svg></span>';
 /* 장 듣기: 음성이 있는 장(LISTEN)에서만 재생기를 보여 준다. 음성은 Opus 20k(webm) 하나. 속도는 눌러서 0.8 → 1.0 → 1.25 → 1.5 → 2.0 (음 높이는 그대로) */
 (function(){
   const box=document.getElementById("listen"),au=document.getElementById("lsAudio"),btn=document.getElementById("lsPlay"),sp=document.getElementById("lsSpeed"),tm=document.getElementById("lsTime"),bar=document.getElementById("lsBar");
@@ -3013,6 +3020,10 @@ window.addEventListener("online",()=>{updateNet();toast("인터넷 연결됨 —
   /* 음성이 있는 장 → 파일 이름 (assets/audio/<이름>.webm) */
   const LISTEN={"창세기/1":"genesis-1"},HAS={},AV="2";   // AV: 음성을 다시 만들면 올린다(브라우저가 하루 동안 옛 파일을 들고 있어서 — 2026-11-14 '창세기 한장' 으로 들린 일)
   for(let i=1;i<=31;i++)LISTEN["잠언/"+i]="proverbs-"+i;
+  for(let i=1;i<=12;i++)LISTEN["전도서/"+i]="ecclesiastes-"+i;
+  for(let i=1;i<=8;i++)LISTEN["아가/"+i]="song-"+i;
+  for(let i=1;i<=16;i++)LISTEN["로마서/"+i]="romans-"+i;
+  window.hasAudio=(book,chap)=>chap?!!LISTEN[book+"/"+chap]:Object.keys(LISTEN).some(k=>k.startsWith(book+"/"));
   try{const v=+localStorage.getItem("lsSpeed");if(SPEEDS.includes(v))si=SPEEDS.indexOf(v)}catch(e){}
   const ICON={play:'<path d="M8 5v14l11-7z"/>',pause:'<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>'};
   const fmt=t=>isFinite(t)?Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0"):"0:00";
