@@ -503,6 +503,7 @@ export async function studioHelper(request, env, url, path, method) {
   // 다음 일감 하나를 집어 간다. want=text,images — text: 글부터(queued), images: 그림만(images 상태). 가져가면 running 으로 바꿔 두 번 집지 않게 한다
   if (path === '/api/studio/helper/next' && method === 'POST') {
     const want = (url.searchParams.get('want') || 'text,images').split(',');
+    await expireOldScheduled(db);
     // 유튜브 올리기(2026-11-10): 카드의 "유튜브에 올리기" 가 options.yt = {status:'queued', title, visibility} 를 남기면 PC 도우미가 엣지로 올린다
     if (want.includes('youtube')) {
       // 새 발표자료 "유튜브 채널에 올리기"(yt_auto): 영상(clone)이 끝났는지 보고 끝났으면 유튜브 대기열에 올린다
@@ -719,6 +720,17 @@ async function createJob(env, gh, d) {
   }
   return id;
 }
+// 예약한 날이 지난 예약 작업은 하지 않는다(PC 가 꺼져 있다 켜져도 밀린 것을 몰아서 하지 않게 — 사용자 지시 2026-11-14)
+async function expireOldScheduled(db) {
+  const t = now(), dayStart = Date.parse(kstDate(t) + 'T00:00:00+09:00');
+  const old = "json_extract(options, '$.scheduled') IS NOT NULL AND created_at < ?";
+  await db.batch([
+    db.prepare(`UPDATE studio_jobs SET status = 'stopped', error = '예약한 날이 지나 하지 않음', finished_at = ?, updated_at = ? WHERE ${old} AND status IN ('queued', 'running', 'pick', 'thumb', 'images')`).bind(t, t, dayStart),
+    db.prepare(`UPDATE studio_jobs SET options = json_set(options, '$.yt.status', 'failed', '$.yt.error', '예약한 날이 지나 올리지 않음') WHERE ${old} AND json_extract(options, '$.yt.status') IN ('queued', 'running', 'review')`).bind(dayStart),
+    db.prepare(`UPDATE studio_jobs SET options = json_set(options, '$.yt.tg.status', 'failed') WHERE ${old} AND json_extract(options, '$.yt.tg.status') IN ('queued', 'running')`).bind(dayStart),
+    db.prepare(`UPDATE studio_jobs SET options = json_set(options, '$.yt_auto', 0) WHERE ${old} AND json_extract(options, '$.yt_auto') = 1 AND json_extract(options, '$.yt') IS NULL`).bind(dayStart),
+  ]);
+}
 async function getSchedules(db) {
   const row = await db.prepare("SELECT value FROM studio_settings WHERE key = 'schedules'").first();
   if (row) { try { return JSON.parse(row.value); } catch { /* 아래 기본값 */ } }
@@ -770,6 +782,7 @@ async function recoverStudio(env) {
 export async function studioScheduled(env, gh) {
   const db = env.DB;
   try { await purgeOld(env); } catch (e) { console.error('보관 정리 실패', e.message); }
+  try { await expireOldScheduled(db); } catch (e) { console.error('지난 예약 정리 실패', e.message); }
   try { await recoverStudio(env); } catch (e) { console.error('되살리기 실패', e.message); }
   const list = await getSchedules(db);
   const today = kstDate(now()), hm = kstHM(now());
