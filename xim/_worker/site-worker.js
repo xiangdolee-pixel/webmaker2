@@ -47,13 +47,22 @@ function forward(binding, request, env, pathname) {
 const looksHtml = (p) => p.endsWith('/') || /\.html?$/i.test(p) || !/\.[a-z0-9]{1,5}$/i.test(p);
 
 // 정적 파일 캐시: 그림 · 글꼴은 하루, css · js 는 5분 바로 쓰고 그 뒤엔 쓰면서 뒤에서 새것 확인 (페이지 옮길 때마다 다시 받지 않게)
-function cacheStatic(res, pathname) {
+// 사이트 안 링크의 .html 을 뗀다: 정적 파일 서버가 /about.html → /about 으로 한 번 더 돌려보내(307) 페이지마다 왕복 하나가 더 들던 것 (사용자 지시 2026-11-14 "속도 최대로")
+const cleanHref = (h) => {
+  if (!h || /^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(h) || /^\/(xms|member|board|site-api)\//.test(h)) return h;
+  const m = h.match(/^([^?#]*?)\.html?([?#].*)?$/i);
+  if (!m) return h;
+  let p = m[1];
+  if (/(^|\/)index$/i.test(p)) p = p.replace(/index$/i, '') || './';
+  return p + (m[2] || '');
+};
+function cacheStatic(res, pathname, search = '') {
   if (!res.ok) return res;
   const ct = res.headers.get('Content-Type') || '';
   if (ct.includes('text/html')) return res;
   const out = new Response(res.body, res);
   if (/^(image|font)\//.test(ct) || /\.(woff2?|ttf|otf)$/i.test(pathname)) out.headers.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
-  else if (/css|javascript/.test(ct)) out.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=86400');
+  else if (/css|javascript/.test(ct)) out.headers.set('Cache-Control', /[?&]v=/.test(search) ? 'public, max-age=31536000, immutable' : 'public, max-age=300, stale-while-revalidate=86400');   // 주소에 배포 번호(?v=)가 있으면 1년 — 5분마다 다시 묻지 않게
   return out;
 }
 
@@ -167,12 +176,12 @@ async function handle(request, env) {
     // /favicon.ico 가 사이트에 없으면 xms 파비콘(192px PNG)으로 — 구글 · 일부 브라우저는 이 주소부터 찾는다
     if (pathname === '/favicon.ico' && request.method === 'GET') {
       const r = await env.ASSETS.fetch(request);
-      if (r.status !== 404 || !env.XMS) return cacheStatic(r, pathname);
+      if (r.status !== 404 || !env.XMS) return cacheStatic(r, pathname, url.search);
       const x = await forward(env.XMS, request, env, '/xms/file/favicon-192.png');
       if (x.ok) return new Response(x.body, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' } });
       return r;
     }
-    if (!isAdmin && request.method === 'GET' && !looksHtml(pathname) && !XMS_PATHS.test(pathname)) return cacheStatic(await env.ASSETS.fetch(request), pathname);
+    if (!isAdmin && request.method === 'GET' && !looksHtml(pathname) && !XMS_PATHS.test(pathname)) return cacheStatic(await env.ASSETS.fetch(request), pathname, url.search);
     if (!isAdmin && (await siteStatus(env, request)) === 'suspended') return forward(env.XIM, request, env, '/__suspended');
     // 문의 받기 (모든 xim 사이트 공통, 2026-11-12): 사이트 문의 폼 → xim '제작문의' 메뉴. 봇 확인(Turnstile) 키도 xim 에서
     //   GET /site-api/inquiry-key → { sitekey },  POST /site-api/inquiry { name, contact, org, kind, message, turnstile } → { ok } | { error }
@@ -201,7 +210,7 @@ async function handle(request, env) {
       }
       return withXms(res, request, env, data);
     }
-    return cacheStatic(await env.ASSETS.fetch(request), pathname);
+    return cacheStatic(await env.ASSETS.fetch(request), pathname, url.search);
   }
 }
 
@@ -280,7 +289,7 @@ function menuLinks(items, pathname) {
     const href = first(m);
     if (!href) return '';
     const here = !m.external && new URL(href, 'https://x').pathname === pathname && !href.includes('#');
-    return `<a href="${escHtml(href)}"${m.external ? ' target="_blank" rel="noopener"' : ''}${here ? ' aria-current="page"' : ''} data-xms-item>${escHtml(m.title)}</a>`;
+    return `<a href="${escHtml(cleanHref(href))}"${m.external ? ' target="_blank" rel="noopener"' : ''}${here ? ' aria-current="page"' : ''} data-xms-item>${escHtml(m.title)}</a>`;
   }).join('');
 }
 
@@ -324,6 +333,7 @@ async function withXms(res, request, env, data) {
   //   ① 그림은 앞의 4장만 바로, 나머지는 화면에 다가올 때 받는다(loading 이 따로 적힌 그림은 그대로)
   //   ② [data-xms-files="<게시판>"] 목록(자료실 등)은 페이지와 함께 넣어 보낸다 — 페이지가 뜬 뒤 미국 서부를 한 번 더 오가지 않게
   let imgN = 0;
+  rw = rw.on('a[href]', { element(el) { const h = el.getAttribute('href'), c = cleanHref(h); if (c !== h) el.setAttribute('href', c); } });
   rw = rw.on('img', { element(el) { imgN++; if (imgN > 4 && !el.getAttribute('loading')) el.setAttribute('loading', 'lazy'); if (!el.getAttribute('decoding')) el.setAttribute('decoding', 'async'); } });
   rw = rw.on('[data-xms-files]', {
     async element(el) {
