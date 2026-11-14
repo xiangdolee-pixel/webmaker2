@@ -548,11 +548,12 @@ export async function studioHelper(request, env, url, path, method) {
         await setJob(db, job.id, { options: JSON.stringify(jo) });
         return json({ job: { ...job, options: jo, phase: 'youtube-publish' }, youtube: { video_id: jo.yt.video_id || '', url: jo.yt.url || '', title: jo.yt.title || job.title, channel_name: job.channel === '순섬' ? '순수한크립토' : '사적인자산왕' } });
       }
-      const yrow = await db.prepare("SELECT id FROM studio_jobs WHERE json_extract(options, '$.yt.status') = 'queued' ORDER BY json_extract(options, '$.yt.at') ASC LIMIT 1").first();
+      const yrow = await db.prepare("SELECT id FROM studio_jobs WHERE json_extract(options, '$.yt.status') = 'queued' AND json_extract(options, '$.yt.halt') IS NULL ORDER BY json_extract(options, '$.yt.at') ASC LIMIT 1").first();
       if (yrow) {
         const job = await getJob(db, yrow.id);
         const jo = JSON.parse(job.options || '{}');
-        jo.yt = { ...jo.yt, status: 'running', started_at: now(), error: '', phase: 'download', download_at: now(), upload_at: null };
+        if ((jo.yt.attempts || 0) >= 1) { jo.yt = { ...jo.yt, status: 'failed', halt: 1, error: '이미 한 번 올리기를 시도했습니다 — 중복을 막으려고 자동으로 다시 올리지 않습니다. 유튜브 스튜디오를 확인한 뒤 카드에서 다시 올려 주세요', finished_at: now() }; await setJob(db, job.id, { options: JSON.stringify(jo) }); return json({ job: null }); }
+        jo.yt = { ...jo.yt, status: 'running', attempts: (jo.yt.attempts || 0) + 1, started_at: now(), error: '', phase: 'download', download_at: now(), upload_at: null };
         await setJob(db, job.id, { options: JSON.stringify(jo) });
         const summary = docJson(await latestDoc(db, job.id, 'summary')) || {};
         const thumb = (await jobAssets(db, job.id)).filter((a) => a.kind === 'thumb').pop();
@@ -640,7 +641,9 @@ export async function studioHelper(request, env, url, path, method) {
       } else if (y.status === 'review' && (st === 'failed' || st === 'login')) {
         const n = (y.fails || 0) + 1;   // 공개 전환 실패는 3번까지 다시, 그 뒤 포기(비공개로 남음)
         jo.yt = n >= 3 ? { ...y, status: 'done', error: `공개 전환 실패: ${String(d.error || '').slice(0, 200)} — 유튜브에서 직접 공개로 바꿔 주세요`, finished_at: now() } : { ...y, status: 'review', fails: n, next_check: now() + 5 * 60000, error: String(d.error || '').slice(0, 300) };
-      } else if (st === 'failed' && (y.retries || (y.retried ? 1 : 0)) < 3) {
+      } else if (y.halt) {   // 운영자가 멈춘 올리기는 늦게 온 보고로 되살리지 않는다 (2026-11-14 중복 업로드 사고)
+        jo.yt = { ...y, status: 'failed', finished_at: now() };
+      } else if (false) {   // 업로드 자동 재시도 금지(2026-11-14): 다시 올리면 유튜브에 같은 영상이 또 생긴다(중복 19개 사고). 실패하면 카드에서 사람이 다시 올린다
         const n = (y.retries || (y.retried ? 1 : 0)) + 1;   // 업로드 중 일시 오류(파일 선택 시간 초과 · 연결 끊김 등)는 3번까지 자동으로 다시 (2026-11-11: 1번 → 3번)
         jo.yt = { ...y, status: 'queued', retried: true, retries: n, at: now(), error: `${n}차 실패(다시 시도): ${String(d.error || '').slice(0, 200)}` };
       } else {
@@ -774,7 +777,7 @@ async function recoverStudio(env) {
   // 3) 유튜브 올리기가 40분 넘게 '올리는 중'(도우미가 멈춤) → 다시 대기열, 3번까지
   for (const r of (await db.prepare("SELECT id, options FROM studio_jobs WHERE json_extract(options, '$.yt.status') = 'running' AND json_extract(options, '$.yt.started_at') < ?").bind(t - 40 * 60000).all()).results) {
     const jo = JSON.parse(r.options || '{}'); const n = (jo.yt.stale || 0) + 1;
-    jo.yt = n > 3 ? { ...jo.yt, status: 'failed', error: '유튜브 올리기가 계속 멈춰 포기했습니다 — 카드에서 다시 올려 주세요', finished_at: t } : { ...jo.yt, status: 'queued', at: t, stale: n, error: `올리기가 멈춰 다시 시도 (${n}/3)` };
+    jo.yt = { ...jo.yt, status: 'failed', halt: 1, error: '유튜브 올리기가 40분 넘게 멈춰 중지했습니다 — 유튜브 스튜디오에서 올라갔는지 먼저 보고, 없으면 카드에서 다시 올려 주세요', finished_at: t };   // 자동으로 다시 올리지 않는다(중복 업로드 방지, 2026-11-14)
     await setJob(db, r.id, { options: JSON.stringify(jo) });
   }
 }
