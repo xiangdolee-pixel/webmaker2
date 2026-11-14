@@ -520,16 +520,19 @@
     var track = st.closest('.state-track');
     var fill = function () {
       var vh = window.innerHeight, p;
-      if (track && getComputedStyle(track).height !== 'auto') {
+      if (track && getComputedStyle(track.firstElementChild).position === 'sticky') {   // 붙여 둘 때만(낮은 화면 · 움직임 줄이기면 그냥 지나가며 채움)
         var t = track.getBoundingClientRect();
-        p = Math.min(1, Math.max(0, (vh * .35 - t.top) / (t.height - vh * .35 - vh * .25)));
+        // 구간이 화면 절반쯤 올라왔을 때 시작 → 붙어 있는 거리의 70% 에서 다 채움(나머지 30% 는 다 읽을 틈)
+        p = Math.min(1, Math.max(0, (vh * .5 - t.top) / (vh * .5 + (t.height - vh) * .7)));
       } else {
         var r = st.getBoundingClientRect();
         p = Math.min(1, Math.max(0, (vh * .85 - r.top) / (r.height + vh * .35)));
       }
       var n = Math.round(p * ws.length);
       ws.forEach(function (w, i) { w.classList.toggle('on', i < n); });
+      if (cue) { cue.style.setProperty('--p', p.toFixed(3)); cue.parentNode.classList.toggle('done', p >= 1); }
     };
+    var cue = $('.state-cue');
     if (reduce) ws.forEach(function (w) { w.classList.add('on'); }); else { window.addEventListener('scroll', fill, { passive: true }); fill(); }
   }
 

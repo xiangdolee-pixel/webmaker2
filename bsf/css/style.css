@@ -241,10 +241,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .stats li > small { display: block; margin-top: 8px; color: var(--mute); font-size: 14px; line-height: 1.5; word-break: keep-all; }
 /* 선언문 붙여 두기: 이 칸 높이만큼 스크롤하는 동안 글자가 채워진다 */
-.state-track { position: relative; height: 230vh; }
-.state-pin { position: sticky; top: 0; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: calc(var(--hd) + 20px) 0 40px; }
-@media (prefers-reduced-motion: reduce) { .state-track { height: auto; } .state-pin { position: static; min-height: 0; padding: 0; } }
-.statement { margin: 0; font-size: clamp(26px, 3.6vw, 50px); font-weight: 700; line-height: 1.5; letter-spacing: -.035em; max-width: 1180px; }
+/* 붙어 있는 거리는 짧게(화면 0.7개) — 길면 처음 보는 사람은 "안 내려간다 · 여기가 끝" 으로 안다 (사용자 지시 2026-11-14) */
+.state-track { position: relative; height: 170vh; }
+.state-pin { position: sticky; top: 0; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: calc(var(--hd) + 20px) 0 96px; }
+/* 붙어 있는 동안 아래쪽에 "아래로 계속" + 채워지는 막대 — 내용이 더 있다는 걸 알려 준다. 다 채워지면 주황으로 톡톡 */
+.state-cue { position: absolute; left: 50%; bottom: 26px; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--steel); font-size: 14px; font-weight: 700; letter-spacing: .02em; transform: translateX(-50%); white-space: nowrap; transition: color .4s var(--ease); }
+.state-cue i { position: relative; width: 120px; height: 3px; border-radius: 3px; background: rgba(21, 60, 84, .12); overflow: hidden; }
+.state-cue i::after { content: ""; position: absolute; inset: 0; background: currentColor; transform-origin: left; transform: scaleX(var(--p, 0)); }
+.state-cue span::after { content: ""; display: inline-block; width: 8px; height: 8px; margin: 0 0 3px 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); animation: cue-down 1.4s var(--ease) infinite; }
+.state-pin.done .state-cue { color: var(--accent); }
+@keyframes cue-down { 50% { transform: translateY(4px) rotate(45deg); } }
+@media (prefers-reduced-motion: reduce), (max-height: 480px) { .state-track { height: auto; } .state-pin { position: static; min-height: 0; padding: 0; } .state-cue { display: none; } }   /* 폰 가로처럼 아주 낮은 화면은 붙이지 않고 그냥 지나가며 채운다 */
+.statement { margin: 0; font-size: clamp(24px, min(3.6vw, 6.2vh), 50px); font-weight: 700; line-height: 1.5; letter-spacing: -.035em; max-width: 1180px; }
 .statement .w { color: rgba(16, 27, 36, .15); transition: color .6s var(--ease); }
 .statement .w.on { color: var(--ink); }
 .statement .w.hl.on { color: var(--steel); }
