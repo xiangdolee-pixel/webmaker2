@@ -73,7 +73,10 @@ a { color: inherit; text-decoration: none; }
 .wrap { padding-bottom: 104px; }
 
 /* 제작문의 — 오른쪽 아래에 떠서 따라다니는 버튼. 가운데서 바깥으로 신호(고리)가 퍼진다 */
-.ask-fab { position: fixed; z-index: 40; right: calc(clamp(12px, 1.6vw, 24px) + env(safe-area-inset-right, 0px)); bottom: calc(clamp(12px, 1.6vw, 24px) + env(safe-area-inset-bottom, 0px)); display: inline-flex; align-items: center; gap: 7px; height: 54px; padding: 0 21px 0 17px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-fg); font: inherit; font-size: 17px; font-weight: 800; letter-spacing: -.01em; cursor: pointer; box-shadow: 0 8px 22px -8px rgba(37, 99, 235, .55), 0 2px 6px rgba(16, 24, 40, .12); transition: transform .25s var(--ease), box-shadow .25s var(--ease); isolation: isolate; }
+/* 맨 위로 버튼(xim 공통 .xms-top, 52px · 폰 46px)과 같은 오른쪽 아래 자리. 스크롤해서 그 버튼이 뜨면(.up) 한 칸 위로 비켜 준다 */
+.ask-fab { --top-s: 52px; position: fixed; z-index: 40; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); display: inline-flex; align-items: center; gap: 7px; height: 54px; padding: 0 21px 0 17px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-fg); font: inherit; font-size: 17px; font-weight: 800; letter-spacing: -.01em; cursor: pointer; box-shadow: 0 8px 22px -8px rgba(37, 99, 235, .55), 0 2px 6px rgba(16, 24, 40, .12); transition: transform .25s var(--ease), translate .45s var(--ease), box-shadow .25s var(--ease); isolation: isolate; }
+.ask-fab.up { translate: 0 calc(var(--top-s) * -1 - 12px); }
+@media (max-width: 640px) { .ask-fab { --top-s: 46px; } }   /* 맨 위로 버튼이 640px 아래에서 46px 로 작아짐 */
 .ask-fab svg { position: relative; z-index: 1; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .ask-fab b { position: relative; z-index: 1; }
 .ask-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 28px -8px rgba(37, 99, 235, .6), 0 2px 6px rgba(16, 24, 40, .12); }
@@ -155,7 +158,7 @@ input:focus-visible + .ask-box { outline: 2px solid var(--brand); outline-offset
   .cat { height: 36px; padding: 0 13px; font-size: 14.5px; }
   .tab-ind { height: 36px; }
   .wrap { padding: 36px 20px 92px; }
-  .grid { grid-template-columns: 1fr; gap: 12px; }
+  .grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .name { font-size: 17px; }
   .desc { font-size: 15px; }
 }

@@ -100,3 +100,13 @@
   window.addEventListener('resize', slide);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(slide);
 })();
+
+// 제작문의 버튼 — 맨 위로 버튼(스크롤 400px 넘으면 뜸)이 나타나면 한 칸 위로 비켜 준다
+(function () {
+  var fab = document.querySelector('.ask-fab');
+  if (!fab) return;
+  var t = 0;
+  function f() { fab.classList.toggle('up', !!document.querySelector('.xms-top') && (window.scrollY || document.documentElement.scrollTop) > 400); }
+  window.addEventListener('scroll', function () { if (!t) t = requestAnimationFrame(function () { t = 0; f(); }); }, { passive: true });
+  f();
+})();
