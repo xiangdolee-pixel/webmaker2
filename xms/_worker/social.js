@@ -1,7 +1,8 @@
 // 네이버로 시작하기 (모든 xim 사이트 공통, 사용자 지시 2026-11-15)
 //   네이버 앱은 운영자 것 하나("서비스 로그인"). 네이버는 등록한 돌아오는 주소로만 돌려보내므로 그 주소는 xim 한 곳:
 //     https://xim.plators.com/naver/callback   (네이버 지도와 같은 방식 — 사이트가 몇 개든 네이버에 따로 등록하지 않는다)
-//   ① 사이트 /member/naver?next=…        → social_states 에 상태 + 브라우저 쿠키(xms_naver) → 네이버 동의 화면
+//   ① 사이트 /member/naver?next=…        → social_states 에 상태 + 브라우저 쿠키(xms_naver) → xim /naver/go → 네이버 동의 화면
+//      (네이버는 시작한 페이지도 서비스 URL 인지 본다 — 사이트에서 바로 보내면 '등록되지 않은 사이트'로 막힌다)
 //   ② 네이버 → xim /naver/callback        → 토큰 · 프로필을 받아 같은 행(xms DB)에 넣고 원래 사이트 /member/naver/done 으로
 //   ③ 사이트 /member/naver/done           → 쿠키 = 상태 확인 → 연결된 회원이면 로그인, 처음이면 가입 화면(네이버 값 미리 채움)
 //   회원 ↔ 네이버 번호 = member_social (site 조건). 네이버 번호는 앱마다 달라서 앱을 바꾸면 기존 연결이 모두 끊긴다 — 앱을 바꾸지 말 것.
@@ -9,7 +10,7 @@
 //   사이트별 끄기: xms 관리 › 부가 기능 (site_options k = 'naver_login', 기본 켬)
 import { now, esc, str, cookie, setCookie, randomHex, createSession } from './lib.js';
 
-export const NAVER_CALLBACK = 'https://xim.plators.com/naver/callback';
+const NAVER_GO = 'https://xim.plators.com/naver/go';
 const STATE_COOKIE = 'xms_naver';
 const START_TTL = 10 * 60000;   // 네이버 다녀오기 10분
 const SIGNUP_TTL = 30 * 60000;  // 처음 온 사람은 30분 안에 가입
@@ -54,8 +55,8 @@ export async function naverStart(ctx, { msgPage }) {
     env.DB.prepare('INSERT INTO social_states (state, site, origin, next, mode, member_id, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .bind(state, site, url.origin, link ? '/member/mypage' : safeNext(url.searchParams.get('next')), link ? 'link' : 'login', link ? me.member.id : null, now() + START_TTL),
   ]);
-  const q = new URLSearchParams({ response_type: 'code', client_id: await clientId(env), redirect_uri: NAVER_CALLBACK, state });
-  return go(`https://nid.naver.com/oauth2.0/authorize?${q}`, [setCookie(STATE_COOKIE, state, START_TTL / 1000)]);
+  // 네이버는 로그인을 '시작한 페이지'도 등록한 서비스 URL(xim.plators.com)인지 본다 → xim 의 /naver/go 페이지가 네이버로 넘긴다
+  return go(`${NAVER_GO}?state=${state}`, [setCookie(STATE_COOKIE, state, START_TTL / 1000)]);
 }
 
 // 이 브라우저가 시작한 상태 행 (쿠키와 주소의 state 가 같아야 — 남이 만든 주소로 로그인시키는 것을 막는다)

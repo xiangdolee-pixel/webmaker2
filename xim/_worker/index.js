@@ -1183,6 +1183,9 @@ export default {
     }
     // 네이버로 시작하기(사용자 지시 2026-11-15): 네이버 앱("서비스 로그인") 하나의 돌아오는 주소. 받은 프로필은 xms DB 의 그 사이트 상태 행에만 넣고
     //   원래 사이트로 돌려보낸다 — 회원 정보는 xim 에 남기지 않는다. 자세한 흐름은 xms/_worker/social.js
+    if (url.pathname === '/naver/go') {
+      try { return await naverGo(env, url); } catch (e) { return fail(e); }
+    }
     if (url.pathname === '/naver/callback') {
       try { return await naverCallback(env, url); } catch (e) { return fail(e); }
     }
@@ -1221,6 +1224,21 @@ async function staticFile(request, env, url) {
   } else r = new Response(res.body, res);
   r.headers.set('Cache-Control', url.searchParams.has('v') ? 'public, max-age=31536000, immutable' : 'public, max-age=60');
   return r;
+}
+
+// 사이트에서 온 사람을 네이버 동의 화면으로 (네이버가 시작한 페이지 = 서비스 URL 인지 보므로 xim 페이지에서 넘긴다)
+async function naverGo(env, url) {
+  const state = String(url.searchParams.get('state') || '');
+  const row = /^[0-9a-f]{48}$/.test(state) ? await env.XMS_DB.prepare('SELECT expires_at, profile FROM social_states WHERE state = ?').bind(state).first() : null;
+  let cfg = {}; try { cfg = JSON.parse((await getSetting(env.DB, 'naver_login')) || '{}'); } catch { cfg = {}; }
+  if (!row || row.expires_at < Date.now() || row.profile || !cfg.client_id) {
+    return new Response('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>네이버 로그인</title><p style="font:16px/1.6 sans-serif;padding:32px 20px;text-align:center">시간이 지났습니다. 사이트로 돌아가 네이버 로그인을 다시 눌러 주세요.</p>', { status: 400, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  }
+  const to = `https://nid.naver.com/oauth2.0/authorize?${new URLSearchParams({ response_type: 'code', client_id: cfg.client_id, redirect_uri: 'https://xim.plators.com/naver/callback', state })}`;
+  const href = to.replace(/&/g, '&amp;');
+  return new Response(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="origin"><meta name="robots" content="noindex"><title>네이버 로그인</title>
+<style>body{margin:0;display:grid;place-items:center;min-height:100vh;font:16px/1.6 Pretendard,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:#555;background:#fff}a{color:#03c75a;font-weight:700}</style></head>
+<body><p>네이버로 이동하는 중… <a href="${href}">바로 가기</a></p><script>location.replace(${JSON.stringify(to).replace(/</g, '\u003c')});</script></body></html>`, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'origin' } });
 }
 
 async function naverCallback(env, url) {
