@@ -1181,6 +1181,11 @@ export default {
     if (url.pathname === '/map') {
       try { return await sharedMap(env, url); } catch (e) { return fail(e); }
     }
+    // 네이버로 시작하기(사용자 지시 2026-11-15): 네이버 앱("서비스 로그인") 하나의 돌아오는 주소. 받은 프로필은 xms DB 의 그 사이트 상태 행에만 넣고
+    //   원래 사이트로 돌려보낸다 — 회원 정보는 xim 에 남기지 않는다. 자세한 흐름은 xms/_worker/social.js
+    if (url.pathname === '/naver/callback') {
+      try { return await naverCallback(env, url); } catch (e) { return fail(e); }
+    }
     // 스튜디오 공개 주소(그림 · 방송용 슬라이드쇼) — 주소를 아는 사람만, 로그인 없음
     if (url.pathname.startsWith('/studio/')) {
       try { const r = await studioPublic(request, env, url); if (r) return r; } catch (e) { return fail(e); }
@@ -1216,6 +1221,30 @@ async function staticFile(request, env, url) {
   } else r = new Response(res.body, res);
   r.headers.set('Cache-Control', url.searchParams.has('v') ? 'public, max-age=31536000, immutable' : 'public, max-age=60');
   return r;
+}
+
+async function naverCallback(env, url) {
+  const msg = (t, status = 400) => new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>네이버 로그인</title><p style="font:16px/1.6 sans-serif;padding:32px 20px;text-align:center">${t}</p>`, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  const state = String(url.searchParams.get('state') || '');
+  if (!/^[0-9a-f]{48}$/.test(state)) return msg('잘못된 주소입니다.');
+  const row = await env.XMS_DB.prepare('SELECT origin, profile, expires_at FROM social_states WHERE state = ?').bind(state).first();
+  if (!row || row.expires_at < Date.now() || row.profile) return msg('시간이 지났습니다. 사이트로 돌아가 네이버 로그인을 다시 눌러 주세요.');
+  if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(row.origin)) return msg('사이트 주소를 알 수 없습니다.');
+  const back = (q) => new Response(null, { status: 302, headers: { Location: `${row.origin}/member/naver/done?state=${state}${q}`, 'cache-control': 'no-store' } });
+  const code = url.searchParams.get('code');
+  if (url.searchParams.get('error') || !code) return back('&cancel=1');
+  let cfg = {}; try { cfg = JSON.parse((await getSetting(env.DB, 'naver_login')) || '{}'); } catch { cfg = {}; }
+  if (!cfg.client_id || !env.NAVER_LOGIN_SECRET) return msg('네이버 로그인 설정이 아직 끝나지 않았습니다.', 503);
+  const q = new URLSearchParams({ grant_type: 'authorization_code', client_id: cfg.client_id, client_secret: env.NAVER_LOGIN_SECRET, code, state });
+  const tok = await fetch(`https://nid.naver.com/oauth2.0/token?${q}`).then((r) => r.json()).catch(() => null);
+  if (!tok?.access_token) return msg('네이버에서 확인을 받지 못했습니다. 다시 해 주세요.', 502);
+  const me = await fetch('https://openapi.naver.com/v1/nid/me', { headers: { Authorization: `Bearer ${tok.access_token}` } }).then((r) => r.json()).catch(() => null);
+  const p = me?.resultcode === '00' ? me.response : null;
+  if (!p?.id) return msg('네이버 회원 정보를 받지 못했습니다. 다시 해 주세요.', 502);
+  const t = (v, n) => String(v ?? '').trim().slice(0, n);
+  const profile = { id: t(p.id, 100), email: t(p.email, 254).toLowerCase(), name: t(p.name, 50), nickname: t(p.nickname, 50), mobile: t(p.mobile, 20), avatar: t(p.profile_image, 500) };
+  await env.XMS_DB.prepare("UPDATE social_states SET profile = ? WHERE state = ? AND profile = ''").bind(JSON.stringify(profile), state).run();
+  return back('');
 }
 
 async function sharedMap(env, url) {

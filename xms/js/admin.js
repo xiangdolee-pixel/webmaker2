@@ -268,7 +268,7 @@ async function membersPage(qs) {
     <div class="panel">${d.rows.length ? `<table class="tbl cardy"><thead><tr><th>이름</th><th>아이디</th><th>연락처</th>${extraFields.map((f) => `<th>${esc(f.label)}</th>`).join('')}<th>등급</th><th>최근 로그인</th><th>관리</th></tr></thead><tbody>
       ${d.rows.map((m) => `<tr data-id="${m.id}">
         <td><button type="button" class="who-btn" data-detail>${esc(m.name)}</button>${m.nickname ? ` <span class="num">(${esc(m.nickname)})</span>` : ''}${m.status === 'LOCKED' ? ' <span class="tag red">잠김</span>' : ''}</td>
-        <td data-l="아이디">${esc(m.login_id)}</td>
+        <td data-l="아이디">${esc(m.login_id)}${m.naver ? ' <span class="tag green">네이버</span>' : ''}</td>
         <td data-l="연락처">${m.email || m.mobile ? `${esc(m.email)}${m.mobile ? `<small>${esc(fmtPhone(m.mobile))}</small>` : ''}` : '<span class="dash">—</span>'}</td>
         ${extraFields.map((f) => { const v = m.extra[f.key]; const t = Array.isArray(v) ? v.join(', ') : v; return `<td data-l="${esc(f.label)}">${t ? esc(t) : '<span class="dash">—</span>'}</td>`; }).join('')}
         <td data-l="등급"><div class="lv"><select class="input" aria-label="등급">${lvOpts(m.level)}</select><button class="btn sm" type="button" data-level>바꾸기</button></div></td>
@@ -1730,15 +1730,19 @@ async function coursePage(id) {
   });
 }
 
-// ───────── 부가 기능 (맨 위로 버튼 …) ─────────
+// ───────── 부가 기능 (맨 위로 버튼 · 네이버로 시작하기) ─────────
 async function extrasPage() {
-  const v = await api('/options/top');
+  const [v, nv] = await Promise.all([api('/options/top'), api('/options/naver')]);
   main.innerHTML = `${head('사이트', '부가 기능', '홈페이지에 함께 붙는 작은 기능입니다.')}
     <form id="xform"><section class="panel pad"><h2>맨 위로 버튼</h2>
       <div class="top-pv" aria-hidden="true"><span class="top-pv-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg></span></div>
       <label class="check"><input type="checkbox" name="on"${v.on ? ' checked' : ''}> 스크롤을 내리면 오른쪽 아래에 <b>맨 위로</b> 버튼을 띄웁니다</label>
       <label class="field gap"><span>이 주소로 시작하는 페이지에는 띄우지 않기 <small class="meta">한 줄에 하나, / 로 시작 (예: /app)</small></span>
         <textarea class="input" name="except" rows="3" placeholder="/app">${esc((v.except || []).join('\n'))}</textarea></label>
+    </section>
+    <section class="panel pad"><h2>네이버로 시작하기</h2>
+      <label class="check"><input type="checkbox" name="naver"${nv.on ? ' checked' : ''}> 로그인 · 회원가입 화면 아래에 <b>네이버로 시작하기</b> 버튼을 둡니다</label>
+      <p class="meta">방문자가 네이버 계정으로 바로 가입 · 로그인합니다. 이미 가입한 회원은 마이페이지에서 네이버를 연결할 수 있습니다.</p>
     </section>
     <p class="err" role="alert"></p>
     ${saveBar('부가 기능을 고치는 중입니다.', '')}</form>`;
@@ -1748,7 +1752,7 @@ async function extrasPage() {
     e.preventDefault();
     busy(form.querySelector('[type=submit]'), form.querySelector('.err'), async () => {
       const f = formData(form);
-      await api('/options/top', { method: 'PUT', data: { on: !!f.on, except: f.except } });
+      await Promise.all([api('/options/top', { method: 'PUT', data: { on: !!f.on, except: f.except } }), api('/options/naver', { method: 'PUT', data: { on: !!f.naver } })]);
       dirty = false; toast('저장했습니다. 30초 안에 홈페이지에 반영됩니다.'); route();
     });
   });

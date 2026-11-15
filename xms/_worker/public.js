@@ -7,6 +7,7 @@ import {
 import { boardOptions } from './admin-api.js';
 import { postAttachments, syncPostFiles, removePostFiles, setAvatar, avatarOf, directGetUrl, directUrls, uploadIdsIn } from './uploads.js';
 import { sendSignupCode, verifySignupCode, takeTicket, turnstileKeys } from './signup.js';
+import { naverOn, naverButton, naverStart, naverDone, naverSignup, naverLoginId, hasNaver } from './social.js';
 import { applyPage, applicantsPage, applicantPage, publicApply, applyOn, openRound } from './apply.js';
 
 const LOCK_AFTER = 5;
@@ -186,6 +187,7 @@ async function loginPage(ctx) {
       <p class="err" role="alert"></p>
       <button class="btn primary wide mb-go" type="submit">로그인</button>
     </form>
+    ${(await naverOn(ctx.env, ctx.site)) ? naverButton(next, '네이버로 로그인') : ''}
     <div class="mb-foot"><span>아직 회원이 아니신가요?</span><a href="/member/signup">회원가입</a></div>
   </div>
   <p class="mb-note">비밀번호를 잊으셨으면 사이트 관리자에게 새 비밀번호를 받으세요.</p>
@@ -202,6 +204,25 @@ async function signupPage(ctx) {
   const agreeBox = docs.TERMS || docs.PRIVACY ? `<div class="agree">
       <label class="check all"><input type="checkbox" data-agree-all> 모두 동의합니다</label>
       ${agree(docs.TERMS, 'terms', '이용약관')}${agree(docs.PRIVACY, 'privacy', '개인정보 처리방침')}</div>` : '';
+  // 네이버에서 돌아온 사람: 이메일 인증 · 비밀번호 없이 정보 입력만 (네이버 값을 미리 채운다)
+  const nv = ctx.url.searchParams.get('with') === 'naver' ? await naverSignup(ctx) : null;
+  if (nv) {
+    const pre = { name: nv.p.name, nickname: nv.p.nickname, mobile: nv.p.mobile };
+    return page(ctx, '회원가입', `<section class="mb">
+  <div class="mb-card">
+    ${mbHead('user', '회원가입', '네이버 계정으로 가입합니다. 남은 정보만 넣어 주세요.')}
+    <form data-form="signup" data-naver="1" class="mb-form">
+      <div class="mb-verified"><span class="tag green">네이버</span><b>${esc(nv.p.email || nv.p.name || '네이버 계정')}</b></div>
+      ${avatarPick('', '선택 · 나중에 마이페이지에서 바꿀 수 있어요')}
+      <div class="mb-group">${fields.filter((f) => f.mode !== 'EXCLUDED' && f.key !== 'email').map((f) => fieldInput(f, pre[f.key])).join('')}</div>
+      ${agreeBox}
+      <p class="err" role="alert"></p>
+      <button class="btn primary wide mb-go" type="submit">가입하기</button>
+    </form>
+    <div class="mb-foot"><span>다른 방법으로 가입하려면</span><a href="/member/signup">이메일로 가입</a></div>
+  </div>
+</section>`, { noindex: true });
+  }
   const tk = (await turnstileKeys(env, site)).sitekey;
   // 1단계: 이메일 → 6자리 번호 / 2단계: 사진(선택) · 비밀번호 · 이름 · 휴대전화 … (이메일 칸은 1단계에서 받았으니 뺀다)
   return page(ctx, '회원가입', `<section class="mb">
@@ -236,6 +257,7 @@ async function signupPage(ctx) {
       <p class="err" role="alert"></p>
       <button class="btn primary wide mb-go" type="submit">가입하기</button>
     </form>
+    ${(await naverOn(env, site)) ? naverButton('/') : ''}
     <div class="mb-foot"><span>이미 가입하셨나요?</span><a href="/member/login">로그인</a></div>
   </div>
 </section>`, { noindex: true });
@@ -254,7 +276,7 @@ async function welcomePage(ctx) {
     <h1 class="mb-title">가입을 환영합니다</h1>
     <p class="mb-lede"><b>${esc(m.nickname || m.name)}</b>님, ${esc(info.name)} 회원이 되셨어요.</p>
     <dl class="mb-kv"><div><dt>아이디</dt><dd>${esc(m.login_id)}</dd></div><div><dt>이름</dt><dd>${esc(m.name)}</dd></div><div><dt>가입일</dt><dd>${fmtDate(m.created_at)}</dd></div></dl>
-    <p class="mb-note">지금 로그인돼 있어요. 다음부터는 이메일과 비밀번호로 로그인하세요.</p>
+    <p class="mb-note">지금 로그인돼 있어요. 다음부터는 ${m.pw_hash ? '이메일과 비밀번호로' : '<b>네이버로 로그인</b> 버튼으로'} 로그인하세요.</p>
     <div class="mb-acts">${applyNow ? `<a class="btn primary" href="/member/apply">${esc(applyNow.title.includes('장학') ? '장학금 신청하러 가기' : '신청하러 가기')}</a><a class="btn" href="/">홈으로</a>` : '<a class="btn primary" href="/">홈으로</a><a class="btn" href="/member/mypage">마이페이지</a>'}</div>
   </div>
 </section>`, { noindex: true });
@@ -268,6 +290,14 @@ async function mypage(ctx) {
   const extra = JSON.parse(m.extra || '{}');
   const val = (f) => (MEMBER_COLUMNS.includes(f.key) ? m[f.key] : extra[f.key]);
   const av = avatarOf(m);
+  // 네이버 연결 (네이버로 가입한 회원은 비밀번호가 없다 → 비밀번호 변경 칸 대신 이것만)
+  const linked = await hasNaver(env.DB, site, m.id);
+  const naverCard = linked || (await naverOn(env, site)) ? `<div class="mb-card">
+    <h2 class="mb-sec">네이버 로그인</h2>
+    ${linked ? `<p class="mb-naver-on"><span class="tag green">연결됨</span> ${m.pw_hash ? '이메일 · 비밀번호와 네이버 둘 다로 로그인할 수 있어요.' : '네이버로 가입한 계정이에요. <b>네이버로 로그인</b> 버튼으로 로그인하세요.'}</p>`
+    : `<p class="mb-note left">연결해 두면 다음부터 <b>네이버로 로그인</b> 버튼 하나로 로그인할 수 있어요.</p>
+    <div class="mb-acts end"><a class="mb-naver sm" href="/member/naver?link=1" rel="nofollow"><svg viewBox="0 0 20 20" aria-hidden="true"><path fill="#fff" d="M13.56 10.7 6.17 0H0v20h6.44V9.3L13.83 20H20V0h-6.44z"/></svg><span>네이버 연결하기</span></a></div>`}
+  </div>` : '';
   return page(ctx, '마이페이지', `<section class="mb wide">
   <div class="mb-card mb-profile">
     <div class="mb-pick" data-avatar-pick data-avatar-live>
@@ -291,7 +321,8 @@ async function mypage(ctx) {
     </form>
   </div>
 
-  <div class="mb-card">
+  ${naverCard}
+  ${m.pw_hash ? `<div class="mb-card">
     <h2 class="mb-sec">비밀번호 변경</h2>
     <form data-form="password" class="mb-form">
       <label class="field"><span>지금 비밀번호</span>${pwInput('current', 'current-password', ' required')}</label>
@@ -302,7 +333,7 @@ async function mypage(ctx) {
       <p class="err" role="alert"></p>
       <div class="mb-acts end"><button class="btn" type="submit">비밀번호 바꾸기</button></div>
     </form>
-  </div>
+  </div>` : ''}
 
   <details class="mb-card mb-danger">
     <summary>회원 탈퇴</summary>
@@ -541,6 +572,8 @@ export async function publicPage(ctx) {
   const p = ctx.url.pathname.replace(/\/+$/, '') || '/';
   if (p === '/member/login') return loginPage(ctx);
   if (p === '/member/signup') return signupPage(ctx);
+  if (p === '/member/naver') return naverStart(ctx, { msgPage });
+  if (p === '/member/naver/done') return naverDone(ctx, { msgPage });
   if (p === '/member/mypage') return mypage(ctx);
   if (p === '/member/welcome') return welcomePage(ctx);
   if (p === '/member/terms') return docPage(ctx, 'TERMS');
@@ -701,12 +734,15 @@ export async function publicApi(ctx) {
   }
   if (path === '/signup' && method === 'POST') {
     const raw = await body(request);
-    const tk = await takeTicket(db, site, raw); // 이메일 인증을 마친 사람만
-    const loginId = tk.email;
+    // 네이버로 온 사람(쿠키의 상태) 또는 이메일 인증을 마친 사람만
+    const nv = raw.naver ? await naverSignup(ctx) : null;
+    if (raw.naver && !nv) throw bad('네이버 로그인 시간이 지났습니다. 네이버로 가입하기를 다시 눌러 주세요.');
+    const tk = nv ? null : await takeTicket(db, site, raw);
+    const loginId = nv ? naverLoginId(nv.p) : tk.email;
     const pw = String(raw.password ?? '');
-    if (pw.length < 8 || pw.length > 200) throw bad('비밀번호는 8자 이상으로 넣어 주세요.');
+    if (!nv && (pw.length < 8 || pw.length > 200)) throw bad('비밀번호는 8자 이상으로 넣어 주세요.');
     const { fields } = await siteSettings(db, site);
-    const vals = memberValues(fields, { ...raw, email: loginId }, true);
+    const vals = memberValues(fields, { ...raw, email: nv ? nv.p.email || '' : loginId }, true);
     const docs = await latestDocs(db, site, env);
     if (docs.TERMS && !raw.agree_terms) throw bad('이용약관에 동의해 주세요.');
     if (docs.PRIVACY && !raw.agree_privacy) throw bad('개인정보 처리방침에 동의해 주세요.');
@@ -715,14 +751,14 @@ export async function publicApi(ctx) {
     if (dup) throw bad('이미 가입한 이메일입니다. 로그인해 주세요.');
     const prob = await uniqueProblem(db, site, { nickname: vals.cols.nickname });
     if (prob) throw bad(prob.message);
-    const p = await newPassword(pw);
+    const p = nv ? { pw_hash: '', pw_salt: '' } : await newPassword(pw); // 네이버 회원은 비밀번호 없음 (비밀번호 로그인은 늘 실패)
     const t = now();
     const r = await db.prepare(`INSERT INTO members (site, login_id, pw_hash, pw_salt, name, nickname, level, email, mobile, phone, extra, last_login_at, created_at)
       VALUES (?, ?, ?, ?, ?, ?, 9, ?, ?, ?, ?, ?, ?)`).bind(site, loginId, p.pw_hash, p.pw_salt, vals.cols.name, vals.cols.nickname,
-      loginId, vals.cols.mobile, vals.cols.phone, JSON.stringify(vals.extra), t, t).run();
+      nv ? nv.p.email || '' : loginId, vals.cols.mobile, vals.cols.phone, JSON.stringify(vals.extra), t, t).run();
     const id = r.meta.last_row_id;
     const stmts = [docs.TERMS, docs.PRIVACY].filter(Boolean).map((d) => db.prepare('INSERT INTO member_agreements (member_id, document_id, agreed_at) VALUES (?, ?, ?)').bind(id, d.id, t));
-    await db.batch([...stmts, tk.done()]);
+    await db.batch([...stmts, ...(nv ? nv.done(id) : [tk.done()])]);
     return json({ ok: true }, 200, { 'Set-Cookie': await createSession(db, site, 'keep', id) });
   }
 
@@ -761,6 +797,7 @@ export async function publicApi(ctx) {
     await db.batch([
       db.prepare("UPDATE members SET status = 'WITHDRAWN', withdrawn_at = ?, withdraw_reason = ? WHERE id = ?").bind(now(), reason, me.member.id),
       db.prepare('DELETE FROM sessions WHERE member_id = ?').bind(me.member.id),
+      db.prepare('DELETE FROM member_social WHERE site = ? AND member_id = ?').bind(site, me.member.id),
     ]);
     return json({ ok: true }, 200, { 'Set-Cookie': setCookie(SESS_COOKIE, '', 0) });
   }

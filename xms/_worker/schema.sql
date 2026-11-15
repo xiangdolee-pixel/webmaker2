@@ -449,3 +449,26 @@ CREATE INDEX IF NOT EXISTS site_inquiries_site ON site_inquiries (site, id);
 CREATE TABLE IF NOT EXISTS site_inquiry_mail (site TEXT PRIMARY KEY, emails TEXT NOT NULL DEFAULT '[]', updated_at INTEGER NOT NULL DEFAULT 0);
 -- 홈페이지 사진 지도 (deploy.mjs 가 R2 static/ 에 올린 파일) — r2-static.mjs
 CREATE TABLE IF NOT EXISTS site_static (site TEXT NOT NULL, path TEXT NOT NULL, hash TEXT NOT NULL, PRIMARY KEY (site, path));
+
+-- 네이버로 시작하기 (social.js) — 사이트별 (site 조건)
+--   social_states: 네이버를 다녀오는 동안 잠깐(10분 · 가입 화면 30분) 두는 상태. profile 은 xim /naver/callback 이 채운다. 쓰고 나면 지운다.
+CREATE TABLE IF NOT EXISTS social_states (
+  state       TEXT PRIMARY KEY,
+  site        TEXT NOT NULL,
+  origin      TEXT NOT NULL,
+  next        TEXT NOT NULL DEFAULT '/',
+  mode        TEXT NOT NULL DEFAULT 'login',   -- login | link | signup
+  member_id   INTEGER,
+  profile     TEXT NOT NULL DEFAULT '',
+  expires_at  INTEGER NOT NULL
+);
+-- member_social: 회원 ↔ 네이버 회원 번호 (네이버 번호는 앱마다 다르다)
+CREATE TABLE IF NOT EXISTS member_social (
+  site        TEXT NOT NULL,
+  provider    TEXT NOT NULL,
+  uid         TEXT NOT NULL,
+  member_id   INTEGER NOT NULL,
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (site, provider, uid)
+);
+CREATE INDEX IF NOT EXISTS member_social_member ON member_social (member_id);

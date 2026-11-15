@@ -68,6 +68,18 @@ export async function adminApi(ctx) {
     try { if (r) v = { ...v, ...JSON.parse(r.v) }; } catch { /* 기본값 */ }
     return json(v);
   }
+  // 부가 기능: 네이버로 시작하기 (기본 켬 — 운영자 네이버 키가 있을 때만 보인다)
+  if (path === '/options/naver') {
+    if (method === 'PUT') {
+      const on = !!(await body(request)).on;
+      await db.prepare("INSERT INTO site_options (site, k, v, updated_at) VALUES (?, 'naver_login', ?, ?) ON CONFLICT(site, k) DO UPDATE SET v = excluded.v, updated_at = excluded.updated_at").bind(site, JSON.stringify({ on }), now()).run();
+      await audit(db, site, me, request, 'NAVER_LOGIN', on ? '켬' : '끔', '');
+      return json({ ok: true });
+    }
+    const r = await db.prepare("SELECT v FROM site_options WHERE site = ? AND k = 'naver_login'").bind(site).first();
+    let on = true; try { if (r) on = !!JSON.parse(r.v).on; } catch { /* 기본 켬 */ }
+    return json({ on });
+  }
   // 강의 (기능을 켠 사이트만)
   if (path.startsWith('/apply')) {
     const r = await adminApply(ctx, path, method);
@@ -591,7 +603,7 @@ async function listMembers(db, site, q, withdrawn, all = false) {
   const total = (await db.prepare(`SELECT COUNT(*) AS n FROM members WHERE ${w}`).bind(...args).first()).n;
   const all_ = (await db.prepare(`SELECT COUNT(*) AS n FROM members WHERE site = ? AND ${withdrawn ? "status = 'WITHDRAWN'" : "status != 'WITHDRAWN'"}`).bind(site).first()).n;
   const page = Math.max(1, Number(q.get('page')) || 1);
-  const sql = `SELECT * FROM members WHERE ${w} ORDER BY ${withdrawn ? 'withdrawn_at DESC' : 'id DESC'}${all ? '' : ` LIMIT ${PAGE} OFFSET ${(page - 1) * PAGE}`}`;
+  const sql = `SELECT *, EXISTS(SELECT 1 FROM member_social s WHERE s.site = members.site AND s.member_id = members.id) AS naver FROM members WHERE ${w} ORDER BY ${withdrawn ? 'withdrawn_at DESC' : 'id DESC'}${all ? '' : ` LIMIT ${PAGE} OFFSET ${(page - 1) * PAGE}`}`;
   const { results } = await db.prepare(sql).bind(...args).all();
   const rows = results.map(({ pw_hash, pw_salt, ...r }) => ({ ...r, extra: JSON.parse(r.extra || '{}') }));
   return { total, all: all_, page, size: PAGE, rows, fields, levelNames };

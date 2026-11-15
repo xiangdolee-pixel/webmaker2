@@ -411,6 +411,14 @@ tr.dragging td { background: var(--surface); }
 .mb .err { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); font-size: 14px; font-weight: 600; }
 .mb-foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 22px -28px -32px; padding: 16px 20px; border-top: 1px solid #eef0f4; border-radius: 0 0 var(--mb-r) var(--mb-r); background: #fafbfc; font-size: 15px; color: var(--sub); }
 .mb-foot a { color: var(--brand); font-weight: 700; text-decoration: none; }
+.mb-or { display: flex; align-items: center; gap: 12px; margin: 20px 0 14px; color: var(--mute); font-size: 13px; }
+.mb-or::before, .mb-or::after { content: ""; flex: 1; height: 1px; background: #eef0f4; }
+.mb-naver { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 54px; padding: 0 18px; border-radius: 12px; background: #03c75a; color: #fff !important; font-size: 17px; font-weight: 700; text-decoration: none !important; transition: background .2s; }
+.mb-naver:hover { background: #02b351; }
+.mb-naver:focus-visible { outline: 3px solid #03c75a; outline-offset: 2px; }
+.mb-naver svg { flex: none; width: 16px; height: 16px; }
+.mb-naver.sm { display: inline-flex; min-height: 44px; font-size: 15px; }
+.mb-naver-on { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; color: var(--sub); font-size: 15px; }
 .mb-note { margin: 0; color: var(--mute); font-size: 13px; text-align: center; }
 .mb-note.left { text-align: left; margin-bottom: 14px; color: var(--sub); font-size: 14px; }
 .mb-group { display: grid; padding-top: 18px; margin-top: 2px; border-top: 1px solid #eef0f4; }
