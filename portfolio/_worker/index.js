@@ -44,13 +44,12 @@ ${body}<span class="go">비공개</span></span></div></li>`;
   return `<li${st.tag ? ` data-tag="${st.tag}"` : ''}><a class="card" href="${escHtml(site.url)}"${site.slug ? ` data-xim="${escHtml(site.slug)}"` : ''} target="_blank" rel="noopener">${thumb}
 ${body}<span class="go">바로가기</span></span></a></li>`;
 }
-// 카드 목록: 만든 것을 이 Worker 메모리에 두고 바로 보낸 뒤, 20초가 지났으면 뒤에서 새로 만든다
-//   (사이트 13곳의 xms 값을 매번 다 읽고 보내느라 첫 바이트가 2초 넘게 걸렸다 — 2026-11-13 "빨리 불러오게")
-let cardMem = null;   // { list, at }
-async function buildList(html, env) {
-  let sites = null;
-  try { if (env.XIM) sites = await env.XIM.portfolio(); } catch { sites = null; }
-  if (!sites || !env.XMS) return null;
+// 카드 목록: 만든 것을 이 Worker 메모리에 두고 바로 보낸다 (사이트 13곳의 xms 값을 매번 다 읽으면 첫 바이트가 2초 넘게 걸렸다 — 2026-11-13 "빨리 불러오게")
+//   다만 xim 목록(켜 둔 사이트 · 포트폴리오2 의 주소 · 분류 · 글 · 그림)은 요청마다 묻는다(D1 한 번) — 바뀌었으면 그 자리에서 다시 만든다.
+//   예전엔 xim 에서 분류를 바꿔도 메모리 · 캐시에 남은 옛 카드가 한참 나왔다(2026-11-16 컴퍼니 독스).
+//   각 사이트 xms 값(이름 · 설명 · 그림)은 20초가 지났으면 뒤에서 새로 읽는다.
+let cardMem = null;   // { sig, list, at }
+async function buildList(html, env, sites) {
   const st = staticCards(html);
   const info = await Promise.all(sites.map((s) => (s.extra ? s.extra : readSite(env, s.slug, new URL(s.url).origin))));
   return sites.map((s, i) => {
@@ -59,23 +58,30 @@ async function buildList(html, env) {
     return cardHtml(s, info[i] || {}, { ...base, tag: tags || base.tag || '' });
   }).join('\n');
 }
-//   Worker 가 새로 뜨면 메모리가 비므로 Cloudflare 캐시(서울 자리)에도 둔다 — 없을 때만 새로 만든다
-const CARD_KEY = 'https://portfolio-cards.invalid/v1';
-async function cachedList(html, env, ctx) {
-  try { const hit = await caches.default.match(CARD_KEY); if (hit) return await hit.text(); } catch { /* 캐시 없음 */ }
-  const l = await buildList(html, env);
-  if (l !== null) ctx.waitUntil(caches.default.put(CARD_KEY, new Response(l, { headers: { 'Cache-Control': 'public, max-age=300' } })).catch(() => {}));
-  return l;
+const ximSites = async (env) => { try { return env.XIM ? await env.XIM.portfolio() : null; } catch { return null; } };
+async function sigOf(sites) {
+  const d = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(JSON.stringify(sites)));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
+//   Worker 가 새로 뜨면 메모리가 비므로 Cloudflare 캐시(서울 자리)에도 둔다 — 열쇠에 목록 지문(sig)을 넣어 목록이 바뀌면 옛 것은 안 쓴다
+const cardKey = (sig) => `https://portfolio-cards.invalid/v2/${sig}`;
+const putCard = (sig, l) => caches.default.put(cardKey(sig), new Response(l, { headers: { 'Cache-Control': 'public, max-age=300' } })).catch(() => {});
 async function fillCards(res, env, ctx) {
   const html = await res.text();
-  let list = cardMem?.list ?? null;
-  if (list === null) { list = await cachedList(html, env, ctx); if (list !== null) cardMem = { list, at: Date.now() }; }
-  else if (Date.now() - cardMem.at > 20000) {
-    cardMem.at = Date.now();   // 한 번만 새로 만들게
-    ctx.waitUntil(buildList(html, env).then((l) => { if (l !== null) { cardMem = { list: l, at: Date.now() }; return caches.default.put(CARD_KEY, new Response(l, { headers: { 'Cache-Control': 'public, max-age=300' } })); } }).catch(() => {}));
+  const sites = env.XMS ? await ximSites(env) : null;
+  if (!sites) return new Response(html, res);   // xim 에 못 물으면 index.html 목록 그대로
+  const sig = await sigOf(sites);
+  let list = cardMem?.sig === sig ? cardMem.list : null;
+  if (list !== null) {
+    if (Date.now() - cardMem.at > 20000) {
+      cardMem.at = Date.now();   // 한 번만 새로 만들게
+      ctx.waitUntil(buildList(html, env, sites).then((l) => { if (cardMem?.sig === sig) cardMem = { sig, list: l, at: Date.now() }; return putCard(sig, l); }).catch(() => {}));
+    }
+  } else {
+    try { const hit = await caches.default.match(cardKey(sig)); if (hit) list = await hit.text(); } catch { /* 캐시 없음 */ }
+    if (list === null) { list = await buildList(html, env, sites); ctx.waitUntil(putCard(sig, list)); }
+    cardMem = { sig, list, at: Date.now() };
   }
-  if (list === null) return new Response(html, res);
   return new HTMLRewriter()
     .on('ul.grid', { element(e) { e.setInnerContent(list || '<li class="none">아직 올린 사이트가 없습니다.</li>', { html: true }); } })
     .transform(new Response(html, res));
