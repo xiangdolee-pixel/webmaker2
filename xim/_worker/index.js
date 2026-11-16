@@ -530,15 +530,16 @@ async function ximApi(request, env, url, ctx) {
   }
   if (path === '/api/portfolio2' && method === 'POST') {
     const v = await body(request);
-    const url = pf2Url(v.url);
+    // 비공개: 주소 없이(url = '') 카드만 보인다 — 직접 넣기에서만
+    const url = v.manual && v.private ? '' : pf2Url(v.url);
     const top0 = () => db.prepare('SELECT COALESCE(MAX(sort), 0) AS n FROM portfolio_links').first();
     if (v.manual) {
       // 직접 넣기: 그 사이트를 읽지 않고 운영자가 쓴 값 그대로 (그림은 따로 /image 로 올린다)
       const name = str(v.name, 120);
       if (!name) throw bad('사이트명을 넣어 주세요.');
       const row = await db.prepare('INSERT INTO portfolio_links (url, name, description, image, tag, shown, sort, created_at) VALUES (?, ?, ?, \'\', ?, 1, ?, ?) RETURNING *')
-        .bind(url, name, str(v.description, 300), str(v.tag, 20) || '홈페이지', (await top0()).n + 1, now()).first();
-      await audit(db, request, 'PF2_CREATE', row.name, `${row.url} (직접)`);
+        .bind(url, name, str(v.description, 300), str(v.tag, 60), (await top0()).n + 1, now()).first();
+      await audit(db, request, 'PF2_CREATE', row.name, `${row.url || '비공개'} (직접)`);
       return json({ row });
     }
     const meta = await scrapeMeta(url);
@@ -563,6 +564,7 @@ async function ximApi(request, env, url, ctx) {
       return row;
     };
     if (m[2] === '/refetch' && method === 'POST') {
+      if (!old.url) throw bad('비공개 사이트는 주소가 없어 미리보기를 가져올 수 없습니다.');
       // 다시 가져오기(운영자가 누를 때만): 그 사이트 미리보기를 다시 읽는다 (못 읽은 칸은 원래 값 그대로)
       const meta = await scrapeMeta(old.url);
       if (meta.error) throw bad(meta.error);
@@ -592,8 +594,8 @@ async function ximApi(request, env, url, ctx) {
       const v = await body(request);
       const shown = v.shown === undefined ? old.shown : (v.shown ? 1 : 0);
       const row = await db.prepare('UPDATE portfolio_links SET url = ?, name = ?, description = ?, tag = ?, shown = ? WHERE id = ? RETURNING *')
-        .bind(v.url === undefined ? old.url : pf2Url(v.url), v.name === undefined ? old.name : str(v.name, 120) || old.name,
-          v.description === undefined ? old.description : str(v.description, 300), v.tag === undefined ? old.tag : str(v.tag, 20), shown, id).first();
+        .bind(v.private ? '' : v.url === undefined ? old.url : pf2Url(v.url), v.name === undefined ? old.name : str(v.name, 120) || old.name,
+          v.description === undefined ? old.description : str(v.description, 300), v.tag === undefined ? old.tag : str(v.tag, 60), shown, id).first();
       await audit(db, request, 'PF2_UPDATE', row.name, v.shown !== undefined && Object.keys(v).length === 1 ? (shown ? '보이기' : '숨기기') : '수정');
       return json({ row });
     }

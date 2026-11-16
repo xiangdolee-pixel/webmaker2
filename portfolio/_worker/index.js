@@ -37,8 +37,12 @@ function cardHtml(site, d, st) {
   const thumb = img
     ? `<span class="thumb is-og"><img src="${escHtml(img)}" alt="${name} 공유 이미지" width="1200" height="630" loading="lazy"></span>`
     : `<span class="thumb is-empty"><b>${escHtml([...plain][0] || '')}</b></span>`;
+  const body = `<span class="body">${st.tag ? `<span class="tag">${st.tag}</span>` : ''}<strong class="name">${name}</strong><span class="desc">${desc}</span>`;
+  // 비공개(포트폴리오2 에서 주소를 비운 것): 누를 수 없는 카드
+  if (!site.url) return `<li${st.tag ? ` data-tag="${st.tag}"` : ''}><div class="card is-private">${thumb}
+${body}<span class="go">비공개</span></span></div></li>`;
   return `<li${st.tag ? ` data-tag="${st.tag}"` : ''}><a class="card" href="${escHtml(site.url)}"${site.slug ? ` data-xim="${escHtml(site.slug)}"` : ''} target="_blank" rel="noopener">${thumb}
-<span class="body">${st.tag ? `<span class="tag">${st.tag}</span>` : ''}<strong class="name">${name}</strong><span class="desc">${desc}</span><span class="go">바로가기</span></span></a></li>`;
+${body}<span class="go">바로가기</span></span></a></li>`;
 }
 // 카드 목록: 만든 것을 이 Worker 메모리에 두고 바로 보낸 뒤, 20초가 지났으면 뒤에서 새로 만든다
 //   (사이트 13곳의 xms 값을 매번 다 읽고 보내느라 첫 바이트가 2초 넘게 걸렸다 — 2026-11-13 "빨리 불러오게")

@@ -266,7 +266,6 @@ async function renderSites() {
 // ───────── 포트폴리오2: xim 밖에서 만든 사이트를 주소로 넣기 ─────────
 //   넣으면 xim 이 그 페이지의 카톡 미리보기(썸네일 · 사이트명 · 설명)를 읽어 온다. 포트폴리오에서 xim 사이트 다음 차례로 나온다.
 let pf2 = [];
-const PF_TAGS = '<datalist id="pf-tags"><option value="홈페이지"><option value="웹서비스"><option value="웹앱"><option value="웹게임"></datalist>';
 const pf2Host = (u) => { try { return new URL(u).hostname; } catch { return u; } };
 // 그림은 xim 이 저장해 둔 것(R2 pf2/…)
 const pf2Src = (img) => (/^pf2\/[a-f0-9]{32}$/.test(img || '') ? `/api/portfolio2/img/${img}` : '');
@@ -287,10 +286,10 @@ async function renderPortfolio2() {
       <article class="card srow pf2-row${l.shown ? '' : ' off'}" data-id="${l.id}">
         ${pf2Thumb(l)}
         <div class="pf2-txt"><b>${esc(l.name)}</b><span class="badge doing">${esc(l.tag || '분류 없음')}</span><span class="pf2-desc">${l.description ? esc(l.description) : '<span class="dim">설명 없음</span>'}</span>
-          <a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(pf2Host(l.url))}</a></div>
+          ${l.url ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(pf2Host(l.url))}</a>` : '<span class="badge">비공개</span>'}</div>
         <div class="sr-act">
           <label class="pf-sw" title="켜면 포트폴리오에 나옵니다"><input type="checkbox" data-pf${l.shown ? ' checked' : ''}><i aria-hidden="true"></i>보이기</label>
-          <button class="btn sm" type="button" data-act="refetch">다시 가져오기</button>
+          ${l.url ? '<button class="btn sm" type="button" data-act="refetch">다시 가져오기</button>' : ''}
           <button class="btn sm" type="button" data-act="edit">수정</button>
           <button class="btn sm danger" type="button" data-act="del">삭제</button>
         </div>
@@ -309,7 +308,8 @@ async function renderPortfolio2() {
   view.querySelectorAll('[data-id]').forEach((el) => {
     const l = pf2.find((x) => x.id === +el.dataset.id);
     el.querySelector('[data-act="edit"]').onclick = () => pf2Dialog(l);
-    el.querySelector('[data-act="refetch"]').onclick = (e) => busy(e.currentTarget, null, async () => {
+    const re = el.querySelector('[data-act="refetch"]');
+    if (re) re.onclick = (e) => busy(e.currentTarget, null, async () => {
       await api(`/portfolio2/${l.id}/refetch`, { method: 'POST', data: {} });
       toast('미리보기 정보를 다시 가져왔습니다.');
       renderPortfolio2();
@@ -351,10 +351,12 @@ function pf2Dialog(l) {
     <h2>포트폴리오2 ${l.id ? '수정' : '직접 넣기'}</h2>
     <form>
       <div class="pf2-prev" data-prev>${pf2Thumb(l)}</div>
-      <label class="field"><span>주소</span><input class="input" name="url" value="${esc(l.url)}" required placeholder="https://example.kr/" autocomplete="off"></label>
+      <div class="field"><span class="pf2-url-head">주소<label class="pf2-priv"><input type="checkbox" name="private" data-priv${l.id && !l.url ? ' checked' : ''}>비공개</label></span>
+        <input class="input" name="url" value="${esc(l.url)}" required placeholder="https://example.kr/" autocomplete="off" aria-label="주소">
+        <small data-priv-note hidden>주소를 밝히지 않는 사이트입니다. 포트폴리오에 카드만 보이고 누를 수 없습니다.</small></div>
       <div class="row2">
         <label class="field"><span>사이트명</span><input class="input" name="name" value="${esc(l.name)}" required maxlength="120"></label>
-        <label class="field"><span>분류</span><input class="input" name="tag" value="${esc(l.tag)}" maxlength="40" placeholder="홈페이지" list="pf-tags">${PF_TAGS}</label>
+        <div class="field"><span>분류 <small>여러 개 고를 수 있어요</small></span><div class="pf-cats" data-pf-cats></div><input type="hidden" name="tag" value="${esc(l.tag)}"></div>
       </div>
       <label class="field"><span>설명</span><textarea class="input" name="description" maxlength="300">${esc(l.description)}</textarea></label>
       <div class="field"><span>썸네일 그림</span>
@@ -365,6 +367,12 @@ function pf2Dialog(l) {
       <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">${l.id ? '저장' : '추가'}</button></div>
     </form>`, (dlg) => {
     const form = dlg.querySelector('form');
+    // 비공개면 주소 칸을 끈다 (꺼진 칸은 보내지 않는다 → 서버가 주소를 비움)
+    const priv = form.querySelector('[data-priv]');
+    const syncPriv = () => { form.url.disabled = priv.checked; form.url.hidden = priv.checked; dlg.querySelector('[data-priv-note]').hidden = !priv.checked; };
+    priv.onchange = () => { syncPriv(); if (!priv.checked) form.url.focus(); };
+    syncPriv();
+    pfCatPicker(form.querySelector('[data-pf-cats]'), form.tag);
     // 그림은 고르는 즉시 올려 저장한다 (저장 버튼과 따로)
     const prev = dlg.querySelector('[data-prev]');
     const del = dlg.querySelector('[data-img-del]');
@@ -589,7 +597,7 @@ const customerOptions = (selected) => `<option value="">— 고객 없음 —</o
 function pfCatPicker(box, hidden) {
   const split = (v) => String(v || '').split(/\s*[,·]\s*/).filter(Boolean);
   let picked = split(hidden.value);
-  const used = allSites.flatMap((x) => split(x.portfolio_tag));
+  const used = [...allSites.map((x) => x.portfolio_tag), ...pf2.map((x) => x.tag)].flatMap(split);   // 포트폴리오2 분류도 함께
   const opts = [...new Set([...CAT_ORDER, ...used, ...picked])];
   const draw = () => {
     box.innerHTML = opts.map((c) => `<button type="button" class="pf-cat${picked.includes(c) ? ' on' : ''}" aria-pressed="${picked.includes(c)}" data-c="${esc(c)}">${esc(c)}</button>`).join('')

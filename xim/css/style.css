@@ -981,3 +981,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .nm-empty { color: var(--mute); }
 .nm-note { margin: 14px 0 0; color: var(--mute); font-size: 13px; }
 @media (max-width: 640px) { .nm-dl > div { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+/* 포트폴리오2 주소 칸 옆 '비공개' */
+.pf2-url-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pf2-priv { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--ink); cursor: pointer; }
+.pf2-priv input { width: 16px; height: 16px; margin: 0; accent-color: var(--brand); }
