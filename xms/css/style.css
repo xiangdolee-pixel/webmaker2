@@ -68,7 +68,8 @@ h1, h2, h3 { line-height: 1.35; }
 textarea.input { min-height: 110px; resize: vertical; }
 select.input { padding-right: 32px; }
 .check { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; cursor: pointer; }
-.check input { width: 18px; height: 18px; accent-color: var(--brand); margin: 0; }
+/* 사이트 CSS 가 같은 이름(.agree input 등)으로 체크박스를 숨겨도 보이게 (bsf 문의 폼 꾸밈이 가입 동의 칸을 지웠다) */
+.check input { width: 18px; height: 18px; accent-color: var(--brand); margin: 0; position: static; opacity: 1; pointer-events: auto; appearance: auto; flex: none; }
 .choices { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .err { min-height: 0; margin: 0 0 10px; color: var(--danger); font-size: 14px; }
 .err:empty { display: none; }
