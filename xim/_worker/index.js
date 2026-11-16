@@ -1208,6 +1208,10 @@ export default {
     if (url.pathname === '/kakao/callback') {
       try { return await kakaoCallback(env, url); } catch (e) { return fail(e); }
     }
+    // 카카오 연결 해제 웹훅: 사용자가 카카오 쪽에서 이 앱 연결을 끊으면 카카오가 부른다
+    if (url.pathname === '/kakao/unlink') {
+      try { return await kakaoUnlink(env, request, url); } catch (e) { return fail(e); }
+    }
     // 스튜디오 공개 주소(그림 · 방송용 슬라이드쇼) — 주소를 아는 사람만, 로그인 없음
     if (url.pathname.startsWith('/studio/')) {
       try { const r = await studioPublic(request, env, url); if (r) return r; } catch (e) { return fail(e); }
@@ -1311,6 +1315,34 @@ async function kakaoCallback(env, url) {
   const profile = { provider: 'kakao', id: t(me.id, 100), email, name: t(a.name, 50), nickname: t(a.profile?.nickname, 50), mobile, avatar: t(a.profile?.profile_image_url, 500) };
   await env.XMS_DB.prepare("UPDATE social_states SET profile = ? WHERE state = ? AND profile = ''").bind(JSON.stringify(profile), state).run();
   return back('');
+}
+
+// 카카오 연결 해제 웹훅 (카카오 앱 › 웹훅 › 연결 해제 웹훅 = https://xim.plators.com/kakao/unlink)
+//   카카오가 Authorization: KakaoAK <어드민 키> 로 user_id 를 보낸다. 모든 사이트에서 그 카카오 번호의 연결을 지운다.
+//   카카오로만 들어오던 회원(비밀번호 · 다른 연결 없음)은 더 로그인할 길이 없으니 탈퇴 처리(관리자 등급 1 은 빼고) — 개인정보를 남겨 두지 않게.
+async function kakaoUnlink(env, request, url) {
+  const auth = request.headers.get('Authorization') || '';
+  if (!env.KAKAO_ADMIN_KEY || auth !== `KakaoAK ${env.KAKAO_ADMIN_KEY}`) return new Response('unauthorized', { status: 401 });
+  const p = request.method === 'POST' ? new URLSearchParams(await request.text()) : url.searchParams;
+  const uid = String(p.get('user_id') || '').trim();
+  if (!/^\d{1,30}$/.test(uid)) return new Response('bad user_id', { status: 400 });
+  const db = env.XMS_DB;
+  const { results } = await db.prepare("SELECT site, member_id FROM member_social WHERE provider = 'kakao' AND uid = ?").bind(uid).all();
+  let left = 0;
+  for (const r of results) {
+    await db.prepare("DELETE FROM member_social WHERE site = ? AND provider = 'kakao' AND uid = ?").bind(r.site, uid).run();
+    const m = await db.prepare('SELECT id, pw_hash, level, status FROM members WHERE id = ? AND site = ?').bind(r.member_id, r.site).first();
+    const other = await db.prepare('SELECT 1 FROM member_social WHERE site = ? AND member_id = ?').bind(r.site, r.member_id).first();
+    if (m && m.status !== 'WITHDRAWN' && !m.pw_hash && !other && m.level !== 1) {
+      await db.batch([
+        db.prepare("UPDATE members SET status = 'WITHDRAWN', withdrawn_at = ?, withdraw_reason = ? WHERE id = ?").bind(Date.now(), '카카오 연결 해제', m.id),
+        db.prepare('DELETE FROM sessions WHERE member_id = ?').bind(m.id),
+      ]);
+      left++;
+    }
+  }
+  console.log('카카오 연결 해제', uid, `연결 ${results.length} · 탈퇴 ${left}`);
+  return new Response('ok', { headers: { 'content-type': 'text/plain' } });
 }
 
 async function sharedMap(env, url) {

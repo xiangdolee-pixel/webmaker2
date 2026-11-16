@@ -207,12 +207,12 @@ async function signupPage(ctx) {
   // 네이버 · 카카오에서 돌아온 사람: 이메일 인증 · 비밀번호 없이 정보 입력만 (받은 값을 미리 채운다)
   const nv = await socialSignup(ctx, ctx.url.searchParams.get('with'));
   if (nv) {
-    const pre = { name: nv.p.name, nickname: nv.p.nickname, mobile: nv.p.mobile };
+    const pre = { name: nv.p.name || nv.p.nickname, nickname: nv.p.nickname, mobile: nv.p.mobile };   // 카카오는 이름을 안 준다 → 닉네임으로 미리 채움(고칠 수 있음)
     return page(ctx, '회원가입', `<section class="mb">
   <div class="mb-card">
     ${mbHead('user', '회원가입', `${nv.name} 계정으로 가입합니다. 남은 정보만 넣어 주세요.`)}
     <form data-form="signup" data-social="${nv.provider}" class="mb-form">
-      <div class="mb-verified"><span class="tag ${nv.provider === 'kakao' ? 'yellow' : 'green'}">${nv.name}</span><b>${esc(nv.p.email || nv.p.nickname || nv.p.name || `${nv.name} 계정`)}</b></div>
+      <div class="mb-verified ${nv.provider}"><span class="tag ${nv.provider === 'kakao' ? 'yellow' : 'green'}">${nv.name}</span><b>${esc(nv.p.email || nv.p.nickname || nv.p.name || `${nv.name} 계정`)}</b></div>
       ${avatarPick('', '선택 · 나중에 마이페이지에서 바꿀 수 있어요')}
       <div class="mb-group">${fields.filter((f) => f.mode !== 'EXCLUDED' && f.key !== 'email').map((f) => fieldInput(f, pre[f.key])).join('')}</div>
       ${agreeBox}
@@ -743,7 +743,9 @@ export async function publicApi(ctx) {
     const loginId = nv ? socialLoginId(nv.provider, nv.p) : tk.email;
     const pw = String(raw.password ?? '');
     if (!nv && (pw.length < 8 || pw.length > 200)) throw bad('비밀번호는 8자 이상으로 넣어 주세요.');
-    const { fields } = await siteSettings(db, site);
+    const { fields: allFields } = await siteSettings(db, site);
+    // 카카오처럼 이메일을 주지 않는 곳에서 온 사람은 이메일 칸을 받지 않는다(가입 화면에 없음) — 사이트가 이메일을 필수로 해 두었어도 막지 않게
+    const fields = nv && !nv.p.email ? allFields.map((f) => (f.key === 'email' ? { ...f, mode: 'OPTIONAL' } : f)) : allFields;
     const vals = memberValues(fields, { ...raw, email: nv ? nv.p.email || '' : loginId }, true);
     const docs = await latestDocs(db, site, env);
     if (docs.TERMS && !raw.agree_terms) throw bad('이용약관에 동의해 주세요.');
