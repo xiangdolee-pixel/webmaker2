@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="감사노트">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="/css/style.css?v=8">
+<link rel="stylesheet" href="/css/style.css?v=9">
 </head>
 <body class="app">
 <header class="top">
@@ -49,6 +49,7 @@
     <div class="greet">
       <p class="greet-date"><span id="gTime"></span><span id="gDate"></span></p>
       <h1 class="greet-title" id="gTitle">오늘 하루도 수고했어요</h1>
+      <p class="greet-msg" id="gMsg"></p>
     </div>
   </div>
   <script>(function(){var h=new Date().getHours(),t=h>=4&&h<6?'dawn':h<11&&h>=6?'morning':h>=11&&h<15?'noon':h>=15&&h<18?'afternoon':h>=18&&h<20?'evening':'night';document.getElementById('sky').className='sky '+t;})();</script>
@@ -216,6 +217,6 @@
   </div>
 </footer>
 <!--G-->
-<script src="/js/note.js?v=7"></script>
+<script src="/js/note.js?v=9"></script>
 </body>
 </html>

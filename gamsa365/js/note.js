@@ -86,15 +86,17 @@
     const h = d.getHours();
     const who = G.me.nick || G.me.name;
     // 위 하늘 그림(note.html 의 #sky)과 같은 때 나눔
-    const [name, hi] = h >= 4 && h < 6 ? ['새벽', '고요한 새벽이에요']
-      : h >= 6 && h < 11 ? ['아침', '좋은 아침이에요']
-      : h >= 11 && h < 15 ? ['한낮', '따뜻한 한낮이에요']
-      : h >= 15 && h < 18 ? ['늦은 오후', '오후도 잘 보내고 있나요']
-      : h >= 18 && h < 20 ? ['저녁', '오늘 하루도 수고했어요']
-      : ['밤', h >= 20 ? '편안한 밤이에요, 오늘도 애썼어요' : '늦은 밤까지 애썼어요'];
+    // 이름을 먼저 부르고(큰 글자), 아래 줄에 그때에 맞는 메시지
+    const [name, hi] = h >= 4 && h < 6 ? ['새벽', '고요한 새벽이에요. 오늘도 천천히 시작해요.']
+      : h >= 6 && h < 11 ? ['아침', '좋은 아침이에요. 오늘은 어떤 빛을 만나게 될까요?']
+      : h >= 11 && h < 15 ? ['한낮', '따뜻한 한낮이에요. 잠깐 숨 고르고 가요.']
+      : h >= 15 && h < 18 ? ['늦은 오후', '오후도 잘 보내고 있나요? 조금만 더 힘내요.']
+      : h >= 18 && h < 20 ? ['저녁', '오늘 하루도 수고했어요. 고마웠던 순간을 떠올려 봐요.']
+      : ['밤', h >= 20 ? '편안한 밤이에요. 오늘 하루도 정말 애썼어요.' : '늦은 밤까지 애썼어요. 이제 마음을 내려놓아요.'];
     $('#gTime').textContent = `${name} · `;
     $('#gDate').textContent = d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
-    $('#gTitle').textContent = who ? `${who}님, ${hi}` : hi;
+    $('#gTitle').textContent = who ? `${who}님,` : hi;
+    $('#gMsg').textContent = who ? hi : '';
     if (G.newHearts > 0) {
       const g = $('#gift');
       g.innerHTML = `<span class="glow-dot" aria-hidden="true"></span> 당신이 나눈 감사에 이웃의 빛 <b>${G.newHearts}개</b>가 도착했어요`;
@@ -536,7 +538,7 @@
     const show = (name) => {
       $$('.panel').forEach((p) => { p.hidden = p.dataset.panel !== name; });
       if (name === 'share' && !feedLoaded) loadFeed();
-      if (name === 'today') $('#lines textarea, #prayer').forEach(grow);
+      if (name === 'today') $$('#lines textarea, #prayer').forEach(grow);
       if (name === 'look') drawLook();
       if (name === 'set') goalSeg?.move();
       try { history.replaceState(null, '', name === 'today' ? '/note' : `/note#${name}`); } catch { /* 없음 */ }
@@ -611,7 +613,7 @@
       setTimeout(() => {
         box.hidden = true;
         panel.classList.remove('onboarding');
-        $('#lines textarea, #prayer').forEach(grow);
+        $$('#lines textarea, #prayer').forEach(grow);
         toast(`좋아요. 하루 ${goal}가지, 오늘의 첫 감사를 적어 볼까요?`);
         scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
       }, reduce ? 0 : 220);
