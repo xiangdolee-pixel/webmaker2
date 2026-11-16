@@ -264,7 +264,7 @@ async function renderSites() {
 }
 
 // ───────── 포트폴리오2: xim 밖에서 만든 사이트를 주소로 넣기 ─────────
-//   넣으면 xim 이 그 페이지의 카톡 미리보기(썸네일 · 사이트명 · 설명)를 읽어 온다. 포트폴리오에서 xim 사이트 다음 차례로 나온다.
+//   넣으면 xim 이 그 페이지의 카톡 미리보기(썸네일 · 사이트명 · 설명)를 읽어 온다. 포트폴리오에는 xim 사이트와 섞여 최근 것부터 나온다.
 let pf2 = [];
 const pf2Host = (u) => { try { return new URL(u).hostname; } catch { return u; } };
 // 그림은 xim 이 저장해 둔 것(R2 pf2/…)
@@ -281,7 +281,7 @@ async function renderPortfolio2() {
   view.innerHTML = `
     <div class="bar"><h2>포트폴리오2 ${pf2.length}</h2>
       <form class="pf2-add" data-add><input class="input" name="url" required placeholder="https://example.kr/ 또는 한글주소.kr" autocomplete="off" aria-label="사이트 주소"><button class="btn primary" type="submit">가져오기</button><button class="btn" type="button" data-manual>직접 넣기</button></form></div>
-    <p class="meta mon-rule">xim 에서 만들지 않은 사이트도 포트폴리오에 올립니다. 주소를 넣고 가져오기를 누르면 카톡 미리보기(썸네일 · 사이트명 · 설명)를 한 번만 읽어 xim 에 저장하고(그림 포함), 그 뒤로는 그 사이트 서버에 다시 묻지 않습니다. 미리보기가 없거나 읽히지 않는 사이트는 직접 넣기로 주소 · 사이트명 · 설명 · 그림을 손으로 넣습니다. 포트폴리오에는 xim 사이트 다음에 같은 모양으로 나옵니다.</p>
+    <p class="meta mon-rule">xim 에서 만들지 않은 사이트도 포트폴리오에 올립니다. 주소를 넣고 가져오기를 누르면 카톡 미리보기(썸네일 · 사이트명 · 설명)를 한 번만 읽어 xim 에 저장하고(그림 포함), 그 뒤로는 그 사이트 서버에 다시 묻지 않습니다. 미리보기가 없거나 읽히지 않는 사이트는 직접 넣기로 주소 · 사이트명 · 설명 · 그림을 손으로 넣습니다. 포트폴리오에는 xim 사이트와 같은 모양으로, 섞어서 최근에 넣은 것부터 나옵니다.</p>
     <div class="rows">${pf2.map((l) => `
       <article class="card srow pf2-row${l.shown ? '' : ' off'}" data-id="${l.id}">
         ${pf2Thumb(l)}

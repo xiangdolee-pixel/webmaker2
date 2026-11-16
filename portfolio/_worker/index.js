@@ -1,7 +1,7 @@
 // portfolio — 누구나 보는 포트폴리오 (2026-11-11 사용자 지시로 비밀번호 잠금을 뺐다. 예전 잠금 코드는 git 기록에)
 //   카드의 사이트명 · 설명 · 이미지는 각 사이트 xms 설정을 열 때마다 읽어 채운다:
 //     사이트명 = 검색엔진 제목, 설명 = 카톡 미리보기 설명, 이미지 = 카톡 미리보기 그림. 비어 있으면 index.html 에 적힌 그대로.
-//   포트폴리오2(xim 에서 만들지 않은 사이트)는 xim 의 '포트폴리오2' 탭에서 넣은 값(카톡 미리보기)으로 xim 사이트 다음에 붙인다.
+//   포트폴리오2(xim 에서 만들지 않은 사이트)는 xim 의 '포트폴리오2' 탭에서 넣은 값(카톡 미리보기)으로 함께 — 차례는 둘을 섞어 최근 것부터(xim 이 정한다).
 //   그 밖(페이지 · /xms 관리 · /member)은 xim 공통 사이트 Worker 가 맡는다.
 import site from '../../xim/_worker/site-worker.js';
 
@@ -17,7 +17,7 @@ async function readSite(env, slug, origin) {
     return { name: h.title || '', desc: h.share_description || '', image: h.og_direct || (h.og_image ? new URL(h.og_image, origin).href : '') };
   } catch { return {}; } // 못 읽으면 index.html 에 적힌 그대로
 }
-// 카드 목록 = xim 에서 "포트폴리오" 를 켜 둔 사이트 (만든 차례).
+// 카드 목록 = xim 에서 "포트폴리오" 를 켜 둔 사이트 (최근 것부터).
 //   글 · 그림은 그 사이트 xms 값, 비어 있으면 index.html 에 미리 적어 둔 같은 사이트 카드(data-xim) 값, 그것도 없으면 xim 사이트 이름.
 //   xim 에 못 물으면 index.html 목록 그대로.
 const escHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);

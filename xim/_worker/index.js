@@ -3,7 +3,7 @@
 //   기본 export (xim.….workers.dev)   운영자 관리 화면(/) + 운영자 API(/api/*)
 //   Engine (서비스 바인딩 전용)          각 고객 사이트 Worker 가 부른다. 공개 주소로는 닿지 않는다.
 //     status(slug)                      사이트 상태(active | suspended | unknown)
-//     portfolio()                       포트폴리오에 켜 둔 사이트 [{ slug, name, url }] + 포트폴리오2 [{ slug:'', name, url, extra }] (portfolio 폴더가 쓴다)
+//     portfolio()                       포트폴리오에 켜 둔 사이트 [{ slug, name, url }] + 포트폴리오2 [{ slug:'', name, url, extra }], 최근 것부터 (portfolio 폴더가 쓴다)
 //     fetch(request)                    /__suspended (정지 화면). 업체 관리 화면 · 회원 · 게시판은 xms 가 맡는다.
 //
 //   바인딩: DB(D1 xim), XMS_DB(D1 xms: 업체 관리자 계정 · 입장권), ASSETS(정적 파일)   비밀값: XIM_ADMIN_PASSWORD (wrangler secret, 리포에 없음)
@@ -525,7 +525,7 @@ async function ximApi(request, env, url, ctx) {
   //   그림도 그때 받아 R2(FILES, pf2/…)에 넣어 두고 포트폴리오는 그 저장본을 보여 준다 → 그 뒤로는 그 사이트 서버에 묻지 않는다.
   //   image 칸 = R2 이름(pf2/…). 운영자는 그림을 새로 올리거나 뺄 수 있다.
   if (path === '/api/portfolio2' && method === 'GET') {
-    const { results } = await db.prepare('SELECT * FROM portfolio_links ORDER BY sort, id').all();
+    const { results } = await db.prepare('SELECT * FROM portfolio_links ORDER BY created_at DESC, id DESC').all();   // 최근에 넣은 것이 맨 위
     return json(results);
   }
   if (path === '/api/portfolio2' && method === 'POST') {
@@ -1078,11 +1078,13 @@ export class Engine extends WorkerEntrypoint {
 
   // 포트폴리오 사이트가 묻는다: 포트폴리오에 켜 둔 운영 중 사이트 [{ slug, name, url }] (만든 차례)
   async portfolio() {
-    const { results } = await this.env.DB.prepare("SELECT slug, name, domain, portfolio_tag FROM sites WHERE portfolio = 1 AND status = 'active' ORDER BY id").all();
-    const list = results.map((s) => ({ slug: s.slug, name: s.name, url: `${siteUrl(s)}/`, tag: s.portfolio_tag || '' }));
-    // 포트폴리오2(xim 밖의 사이트)는 그 뒤에: 글 · 그림을 그대로 넘긴다
-    const { results: links } = await this.env.DB.prepare('SELECT * FROM portfolio_links WHERE shown = 1 ORDER BY sort, id').all().catch(() => ({ results: [] }));
-    return list.concat(links.map((l) => ({ slug: '', name: l.name, url: l.url, tag: l.tag || '', extra: { name: l.name, desc: l.description, image: l.image ? `/pf2-img/${l.image.slice(4)}` : '', tag: l.tag } })));
+    const { results } = await this.env.DB.prepare("SELECT slug, name, domain, portfolio_tag, created_at FROM sites WHERE portfolio = 1 AND status = 'active'").all();
+    const list = results.map((s) => ({ at: s.created_at, slug: s.slug, name: s.name, url: `${siteUrl(s)}/`, tag: s.portfolio_tag || '' }));
+    // 포트폴리오2(xim 밖의 사이트): 글 · 그림을 그대로 넘긴다
+    const { results: links } = await this.env.DB.prepare('SELECT * FROM portfolio_links WHERE shown = 1').all().catch(() => ({ results: [] }));
+    const all = list.concat(links.map((l) => ({ at: l.created_at, slug: '', name: l.name, url: l.url, tag: l.tag || '', extra: { name: l.name, desc: l.description, image: l.image ? `/pf2-img/${l.image.slice(4)}` : '', tag: l.tag } })));
+    // 차례: xim 사이트 · 포트폴리오2 섞어서 최근에 넣은 것이 맨 앞 (사용자 지시 2026-11-16)
+    return all.sort((x, y) => y.at - x.at).map(({ at, ...r }) => r);
   }
 
   // 제작문의 (포트폴리오 사이트가 부른다, 사용자 지시 2026-11-12)
