@@ -150,6 +150,7 @@ input:focus-visible + .ask-box { outline: 2px solid var(--brand); outline-offset
 .grid > li[hidden] { display: none; }
 
 /* 화면이 좁아지면 한 줄 칸 수를 줄인다: 5 → 3 → 2 → 1 */
+@media (min-width: 1800px) { .grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }   /* 1920 같은 넓은 화면은 한 줄에 6개 */
 @media (max-width: 1200px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 900px) {
   .wrap { padding: 44px 22px 100px; }
