@@ -138,7 +138,7 @@ onForm('signup', async (form, data) => {
   delete data.password2;
   const w = waiting(form, '가입 중입니다…');
   try {
-    await api('/signup', { method: 'POST', data: form.dataset.naver ? { ...data, naver: 1 } : { ...data, email: signup.email, ticket: signup.ticket } });
+    await api('/signup', { method: 'POST', data: form.dataset.social ? { ...data, social: form.dataset.social } : { ...data, email: signup.email, ticket: signup.ticket } });
   } catch (e) { w.done(); throw e; }
   // 가입하면 바로 로그인돼 있다 → 고른 프로필 사진을 이어서 올린다 (실패해도 가입은 끝났으니 넘어간다)
   if (avatar.pending) { w.say('프로필 사진을 적용하고 있어요…'); try { await uploadAvatar(avatar.pending); } catch (e) { /* 마이페이지에서 다시 */ } }
@@ -162,7 +162,7 @@ onForm('withdraw', async (form, data) => {
   location.href = '/';
 });
 if (new URLSearchParams(location.search).get('welcome')) toast('가입을 환영합니다!');
-if (new URLSearchParams(location.search).get('naver') === 'linked') toast('네이버 계정을 연결했습니다.');
+{ const lk = new URLSearchParams(location.search).get('linked'); if (lk === 'naver' || lk === 'kakao') toast(`${lk === 'kakao' ? '카카오' : '네이버'} 계정을 연결했습니다.`); }
 
 // 가입: 비밀번호 같음 확인 · 보기 · 모두 동의 · 약관 전문
 const pw = $('form[data-form=signup] [name=password]');
