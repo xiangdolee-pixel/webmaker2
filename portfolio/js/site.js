@@ -55,13 +55,13 @@
   });
 })();
 
-// 분류 탭: 카드의 분류(.tag)로 전체 · 홈페이지 · 웹서비스 · 웹앱 · 웹게임 … 탭을 한 번 만들고, 고르면 그 분류만 보인다.
+// 분류 탭: 카드의 분류(.tag)로 전체 · 홈페이지 · 솔루션개발 · 웹앱 · 웹게임 … 탭을 한 번 만들고, 고르면 그 분류만 보인다.
 //   한 카드에 분류가 여럿이면('웹앱 · 홈페이지') 그 탭 모두에 나온다
 (function () {
   var grid = document.querySelector('.grid');
   var nav = document.querySelector('.cats');
   if (!grid || !nav) return;
-  var ORDER = ['홈페이지', '웹서비스', '웹앱', '웹게임'];
+  var ORDER = ['홈페이지', '솔루션개발', '웹앱', '웹게임'];
   var items = [].slice.call(grid.children).filter(function (li) { return li.querySelector('.card'); });
   var count = {};
   items.forEach(function (li) {

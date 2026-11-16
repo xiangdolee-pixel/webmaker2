@@ -507,7 +507,7 @@ async function ximApi(request, env, url, ctx) {
   if (m && method === 'POST') {
     const v = await body(request);
     const s = await db.prepare('SELECT slug, name FROM sites WHERE id = ?').bind(+m[1]).first();
-    // { tag } = 포트폴리오 분류(홈페이지 · 웹서비스 · 웹앱 · 웹게임 …)만 바꾸기
+    // { tag } = 포트폴리오 분류(홈페이지 · 솔루션개발 · 웹앱 · 웹게임 …)만 바꾸기
     if (v.tag !== undefined) {
       const tag = str(v.tag, 40);   // 여러 개면 쉼표로 (예: 웹앱, 홈페이지)
       await db.prepare('UPDATE sites SET portfolio_tag = ? WHERE id = ?').bind(tag, +m[1]).run();

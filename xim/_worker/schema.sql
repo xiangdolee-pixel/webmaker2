@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS portfolio_links (
   sort        INTEGER NOT NULL DEFAULT 0,
   created_at  INTEGER NOT NULL
 );
---   ALTER TABLE sites ADD COLUMN portfolio_tag TEXT NOT NULL DEFAULT '';  -- 포트폴리오 분류(홈페이지 · 웹서비스 · 웹앱 · 웹게임), 사이트 수정 창에서
+--   ALTER TABLE sites ADD COLUMN portfolio_tag TEXT NOT NULL DEFAULT '';  -- 포트폴리오 분류(홈페이지 · 솔루션개발 · 웹앱 · 웹게임), 사이트 수정 창에서
 
 -- ───────── 스튜디오 (유튜브 발표자료 제작, 2026-11-09) ─────────
 -- 작업 하나 = 발표자료 한 회차 (본편 main · 폰UI 쇼츠 phone · 썸네일만 thumb)

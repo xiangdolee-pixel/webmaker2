@@ -210,7 +210,7 @@ function render() {
 // ───────── 사이트 ─────────
 let siteQ = '', siteCat = '', allSites = [];
 // 사이트 분류 = 포트폴리오 분류(sites.portfolio_tag, 사이트 수정 창). 포트폴리오와 같은 차례, 비어 있으면 '미분류'
-const CAT_ORDER = ['홈페이지', '웹서비스', '웹앱', '웹게임'];
+const CAT_ORDER = ['홈페이지', '솔루션개발', '웹앱', '웹게임'];
 const catOf = (s) => (s.portfolio_tag || '').split(/\s*[,·]\s*/).filter(Boolean)[0] || '미분류';   // 분류가 여럿('웹앱, 홈페이지')이면 첫째로 묶는다
 async function renderSites() {
   const [sites, cs] = await Promise.all([api('/sites'), api('/customers')]);
@@ -222,7 +222,7 @@ async function renderSites() {
     <div class="tabs site-cats" id="site-cats"></div>
     <div class="rows">${sites.map(siteRow).join('') || '<div class="card empty">아직 등록된 사이트가 없습니다.</div>'}</div>
     <div class="card empty" data-none hidden>찾는 사이트가 없습니다.</div>`;
-  // 분류 탭: 전체 · 홈페이지 · 웹서비스 · 웹앱 · 웹게임 … (사이트에 있는 분류만, 개수와 함께) — 찾기와 함께 걸러진다
+  // 분류 탭: 전체 · 홈페이지 · 솔루션개발 · 웹앱 · 웹게임 … (사이트에 있는 분류만, 개수와 함께) — 찾기와 함께 걸러진다
   const count = {};
   sites.forEach((s) => { const c = catOf(s); count[c] = (count[c] || 0) + 1; });
   const rank = (c) => (c === '미분류' ? 100 : CAT_ORDER.includes(c) ? CAT_ORDER.indexOf(c) : 50);
