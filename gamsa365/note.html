@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="감사노트">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="/css/style.css?v=7">
+<link rel="stylesheet" href="/css/style.css?v=8">
 </head>
 <body class="app">
 <header class="top">
@@ -112,6 +112,11 @@
         <button type="button" class="btn ghost small" id="addLine">+ 하나 더 적기</button>
         <span class="saved" id="saved" aria-live="polite"></span>
       </div>
+      <div class="prayer" id="prayerBox">
+        <label for="prayer" class="prayer-label"><span class="prayer-mark" aria-hidden="true"></span>한 줄 기도</label>
+        <textarea id="prayer" rows="1" maxlength="1000" placeholder="예) 오늘도 지켜 주셔서 감사합니다. 내일도 평안하게 하소서."></textarea>
+        <p class="prayer-note">나만 보는 기도예요. 한 줄이어도, 더 길게 써도 좋아요.</p>
+      </div>
     </div>
 
     <div class="box done" id="done" hidden>
@@ -178,6 +183,11 @@
       <label class="switch"><input type="checkbox" id="helps"><span></span>도움 질문 보여 주기</label>
     </div>
     <div class="box">
+      <h2 class="box-title">한 줄 기도</h2>
+      <p class="sec-sub">감사 아래에 하루 한 번 기도를 적는 칸이에요. 나만 보이고 나눔에는 올라가지 않아요.</p>
+      <label class="switch"><input type="checkbox" id="pray"><span></span>한 줄 기도 칸 보이기</label>
+    </div>
+    <div class="box">
       <h2 class="box-title">감사 알림</h2>
       <p class="sec-sub">하루 한 번, 고른 시간에 다정하게 알려 드려요. 그날 이미 적었다면 보내지 않아요. 잠들기 전 저녁 시간을 권해요.</p>
       <div class="row">
@@ -206,6 +216,6 @@
   </div>
 </footer>
 <!--G-->
-<script src="/js/note.js?v=6"></script>
+<script src="/js/note.js?v=7"></script>
 </body>
 </html>

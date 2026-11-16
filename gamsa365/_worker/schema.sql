@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   seen_hearts_at INTEGER NOT NULL DEFAULT 0,  -- 받은 빛 알림을 마지막으로 본 때(ms)
   helps INTEGER NOT NULL DEFAULT 1,           -- 감사꺼리 찾기 도움 질문 (끄면 그냥 생각해서 쓴다)
   onboarded INTEGER NOT NULL DEFAULT 0,       -- 처음 질문(하루 몇 개 · 도움 질문)에 답했는지
+  pray INTEGER NOT NULL DEFAULT 1,            -- 한 줄 기도 칸 보이기
   avatar TEXT NOT NULL DEFAULT '',            -- xms 프로필 사진 주소 (나눔에 이름을 쓴 사람만 보인다)
   created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
 );
@@ -21,6 +22,7 @@ CREATE TABLE IF NOT EXISTS days (
   user_id INTEGER NOT NULL,
   day TEXT NOT NULL,              -- YYYY-MM-DD (한국 시간)
   mood INTEGER NOT NULL DEFAULT 0, -- 0 안 고름 · 1 비 ~ 5 햇살
+  prayer TEXT NOT NULL DEFAULT '', -- 한 줄 기도 (나만 본다, 나눔에 안 올라감)
   PRIMARY KEY (user_id, day)
 );
 

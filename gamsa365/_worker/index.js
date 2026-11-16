@@ -63,7 +63,7 @@ async function stateOf(db, u, me) {
   const from30 = dayOf(Date.now() - 29 * 86400000);
   const [items, dayRow, cal, totals, moods, hearts, recent] = await db.batch([
     db.prepare(ITEMS_SQL).bind(u.id, today),
-    db.prepare('SELECT mood FROM days WHERE user_id = ? AND day = ?').bind(u.id, today),
+    db.prepare('SELECT mood, prayer FROM days WHERE user_id = ? AND day = ?').bind(u.id, today),
     db.prepare('SELECT day, count(*) AS n FROM entries WHERE user_id = ? AND day >= ? GROUP BY day').bind(u.id, `${year}-01-01`),
     db.prepare('SELECT count(*) AS lights, count(DISTINCT day) AS days FROM entries WHERE user_id = ?').bind(u.id),
     db.prepare('SELECT day, mood FROM days WHERE user_id = ? AND day >= ? AND mood > 0 ORDER BY day').bind(u.id, from30),
@@ -73,9 +73,10 @@ async function stateOf(db, u, me) {
   const last3 = recent.results.map((r) => r.mood);
   return {
     today,
-    me: { nick: u.nick, name: me.name, admin: me.admin, goal: u.goal, remind_on: !!u.remind_on, remind_time: u.remind_time, share_default: !!u.share_default, helps: !!u.helps, onboarded: !!u.onboarded },
+    me: { nick: u.nick, name: me.name, admin: me.admin, goal: u.goal, remind_on: !!u.remind_on, remind_time: u.remind_time, share_default: !!u.share_default, helps: !!u.helps, pray: !!u.pray, onboarded: !!u.onboarded },
     items: items.results,
     mood: dayRow.results[0]?.mood || 0,
+    prayer: dayRow.results[0]?.prayer || '',
     cal: Object.fromEntries(cal.results.map((r) => [r.day, r.n])),
     lights: totals.results[0]?.lights || 0,
     days: totals.results[0]?.days || 0,
@@ -190,8 +191,8 @@ async function api(request, env, url) {
   if (path === '/api/day' && method === 'GET') {
     const d = url.searchParams.get('d');
     if (!isDay(d)) return json({ error: 'bad day' }, 400);
-    const [items, dr] = await db.batch([db.prepare(ITEMS_SQL).bind(u.id, d), db.prepare('SELECT mood FROM days WHERE user_id = ? AND day = ?').bind(u.id, d)]);
-    return json({ day: d, items: items.results, mood: dr.results[0]?.mood || 0 });
+    const [items, dr] = await db.batch([db.prepare(ITEMS_SQL).bind(u.id, d), db.prepare('SELECT mood, prayer FROM days WHERE user_id = ? AND day = ?').bind(u.id, d)]);
+    return json({ day: d, items: items.results, mood: dr.results[0]?.mood || 0, prayer: dr.results[0]?.prayer || '' });
   }
   // 하루 기록 저장 (그날 전체를 보낸다)
   if (path === '/api/day' && method === 'PUT') {
@@ -199,13 +200,15 @@ async function api(request, env, url) {
     const d = v.day;
     if (!isDay(d) || d > dayOf()) return json({ error: '날짜가 올바르지 않습니다.' }, 400);
     const mood = Math.max(0, Math.min(5, Math.round(Number(v.mood) || 0)));
+    // 한 줄 기도: 길게 써도 된다 (줄바꿈은 살린다)
+    const prayer = String(v.prayer ?? '').replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 1000);
     const lines = (Array.isArray(v.items) ? v.items : []).slice(0, MAX_LINES)
       .map((it, i) => ({ pos: i, text: str(it?.text, 200), why: str(it?.why, 200), shared: it?.shared ? 1 : 0 }));
     const keep = lines.filter((l) => l.text);
     // 빈 줄은 빼고 pos 를 0.. 로 다시 매긴다. 이미 있던 줄은 id 로 이어 써서 받은 빛(hearts)이 그대로 남는다
     const old = (await db.prepare('SELECT id FROM entries WHERE user_id = ? AND day = ?').bind(u.id, d).all()).results;
     const stmts = [
-      db.prepare('INSERT INTO days (user_id, day, mood) VALUES (?, ?, ?) ON CONFLICT (user_id, day) DO UPDATE SET mood = excluded.mood').bind(u.id, d, mood),
+      db.prepare('INSERT INTO days (user_id, day, mood, prayer) VALUES (?, ?, ?, ?) ON CONFLICT (user_id, day) DO UPDATE SET mood = excluded.mood, prayer = excluded.prayer').bind(u.id, d, mood, prayer),
       db.prepare('UPDATE entries SET pos = pos + 100 WHERE user_id = ? AND day = ?').bind(u.id, d),   // 자리 바꿀 때 UNIQUE 충돌 막기
     ];
     const ids = keep.map((l) => Number(v.items[l.pos]?.id) || 0);
@@ -268,12 +271,13 @@ async function api(request, env, url) {
     const share = v.share_default === undefined ? u.share_default : (v.share_default ? 1 : 0);
     const nick = v.nick === undefined ? u.nick : str(v.nick, 12);
     const helps = v.helps === undefined ? u.helps : (v.helps ? 1 : 0);
+    const pray = v.pray === undefined ? u.pray : (v.pray ? 1 : 0);
     const onboarded = v.onboarded ? 1 : u.onboarded;
     // 시간을 앞당겨 바꾸면 오늘 다시 알림이 갈 수 있게
     const reset = time !== u.remind_time ? '' : u.last_remind_day;
-    await db.prepare('UPDATE users SET goal = ?, remind_time = ?, remind_on = ?, share_default = ?, nick = ?, helps = ?, onboarded = ?, last_remind_day = ? WHERE id = ?')
-      .bind(goal, time, on, share, nick, helps, onboarded, reset, u.id).run();
-    return json({ ok: true, goal, remind_time: time, remind_on: !!on, share_default: !!share, nick, helps: !!helps, onboarded: !!onboarded });
+    await db.prepare('UPDATE users SET goal = ?, remind_time = ?, remind_on = ?, share_default = ?, nick = ?, helps = ?, pray = ?, onboarded = ?, last_remind_day = ? WHERE id = ?')
+      .bind(goal, time, on, share, nick, helps, pray, onboarded, reset, u.id).run();
+    return json({ ok: true, goal, remind_time: time, remind_on: !!on, share_default: !!share, nick, helps: !!helps, pray: !!pray, onboarded: !!onboarded });
   }
   if (path === '/api/push' && method === 'POST') {
     const v = await body();

@@ -76,6 +76,7 @@
   }
 
   // ─── 오늘 ───
+  let prayer = '';
   let lines = [], mood = 0, askI = Math.floor(Math.random() * ASKS.length), saveT = 0, doneShown = false, baseLights = 0, baseCount = 0;
   const target = () => (mood === 1 ? 1 : G.me.goal);
   const filled = () => lines.filter((l) => l.text.trim()).length;
@@ -248,7 +249,7 @@
     if (saving) { await saving; }
     const items = lines.map((l) => ({ id: l.id, text: l.text, why: l.why, shared: l.shared }));
     $('#saved').textContent = '저장 중…';
-    saving = api('/api/day', { method: 'PUT', data: { day: G.today, mood, items } }).then((r) => {
+    saving = api('/api/day', { method: 'PUT', data: { day: G.today, mood, items, prayer } }).then((r) => {
       const kept = lines.filter((l) => l.text.trim());
       r.items.forEach((it, i) => { if (kept[i]) { kept[i].id = it.id; kept[i].hearts = it.hearts; } });
       lines.filter((l) => !l.text.trim()).forEach((l) => { l.id = 0; });
@@ -262,7 +263,7 @@
     if (!saveT) return;
     clearTimeout(saveT);
     const items = lines.map((l) => ({ id: l.id, text: l.text, why: l.why, shared: l.shared }));
-    fetch('/api/day', { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ day: G.today, mood, items }) }).catch(() => {});
+    fetch('/api/day', { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ day: G.today, mood, items, prayer }) }).catch(() => {});
   });
 
   let toastT = 0;
@@ -440,7 +441,7 @@
         const m = MOODS.find((x) => x.v === r.mood);
         v.innerHTML = `<h2 class="box-title">${esc(fmtDay(r.day))}${m ? ` <span class="dv-mood m${m.v}">${svg(m.v)}${m.name}</span>` : ''}</h2>` + (r.items.length
           ? `<ol class="dv-list">${r.items.map((it) => `<li><p>${esc(it.text)}</p>${it.why ? `<p class="mem-why">${esc(it.why)}</p>` : ''}${it.hearts ? `<span class="lhearts">이웃의 빛 ${it.hearts}</span>` : ''}</li>`).join('')}</ol>`
-          : '<p class="sec-sub">이날은 쉬어 간 날이에요. 쉬어 가도 괜찮아요.</p>');
+          : '<p class="sec-sub">이날은 쉬어 간 날이에요. 쉬어 가도 괜찮아요.</p>') + (r.prayer ? `<div class="dv-prayer"><span class="prayer-label"><span class="prayer-mark" aria-hidden="true"></span>한 줄 기도</span><p>${esc(r.prayer)}</p></div>` : '');
         v.hidden = false;
         v.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
       } catch (err) { toast(err.message); }
@@ -472,6 +473,8 @@
     $('#remOn').addEventListener('change', (e) => saveSet({ remind_on: e.target.checked }));
     $('#remTime').addEventListener('change', (e) => { if (e.target.value) saveSet({ remind_time: e.target.value }); });
     $('#shareDef').addEventListener('change', (e) => saveSet({ share_default: e.target.checked }));
+    $('#pray').checked = G.me.pray;
+    $('#pray').addEventListener('change', (e) => { G.me.pray = e.target.checked; saveSet({ pray: G.me.pray }); $('#prayerBox').hidden = !G.me.pray; });
     $('#helps').checked = G.me.helps;
     $('#helps').addEventListener('change', (e) => { G.me.helps = e.target.checked; saveSet({ helps: G.me.helps }); drawLines(); setAsk(); });
     let nt = 0;
@@ -533,7 +536,7 @@
     const show = (name) => {
       $$('.panel').forEach((p) => { p.hidden = p.dataset.panel !== name; });
       if (name === 'share' && !feedLoaded) loadFeed();
-      if (name === 'today') $$('#lines textarea').forEach(grow);
+      if (name === 'today') $('#lines textarea, #prayer').forEach(grow);
       if (name === 'look') drawLook();
       if (name === 'set') goalSeg?.move();
       try { history.replaceState(null, '', name === 'today' ? '/note' : `/note#${name}`); } catch { /* 없음 */ }
@@ -551,6 +554,12 @@
 
   function init() {
     mood = G.mood || 0;
+    prayer = G.prayer || '';
+    const pr = $('#prayer');
+    pr.value = prayer;
+    $('#prayerBox').hidden = !G.me.pray;
+    pr.addEventListener('input', () => { prayer = pr.value; grow(pr); queueSave(); });
+    requestAnimationFrame(() => grow(pr));
     lines = G.items.map((it) => ({ id: it.id, text: it.text, why: it.why, shared: !!it.shared, hearts: it.hearts, cheered: true }));
     baseCount = lines.length;
     baseLights = G.lights;
@@ -602,7 +611,7 @@
       setTimeout(() => {
         box.hidden = true;
         panel.classList.remove('onboarding');
-        $$('#lines textarea').forEach(grow);
+        $('#lines textarea, #prayer').forEach(grow);
         toast(`좋아요. 하루 ${goal}가지, 오늘의 첫 감사를 적어 볼까요?`);
         scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
       }, reduce ? 0 : 220);
