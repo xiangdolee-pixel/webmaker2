@@ -354,6 +354,8 @@ if (CONNECT && DEPLOY) {
 ${JSON.stringify(core, null, 2)}
 `);
   config.main = './xim/_worker/site-edge.js';
+  // 정해진 시간 일(cron, 예: gamsa365 알림)은 본체만 — 가장자리(site-edge)에는 scheduled 가 없다
+  if (core.triggers) config.triggers = { crons: [] };
   if (doClasses.length) {
     // 가장자리 = site-edge + 이 사이트 Durable Object 클래스 (main 은 설정 파일 기준 경로)
     const edgeFile = path.join(ROOT, '.deploy', `${slug}.edge.js`);

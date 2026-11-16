@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>감사노트365</title>
+<meta name="description" content="하루 세 가지, 마음에 빛을 담다. 오늘의 감사를 적고, 이웃의 감사로 마음이 다시 밝아지는 감사노트.">
+<meta property="og:title" content="감사노트365 — 하루 세 가지, 마음에 빛을 담다">
+<meta property="og:description" content="힘든 하루 끝에도 감사한 순간은 있었어요. 365일 언제든 돌아올 수 있는 나만의 감사노트.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="preload" as="image" href="/img/hero-640.webp" imagesrcset="/img/hero-640.webp 640w, /img/hero.webp 1100w" imagesizes="(min-width: 900px) 540px, 100vw">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="/css/style.css?v=7">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-in">
+    <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span><span>감사노트<b>365</b></span></a>
+    <nav class="gnb" aria-label="주요 메뉴">
+      <a href="#why">왜 감사일까요</a>
+      <a href="#how">이렇게 써요</a>
+      <a href="#share">이웃의 감사</a>
+    </nav>
+    <span class="acc" data-xms-account></span>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap hero-in">
+      <div class="hero-text">
+        <p class="eyebrow">하루 세 가지, 마음에 빛을 담다</p>
+        <h1>힘든 하루 끝에도<br>감사한 순간은 있었어요</h1>
+        <p class="lead">오늘 고마웠던 일 세 가지를 적는 노트예요. 적을 때마다 나의 365일 달력에 빛이 하나씩 켜지고, 이웃의 감사가 내 마음을 다시 밝혀 줘요.</p>
+        <div class="hero-cta">
+          <a class="btn primary big" href="/member/signup">무료로 시작하기</a>
+          <a class="btn ghost big" href="#try">먼저 하나 적어보기</a>
+        </div>
+        <p class="hero-note">이메일만 있으면 30초면 가입돼요 · 언제든 그만둘 수 있어요</p>
+      </div>
+      <figure class="hero-art">
+        <img src="/img/hero-640.webp" srcset="/img/hero-640.webp 640w, /img/hero.webp 1100w" sizes="(min-width: 900px) 540px, 100vw" width="1100" height="619" alt="햇살 드는 창가 책상 위의 감사노트와 따뜻한 차 한 잔" fetchpriority="high">
+      </figure>
+    </div>
+  </section>
+
+  <!-- 가입 전에 먼저 한 줄 — 빈 노트 앞에서 망설이지 않게, 적은 것은 가입 뒤 내 노트로 옮겨진다 -->
+  <section class="try" id="try">
+    <div class="wrap">
+      <div class="try-card">
+        <h2 class="sec-title">지금 떠오르는 감사, 하나만 적어볼까요?</h2>
+        <p class="sec-sub" id="tryAsk">오늘 먹은 것 중에 맛있었던 건 무엇인가요?</p>
+        <form class="try-form" id="tryForm" autocomplete="off">
+          <label class="sr" for="tryInput">감사 한 줄</label>
+          <textarea id="tryInput" maxlength="200" rows="3" placeholder="예) 퇴근길에 따뜻한 커피를 마실 수 있어서 감사합니다."></textarea>
+          <button class="btn primary" type="submit">빛 켜기</button>
+        </form>
+        <div class="try-done" id="tryDone" hidden>
+          <span class="glow-dot big" aria-hidden="true"></span>
+          <p><b>첫 번째 빛이 켜졌어요.</b><br>방금 적은 감사는 가입하면 내 노트에 그대로 담겨요.</p>
+          <a class="btn primary" href="/member/signup">이 감사 간직하기</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="why">
+    <div class="wrap">
+      <p class="eyebrow">왜 감사일까요</p>
+      <h2 class="sec-title">감사는 기분이 좋아서 하는 게 아니라,<br class="pc">기분을 바꾸는 작은 연습이에요</h2>
+      <p class="sec-sub">마음이 지칠 때 우리의 뇌는 잘못된 것, 위험한 것부터 찾아요. 감사를 적는 몇 분 동안은 시선이 잠시 '그래도 괜찮았던 것'으로 옮겨 가요. 그 연습이 쌓이면 마음의 길이 조금씩 바뀝니다.</p>
+      <ul class="cards">
+        <li class="card">
+          <span class="card-ico" aria-hidden="true">☀</span>
+          <h3>마음이 조금씩 가벼워져요</h3>
+          <p>매일 좋았던 일 세 가지와 <b>그 이유</b>를 적은 사람들은 일주일 만에 행복감이 높아지고 우울감이 줄었고, 그 차이가 여섯 달까지 이어졌어요.</p>
+          <small>Seligman 외, 2005 · '세 가지 좋은 일' 연구</small>
+        </li>
+        <li class="card">
+          <span class="card-ico" aria-hidden="true">☾</span>
+          <h3>잠들기 전 생각이 편안해져요</h3>
+          <p>감사를 자주 떠올리는 사람일수록 잠들기 전 걱정이 줄고, 더 쉽게 잠들고 더 깊이 잔다는 연구가 있어요. 그래서 알림은 저녁 시간을 권해요.</p>
+          <small>Wood 외, 2009</small>
+        </li>
+        <li class="card">
+          <span class="card-ico" aria-hidden="true">✿</span>
+          <h3>앞날을 조금 더 기대하게 돼요</h3>
+          <p>감사한 일을 꾸준히 적은 사람들은 불평을 적은 사람들보다 다가올 날을 더 희망적으로 보고, 몸의 불편함도 덜 느꼈어요.</p>
+          <small>Emmons &amp; McCullough, 2003</small>
+        </li>
+        <li class="card">
+          <span class="card-ico" aria-hidden="true">♡</span>
+          <h3>나 혼자가 아니라는 걸 느껴요</h3>
+          <p>고마운 사람을 떠올리면 곁에 있던 관계가 다시 보여요. 이웃이 나눈 작은 감사를 읽기만 해도 '나만 힘든 게 아니구나' 하는 위로가 돼요.</p>
+          <small>감사노트365 의 나눔 공간</small>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="sec band" id="how">
+    <div class="wrap">
+      <p class="eyebrow">이렇게 써요</p>
+      <h2 class="sec-title">하루 3분이면 충분해요</h2>
+      <ol class="steps">
+        <li><span class="step-n">1</span><h3>오늘의 마음 날씨</h3><p>비 오는 날도 괜찮아요. 오늘 마음이 어땠는지 먼저 골라요. 힘든 날엔 하나만 적어도 충분해요.</p></li>
+        <li><span class="step-n">2</span><h3>"~해서 감사합니다." 한 줄씩</h3><p>무엇이, 왜 고마웠는지가 한 문장에 함께 담겨요. 그 '이유'를 떠올리는 순간이 마음을 오래 바꿔 줘요.</p></li>
+        <li><span class="step-n">3</span><h3>빛이 켜지고, 이웃과 나눠요</h3><p>적은 만큼 나의 365일 달력에 빛이 켜져요. 원하는 감사만 이름 없이 나누고, 이웃에게 빛을 보내요.</p></li>
+      </ol>
+      <ul class="points">
+        <li><b>연속 기록이 끊겨도 괜찮아요</b><span>며칠 쉬어도 모은 빛은 줄지 않아요. 365는 '매일 써야 한다'가 아니라 '언제든 돌아올 수 있다'는 뜻이에요.</span></li>
+        <li><b>정한 시간에 다정한 알림</b><span>하루 한 번, 내가 고른 시간에. 이미 적은 날엔 알림이 가지 않아요.</span></li>
+        <li><b>힘든 날엔 기억 꺼내기</b><span>예전에 적어 둔 감사 하나를 꺼내 읽어요. 지난날의 내가 오늘의 나를 위로해 줘요.</span></li>
+        <li><b>내 속도, 내 방식대로</b><span>하루 3 · 5 · 10가지 중에 고르고, 막힐 땐 도움 질문을 켜거나 끄고 떠오르는 대로 적어요. 설정에서 언제든 바꿔요.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="sec share" id="share">
+    <div class="wrap">
+      <div class="share-head">
+        <div>
+          <p class="eyebrow">이웃의 감사</p>
+          <h2 class="sec-title">오늘, 누군가 감사한 일</h2>
+          <p class="sec-sub">이웃이 나눈 감사들이에요. 댓글 대신 '나도 감사해요' 빛만 보낼 수 있어서 비교도 상처도 없어요. 이름 없이 나누는 것도 괜찮아요.</p>
+        </div>
+        <a class="btn ghost" href="/member/signup">가입하고 더 많은 감사 보기</a>
+      </div>
+      <ul class="wall"><!--FEED--></ul>
+    </div>
+  </section>
+
+  <section class="sec end">
+    <div class="wrap end-in">
+      <span class="glow-dot big" aria-hidden="true"></span>
+      <h2 class="sec-title">오늘도 힘든 날이었지만,<br>그래도 감사한 순간이 있었구나.</h2>
+      <p class="sec-sub">그 마음이 쌓이는 곳. 오늘 첫 빛을 켜 보세요.</p>
+      <a class="btn primary big" href="/member/signup">무료로 시작하기</a>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <p class="foot-help">마음이 많이 힘들다면 혼자 견디지 마세요. <a href="tel:109">자살예방상담 109</a> · <a href="tel:15770199">정신건강위기상담 1577-0199</a> (24시간)</p>
+    <p class="foot-small">감사노트는 마음을 돌보는 작은 습관이며, 전문 치료를 대신하지 않아요. © 감사노트365</p>
+  </div>
+</footer>
+<script src="/js/landing.js?v=3" defer></script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>내 감사노트 · 감사노트365</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="감사노트">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="/css/style.css?v=7">
+</head>
+<body class="app">
+<header class="top">
+  <div class="wrap top-in">
+    <a class="logo" href="/note"><span class="logo-mark" aria-hidden="true"></span><span>감사노트<b>365</b></span></a>
+    <span class="acc" data-xms-account></span>
+  </div>
+</header>
+
+<main class="wrap note">
+  <!-- 지금 시간의 하늘 (새벽 · 아침 · 점심 · 늦은 오후 · 저녁 · 밤) — 그림 파일 없이 SVG, 색은 css .sky.<때> -->
+  <div class="sky" id="sky">
+    <svg class="sky-art" viewBox="0 0 1200 240" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="s1"/><stop offset=".6" class="s2"/><stop offset="1" class="s3"/></linearGradient>
+        <radialGradient id="sunG"><stop offset="0" class="sun-c"/><stop offset=".35" class="sun-c" stop-opacity=".55"/><stop offset="1" class="sun-c" stop-opacity="0"/></radialGradient>
+        <mask id="moonM"><rect x="-40" y="-40" width="80" height="80" fill="#fff"/><circle cx="14" cy="-8" r="22" fill="#000"/></mask>
+      </defs>
+      <rect width="1200" height="240" fill="url(#skyG)"/>
+      <g class="stars" fill="#fff">
+        <circle cx="90" cy="40" r="1.6"/><circle cx="180" cy="90" r="1.1"/><circle cx="260" cy="30" r="1.4"/><circle cx="340" cy="70" r="1"/><circle cx="430" cy="25" r="1.7"/><circle cx="520" cy="80" r="1.1"/><circle cx="600" cy="40" r="1.3"/><circle cx="700" cy="20" r="1"/><circle cx="760" cy="95" r="1.4"/><circle cx="830" cy="45" r="1.1"/><circle cx="1010" cy="35" r="1.5"/><circle cx="1080" cy="85" r="1"/><circle cx="1150" cy="30" r="1.3"/><circle cx="140" cy="130" r="1"/><circle cx="470" cy="120" r="1.2"/><circle cx="1120" cy="140" r="1.1"/>
+      </g>
+      <g class="sun"><circle r="90" fill="url(#sunG)"/><circle r="26" class="sun-core"/></g>
+      <g class="moon"><circle r="70" fill="url(#sunG)" opacity=".35"/><circle r="22" fill="#fff6dc" mask="url(#moonM)"/></g>
+      <g class="clouds">
+        <g class="cl a"><ellipse cx="0" cy="0" rx="62" ry="15"/><ellipse cx="-24" cy="-10" rx="30" ry="16"/><ellipse cx="18" cy="-13" rx="34" ry="19"/></g>
+        <g class="cl b"><ellipse cx="0" cy="0" rx="48" ry="12"/><ellipse cx="-14" cy="-9" rx="24" ry="13"/><ellipse cx="14" cy="-10" rx="26" ry="14"/></g>
+        <g class="cl c"><ellipse cx="0" cy="0" rx="70" ry="14"/><ellipse cx="20" cy="-11" rx="36" ry="17"/></g>
+      </g>
+      <path class="h1" d="M0 170 C120 130 230 150 330 140 C450 128 560 92 700 118 C820 140 930 104 1040 110 C1110 114 1160 126 1200 132 V240 H0Z"/>
+      <path class="h2" d="M0 196 C140 168 260 176 380 170 C520 162 610 140 760 160 C880 176 1000 150 1200 168 V240 H0Z"/>
+      <path class="h3" d="M0 222 C160 204 320 214 470 206 C640 197 780 212 930 202 C1050 195 1130 204 1200 208 V240 H0Z"/>
+    </svg>
+    <div class="greet">
+      <p class="greet-date"><span id="gTime"></span><span id="gDate"></span></p>
+      <h1 class="greet-title" id="gTitle">오늘 하루도 수고했어요</h1>
+    </div>
+  </div>
+  <script>(function(){var h=new Date().getHours(),t=h>=4&&h<6?'dawn':h<11&&h>=6?'morning':h>=11&&h<15?'noon':h>=15&&h<18?'afternoon':h>=18&&h<20?'evening':'night';document.getElementById('sky').className='sky '+t;})();</script>
+  <p class="gift" id="gift" hidden></p>
+
+  <div class="seg" id="tabs" role="tablist">
+    <span class="seg-ind" aria-hidden="true"></span>
+    <button role="tab" data-tab="today" class="on">오늘</button>
+    <button role="tab" data-tab="share">나눔</button>
+    <button role="tab" data-tab="look">돌아보기</button>
+    <button role="tab" data-tab="set">설정</button>
+  </div>
+
+  <!-- 오늘 -->
+  <section class="panel" data-panel="today">
+    <!-- 처음 한 번: 하루 몇 개 · 도움 질문 (설정에서 다시 바꿀 수 있다) -->
+    <div class="box onboard" id="onboard" hidden>
+      <div class="ob-step" data-step="1">
+        <p class="eyebrow">반가워요, 감사노트를 시작해요</p>
+        <h2 class="ob-q">하루에 몇 가지 감사를 기록할까요?</h2>
+        <p class="sec-sub">나중에 설정에서 언제든 바꿀 수 있어요. 목표보다 적게 적어도 빛은 켜져요.</p>
+        <div class="choices">
+          <button type="button" data-goal="3"><b>3가지</b><span>처음이라면 추천해요</span></button>
+          <button type="button" data-goal="5"><b>5가지</b><span>조금 더 찾아볼래요</span></button>
+          <button type="button" data-goal="10"><b>10가지</b><span>마음껏 적고 싶어요</span></button>
+        </div>
+      </div>
+      <div class="ob-step" data-step="2" hidden>
+        <p class="eyebrow">하나만 더 여쭤볼게요</p>
+        <h2 class="ob-q">감사꺼리를 찾을 수 있게<br>도움 질문을 드릴까요?</h2>
+        <p class="sec-sub">"오늘 나를 웃게 한 사람은 누구였나요?" 같은 질문을 하나씩 보여 드려요. 끄면 빈 줄에 생각나는 대로 적으면 돼요.</p>
+        <div class="choices two">
+          <button type="button" data-helps="1"><b>네, 질문을 보여 주세요</b><span>무엇을 쓸지 막힐 때 도움이 돼요</span></button>
+          <button type="button" data-helps="0"><b>아니요, 제가 생각해서 쓸게요</b><span>질문 없이 깔끔하게 적어요</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2 class="box-title">오늘 마음 날씨는 어땠나요?</h2>
+      <div class="moods" id="moods"></div>
+      <p class="mood-say" id="moodSay"></p>
+    </div>
+
+    <div class="box sos" id="sos" hidden>
+      <p><b>요즘 많이 힘드셨군요.</b> 그런 날에도 이곳에 와 준 것만으로 충분히 잘하고 있어요.<br>혼자 견디기 버거우면, 지금 이야기 나눌 수 있는 곳이 있어요.</p>
+      <p class="sos-lines"><a class="btn" href="tel:109">자살예방상담 109</a><a class="btn" href="tel:15770199">정신건강위기상담 1577-0199</a></p>
+    </div>
+
+    <div class="box">
+      <div class="lights-head">
+        <h2 class="box-title" id="dayTitle">오늘의 감사</h2>
+        <span class="lights" id="lights" aria-live="polite"></span>
+      </div>
+      <div class="ask" id="askBox">
+        <span class="ask-q" id="askQ"></span>
+        <button type="button" class="ask-more" id="askMore">다른 질문</button>
+      </div>
+      <ol class="lines" id="lines"></ol>
+      <div class="lines-foot">
+        <button type="button" class="btn ghost small" id="addLine">+ 하나 더 적기</button>
+        <span class="saved" id="saved" aria-live="polite"></span>
+      </div>
+    </div>
+
+    <div class="box done" id="done" hidden>
+      <span class="glow-dot big" aria-hidden="true"></span>
+      <p class="done-say" id="doneSay"></p>
+      <button type="button" class="btn ghost small" data-go="share">이웃의 감사 보러 가기</button>
+    </div>
+
+    <div class="box near" id="nearBox" hidden>
+      <div class="near-head"><h2 class="box-title">이웃의 오늘 감사</h2><button type="button" class="btn ghost small" data-go="share">더 보기</button></div>
+      <ul class="feed one" id="near"></ul>
+    </div>
+
+    <div class="box memory">
+      <h2 class="box-title">기억 꺼내기</h2>
+      <p class="sec-sub">예전에 적어 둔 감사 하나를 꺼내 읽어요. 지난날의 내가 오늘의 나를 위로해 줘요.</p>
+      <div class="memory-card" id="memCard" hidden></div>
+      <button type="button" class="btn ghost small" id="memBtn">하나 꺼내기</button>
+    </div>
+  </section>
+
+  <!-- 나눔 -->
+  <section class="panel" data-panel="share" hidden>
+    <p class="sec-sub">이웃이 나눈 감사예요. 마음이 닿으면 빛을 보내 주세요. 내가 적은 감사는 '나누기'를 켠 것만 여기에 보여요(이유는 나만 봐요).</p>
+    <ul class="feed one" id="feed"></ul>
+    <button type="button" class="btn ghost small more" id="feedMore" hidden>더 보기</button>
+  </section>
+
+  <!-- 돌아보기 -->
+  <section class="panel" data-panel="look" hidden>
+    <div class="stats">
+      <div class="stat"><b id="sLights">0</b><span>모은 빛</span></div>
+      <div class="stat"><b id="sDays">0</b><span>감사한 날</span></div>
+      <div class="stat"><b id="sYear">0</b><span>올해 켜진 날</span></div>
+    </div>
+    <div class="box">
+      <h2 class="box-title"><span id="yearLabel"></span> 빛 달력</h2>
+      <p class="sec-sub">감사를 적은 날마다 빛이 켜져요. 목표만큼 적은 날은 더 밝게. 점을 누르면 그날의 감사를 볼 수 있어요.</p>
+      <div class="cal" id="cal"></div>
+    </div>
+    <div class="box" id="dayView" hidden></div>
+    <div class="box">
+      <h2 class="box-title">최근 30일 마음 날씨</h2>
+      <div class="weather" id="weather"></div>
+      <p class="sec-sub" id="weatherSay"></p>
+    </div>
+  </section>
+
+  <!-- 설정 -->
+  <section class="panel" data-panel="set" hidden>
+    <div class="box">
+      <h2 class="box-title">하루 목표</h2>
+      <p class="sec-sub">처음엔 세 가지를 권해요. 목표보다 적게 적어도 빛은 켜져요.</p>
+      <div class="seg small" id="goalSeg">
+        <span class="seg-ind" aria-hidden="true"></span>
+        <button data-goal="3">3가지</button>
+        <button data-goal="5">5가지</button>
+        <button data-goal="10">10가지</button>
+      </div>
+    </div>
+    <div class="box">
+      <h2 class="box-title">감사꺼리 찾기</h2>
+      <p class="sec-sub">무엇을 쓸지 막힐 때 질문 카드를 하나씩 보여 드려요. 끄면 질문 없이 생각나는 대로 적어요.</p>
+      <label class="switch"><input type="checkbox" id="helps"><span></span>도움 질문 보여 주기</label>
+    </div>
+    <div class="box">
+      <h2 class="box-title">감사 알림</h2>
+      <p class="sec-sub">하루 한 번, 고른 시간에 다정하게 알려 드려요. 그날 이미 적었다면 보내지 않아요. 잠들기 전 저녁 시간을 권해요.</p>
+      <div class="row">
+        <label class="switch"><input type="checkbox" id="remOn"><span></span>알림 받기</label>
+        <input type="time" id="remTime" step="600" aria-label="알림 시간">
+      </div>
+      <div class="push" id="pushBox"></div>
+    </div>
+    <div class="box">
+      <h2 class="box-title">나눔</h2>
+      <label class="switch"><input type="checkbox" id="shareDef"><span></span>새로 적는 감사를 기본으로 나누기</label>
+      <div class="row nick">
+        <label for="nick">나눔에 보일 이름</label>
+        <input id="nick" maxlength="12" placeholder="비우면 '익명의 이웃'">
+      </div>
+      <p class="sec-sub small-note">이름을 적으면 <a href="/member/mypage">내 정보</a>의 프로필 사진도 함께 보여요. 비워 두면 사진 없이 '익명의 이웃'으로 나눠져요.</p>
+      <span class="saved" id="setSaved" aria-live="polite"></span>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <p class="foot-help">마음이 많이 힘들다면 혼자 견디지 마세요. <a href="tel:109">자살예방상담 109</a> · <a href="tel:15770199">정신건강위기상담 1577-0199</a> (24시간)</p>
+    <p class="foot-small">감사노트는 마음을 돌보는 작은 습관이며, 전문 치료를 대신하지 않아요. © 감사노트365</p>
+  </div>
+</footer>
+<!--G-->
+<script src="/js/note.js?v=6"></script>
+</body>
+</html>

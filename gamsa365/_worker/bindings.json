@@ -1,0 +1,36 @@
+{
+  "xim": true,
+  "assets": {
+    "run_worker_first": [
+      "/*",
+      "!/css/*",
+      "!/js/*",
+      "!/icons/*",
+      "!/img/*",
+      "!/sw.js",
+      "!/manifest.webmanifest"
+    ]
+  },
+  "vars": {
+    "VAPID_PUBLIC": "BL6cc8J6BpdEcHYrMysIyISMadXFEAlAMNxnn9km_nxCUy65Wic9kwSTQ0RhLAo2DLvMYRORXZJDzZMQitJRMM4"
+  },
+  "triggers": {
+    "crons": [
+      "*/10 * * * *"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gamsa365",
+      "database_id": "f4ba1b0b-e7a5-4d40-accc-d08668b29e46"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "thanks365.plators.com",
+      "custom_domain": true
+    }
+  ],
+  "workers_dev": true
+}
