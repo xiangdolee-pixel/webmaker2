@@ -281,8 +281,8 @@ async function renderPortfolio2() {
   if (tab !== 'portfolio2') return;
   view.innerHTML = `
     <div class="bar"><h2>포트폴리오2 ${pf2.length}</h2>
-      <form class="pf2-add" data-add><input class="input" name="url" required placeholder="https://example.kr/ 또는 한글주소.kr" autocomplete="off" aria-label="사이트 주소"><button class="btn primary" type="submit">가져오기</button></form></div>
-    <p class="meta mon-rule">xim 에서 만들지 않은 사이트도 포트폴리오에 올립니다. 주소를 넣으면 카톡 미리보기(썸네일 · 사이트명 · 설명)를 한 번만 읽어 xim 에 저장하고(그림 포함), 그 뒤로는 그 사이트 서버에 다시 묻지 않습니다. 포트폴리오에는 xim 사이트 다음에 같은 모양으로 나옵니다.</p>
+      <form class="pf2-add" data-add><input class="input" name="url" required placeholder="https://example.kr/ 또는 한글주소.kr" autocomplete="off" aria-label="사이트 주소"><button class="btn primary" type="submit">가져오기</button><button class="btn" type="button" data-manual>직접 넣기</button></form></div>
+    <p class="meta mon-rule">xim 에서 만들지 않은 사이트도 포트폴리오에 올립니다. 주소를 넣고 가져오기를 누르면 카톡 미리보기(썸네일 · 사이트명 · 설명)를 한 번만 읽어 xim 에 저장하고(그림 포함), 그 뒤로는 그 사이트 서버에 다시 묻지 않습니다. 미리보기가 없거나 읽히지 않는 사이트는 직접 넣기로 주소 · 사이트명 · 설명 · 그림을 손으로 넣습니다. 포트폴리오에는 xim 사이트 다음에 같은 모양으로 나옵니다.</p>
     <div class="rows">${pf2.map((l) => `
       <article class="card srow pf2-row${l.shown ? '' : ' off'}" data-id="${l.id}">
         ${pf2Thumb(l)}
@@ -296,6 +296,7 @@ async function renderPortfolio2() {
         </div>
       </article>`).join('') || '<div class="card empty">아직 넣은 사이트가 없습니다. 위에 주소를 넣어 보세요.</div>'}</div>`;
   const form = view.querySelector('[data-add]');
+  form.querySelector('[data-manual]').onclick = () => pf2Dialog({ url: form.url.value.trim(), name: '', tag: '홈페이지', description: '', image: '' });
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     busy(form.querySelector('button'), null, async () => {
@@ -347,10 +348,10 @@ async function shrinkImage(file) {
 }
 function pf2Dialog(l) {
   openDialog(`
-    <h2>포트폴리오2 수정</h2>
+    <h2>포트폴리오2 ${l.id ? '수정' : '직접 넣기'}</h2>
     <form>
       <div class="pf2-prev" data-prev>${pf2Thumb(l)}</div>
-      <label class="field"><span>주소</span><input class="input" name="url" value="${esc(l.url)}" required></label>
+      <label class="field"><span>주소</span><input class="input" name="url" value="${esc(l.url)}" required placeholder="https://example.kr/" autocomplete="off"></label>
       <div class="row2">
         <label class="field"><span>사이트명</span><input class="input" name="name" value="${esc(l.name)}" required maxlength="120"></label>
         <label class="field"><span>분류</span><input class="input" name="tag" value="${esc(l.tag)}" maxlength="40" placeholder="홈페이지" list="pf-tags">${PF_TAGS}</label>
@@ -361,28 +362,40 @@ function pf2Dialog(l) {
           <button class="btn sm" type="button" data-img-del${l.image ? '' : ' hidden'}>그림 빼기</button></div>
         <small>jpg · png · webp · gif. 큰 사진도 자동으로 줄여서 올립니다. 가로 1200 × 세로 630 비율이 가장 잘 맞습니다. 그림이 없으면 사이트명 첫 글자로 보입니다.</small></div>
       <p class="err" role="alert"></p>
-      <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">저장</button></div>
+      <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">${l.id ? '저장' : '추가'}</button></div>
     </form>`, (dlg) => {
     const form = dlg.querySelector('form');
     // 그림은 고르는 즉시 올려 저장한다 (저장 버튼과 따로)
     const prev = dlg.querySelector('[data-prev]');
     const del = dlg.querySelector('[data-img-del]');
     const showImg = (row) => { l.image = row.image; prev.innerHTML = pf2Thumb(row); del.hidden = !row.image; renderPortfolio2(); };
+    // 직접 넣기(아직 id 없음): 고른 그림은 들고 있다가 추가할 때 함께 올린다
+    let pending = null, pendingUrl = '';
+    const sendImg = async (id, blob) => {
+      const res = await fetch(`/api/portfolio2/${id}/image`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': blob.type || 'image/jpeg' }, body: blob });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || `올리지 못했습니다 (${res.status})`);
+      return out.row;
+    };
     const up = dlg.querySelector('[data-up]'), err = form.querySelector('.err');
     dlg.querySelector('[data-img]').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       e.target.value = '';
       if (!file || up.classList.contains('busy')) return;
+      if (!l.id) {
+        try { pending = await shrinkImage(file); } catch (x) { err.textContent = x.message; return; }
+        if (pendingUrl) URL.revokeObjectURL(pendingUrl);
+        pendingUrl = URL.createObjectURL(pending);
+        prev.innerHTML = `<span class="pf2-thumb"><img src="${pendingUrl}" alt=""><b></b></span>`;
+        del.hidden = false; err.textContent = '';
+        return;
+      }
       // 고르자마자 미리보기 + '올리는 중…' (예전엔 아무 변화가 없어 안 되는 것처럼 보였다)
       const local = URL.createObjectURL(file);
       prev.innerHTML = `<span class="pf2-thumb uploading"><img src="${local}" alt=""><i>올리는 중…</i></span>`;
       up.classList.add('busy'); up.firstChild.textContent = '올리는 중…'; err.textContent = '';
       try {
-        const blob = await shrinkImage(file);
-        const res = await fetch(`/api/portfolio2/${l.id}/image`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': blob.type || 'image/jpeg' }, body: blob });
-        const out = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(out.error || `올리지 못했습니다 (${res.status})`);
-        showImg(out.row);
+        showImg(await sendImg(l.id, await shrinkImage(file)));
         toast('그림을 올렸습니다.');
       } catch (x) {
         prev.innerHTML = pf2Thumb(l);   // 예전 그림으로 되돌림
@@ -393,6 +406,7 @@ function pf2Dialog(l) {
       }
     });
     del.onclick = () => busy(del, form.querySelector('.err'), async () => {
+      if (!l.id) { pending = null; prev.innerHTML = pf2Thumb(l); del.hidden = true; return; }
       const r = await api(`/portfolio2/${l.id}/image`, { method: 'DELETE' });
       showImg(r.row);
       toast('그림을 뺐습니다.');
@@ -400,6 +414,14 @@ function pf2Dialog(l) {
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       busy(form.querySelector('[type=submit]'), form.querySelector('.err'), async () => {
+        if (!l.id) {
+          const r = await api('/portfolio2', { method: 'POST', data: { ...formData(form), manual: true } });
+          if (pending) { try { await sendImg(r.row.id, pending); } catch (x) { toast(`추가는 했지만 그림은 못 올렸습니다: ${x.message}`); } }
+          dlg.close();
+          toast(`"${r.row.name}" 을(를) 포트폴리오에 올렸습니다.`);
+          renderPortfolio2();
+          return;
+        }
         await api(`/portfolio2/${l.id}`, { method: 'PUT', data: formData(form) });
         dlg.close();
         toast('저장했습니다.');

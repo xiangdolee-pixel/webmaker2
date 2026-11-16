@@ -529,10 +529,21 @@ async function ximApi(request, env, url, ctx) {
     return json(results);
   }
   if (path === '/api/portfolio2' && method === 'POST') {
-    const url = pf2Url((await body(request)).url);
+    const v = await body(request);
+    const url = pf2Url(v.url);
+    const top0 = () => db.prepare('SELECT COALESCE(MAX(sort), 0) AS n FROM portfolio_links').first();
+    if (v.manual) {
+      // 직접 넣기: 그 사이트를 읽지 않고 운영자가 쓴 값 그대로 (그림은 따로 /image 로 올린다)
+      const name = str(v.name, 120);
+      if (!name) throw bad('사이트명을 넣어 주세요.');
+      const row = await db.prepare('INSERT INTO portfolio_links (url, name, description, image, tag, shown, sort, created_at) VALUES (?, ?, ?, \'\', ?, 1, ?, ?) RETURNING *')
+        .bind(url, name, str(v.description, 300), str(v.tag, 20) || '홈페이지', (await top0()).n + 1, now()).first();
+      await audit(db, request, 'PF2_CREATE', row.name, `${row.url} (직접)`);
+      return json({ row });
+    }
     const meta = await scrapeMeta(url);
     const image = meta.image ? await pf2SaveRemote(env, meta.image) : '';
-    const top = await db.prepare('SELECT COALESCE(MAX(sort), 0) AS n FROM portfolio_links').first();
+    const top = await top0();
     const row = await db.prepare('INSERT INTO portfolio_links (url, name, description, image, tag, shown, sort, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?) RETURNING *')
       .bind(meta.url || url, meta.name || new URL(url).hostname, meta.desc || '', image, '홈페이지', top.n + 1, now()).first();
     await audit(db, request, 'PF2_CREATE', row.name, row.url);
