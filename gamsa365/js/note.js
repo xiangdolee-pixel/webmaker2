@@ -2,12 +2,13 @@
 //   첫 자료는 Worker 가 html 에 함께 넣는다(window.__G) → 뜨자마자 그린다. 저장은 하루 단위(PUT /api/day)로 조용히.
 //   마음 쓰는 원칙: 재촉 · 비교 · 끊김(연속 기록) 없이, 적은 만큼 빛이 켜지고, 힘든 날엔 하나로도 충분하게.
 (() => {
+  try { localStorage.setItem('g365_in', '1'); } catch { /* 없음 */ }   // 소개 페이지가 '로그인한 적 있음'을 알고 바로 내 노트로 넘기게
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const api = async (path, opt = {}) => {
     const res = await fetch(path, { method: opt.method || 'GET', headers: opt.data ? { 'Content-Type': 'application/json' } : {}, body: opt.data ? JSON.stringify(opt.data) : undefined, credentials: 'same-origin' });
-    if (res.status === 401) { location.href = '/member/login?next=%2Fnote'; throw new Error('login'); }
+    if (res.status === 401) { try { localStorage.removeItem('g365_in'); } catch { /* 없음 */ } location.href = '/member/login?next=%2Fnote'; throw new Error('login'); }
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(d.error || '잠시 뒤에 다시 해 주세요.');
     return d;

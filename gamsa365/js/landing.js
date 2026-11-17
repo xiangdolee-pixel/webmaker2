@@ -32,3 +32,23 @@
     document.getElementById('tryDone').hidden = false;
   });
 })();
+
+// 로그인한 사람에게는 소개 페이지를 보여 주지 않는다 — 늘 내 노트(/note)로 (사용자 지시 2026-11-17).
+//   보통은 서버가 바로 넘기지만, 로그인 전에 받아 둔 화면이 다시 나올 때(뒤로 가기 · 미리 그려 둔 화면 · 브라우저가 들고 있던 화면)는 서버를 안 거친다 → 여기서 한 번 더 본다.
+(function () {
+  var busy = false;
+  function go() {
+    if (busy) return;
+    busy = true;
+    fetch('/xms-api/me', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (me) { busy = false; if (me && me.login_id && !me.guest) location.replace('/note'); })
+      .catch(function () { busy = false; });
+  }
+  var nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {};
+  if (document.prerendering) document.addEventListener('prerenderingchange', go, { once: true });
+  else if (nav.activationStart > 0 || nav.type === 'back_forward') go();
+  else { try { if (localStorage.getItem('g365_in')) go(); } catch (_) {} }
+  window.addEventListener('pageshow', function (e) { if (e.persisted) go(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { try { if (localStorage.getItem('g365_in')) go(); } catch (_) {} } });
+})();
