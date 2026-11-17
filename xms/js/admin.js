@@ -122,7 +122,7 @@ let favVer = Date.now();
 function renderSide() {
   const s = INFO.site;
   const pct = s.quota_mb ? Math.round((s.used_mb / s.quota_mb) * 100) : 0;
-  $('#side').innerHTML = `<a class="brand" href="/" target="_blank" rel="noopener"><i>${esc(s.slug.slice(0, 2).toUpperCase())}<img src="/xms/file/favicon-192.png?v=${favVer}" alt="" onload="this.parentElement.classList.add('has-fav')" onerror="this.remove()"></i><span><b>${esc(s.name)}</b><small>${esc(s.domain || s.slug)}</small></span></a>
+  $('#side').innerHTML = `<a class="brand" href="/" target="_blank" rel="noopener"><i>${esc(s.slug.slice(0, 2).toUpperCase())}<img src="/xms/file/favicon-192.png?v=${favVer}" alt="" onload="this.parentElement.classList.add('has-fav')" onerror="this.remove()"></i><span><b>${esc(s.name)}</b><small>${esc(s.domain || s.slug)} <button type="button" class="dom-copy" data-url="${esc(s.domain ? `https://${s.domain}` : location.origin)}" title="사이트 주소 복사">복사</button></small></span></a>
     ${sideGroups().map(([group, items]) => `${group ? `<h4>${group}</h4>` : ''}${items.map(([href, label, icon]) => `<a href="${href}">${SIDE_ICON[icon] || ''}<span class="lbl">${label}</span>${icon === 'storage' ? `<span class="meter${pct >= 90 ? ' full' : ''}">${pct}%</span>` : ''}</a>`).join('')}`).join('')}
     <p class="foot">${esc(s.name)} 관리자 화면</p>`;
 }
@@ -138,7 +138,16 @@ function markSide() {
 const side = $('#side');
 $('#menu-btn').addEventListener('click', () => side.classList.toggle('open'));
 $('#side-dim').addEventListener('click', () => side.classList.remove('open'));
-side.addEventListener('click', (e) => { if (e.target.closest('a[href^="#/"]')) side.classList.remove('open'); });
+side.addEventListener('click', (e) => {
+  // 사이트 주소 옆 '복사' — https:// 를 붙인 주소를 복사한다 (사이트 열기 링크 안에 있어서 링크는 막는다)
+  const c = e.target.closest('.dom-copy');
+  if (c) {
+    e.preventDefault();
+    navigator.clipboard.writeText(c.dataset.url).then(() => toast('주소를 복사했습니다.'), () => toast('복사하지 못했습니다. 주소를 직접 골라 복사해 주세요.'));
+    return;
+  }
+  if (e.target.closest('a[href^="#/"]')) side.classList.remove('open');
+});
 
 // ───────── 화면 바꾸기 ─────────
 addEventListener('hashchange', () => route());
