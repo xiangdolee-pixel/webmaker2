@@ -987,7 +987,7 @@ function btnPager(key, page, size, total) {
   return `<nav class="pager">${start > 1 ? btn(start - 1, '‹') : ''}${nums.map((n) => btn(n)).join('')}${start + 5 <= pages ? btn(start + 5, '›') : ''}</nav>`;
 }
 async function statsPage() {
-  main.innerHTML = `${head('사이트', '방문 통계', '홈페이지 방문자와 많이 본 페이지입니다. 최근 1년치만 남고 그보다 오래된 기록은 저절로 지워집니다.')}
+  main.innerHTML = `${head('사이트', '방문 통계', '홈페이지 방문자와 많이 본 페이지입니다. 2026년 11월 18일부터는 실제로 화면을 띄운 방문만 세고 봇 · 관리자 방문은 뺍니다(그 전 숫자에는 봇이 섞여 있습니다). 최근 1년치만 남고 그보다 오래된 기록은 저절로 지워집니다.')}
     <div class="st-bar"><div class="tabs" id="st-tabs"></div></div>
     <div id="st-body"></div>`;
   const pg = { pp: 1, rp: 1, tp: 1, kp: 1, sp: 1 }; // 많이 본 페이지 · 들어온 곳 · 표 · 검색어 · 최근 검색 유입 쪽 번호

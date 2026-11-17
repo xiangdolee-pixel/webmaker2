@@ -443,7 +443,10 @@ async function ximApi(request, env, url, ctx) {
         }
       })());
     }
-    const [{ results }, { results: admins }, use, { results: favs }] = await Promise.all([db.prepare(`
+    // 오늘 · 어제 방문자 (xms 방문 통계의 숫자만 — 사이트마다 xms 에 들어가 보지 않아도 되게, 사용자 지시 2026-11-17)
+    const kd = (ms) => new Date(ms + 9 * 3600000).toISOString().slice(0, 10);
+    const today = kd(now()), yesterday = kd(now() - 86400000);
+    const [{ results }, { results: admins }, use, { results: favs }, { results: vis }] = await Promise.all([db.prepare(`
       SELECT s.*, c.name AS customer_name,
         (SELECT COUNT(*) FROM requests r WHERE r.site_id = s.id AND r.status != 'done') AS open_requests
       FROM sites s LEFT JOIN customers c ON c.id = s.customer_id
@@ -453,11 +456,14 @@ async function ximApi(request, env, url, ctx) {
       siteUsage(env),
       // 파비콘 (xms 에 올린 것) — 카드 이름 옆에 보인다
       env.XMS_DB.prepare("SELECT site, updated_at FROM site_files WHERE kind = 'favicon-32'").all(),
+      env.XMS_DB.prepare('SELECT site, day, views, visitors FROM visit_days WHERE day IN (?, ?)').bind(today, yesterday).all(),
     ]);
+    const visit = {};
+    for (const v of vis) (visit[v.site] ||= {})[v.day === today ? 'today' : 'yesterday'] = { visitors: v.visitors, views: v.views };
     const count = Object.fromEntries(admins.map((a) => [a.site, a.n]));
     const fav = Object.fromEntries(favs.map((f) => [f.site, f.updated_at]));
     // 봇 확인 비밀 키(turnstile_secret)는 화면에 필요 없다 — 내려보내지 않는다
-    return json(results.map(({ turnstile_secret, ...s }) => ({ ...s, admin_count: count[s.slug] || 0, url: siteUrl(s), favicon: fav[s.slug] ? `${siteUrl(s)}/xms/file/favicon-32.png?v=${fav[s.slug]}` : s.site_favicon ? `${siteUrl(s)}${s.site_favicon}` : '', usage: use[s.slug] || { db: 0, files: 0, file_count: 0, r2: 0, d1_files: 0 } })));
+    return json(results.map(({ turnstile_secret, ...s }) => ({ ...s, visits: { today: visit[s.slug]?.today || { visitors: 0, views: 0 }, yesterday: visit[s.slug]?.yesterday || { visitors: 0, views: 0 } }, admin_count: count[s.slug] || 0, url: siteUrl(s), favicon: fav[s.slug] ? `${siteUrl(s)}/xms/file/favicon-32.png?v=${fav[s.slug]}` : s.site_favicon ? `${siteUrl(s)}${s.site_favicon}` : '', usage: use[s.slug] || { db: 0, files: 0, file_count: 0, r2: 0, d1_files: 0 } })));
   }
   if (path === '/api/sites' && method === 'POST') {
     const raw = await body(request);

@@ -129,13 +129,17 @@ export default {
   },
 };
 // ───── 방문 통계 (xms "방문 통계") ─────
-//   방문자가 html 페이지를 열면 xms 에 알린다(기다리지 않음). 그날 처음 온 브라우저에는 쿠키 xms_v=<날짜> 를 남겨 방문자 수를 센다.
+//   브라우저가 페이지를 실제로 화면에 띄운 뒤 보내는 신호(/site-api/visit)만 방문으로 센다 (사용자 지시 2026-11-17 "봇은 제외").
+//     전에는 서버가 html 요청을 받을 때 셌는데, 브라우저인 척하는 수집 · 점검 프로그램이 쿠키 없이 첫 화면만 열고 가서 방문자가 크게 부풀었다
+//     (어제 만든 감사노트365 가 하루 79명 — 대부분 들어온 곳 없음 · 첫 화면 한 번). 그런 프로그램은 화면을 그리지 않아 신호를 보내지 않는다.
+//   그날 처음 온 브라우저에는 쿠키 xms_v=<날짜> 를 남겨 방문자 수를 센다. 신호는 페이지가 뜬 뒤 뒤에서 보내므로 속도에는 영향이 없다.
 //   관리 화면 · API · 검색엔진 로봇 · 미리 불러오기 · 오류 화면은 세지 않는다.
 const BOT = /bot|crawl|spider|slurp|scrap|preview|fetch|curl|wget|python|java\/|go-http|okhttp|axios|node|headless|lighthouse|pagespeed|monitor|uptime|facebookexternalhit|kakaotalk-scrap|yeti|daumoa/i;
 const MOBILE = /Mobi|Android|iPhone|iPad|iPod/i;
 const SEARCH_HOST = /^search\.|^google\.|^bing\.com$|yahoo\.|^duckduckgo\.com$|^yandex\.|^baidu\.com$|^ecosia\.org$/;
 const kstDay = () => new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
-export function countVisit(request, env, ctx, res) {
+export function countVisit(request, env, ctx, res, beacon = false) {
+  if (!beacon) return res;   // html 요청만으로는 세지 않는다 — 화면에 띄운 브라우저의 신호만
   if (request.headers.get('X-Edge-Fill')) return res;   // 가장자리(site-edge)가 캐시를 채우려고 부른 것 — 방문이 아님
   if (request.method !== 'GET' || (res.status !== 200 && res.status !== 304)) return res;
   const url = new URL(request.url);
@@ -145,6 +149,10 @@ export function countVisit(request, env, ctx, res) {
   const h = request.headers;
   const ua = h.get('User-Agent') || '';
   if (!ua || BOT.test(ua) || /prefetch|prerender/i.test(`${h.get('Sec-Purpose') || ''} ${h.get('Purpose') || ''}`)) return res;
+  if (request.cf?.verifiedBotCategory || request.cf?.botManagement?.verifiedBot) return res;   // Cloudflare 가 알아본 봇
+  if (!h.get('Accept-Language')) return res;   // 사람 브라우저는 늘 보낸다 — 없는 것은 프로그램
+  // 로그인한 사람의 세션(있으면) — xms 가 관리자(등급 1) · 운영자면 세지 않는다 (사이트를 손보는 사람의 방문은 방문 통계가 아니다)
+  const sess = ((h.get('Cookie') || '').match(/(?:^|;\s*)xms_sess=([0-9a-f]{64})/) || [])[1] || '';
   const day = kstDay();
   const fresh = !(h.get('Cookie') || '').split(/;\s*/).includes(`xms_v=${day}`);
   let ref = '';
@@ -157,7 +165,7 @@ export function countVisit(request, env, ctx, res) {
     }
   } catch { /* 바로 들어옴 */ }
   const path = p === '/index.html' || p === '/index' ? '/' : p.replace(/\.html?$/i, '').replace(/(.)\/+$/, '$1');
-  ctx.waitUntil(env.XMS.visit(env.XIM_SITE, { path, fresh, ref, rq, mobile: MOBILE.test(ua) }).catch(() => {}));
+  ctx.waitUntil(env.XMS.visit(env.XIM_SITE, { path, fresh, ref, rq, mobile: MOBILE.test(ua), sess }).catch(() => {}));
   if (!fresh) return res;
   const out = new Response(res.body, res);
   out.headers.append('Set-Cookie', `xms_v=${day}; Path=/; Max-Age=172800; SameSite=Lax${url.protocol === 'https:' ? '; Secure' : ''}`);
@@ -188,9 +196,15 @@ async function handle(request, env, ctx) {
     //   GET /site-api/inquiry-key → { sitekey },  POST /site-api/inquiry { name, contact, org, kind, message, turnstile } → { ok } | { error }
     // 미리 그려 둔(prerender) 페이지가 실제로 열렸다는 알림 → 방문으로 센다 (첫 방문 쿠키도 여기서)
     if (pathname === '/site-api/visit' && request.method === 'POST') {
+      // 다른 곳에서 대신 보낸 신호는 받지 않는다 (브라우저는 이 사이트 페이지에서 보낼 때 Origin = 이 사이트)
+      const og = request.headers.get('Origin');
+      if (og && og !== url.origin) return new Response(null, { status: 204 });
       const pg = (url.searchParams.get('p') || '/').slice(0, 300);
       const h = new Headers(request.headers); h.delete('Sec-Purpose'); h.delete('Purpose');
-      const r = countVisit(new Request(new URL(pg, url.origin), { headers: h }), env, ctx, new Response(null, { status: 200, headers: { 'Content-Type': 'text/html' } }));
+      // 들어온 곳: 신호 요청의 Referer 는 지금 페이지라서, 페이지가 알려 준 document.referrer(r) 로 바꾼다
+      const from = (url.searchParams.get('r') || '').slice(0, 800);
+      if (/^https?:\/\//i.test(from)) h.set('Referer', from); else h.delete('Referer');
+      const r = countVisit(new Request(new URL(pg, url.origin), { headers: h, cf: request.cf }), env, ctx, new Response(null, { status: 200, headers: { 'Content-Type': 'text/html' } }), true);
       return new Response(null, { status: 204, headers: r.headers.get('Set-Cookie') ? { 'Set-Cookie': r.headers.get('Set-Cookie') } : {} });
     }
     if (pathname === '/site-api/inquiry-key' || pathname === '/site-api/inquiry') {
@@ -424,8 +438,9 @@ async function withXms(res, request, env, data) {
       // 내 정보 · 관리 · 로그인 · 게시판 링크에 손가락(마우스)이 닿으면 그 화면을 미리 준비해 둔다 → 누르면 바로 뜬다 (크롬 · 엣지 · 안드로이드)
       // 사이트 안 모든 페이지도 손가락 · 마우스가 닿는 순간 미리 그려 둔다 → 누르면 즉시 (2026-11-14 "0.1초라도"). 로그아웃 · 파일 받기는 뺀다
       tags.push('<script type="speculationrules">{"prerender":[{"where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":"/xms/*"}},{"not":{"href_matches":"/xms-api/*"}},{"not":{"href_matches":"/member/logout*"}},{"not":{"href_matches":"/site-api/*"}},{"not":{"href_matches":"/*.(pdf|zip|hwp|docx?|xlsx?|pptx?)"}},{"not":{"selector_matches":"[download],[target=_blank],[rel~=nofollow]"}}]},"eagerness":"moderate"}]}</script>');
-      // 미리 그린 페이지는 서버가 방문으로 세지 않는다 → 실제로 열렸을 때 한 번 알린다
-      tags.push('<script>if(document.prerendering)document.addEventListener("prerenderingchange",function(){navigator.sendBeacon("/site-api/visit?p="+encodeURIComponent(location.pathname))},{once:true})</script>');
+      // 방문 신호: 페이지가 실제로 화면에 보일 때 한 번(미리 그린 페이지 · 뒤에 숨은 탭은 보이게 됐을 때). 서버는 이 신호만 방문으로 센다
+      //   → 화면을 안 그리는 봇, 자동으로 조종되는 브라우저(navigator.webdriver)는 빠진다
+      tags.push('<script>(function(){var d=document,s=function(){try{navigator.sendBeacon("/site-api/visit?p="+encodeURIComponent(location.pathname)+"&r="+encodeURIComponent(d.referrer||""))}catch(e){}};if(navigator.webdriver)return;var g=function(){if(d.visibilityState==="visible")s();else d.addEventListener("visibilitychange",function f(){if(d.visibilityState==="visible"){d.removeEventListener("visibilitychange",f);s()}})};if(d.prerendering)d.addEventListener("prerenderingchange",g,{once:true});else g()})()</script>');
       tags.push('<link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml">');
       for (const v of h.verify || []) tags.push(`<meta name="${attr(v.name)}" content="${attr(v.content)}">`);
       if (h.favicon) {

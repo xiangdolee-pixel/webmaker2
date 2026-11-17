@@ -1,4 +1,4 @@
-// 방문 통계 — 사이트 Worker 가 html 페이지를 내보낼 때마다 Cms.visit() 으로 알린다 (방문자에게는 기다림 없음, waitUntil)
+// 방문 통계 — 브라우저가 페이지를 화면에 띄운 뒤 보낸 신호(/site-api/visit)를 사이트 Worker 가 Cms.visit() 으로 알린다 (2026-11-17 부터: 봇 · 관리자 방문 제외)
 //   하루 단위로 더해 두고, 1년(366일)이 지난 날은 지운다. 날짜는 한국 시간.
 //   검색엔진에서 들어온 것은 한 번에 한 줄씩(visit_searches) 남겨 어떤 검색어로 어디서 왔는지 보여 준다.
 import { json } from './lib.js';
@@ -47,6 +47,12 @@ async function purge(db, site) {
 
 // hit = { path, fresh(그날 첫 방문), ref(들어온 곳 호스트), rq(들어온 곳 주소의 ? 뒷부분, 검색엔진일 때만), mobile }
 export async function recordVisit(db, site, hit) {
+  // 관리자(등급 1) · 운영자로 로그인한 사람의 방문은 세지 않는다 (사용자 지시 2026-11-17 "정말 유효한 방문만")
+  if (/^[0-9a-f]{64}$/.test(hit.sess || '')) {
+    const s = await db.prepare(`SELECT s.kind, m.level FROM sessions s LEFT JOIN members m ON m.id = s.member_id AND m.site = s.site
+      WHERE s.token = ? AND s.site = ? AND s.expires_at > ?`).bind(hit.sess, site, Date.now()).first();
+    if (s && (s.kind === 'staff' || s.level === 1)) return;
+  }
   const t = Date.now();
   const day = kstDay(t);
   const path = String(hit.path || '/').slice(0, 200);
