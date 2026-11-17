@@ -1196,7 +1196,7 @@ export default {
     if (url.pathname === '/map') {
       try { return await sharedMap(env, url); } catch (e) { return fail(e); }
     }
-    // 네이버로 시작하기(사용자 지시 2026-11-15): 네이버 앱("plators") 하나의 돌아오는 주소. 받은 프로필은 xms DB 의 그 사이트 상태 행에만 넣고
+    // 네이버로 시작하기(사용자 지시 2026-11-15): 네이버 앱("자두랩스") 하나의 돌아오는 주소. 받은 프로필은 xms DB 의 그 사이트 상태 행에만 넣고
     //   원래 사이트로 돌려보낸다 — 회원 정보는 xim 에 남기지 않는다. 자세한 흐름은 xms/_worker/social.js
     if (url.pathname === '/naver/go') {
       try { return await naverGo(env, url); } catch (e) { return fail(e); }
