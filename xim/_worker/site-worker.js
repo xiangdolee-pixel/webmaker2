@@ -165,7 +165,7 @@ export function countVisit(request, env, ctx, res, beacon = false) {
     }
   } catch { /* 바로 들어옴 */ }
   const path = p === '/index.html' || p === '/index' ? '/' : p.replace(/\.html?$/i, '').replace(/(.)\/+$/, '$1');
-  ctx.waitUntil(env.XMS.visit(env.XIM_SITE, { path, fresh, ref, rq, mobile: MOBILE.test(ua), sess }).catch(() => {}));
+  ctx.waitUntil(env.XMS.visit(env.XIM_SITE, { path, fresh, ref, rq, mobile: MOBILE.test(ua), sess, ip: h.get('CF-Connecting-IP') || '' }).catch(() => {}));
   if (!fresh) return res;
   const out = new Response(res.body, res);
   out.headers.append('Set-Cookie', `xms_v=${day}; Path=/; Max-Age=172800; SameSite=Lax${url.protocol === 'https:' ? '; Secure' : ''}`);

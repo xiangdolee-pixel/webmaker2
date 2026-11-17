@@ -46,6 +46,28 @@ async function purge(db, site) {
 }
 
 // hit = { path, fresh(그날 첫 방문), ref(들어온 곳 호스트), rq(들어온 곳 주소의 ? 뒷부분, 검색엔진일 때만), mobile }
+// 같은 사람이 하루에 여러 번(다른 브라우저 · 시크릿 창 · 쿠키를 지우고) 와도 방문자는 한 번만 센다 (사용자 지시 2026-11-17).
+//   쿠키(xms_v)가 없어도 같은 인터넷 주소(IP)에서 그날 이미 왔으면 방문자로 다시 세지 않는다 — 페이지뷰는 그대로 센다.
+//   IP 는 저장하지 않는다: 그날의 임의 값(소금)과 섞은 해시만 visit_seen 에 이틀 두었다가 지운다.
+//   같은 공유기를 쓰는 여러 사람(사무실 · 교회 · 가족)은 한 명으로 세어진다 — 부풀리는 것보다 낫다고 보고 이렇게 정함.
+const salts = new Map();
+async function daySalt(db, day) {
+  if (salts.has(day)) return salts.get(day);
+  const made = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  await db.prepare("INSERT OR IGNORE INTO visit_seen (site, day, h) VALUES ('', ?, ?)").bind(day, `salt:${made}`).run();
+  const r = await db.prepare("SELECT h FROM visit_seen WHERE site = '' AND day = ? AND h LIKE 'salt:%' ORDER BY rowid LIMIT 1").bind(day).first();
+  const salt = r?.h || `salt:${made}`;
+  salts.clear(); salts.set(day, salt);
+  return salt;
+}
+async function seenToday(db, site, day, ip) {
+  if (!ip) return false;
+  const salt = await daySalt(db, day);
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${salt}|${site}|${ip}`));
+  const h = [...new Uint8Array(buf)].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
+  const r = await db.prepare('INSERT OR IGNORE INTO visit_seen (site, day, h) VALUES (?, ?, ?)').bind(site, day, h).run();
+  return !r.meta.changes;   // 못 넣었으면(이미 있음) 오늘 온 적 있는 곳
+}
 export async function recordVisit(db, site, hit) {
   // 관리자(등급 1) · 운영자로 로그인한 사람의 방문은 세지 않는다 (사용자 지시 2026-11-17 "정말 유효한 방문만")
   if (/^[0-9a-f]{64}$/.test(hit.sess || '')) {
@@ -56,7 +78,8 @@ export async function recordVisit(db, site, hit) {
   const t = Date.now();
   const day = kstDay(t);
   const path = String(hit.path || '/').slice(0, 200);
-  const fresh = hit.fresh ? 1 : 0;
+  const again = await seenToday(db, site, day, String(hit.ip || '')).catch(() => false);
+  const fresh = hit.fresh && !again ? 1 : 0;
   const mob = fresh && hit.mobile ? 1 : 0;
   const stmts = [
     db.prepare(`INSERT INTO visit_days (site, day, views, visitors, mobile) VALUES (?, ?, 1, ?, ?)
@@ -72,6 +95,7 @@ export async function recordVisit(db, site, hit) {
   if (s) stmts.push(db.prepare('INSERT INTO visit_searches (site, day, at, engine, keyword, path) VALUES (?, ?, ?, ?, ?, ?)').bind(site, day, t, s.engine, s.keyword, path));
   await db.batch(stmts);
   if (Math.random() < 0.002) await purge(db); // 가끔 모든 사이트의 1년 지난 기록을 지운다
+  if (Math.random() < 0.02) await db.prepare('DELETE FROM visit_seen WHERE day < ?').bind(kstDay(t - 86400000)).run(); // 방문 확인용 해시는 이틀만
 }
 
 // 관리 화면: GET /xms-api/admin/stats?range=7|30|90|180|270|365&pp=1&rp=1&kp=1&sp=1

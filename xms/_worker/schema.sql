@@ -264,6 +264,13 @@ CREATE TABLE IF NOT EXISTS visit_refs (   -- 방문자가 들어온 곳 (다른 
   PRIMARY KEY (site, day, ref)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS idx_visit_days_day ON visit_days(day);
+-- 같은 사람(같은 인터넷 주소)이 하루에 여러 번 와도 방문자 한 번 — IP 는 저장하지 않고 그날의 소금과 섞은 해시만, 이틀 뒤 지움 (site '' 행 = 그날의 소금)
+CREATE TABLE IF NOT EXISTS visit_seen (
+  site TEXT NOT NULL,
+  day  TEXT NOT NULL,
+  h    TEXT NOT NULL,
+  PRIMARY KEY (site, day, h)
+);
 CREATE INDEX IF NOT EXISTS idx_visit_pages_day ON visit_pages(day);
 CREATE INDEX IF NOT EXISTS idx_visit_refs_day ON visit_refs(day);
 CREATE TABLE IF NOT EXISTS visit_searches ( -- 검색엔진에서 들어온 기록 한 번에 한 줄 (2026-11-09): 어떤 검색엔진 · 어떤 검색어(안 넘겨 주면 '') · 어느 페이지로
