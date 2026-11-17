@@ -1,0 +1,72 @@
+/* plators 서비스 소개 (xim.plators.com/service) — 네이버 로그인 검수용 공개 페이지. 운영자 화면(style.css)과 따로 */
+:root {
+  --ink: #16181d; --sub: #5b6170; --line: #e5e7ec; --bg: #fff; --alt: #f6f7f9; --brand: #111; --naver: #03c75a;
+  --r: 14px; --gut: clamp(16px, 4vw, 40px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.7 "Pretendard Variable", Pretendard, "Noto Sans KR", sans-serif; word-break: keep-all; }
+a { color: inherit; }
+a:focus-visible, .sv-btn:focus-visible { outline: 3px solid var(--naver); outline-offset: 2px; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 var(--gut); }
+h1, h2, h3 { margin: 0; line-height: 1.35; letter-spacing: -.02em; }
+h2 { font-size: clamp(22px, 3vw, 30px); margin-bottom: 14px; }
+h3 { font-size: 19px; margin: 32px 0 12px; }
+
+.sv-head { position: sticky; top: 0; z-index: 5; background: rgba(255, 255, 255, .92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.sv-head .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; }
+.sv-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; text-decoration: none; }
+.sv-brand img { border-radius: 8px; }
+.sv-nav { display: flex; gap: clamp(10px, 2vw, 24px); font-size: 15px; white-space: nowrap; }
+.sv-nav a { text-decoration: none; color: var(--sub); }
+.sv-nav a:hover { color: var(--ink); }
+
+.sv-hero { padding: clamp(48px, 9vw, 104px) 0 clamp(40px, 7vw, 80px); background: var(--alt); }
+.sv-hero h1 { font-size: clamp(28px, 4.6vw, 46px); }
+.sv-hero p { max-width: 640px; margin: 18px 0 0; color: var(--sub); font-size: clamp(16px, 1.6vw, 18px); }
+.sv-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.sv-btn { display: inline-flex; align-items: center; min-height: 50px; padding: 0 22px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font-weight: 700; text-decoration: none; transition: background .2s, border-color .2s; }
+.sv-btn:hover { border-color: #c9ccd3; }
+.sv-btn.primary { background: var(--naver); border-color: var(--naver); color: #fff; }
+.sv-btn.primary:hover { background: #02b351; }
+
+.sv-sec { padding: clamp(44px, 7vw, 80px) 0; }
+.sv-sec.alt { background: var(--alt); }
+.sv-lead { max-width: 760px; margin: 0 0 24px; color: var(--sub); }
+.sv-lead b { color: var(--ink); }
+
+.sv-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.sv-cards li { padding: 20px; border: 1px solid var(--line); border-radius: var(--r); background: #fff; }
+.sv-cards b { display: block; margin-bottom: 6px; font-size: 17px; }
+.sv-cards span { color: var(--sub); font-size: 15px; }
+
+.sv-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; font-size: 15px; }
+.sv-table th, .sv-table td { padding: 14px 16px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+.sv-table thead th { border-top: 0; background: #fafbfc; color: var(--sub); font-weight: 600; }
+.sv-table tbody th { width: 30%; font-weight: 700; }
+.sv-table small { display: block; color: var(--sub); font-weight: 400; }
+
+.sv-steps { margin: 0; padding-left: 22px; }
+.sv-steps li { margin: 6px 0; }
+.sv-steps em { color: var(--sub); font-style: normal; }
+.sv-note { margin: 24px 0 0; padding: 16px 18px; border-radius: var(--r); background: var(--alt); color: var(--sub); font-size: 15px; }
+
+.sv-sites { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.sv-sites li { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--r); background: #fff; }
+.sv-sites a { display: block; font-weight: 700; font-size: 17px; }
+.sv-sites span { color: var(--sub); font-size: 15px; }
+
+.sv-foot { padding: 28px 0; border-top: 1px solid var(--line); color: var(--sub); font-size: 14px; }
+
+@media (max-width: 860px) {
+  .sv-cards { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .sv-nav a:not([href="#naver"]) { display: none; }
+  .sv-cards, .sv-sites { grid-template-columns: 1fr; }
+  .sv-table thead { display: none; }
+  .sv-table, .sv-table tbody, .sv-table tr, .sv-table th, .sv-table td { display: block; width: auto; }
+  .sv-table tbody th { width: auto; padding-bottom: 2px; }
+  .sv-table td { border-top: 0; padding-top: 0; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

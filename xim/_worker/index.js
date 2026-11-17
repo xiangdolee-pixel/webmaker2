@@ -1196,7 +1196,7 @@ export default {
     if (url.pathname === '/map') {
       try { return await sharedMap(env, url); } catch (e) { return fail(e); }
     }
-    // 네이버로 시작하기(사용자 지시 2026-11-15): 네이버 앱("서비스 로그인") 하나의 돌아오는 주소. 받은 프로필은 xms DB 의 그 사이트 상태 행에만 넣고
+    // 네이버로 시작하기(사용자 지시 2026-11-15): 네이버 앱("plators") 하나의 돌아오는 주소. 받은 프로필은 xms DB 의 그 사이트 상태 행에만 넣고
     //   원래 사이트로 돌려보낸다 — 회원 정보는 xim 에 남기지 않는다. 자세한 흐름은 xms/_worker/social.js
     if (url.pathname === '/naver/go') {
       try { return await naverGo(env, url); } catch (e) { return fail(e); }
@@ -1283,7 +1283,7 @@ async function naverCallback(env, url) {
   const p = me?.resultcode === '00' ? me.response : null;
   if (!p?.id) return msg('네이버 회원 정보를 받지 못했습니다. 다시 해 주세요.', 502);
   const t = (v, n) => String(v ?? '').trim().slice(0, n);
-  const profile = { provider: 'naver', id: t(p.id, 100), email: t(p.email, 254).toLowerCase(), name: t(p.name, 50), nickname: t(p.nickname, 50), mobile: t(p.mobile, 20), avatar: t(p.profile_image, 500) };
+  const profile = { provider: 'naver', id: t(p.id, 100), email: t(p.email, 254).toLowerCase(), name: t(p.name, 50), nickname: t(p.nickname, 50), avatar: t(p.profile_image, 500) };
   await env.XMS_DB.prepare("UPDATE social_states SET profile = ? WHERE state = ? AND profile = ''").bind(JSON.stringify(profile), state).run();
   return back('');
 }
