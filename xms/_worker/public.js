@@ -212,7 +212,7 @@ async function signupPage(ctx) {
   <div class="mb-card">
     ${mbHead('user', '회원가입', `${nv.name} 계정으로 가입합니다. 남은 정보만 넣어 주세요.`)}
     <form data-form="signup" data-social="${nv.provider}" class="mb-form">
-      <div class="mb-verified ${nv.provider}"><span class="tag ${nv.provider === 'kakao' ? 'yellow' : 'green'}">${nv.name}</span><b>${esc(nv.p.email || nv.p.nickname || nv.p.name || `${nv.name} 계정`)}</b></div>
+      <div class="mb-verified ${nv.provider}"><span class="tag ${nv.provider === 'kakao' ? 'yellow' : nv.provider === 'google' ? 'blue' : 'green'}">${nv.name}</span><b>${esc(nv.p.email || nv.p.nickname || nv.p.name || `${nv.name} 계정`)}</b></div>
       ${avatarPick('', '선택 · 나중에 마이페이지에서 바꿀 수 있어요')}
       <div class="mb-group">${fields.filter((f) => f.mode !== 'EXCLUDED' && f.key !== 'email').map((f) => fieldInput(f, pre[f.key])).join('')}</div>
       ${agreeBox}
@@ -296,7 +296,7 @@ async function mypage(ctx) {
   const naverCard = shownP.length ? `<div class="mb-card">
     <h2 class="mb-sec">간편 로그인</h2>
     <div class="mb-social-list">${shownP.map((p) => `<div class="mb-social-row"><b>${PROVIDERS[p].name}</b>
-      ${linked.includes(p) ? `<p class="mb-naver-on"><span class="tag ${p === 'kakao' ? 'yellow' : 'green'}">연결됨</span> <b>${PROVIDERS[p].name}로 로그인</b> 버튼으로 로그인할 수 있어요.</p>`
+      ${linked.includes(p) ? `<p class="mb-naver-on"><span class="tag ${p === 'kakao' ? 'yellow' : p === 'google' ? 'blue' : 'green'}">연결됨</span> <b>${PROVIDERS[p].name}로 로그인</b> 버튼으로 로그인할 수 있어요.</p>`
       : `<p class="mb-note left">연결해 두면 다음부터 <b>${PROVIDERS[p].name}로 로그인</b> 버튼 하나로 로그인할 수 있어요.</p>${linkButton(p)}`}</div>`).join('')}</div>
   </div>` : '';
   return page(ctx, '마이페이지', `<section class="mb wide">
@@ -573,7 +573,7 @@ export async function publicPage(ctx) {
   const p = ctx.url.pathname.replace(/\/+$/, '') || '/';
   if (p === '/member/login') return loginPage(ctx);
   if (p === '/member/signup') return signupPage(ctx);
-  const sp = p.match(/^\/member\/(naver|kakao)(\/done)?$/);
+  const sp = p.match(/^\/member\/(naver|kakao|google)(\/done)?$/);
   if (sp) return sp[2] ? socialDone(ctx, sp[1], { msgPage }) : socialStart(ctx, sp[1], { msgPage });
   if (p === '/member/mypage') return mypage(ctx);
   if (p === '/member/welcome') return welcomePage(ctx);

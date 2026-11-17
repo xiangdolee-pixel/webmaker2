@@ -162,7 +162,7 @@ onForm('withdraw', async (form, data) => {
   location.href = '/';
 });
 if (new URLSearchParams(location.search).get('welcome')) toast('가입을 환영합니다!');
-{ const lk = new URLSearchParams(location.search).get('linked'); if (lk === 'naver' || lk === 'kakao') toast(`${lk === 'kakao' ? '카카오' : '네이버'} 계정을 연결했습니다.`); }
+{ const lk = new URLSearchParams(location.search).get('linked'); if (lk === 'naver' || lk === 'kakao' || lk === 'google') toast(`${lk === 'kakao' ? '카카오' : lk === 'google' ? 'Google' : '네이버'} 계정을 연결했습니다.`); }
 
 // 가입: 비밀번호 같음 확인 · 보기 · 모두 동의 · 약관 전문
 const pw = $('form[data-form=signup] [name=password]');

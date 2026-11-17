@@ -1,4 +1,7 @@
-// 네이버 · 카카오로 시작하기 (모든 xim 사이트 공통, 사용자 지시 2026-11-15 네이버 · 2026-11-16 카카오)
+// 네이버 · 카카오 · Google 로 시작하기 (모든 xim 사이트 공통, 사용자 지시 2026-11-15 네이버 · 2026-11-16 카카오 · 2026-11-17 Google)
+//   Google: 구글 클라우드 프로젝트 xim-login(xiangdolee 계정)의 웹 클라이언트 하나, 돌아오는 주소 https://xim.plators.com/google/callback,
+//     설정 xim DB settings.google_login = {"client_id": "…"} · 비밀값 xim Worker GOOGLE_LOGIN_SECRET. 받는 것은 이메일 · 이름 · 프로필 사진뿐(심사 불필요).
+//     카카오톡 · 네이버 앱 같은 앱 안 브라우저에서는 구글이 로그인을 막는다(403 disallowed_useragent) → 시작할 때 바깥 브라우저로 열도록 안내한다.
 //   앱은 운영자 것 하나씩(네이버 "자두랩스", 카카오 앱). 둘 다 등록한 돌아오는 주소로만 돌려보내므로 그 주소는 xim 한 곳:
 //     https://xim.plators.com/naver/callback · https://xim.plators.com/kakao/callback
 //     (네이버 지도와 같은 방식 — 사이트가 몇 개든 네이버 · 카카오에 따로 등록하지 않는다)
@@ -27,6 +30,12 @@ export const PROVIDERS = {
     name: '카카오', cls: 'mb-kakao', setting: 'kakao_login',
     logo: '<svg viewBox="0 0 18 18" aria-hidden="true"><path fill="#000" d="M9 1.2C4.4 1.2.7 4.1.7 7.7c0 2.3 1.5 4.3 3.8 5.5l-.97 3.55c-.09.31.27.56.54.38l4.24-2.8c.22.02.45.03.68.03 4.6 0 8.3-2.9 8.3-6.5S13.6 1.2 9 1.2z"/></svg>',
     authorize: (id, state) => `https://kauth.kakao.com/oauth/authorize?${new URLSearchParams({ response_type: 'code', client_id: id, redirect_uri: 'https://xim.plators.com/kakao/callback', state })}`,
+  },
+  // 구글 버튼 지침: 흰 바탕 · 회색 테두리 · 네 가지 색 G
+  google: {
+    name: 'Google', cls: 'mb-google', setting: 'google_login',
+    logo: '<svg viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.33-1.58-5.04-3.71H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.96 10.71A5.41 5.41 0 0 1 3.68 9c0-.6.1-1.17.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l3-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.96l3 2.33C4.67 5.16 6.66 3.58 9 3.58z"/></svg>',
+    authorize: (id, state) => `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({ response_type: 'code', client_id: id, redirect_uri: 'https://xim.plators.com/google/callback', scope: 'openid email profile', state, prompt: 'select_account' })}`,
   },
 };
 export const PROVIDER_KEYS = Object.keys(PROVIDERS);
@@ -62,7 +71,7 @@ export const socialButtons = (list, next, verb = '시작하기') => (list.length
     <div class="mb-social">${list.map((p) => btn(p, `/member/${p}${next && next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`, `${PROVIDERS[p].name}로 ${verb}`)).join('')}</div>` : '');
 export const linkButton = (p) => btn(p, `/member/${p}?link=1`, `${PROVIDERS[p].name} 연결하기`, true);
 
-const safeNext = (v) => { const s = String(v || '/'); return s.startsWith('/') && !s.startsWith('//') && !/^\/member\/(naver|kakao)/.test(s) ? s.slice(0, 300) : '/'; };
+const safeNext = (v) => { const s = String(v || '/'); return s.startsWith('/') && !s.startsWith('//') && !/^\/member\/(naver|kakao|google)/.test(s) ? s.slice(0, 300) : '/'; };
 const go = (to, cookies = []) => {
   const h = new Headers({ Location: to, 'Cache-Control': 'no-store' });
   cookies.forEach((c) => h.append('Set-Cookie', c));
@@ -78,6 +87,18 @@ export async function socialStart(ctx, p, { msgPage }) {
   const link = url.searchParams.get('link') === '1';
   if (link && me.kind !== 'member') return go(`${url.origin}/member/login?next=${encodeURIComponent('/member/mypage')}`);
   if (!link && me.kind === 'member') return go(`${url.origin}${safeNext(url.searchParams.get('next'))}`);
+  // 구글은 앱 안 브라우저(카카오톡 · 네이버 앱 · 인스타그램 등)의 로그인을 막는다 → 바깥 브라우저로 이 주소를 다시 열게 한다
+  if (p === 'google') {
+    const ua = ctx.request.headers.get('User-Agent') || '';
+    if (/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|FB_IAB|Line\/|DaumApps|everytimeApp|; wv\)/i.test(ua)) {
+      const here = url.href;
+      const out = /KAKAOTALK/i.test(ua) ? `kakaotalk://web/openExternal?url=${encodeURIComponent(here)}`
+        : /Android/i.test(ua) ? `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=https;package=com.android.chrome;end` : '';
+      return msgPage(ctx, 'Google 로그인', '지금 보고 계신 앱 안의 화면에서는 Google 이 로그인을 막아 둡니다.<br><b>크롬 · 사파리 같은 브라우저</b>에서 열면 바로 됩니다.'
+        + (out ? '' : '<br>오른쪽 위(또는 아래) 메뉴에서 <b>다른 브라우저로 열기</b>를 눌러 주세요.'),
+      `<div class="actions center">${out ? `<a class="btn primary" href="${esc(out)}">브라우저로 열기</a>` : ''}<a class="btn" href="/member/login">다른 방법으로 로그인</a></div>`, 200);
+    }
+  }
   const state = randomHex(24);
   await env.DB.batch([
     env.DB.prepare('DELETE FROM social_states WHERE expires_at < ?').bind(now()),

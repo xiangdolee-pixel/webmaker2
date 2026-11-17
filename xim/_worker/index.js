@@ -1208,6 +1208,10 @@ export default {
     if (url.pathname === '/kakao/callback') {
       try { return await kakaoCallback(env, url); } catch (e) { return fail(e); }
     }
+    // Google로 시작하기(사용자 지시 2026-11-17): 구글 클라우드 프로젝트 xim-login 의 웹 클라이언트 하나의 돌아오는 주소 — 카카오와 같은 방식
+    if (url.pathname === '/google/callback') {
+      try { return await googleCallback(env, url); } catch (e) { return fail(e); }
+    }
     // 카카오 연결 해제 웹훅: 사용자가 카카오 쪽에서 이 앱 연결을 끊으면 카카오가 부른다
     if (url.pathname === '/kakao/unlink') {
       try { return await kakaoUnlink(env, request, url); } catch (e) { return fail(e); }
@@ -1313,6 +1317,31 @@ async function kakaoCallback(env, url) {
   const mobile = t(a.phone_number, 20).replace(/^\+82\s*/, '0').replace(/^00/, '0');
   const email = a.email && a.is_email_valid !== false && a.is_email_verified !== false ? t(a.email, 254).toLowerCase() : '';
   const profile = { provider: 'kakao', id: t(me.id, 100), email, name: t(a.name, 50), nickname: t(a.profile?.nickname, 50), mobile, avatar: t(a.profile?.profile_image_url, 500) };
+  await env.XMS_DB.prepare("UPDATE social_states SET profile = ? WHERE state = ? AND profile = ''").bind(JSON.stringify(profile), state).run();
+  return back('');
+}
+
+// Google: 받은 code → 토큰(POST) → 회원 정보(userinfo). 이메일은 구글이 확인한 것(email_verified)만 쓴다. 회원 번호 = sub (클라이언트를 바꿔도 같은 프로젝트면 그대로)
+async function googleCallback(env, url) {
+  const msg = (t, status = 400) => new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Google 로그인</title><p style="font:16px/1.6 sans-serif;padding:32px 20px;text-align:center">${t}</p>`, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  const state = String(url.searchParams.get('state') || '');
+  if (!/^[0-9a-f]{48}$/.test(state)) return msg('잘못된 주소입니다.');
+  const row = await env.XMS_DB.prepare('SELECT origin, profile, expires_at FROM social_states WHERE state = ?').bind(state).first();
+  if (!row || row.expires_at < Date.now() || row.profile) return msg('시간이 지났습니다. 사이트로 돌아가 Google 로그인을 다시 눌러 주세요.');
+  if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(row.origin)) return msg('사이트 주소를 알 수 없습니다.');
+  const back = (q) => new Response(null, { status: 302, headers: { Location: `${row.origin}/member/google/done?state=${state}${q}`, 'cache-control': 'no-store' } });
+  const code = url.searchParams.get('code');
+  if (url.searchParams.get('error') || !code) return back('&cancel=1');
+  let cfg = {}; try { cfg = JSON.parse((await getSetting(env.DB, 'google_login')) || '{}'); } catch { cfg = {}; }
+  if (!cfg.client_id || !env.GOOGLE_LOGIN_SECRET) return msg('Google 로그인 설정이 아직 끝나지 않았습니다.', 503);
+  const form = new URLSearchParams({ grant_type: 'authorization_code', client_id: cfg.client_id, client_secret: env.GOOGLE_LOGIN_SECRET, redirect_uri: 'https://xim.plators.com/google/callback', code });
+  const tok = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form }).then((r) => r.json()).catch(() => null);
+  if (!tok?.access_token) { console.error('구글 토큰', JSON.stringify({ error: tok?.error, error_description: tok?.error_description })); return msg('Google 에서 확인을 받지 못했습니다. 다시 해 주세요.', 502); }
+  const me = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${tok.access_token}` } }).then((r) => r.json()).catch(() => null);
+  if (!me?.sub) return msg('Google 회원 정보를 받지 못했습니다. 다시 해 주세요.', 502);
+  const t = (v, n) => String(v ?? '').trim().slice(0, n);
+  const email = me.email && me.email_verified !== false && me.email_verified !== 'false' ? t(me.email, 254).toLowerCase() : '';
+  const profile = { provider: 'google', id: t(me.sub, 100), email, name: t(me.name, 50), nickname: t(me.given_name, 50), avatar: t(me.picture, 500) };
   await env.XMS_DB.prepare("UPDATE social_states SET profile = ? WHERE state = ? AND profile = ''").bind(JSON.stringify(profile), state).run();
   return back('');
 }

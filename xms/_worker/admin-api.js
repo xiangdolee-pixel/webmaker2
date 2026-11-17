@@ -69,13 +69,13 @@ export async function adminApi(ctx) {
     return json(v);
   }
   // 부가 기능: 네이버 · 카카오로 시작하기 (기본 켬 — 운영자 키가 있을 때만 보인다)
-  const so = path.match(/^\/options\/(naver|kakao)$/);
+  const so = path.match(/^\/options\/(naver|kakao|google)$/);
   if (so) {
     const k = `${so[1]}_login`;
     if (method === 'PUT') {
       const on = !!(await body(request)).on;
       await db.prepare("INSERT INTO site_options (site, k, v, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(site, k) DO UPDATE SET v = excluded.v, updated_at = excluded.updated_at").bind(site, k, JSON.stringify({ on }), now()).run();
-      await audit(db, site, me, request, so[1] === 'naver' ? 'NAVER_LOGIN' : 'KAKAO_LOGIN', on ? '켬' : '끔', '');
+      await audit(db, site, me, request, `${so[1].toUpperCase()}_LOGIN`, on ? '켬' : '끔', '');
       return json({ ok: true });
     }
     const r = await db.prepare('SELECT v FROM site_options WHERE site = ? AND k = ?').bind(site, k).first();

@@ -428,6 +428,11 @@ tr.dragging td { background: var(--surface); }
 .mb-kakao:focus-visible { outline: 3px solid #191919; outline-offset: 2px; }
 .mb-kakao svg { flex: none; width: 18px; height: 18px; }
 .mb-kakao.sm { display: inline-flex; min-height: 44px; font-size: 15px; }
+.mb-google { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 54px; padding: 0 18px; border: 1px solid #747775; border-radius: 12px; background: #fff; color: #1f1f1f !important; font-size: 17px; font-weight: 700; text-decoration: none !important; transition: background .2s; }
+.mb-google:hover { background: #f2f4f7; }
+.mb-google:focus-visible { outline: 3px solid #4285f4; outline-offset: 2px; }
+.mb-google svg { flex: none; width: 18px; height: 18px; }
+.mb-google.sm { display: inline-flex; min-height: 44px; font-size: 15px; }
 .mb-social { display: grid; gap: 10px; }
 .mb-social-list { display: grid; gap: 14px; }
 .mb-social-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
