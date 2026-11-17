@@ -187,7 +187,7 @@ async function loginPage(ctx) {
       <p class="err" role="alert"></p>
       <button class="btn primary wide mb-go" type="submit">로그인</button>
     </form>
-    ${socialButtons(await socialList(ctx.env, ctx.site), next, '로그인')}
+    ${socialButtons(await socialList(ctx.env, ctx.site, ctx.url), next, '로그인')}
     <div class="mb-foot"><span>아직 회원이 아니신가요?</span><a href="/member/signup">회원가입</a></div>
   </div>
   <p class="mb-note">비밀번호를 잊으셨으면 사이트 관리자에게 새 비밀번호를 받으세요.</p>
@@ -257,7 +257,7 @@ async function signupPage(ctx) {
       <p class="err" role="alert"></p>
       <button class="btn primary wide mb-go" type="submit">가입하기</button>
     </form>
-    ${socialButtons(await socialList(env, site), '/')}
+    ${socialButtons(await socialList(env, site, ctx.url), '/')}
     <div class="mb-foot"><span>이미 가입하셨나요?</span><a href="/member/login">로그인</a></div>
   </div>
 </section>`, { noindex: true });

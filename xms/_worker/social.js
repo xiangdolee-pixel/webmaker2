@@ -32,24 +32,27 @@ export const PROVIDERS = {
 export const PROVIDER_KEYS = Object.keys(PROVIDERS);
 const cookieName = (p) => `xms_${p}`;
 
+// hidden = 버튼만 모든 사이트에서 숨김(네이버 검수 승인 전 — 일반 회원은 '개발 중' 앱으로 로그인할 수 없어서, 2026-11-17 사용자 지시).
+//   숨겨도 /member/<p> 주소는 그대로 되고, 로그인 · 가입 주소에 ?<p>=1 을 붙이면 버튼이 보인다(테스터 · 검수 캡처용).
+//   켜기: xim DB settings.naver_login 의 "hidden" 을 지우면 된다(1분 안에 반영).
 const cfgCache = {};
-async function clientId(env, p) {
+async function cfg(env, p) {
   const c = cfgCache[p];
-  if (c && Date.now() - c.at < 60000) return c.id;
-  let id = '';
-  try { id = JSON.parse((await env.XIM_DB.prepare('SELECT value FROM settings WHERE key = ?').bind(PROVIDERS[p].setting).first())?.value || '{}').client_id || ''; } catch { id = ''; }
-  cfgCache[p] = { at: Date.now(), id };
-  return id;
+  if (c && Date.now() - c.at < 60000) return c;
+  let v = {};
+  try { v = JSON.parse((await env.XIM_DB.prepare('SELECT value FROM settings WHERE key = ?').bind(PROVIDERS[p].setting).first())?.value || '{}'); } catch { v = {}; }
+  return (cfgCache[p] = { at: Date.now(), id: v.client_id || '', hidden: !!v.hidden });
 }
+const clientId = async (env, p) => (await cfg(env, p)).id;
 // 이 사이트에서 그 로그인을 쓰나 (운영자 키가 있고 · 부가 기능에서 끄지 않았으면)
 export async function socialOn(env, site, p) {
   if (!(await clientId(env, p))) return false;
   const r = await env.DB.prepare('SELECT v FROM site_options WHERE site = ? AND k = ?').bind(site, PROVIDERS[p].setting).first();
   try { return r ? !!JSON.parse(r.v).on : true; } catch { return true; }
 }
-// 쓰는 것만 [p, …] (네이버 · 카카오 차례)
-export async function socialList(env, site) {
-  const on = await Promise.all(PROVIDER_KEYS.map((p) => socialOn(env, site, p)));
+// 버튼을 보일 것만 [p, …] (네이버 · 카카오 차례) — url 에 ?<p>=1 이 있으면 숨김(hidden)이어도 보인다
+export async function socialList(env, site, url) {
+  const on = await Promise.all(PROVIDER_KEYS.map(async (p) => (await socialOn(env, site, p)) && (!(await cfg(env, p)).hidden || url?.searchParams.get(p) === '1')));
   return PROVIDER_KEYS.filter((_, i) => on[i]);
 }
 
