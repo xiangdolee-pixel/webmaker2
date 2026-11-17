@@ -144,8 +144,12 @@ function afterRows(job, v) {
   return rows;
 }
 const AFTER_EXPECT = { video: 900, 'yt-dl': 20, 'yt-up': 300, 'yt-pub': 1800 };
+// ChatGPT 로그인이 풀려 그림 단계에서 멈춘 작업 — '진행 중'처럼 보이지 않게 멈춤으로 그리고 '해결하기' 버튼을 낸다 (사용자 지시 2026-11-17)
+const needLogin = (job) => job.status === 'images' && /ChatGPT 로그인/.test(job.error || '');
 function timelineHtml(job, steps, v = null) {
   const t = timeline(job, steps);
+  const stopRow = needLogin(job) ? t.rows.find((r) => r.key === 'slides') : null;
+  if (stopRow) { stopRow.status = 'failed'; stopRow.note = 'ChatGPT 로그인이 풀려 멈춤 — 위의 [해결하기] 를 눌러 주세요'; stopRow.secs = 0; }
   const extra = afterRows(job, v);
   if (extra.length) {
     for (const r of extra) if (r.since) r.secs = Math.max(1, Math.round((Date.now() - r.since) / 1000));
@@ -162,7 +166,9 @@ function timelineHtml(job, steps, v = null) {
     }
   }
   const pct = Math.round((t.done / t.total) * 100);
-  const head = t.finished
+  const head = stopRow
+    ? `${t.total}단계 중 ${t.rows.indexOf(stopRow) + 1}번째 <b>${esc(stopRow.label)}</b> · <span class="tl-stop">멈춤 — ChatGPT 로그인이 풀렸습니다</span>`
+    : t.finished
     ? `${job.status === 'done' ? '완료' : STATUS[job.status]?.[0] || job.status} · ${t.total}단계 중 ${t.done}단계 · 총 ${mins(t.elapsed)}`
     : job.status === 'queued' ? `${t.total}단계 · 시작 대기 (PC 도우미가 집어 갑니다)`
     : t.cur?.status === 'wait' && t.cur.key === 'yt-pub' ? `${t.total}단계 중 ${t.done + 1}번째 <b>${esc(t.cur.label)}</b> · 경과 ${mins(t.elapsed)} · <span class="tl-wait">유튜브 검토 기다리는 중</span>`
@@ -226,6 +232,7 @@ function cardProgress(j) {
   return `<div class="tl-bar sm"><i style="width:${pct}%"></i></div><p class="st-meta">${plan.length}단계 중 ${n + 1}번째 · ${esc(plan[n]?.[1] || STEP_LABEL(j.step))}</p><p class="st-time">⏱ <b>${mins(Math.round((Date.now() - (j.started_at || j.created_at)) / 1000))}</b>째 만드는 중</p>`;
 }
 
+let fixAsked = 0;   // '해결하기' 를 누른 때 — 화면이 4초마다 다시 그려져도 안내가 남게
 const sbadge = (st) => { const [l, c] = STATUS[st] || [st, '']; return `<span class="badge st-${c}">${esc(l)}</span>`; };
 const dur = (a, b) => { if (!a) return ''; const s = Math.round(((b || Date.now()) - a) / 1000); return s < 60 ? `${s}초` : `${Math.floor(s / 60)}분 ${s % 60}초`; };
 const money = (d) => (d ? `$${d.toFixed(2)}` : '');
@@ -516,13 +523,13 @@ async function renderJob() {
     <div class="bar st-bar">
       <button class="btn sm" id="st-back" type="button">← 목록</button>
       <h2 class="st-h">${esc(job.title || KIND[job.kind] || '')}</h2>
-      ${sbadge(job.status)}<span class="badge ch-${job.channel === '순섬' ? 'lime' : 'orange'}">${esc(job.channel)}</span>
+      ${needLogin(job) ? '<span class="badge st-fail">멈춤 · 로그인 필요</span>' : sbadge(job.status)}<span class="badge ch-${job.channel === '순섬' ? 'lime' : 'orange'}">${esc(job.channel)}</span>
       <span class="st-meta">${fmtDate(job.created_at)} · ${esc(KIND[job.kind])} · ${esc(SOURCE[job.source])}${job.cost ? ` · ${money(job.cost)}` : ''}</span>
       <span class="sp"></span>
       ${job.kind === 'main' ? `<a class="btn sm" href="${r.show_url}" target="_blank" rel="noopener">슬라이드쇼 열기 ↗</a>` : ''}
       ${active ? '<button class="btn sm danger" id="st-stop" type="button">멈춤</button>' : '<button class="btn sm danger" id="st-del" type="button">삭제</button>'}
     </div>
-    ${job.error ? `<p class="st-warn">${esc(job.error)}</p>` : ''}
+    ${needLogin(job) ? `<div class="st-fix"><div><b>ChatGPT 로그인이 풀려서 멈췄습니다</b><p>그림(슬라이드 · 썸네일)은 PC 의 스튜디오 전용 엣지로 그리는데, 그 엣지의 ChatGPT 로그인이 풀려 있습니다. [해결하기] 를 누르면 PC 화면에 로그인 창이 뜹니다 — 로그인한 뒤 그 창을 닫으면 여기서부터 이어서 진행합니다.</p><p class="st-fix-msg" id="st-fix-msg" hidden></p></div><button class="btn primary" id="st-fixlogin" type="button">해결하기</button></div>` : job.error ? `<p class="st-warn">${esc(job.error)}</p>` : ''}
     ${timelineHtml(job, steps, vjob)}
     ${job.status === 'pick' && top15 ? pickPanel(top15) : ''}
     ${job.status === 'thumb' ? `<section class="card st-panel"><h3>썸네일 고르기</h3><form id="st-thumb-form">${thumbPickForm({}, summary?.titles || [], summary?.people || [])}<p class="err" id="tp-err"></p><button class="btn primary" type="submit">이대로 썸네일 만들기</button></form></section>` : ''}
@@ -531,6 +538,16 @@ async function renderJob() {
       <div id="st-res"></div>
     </section>` : ''}`;
   $('#st-back').addEventListener('click', () => { location.hash = ''; renderStudio(deps); });
+  $('#st-fixlogin')?.addEventListener('click', async (e) => {
+    const b = e.currentTarget, m = $('#st-fix-msg'); b.disabled = true;
+    try {
+      const r = await api('/studio/fix-login', { method: 'POST', data: {} });
+      fixAsked = Date.now();
+      m.textContent = r.online ? 'PC 화면에 ChatGPT 로그인 창을 띄웠습니다. 로그인한 뒤 그 창을 닫아 주세요.' : 'PC 도우미가 꺼져 있습니다 — PC 가 켜지면 로그인 창이 뜹니다.';
+    } catch (err) { m.textContent = '요청하지 못했습니다: ' + err.message; b.disabled = false; }
+    m.hidden = false;
+  });
+  if (needLogin(job) && Date.now() - fixAsked < 120000) { const m = $('#st-fix-msg'); if (m) { m.textContent = 'PC 화면에 ChatGPT 로그인 창을 띄웠습니다. 로그인한 뒤 그 창을 닫아 주세요.'; m.hidden = false; } }
   $('#st-stop')?.addEventListener('click', (e) => { if (!confirm('지금 진행 중인 작업을 멈출까요?')) return; busy(e.currentTarget, null, async () => { await api(`/studio/jobs/${job.id}/stop`, { method: 'POST', data: {} }); renderJob(); }, '멈추는 중…'); });
   $('#st-del')?.addEventListener('click', (e) => { if (!confirm('이 발표자료와 그림을 모두 지울까요? 되돌릴 수 없습니다.')) return; busy(e.currentTarget, null, async () => { await api(`/studio/jobs/${job.id}`, { method: 'DELETE' }); toast('지웠습니다'); location.hash = ''; renderStudio(deps); }, '지우는 중…'); });
   $('#st-pick-form')?.addEventListener('submit', (e) => {

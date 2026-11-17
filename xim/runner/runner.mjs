@@ -578,7 +578,7 @@ async function processJob(payload) {
     log(`✅ ${job.id} 완료`);
   } catch (e) {
     if (e.message === 'STOPPED') { log('  사용자가 멈춤'); return; }
-    if (e.message === 'LOGIN_REQUIRED') { notify('chatgpt', `ChatGPT(그림) 로그인이 필요해 "${job.title || job.id}" 그림 단계가 기다리고 있습니다 — PC 에서 node xim/runner/runner.mjs --login 으로 로그인해 주세요.`, 60); await j.status('images', 'slides', { error: 'ChatGPT 로그인이 필요합니다 — PC 에서 스튜디오_ChatGPT로그인.bat 로 로그인하면 다시 시도됩니다.' }); loginNeeded = true; lastReport = Date.now() - 20 * 60000; return; }   // 10분 뒤 다시 점검
+    if (e.message === 'LOGIN_REQUIRED') { notify('chatgpt', `ChatGPT(그림) 로그인이 필요해 "${job.title || job.id}" 그림 단계가 기다리고 있습니다 — PC 에서 node xim/runner/runner.mjs --login 으로 로그인해 주세요.`, 60); await j.status('images', 'slides', { error: 'ChatGPT 로그인이 풀려 그림 단계에서 멈췄습니다 — [해결하기] 를 누르면 PC 에 로그인 창이 뜹니다. 로그인하고 창을 닫으면 이어서 진행합니다.' }); loginNeeded = true; lastReport = Date.now() - 20 * 60000; return; }   // 10분 뒤 다시 점검
     if (e.message.startsWith('ENGINE_FAILED')) { await j.status('images', 'slides', { error: `그림 엔진 실패 — 잠시 뒤 다시 시도합니다. ${e.message.slice(15, 200)}` }); engineFailAt = Date.now(); return; }
     log('❌', e.message);
     notify(`fail-${job.id}`, `"${job.title || job.id}" 실패: ${String(e.message).slice(0, 200)} — 3분 뒤 자동으로 이어서 다시 합니다(최대 3번).`, 20);
@@ -632,6 +632,24 @@ function cleanLocal() {
   } catch (e) { log('(작업 폴더 정리 실패)', e.message); }
 }
 
+// 화면의 '해결하기' — 자동화용 엣지를 ChatGPT 로그인 화면으로 띄우고, 창이 닫히면 로그인을 다시 확인해 멈춘 작업을 바로 잇는다 (사용자 지시 2026-11-17)
+const profileEdgeOpen = () => {
+  try {
+    const r = spawnSync('powershell', ['-NoProfile', '-Command', `(Get-WmiObject Win32_Process -Filter "name='msedge.exe'" | Where-Object { $_.CommandLine -like '*${path.basename(PROFILE)}*' } | Measure-Object).Count`], { encoding: 'utf8', timeout: 60000, windowsHide: true });
+    return +(r.stdout || '').trim() > 0;
+  } catch { return false; }
+};
+async function fixLogin() {
+  log('해결하기 → ChatGPT 로그인 창을 띄웁니다 (로그인한 뒤 창을 닫으면 이어서 진행)');
+  closeProfileEdge(); await sleep(1500);
+  spawn(BROWSER, [`--user-data-dir=${PROFILE}`, '--no-first-run', '--no-default-browser-check', '--window-position=80,60', '--window-size=1200,900', 'https://chatgpt.com/auth/login'], { detached: true, stdio: 'ignore' }).unref();
+  await sleep(8000);
+  const until = Date.now() + 15 * 60000;      // 15분 안에 안 닫으면 닫고 점검으로
+  while (Date.now() < until && profileEdgeOpen()) await sleep(3000);
+  closeProfileEdge(); await sleep(1500);
+  await reportEnv(true); closeProfileEdge();
+  log(loginNeeded ? '  아직 ChatGPT 로그인이 안 되어 있습니다' : '  ChatGPT 로그인 확인 — 멈춘 작업을 이어갑니다');
+}
 async function pcLoop() {
   if (!DOCS) { console.error('PC 모드는 DOCS(엔진 폴더) 설정이 필요합니다.'); process.exit(1); }
   log(`PC 도우미 시작 — ${XIM} · 엔진 ${DOCS} · 브라우저 ${path.basename(BROWSER)}`);
@@ -642,6 +660,7 @@ async function pcLoop() {
       const before = lastReport; await reportEnv(); if (lastReport !== before) closeProfileEdge();
       const imagesOk = !loginNeeded && Date.now() - engineFailAt > 120000;
       const r = await api(`/api/studio/helper/next?want=${imagesOk ? 'text,images,youtube' : 'text,youtube'}`, { method: 'POST', body: {} });
+      if (r.cmd === 'chatgpt-login') { await fixLogin(); continue; }
       if (r.job) { await processJob(r); closeProfileEdge(); cleanLocal(); continue; }
     } catch (e) { log('(대기 중 오류)', e.message); }
     await sleep(5000);

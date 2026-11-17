@@ -504,6 +504,13 @@ export async function studioHelper(request, env, url, path, method) {
   if (path === '/api/studio/helper/next' && method === 'POST') {
     const want = (url.searchParams.get('want') || 'text,images').split(',');
     await expireOldScheduled(db);
+    // 화면의 '해결하기'(ChatGPT 로그인 창 띄우기) — 도우미가 다음 번 물어볼 때 한 번만 건넨다 (3분 지난 것은 버림)
+    const hc = await db.prepare("SELECT value FROM studio_settings WHERE key = 'helper_cmd'").first();
+    if (hc) {
+      await db.prepare("DELETE FROM studio_settings WHERE key = 'helper_cmd'").run();
+      let c = null; try { c = JSON.parse(hc.value); } catch { /* 버림 */ }
+      if (c && c.cmd && now() - c.at < 180000) return json({ cmd: c.cmd });
+    }
     // 유튜브 올리기(2026-11-10): 카드의 "유튜브에 올리기" 가 options.yt = {status:'queued', title, visibility} 를 남기면 PC 도우미가 엣지로 올린다
     if (want.includes('youtube')) {
       // 새 발표자료 "유튜브 채널에 올리기"(yt_auto): 영상(clone)이 끝났는지 보고 끝났으면 유튜브 대기열에 올린다
@@ -850,6 +857,12 @@ export async function studioApi(request, env, url, ctx, path, method, bodyFn, au
   }
   // 다른 PC 에 도우미를 깔 때 붙여 넣을 토큰 (운영자 로그인 뒤에만)
   if (path === '/api/studio/helper-token' && method === 'GET') return json({ token: env.STUDIO_HELPER_TOKEN || '', url: url.origin });
+  // ChatGPT 로그인이 풀려 멈췄을 때 화면의 '해결하기' → PC 도우미가 자동화용 엣지를 로그인 화면으로 연다 (사용자 지시 2026-11-17)
+  if (path === '/api/studio/fix-login' && method === 'POST') {
+    await db.prepare("INSERT INTO studio_settings (key, value) VALUES ('helper_cmd', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(JSON.stringify({ cmd: 'chatgpt-login', at: now() })).run();
+    const seen = +((await db.prepare("SELECT value FROM studio_settings WHERE key = 'helper_seen'").first())?.value || 0);
+    return json({ ok: true, online: now() - seen < 40000 });
+  }
   if (path === '/api/studio/helper-status' && method === 'GET') {
     const seen = +((await db.prepare("SELECT value FROM studio_settings WHERE key = 'helper_seen'").first())?.value || 0);
     const tot = await db.prepare('SELECT COALESCE(SUM(size), 0) AS bytes, COUNT(*) AS n, COUNT(DISTINCT job_id) AS jobs FROM studio_assets').first();
