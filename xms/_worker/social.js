@@ -38,7 +38,7 @@ export const PROVIDERS = {
     authorize: (id, state) => `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({ response_type: 'code', client_id: id, redirect_uri: 'https://xim.plators.com/google/callback', scope: 'openid email profile', state, prompt: 'select_account' })}`,
   },
 };
-export const PROVIDER_KEYS = Object.keys(PROVIDERS);
+export const PROVIDER_KEYS = ['google', 'naver', 'kakao'];   // 버튼 차례 — Google 이 맨 위 (사용자 지시 2026-11-17)
 const cookieName = (p) => `xms_${p}`;
 
 // hidden = 버튼만 모든 사이트에서 숨김(네이버 검수 승인 전 — 일반 회원은 '개발 중' 앱으로 로그인할 수 없어서, 2026-11-17 사용자 지시).
@@ -59,7 +59,7 @@ export async function socialOn(env, site, p) {
   const r = await env.DB.prepare('SELECT v FROM site_options WHERE site = ? AND k = ?').bind(site, PROVIDERS[p].setting).first();
   try { return r ? !!JSON.parse(r.v).on : true; } catch { return true; }
 }
-// 버튼을 보일 것만 [p, …] (네이버 · 카카오 차례) — url 에 ?<p>=1 이 있으면 숨김(hidden)이어도 보인다
+// 버튼을 보일 것만 [p, …] (Google · 네이버 · 카카오 차례) — url 에 ?<p>=1 이 있으면 숨김(hidden)이어도 보인다
 export async function socialList(env, site, url) {
   const on = await Promise.all(PROVIDER_KEYS.map(async (p) => (await socialOn(env, site, p)) && (!(await cfg(env, p)).hidden || url?.searchParams.get(p) === '1')));
   return PROVIDER_KEYS.filter((_, i) => on[i]);
