@@ -2779,6 +2779,10 @@ function refreshPlanViews(){
 /* 러닝헤드 → 성경통독표 전체 화면 */
 function openPlanFull(){
   doCloseSheets();
+  /* 지금 읽는 장이 든 날짜의 구간 탭을 먼저 보여 준다 — 여러 날에 나뉜 장은 아직 다 읽지 않은 가장 이른 날
+     ('통독' 버튼과 같은 기준). 통독표에 없는 장이면 보던 구간 그대로 */
+  const days=[...new Set((planIndex()[cur.book+"/"+cur.chap]||[]).map(e=>e.d))].sort((a,b)=>a-b);
+  if(days.length)planRange=Math.min(PLAN_RANGES.length-1,Math.floor(((days.find(x=>!planReadCount(x))||days[0])-1)/18));
   renderPlan();
   $("planFullBody").scrollTop=0;
   $("planFull").classList.add("open");
