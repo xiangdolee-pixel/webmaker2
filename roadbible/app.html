@@ -460,15 +460,20 @@ body.has-listen main{padding-bottom:calc(44px + env(safe-area-inset-bottom) + va
 .plan-range .seg{display:grid;grid-template-columns:repeat(5,1fr)}
 .plan-range .seg button{font-size:12px;padding:7px 1px;font-variant-numeric:tabular-nums}
 /* 선택 표시(흰 둥근 상자)는 버튼 배경 대신 떠 있는 .seg-ind 하나가 맡아 — 탭을 옮기면 그 자리로 미끄러져 간다 */
-.plan-range .seg{position:relative}
-.plan-range .seg button{position:relative;z-index:1;transition:color .2s}   /* 글자는 표시 위에 */
+.plan-range .seg,.pp-days{position:relative}
+.plan-range .seg button,.pp-days button{position:relative;z-index:1;transition:color .2s}   /* 글자는 표시 위에 */
 /* 색칠된(읽은 횟수) 탭은 인라인 배경이 흰 표시를 가리므로, 선택된 탭에 흰 안쪽 테두리를 함께 둔다 */
 .plan-range .seg button[aria-selected="true"]{background:none;box-shadow:inset 0 0 0 2px var(--card)}
+/* 장별 이동 창의 날짜 고르기 — 한 장이 여러 날에 나뉘어 있을 때만 보인다(왕하 16장 = 77일 · 81일) */
+.pp-days{margin-bottom:12px}
+.pp-days[hidden]{display:none}
+.pp-days button{font-variant-numeric:tabular-nums}
+.pp-days button[aria-selected="true"]{background:none;box-shadow:none}
 .seg-ind{
   position:absolute;left:0;top:0;border-radius:8px;background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12);
   pointer-events:none;transition:transform .28s cubic-bezier(.32,.72,.34,1);
 }
-@media (prefers-reduced-motion:reduce){.seg-ind,.plan-range .seg button{transition:none}}
+@media (prefers-reduced-motion:reduce){.seg-ind,.plan-range .seg button,.pp-days button{transition:none}}
 /* 구간 탭(1~18·19~36·…·163~180) — 목록을 스크롤해도 위에 붙어 있게.
    좌우 음수 여백으로 sheet-body 안쪽 여백 밖까지 넓혀 서랍 전체 폭을 덮는다. */
 .plan-range{
@@ -1037,6 +1042,7 @@ html[data-skin="2"] .hl-ico{background:rgba(221,184,118,.3);box-shadow:inset 0 -
   <div class="cfm-box pp-box" role="dialog" aria-modal="true" aria-labelledby="ppTitle">
     <div class="pp-title" id="ppTitle"></div>
     <div class="pp-sub" id="ppSub"></div>
+    <div class="seg pp-days" id="ppDays" role="tablist" aria-label="이 장을 읽는 날" hidden></div>
     <div class="pp-grid" id="ppGrid"></div>
     <button class="pp-close" id="ppClose">닫기</button>
   </div>
@@ -2590,9 +2596,25 @@ const bindPlanDays=el=>el.querySelectorAll("[data-day]").forEach(b=>{
 });
 /* 장별 이동 창 — 그 날 읽을 장(planChaps)을 "대상15 · 시8 · 시19 …" 버튼으로 펴고,
    각 버튼은 그 장의 읽은 횟수 색으로 칠한다. 뒤로가기는 창만 닫는다(서랍 2단계). */
-function openPlanPop(d,depth){
+function openPlanPop(d,depth,days){
+  if(!fillPlanPop(d))return;
+  /* 날짜 고르기 — 지금 장이 여러 날에 나뉘어 있을 때(본문 '통독' 버튼)만. 누르면 창 안 내용만 그 날 것으로 바뀐다 */
+  const seg=$("ppDays");
+  seg.hidden=!(days&&days.length>1);
+  seg.innerHTML=seg.hidden?"":'<span class="seg-ind"></span>'+days.map(x=>`<button role="tab" data-pd="${x}" aria-selected="${x===d}">${x}일</button>`).join("");
+  seg.querySelectorAll("[data-pd]").forEach(el=>el.onclick=()=>{
+    if(el.getAttribute("aria-selected")==="true")return;
+    seg.querySelectorAll("[data-pd]").forEach(o=>o.setAttribute("aria-selected",o===el));
+    movePlanInd(seg,true);
+    fillPlanPop(+el.dataset.pd);
+  });
+  $("ppScrim").classList.add("open");
+  movePlanInd(seg,false);
+  pushSheetState(depth||2);   // 통독표 위에서는 2단계, 본문의 '통독' 버튼에서는 1단계
+}
+function fillPlanPop(d){
   const ks=[...new Set(planChaps(d))];
-  if(!ks.length){toast("이동할 성경을 찾지 못했습니다");return}
+  if(!ks.length){toast("이동할 성경을 찾지 못했습니다");return false}
   const curKey=cur.book+"/"+cur.chap;   // 지금 읽던 장은 테두리로 표시
   $("ppTitle").textContent=`${d}일`;
   $("ppSub").textContent=PLAN180[d-1]||"";
@@ -2604,16 +2626,16 @@ function openPlanPop(d,depth){
     const k=el.dataset.pk,i=k.lastIndexOf("/");
     goPlanChap(d,k.slice(0,i),+k.slice(i+1));
   });
-  $("ppScrim").classList.add("open");
-  pushSheetState(depth||2);   // 통독표 위에서는 2단계, 본문의 '통독' 버튼에서는 1단계
+  return true;
 }
 /* 본문 아래 '통독' 버튼 — 지금 읽는 장이 든 통독표 날짜의 장별 이동 창을 본문 위에 바로 띄운다.
-   한 장이 이틀에 걸친 경우(왕하 18장 등)는 그 장을 읽는 가장 이른 날로 본다. */
+   한 장이 여러 날에 나뉜 경우(왕하 16장 = 77일 · 81일)는 창 위에 날짜 칸을 띄워 고르게 하고,
+   처음엔 아직 다 읽지 않은 가장 이른 날(모두 읽었으면 가장 이른 날)을 보여 준다. */
 function openPlanPopHere(){
-  const d=planDayOf(cur.book,cur.chap,1);
-  if(!d){toast("성경통독표에 없는 장입니다");return}
+  const days=[...new Set((planIndex()[cur.book+"/"+cur.chap]||[]).map(e=>e.d))].sort((a,b)=>a-b);
+  if(!days.length){toast("성경통독표에 없는 장입니다");return}
   doCloseSheets();
-  openPlanPop(d,1);
+  openPlanPop(days.find(x=>!planReadCount(x))||days[0],1,days);
 }
 function closePlanPop(){$("ppScrim").classList.remove("open")}
 $("ppClose").onclick=()=>closeSheet1();
@@ -2643,7 +2665,7 @@ function movePlanInd(seg,animate){
   if(!animate){ind.getBoundingClientRect();ind.style.transition=""}
 }
 /* 화면이 돌아가거나 폭이 바뀌면 표시 자리를 다시 잡는다(애니메이션 없이) */
-window.addEventListener("resize",()=>movePlanInd($("planFullBody").querySelector(".plan-range .seg"),false));
+window.addEventListener("resize",()=>{movePlanInd($("planFullBody").querySelector(".plan-range .seg"),false);movePlanInd($("ppDays"),false)});
 /* 진행 중인 미끄러짐을 즉시 마무리 — 연달아 넘길 때 겹치지 않게 */
 function finishPlanAnim(stage){if(stage&&stage._planDone)stage._planDone()}
 /* 구간 바꾸기 — 보던 목록은 옆으로 밀려 나가고 새 목록이 반대쪽에서 들어온다.
