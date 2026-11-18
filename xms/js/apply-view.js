@@ -1,7 +1,8 @@
-// 레벨1 신청자 확인 (/member/apply/list · /member/apply/<번호>) — 찾기 · 상태로 거르기 · 상태 바꾸기 · 서류 크게 보기
+// 심사위원(레벨1 · 2) 신청자 확인 (/member/apply/list · /member/apply/<번호>) — 찾기 · 상태로 거르기 · 상태 바꾸기 · 서류 크게 보기
 import { $, $$, esc, makeApi, toast, openDialog, busy, confirmInline } from './common.js';
 
-const admin = makeApi('/xms-api/admin');
+const admin = makeApi('/xms-api/admin');   // 최종 선정 등 레벨1 만 하는 일
+const judge = makeApi('/xms-api');         // 점수 주기 — 레벨1 · 2 (레벨2 는 관리 API 에 못 들어간다)
 const LABEL = { SUBMITTED: '접수', CHECKED: '서류 확인', SELECTED: '선정', REJECTED: '미선정' };
 
 // 목록: 위 숫자 칸을 누르면 그 상태만, 찾기 칸은 이름 · 학과 · 학번
@@ -54,7 +55,7 @@ if (view) {
     if (!b) return;
     const n = +b.dataset.pt;
     busy(b, null, async () => {
-      const r = await admin(`/apply/${id}/score`, { method: 'PUT', data: { score: n } });
+      const r = await judge(`/apply/${id}/score`, { method: 'PUT', data: { score: n } });
       $$('.apx-pt', sbox).forEach((x) => { const on = +x.dataset.pt === n; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); });
       $('[data-apx-scores]', sbox).innerHTML = r.html;
       $('[data-my-note]', sbox).textContent = n ? `${n}점을 줬습니다 · 다시 누르면 바뀝니다` : '1~10점 중 하나를 누르세요';
@@ -64,7 +65,7 @@ if (view) {
       toast(n ? `${n}점을 줬습니다. (합계 ${r.sum}점)` : '내 점수를 뺐습니다.');
     });
   });
-  // 최종 선정 / 선정 취소 (레벨1 누구나)
+  // 최종 선정 / 선정 취소 (레벨1 누구나 — 레벨2 화면에는 버튼이 없다)
   const fin = $('[data-apx-final]', view);
   fin?.addEventListener('click', (e) => {
     const b = e.target.closest('[data-final]');
@@ -75,7 +76,7 @@ if (view) {
       const on = to === 'SELECTED';
       fin.classList.toggle('on', on);
       const t = new Date(r.at || Date.now()); const hm = `${t.getFullYear()}.${String(t.getMonth() + 1).padStart(2, '0')}.${String(t.getDate()).padStart(2, '0')} ${t.toTimeString().slice(0, 5)}`;
-      $('[data-final-note]', fin).innerHTML = on ? `<b>선정됐습니다</b>${r.by ? ` · ${esc(r.by)}` : ''} · ${hm}` : '점수를 보고 레벨1 중 한 분이 정합니다. 여러 명을 선정할 수 있습니다.';
+      $('[data-final-note]', fin).innerHTML = on ? `<b>선정됐습니다</b>${r.by ? ` · ${esc(r.by)}` : ''} · ${hm}` : '점수를 보고 관리자(레벨1) 중 한 분이 정합니다. 여러 명을 선정할 수 있습니다.';
       b.dataset.final = on ? 'SUBMITTED' : 'SELECTED';
       b.textContent = on ? '선정 취소' : '선정하기';
       b.classList.toggle('primary', !on);

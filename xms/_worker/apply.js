@@ -106,6 +106,8 @@ export async function publicApply(ctx, path = '/apply') {
   const db = env.DB;
   if (!(await applyOn(db, site))) throw notFound('이 사이트는 신청서를 받지 않습니다.');
   if (me.kind !== 'member') throw new HttpError(401, '로그인이 풀렸습니다. 다시 로그인하면 적던 곳부터 이어서 쓸 수 있습니다.');
+  const sm = path.match(/^\/apply\/(\d+)\/score$/);
+  if (sm && request.method === 'PUT') return giveScore(ctx, +sm[1]); // 심사위원(레벨1 · 2) 점수 주기
   if (path === '/apply/draft' && request.method === 'PUT') return saveDraft(ctx);
   if (path !== '/apply' || request.method !== 'POST') throw notFound();
   const raw = await body(request);
@@ -199,7 +201,7 @@ export async function applyPage(ctx, { page, needLogin, msgPage }) {
   const db = env.DB;
   if (!(await applyOn(db, site))) return msgPage(ctx, '페이지가 없습니다', '주소를 다시 확인해 주세요.', '', 404);
   let round = await openRound(db, site);
-  const adminLink = me.level === 1 ? await adminCard(db, site) : ''; // 레벨1만: [신청자 확인]
+  const adminLink = isJudge(me) ? await adminCard(db, site, me) : ''; // 심사위원(레벨1 · 2): [신청자 확인]
   // 관리자 미리보기: 신청 기간이 아니어도 화면을 끝까지 넘겨 볼 수 있다 (내기는 안 됨)
   const preview = !round && me.level === 1 && me.kind === 'member' && ctx.url.searchParams.get('preview') === '1';
   if (preview) round = (await nextRound(db, site)) || (await db.prepare('SELECT * FROM apply_rounds WHERE site = ? AND deleted_at IS NULL ORDER BY starts_on DESC LIMIT 1').bind(site).first());
@@ -330,7 +332,10 @@ function noticeHtml(lines) {
   return `<div class="ap-notice">${out}</div>`;
 }
 
-// ───────── 레벨1: 홈페이지 안에서 신청자 확인 (/member/apply/list · /member/apply/<번호>) ─────────
+// ───────── 심사위원(레벨1 · 2): 홈페이지 안에서 신청자 확인 (/member/apply/list · /member/apply/<번호>) ─────────
+//   레벨1(관리자) · 레벨2(심사위원) 둘 다 신청자를 보고 점수를 준다 (사용자 지시 2026-11-18).
+//   레벨2 는 관리 화면(/xms/)에 못 들어가므로 최종 선정 · 엑셀 · 메모 · 지우기 · 신청 기간은 레벨1만.
+export const isJudge = (me) => me.level === 1 || me.level === 2;
 //   사이트 디자인 그대로, 폰에서도 카드로. 상태 바꾸기는 관리자 API(PUT /xms-api/admin/apply/<번호>)를 그대로 쓴다(js/apply-view.js).
 // 보여 줄 회차: 고른 것 → 지금 열린 것 → 다음 것 → 가장 최근 것
 async function viewRound(db, site, id) {
@@ -338,19 +343,19 @@ async function viewRound(db, site, id) {
   return (await openRound(db, site)) || (await nextRound(db, site))
     || db.prepare('SELECT * FROM apply_rounds WHERE site = ? AND deleted_at IS NULL ORDER BY starts_on DESC, id DESC LIMIT 1').bind(site).first();
 }
-async function adminCard(db, site) {
+async function adminCard(db, site, me) {
   const r = await viewRound(db, site);
   const n = r ? (await db.prepare('SELECT COUNT(*) AS n FROM applications WHERE round_id = ?').bind(r.id).first()).n : 0;
   return `<a class="apx-entry" href="/member/apply/list">
     <span class="apx-entry-ico">${PEOPLE}</span>
-    <span class="apx-entry-t"><b>신청자 확인</b><small>관리자에게만 보입니다</small></span>
+    <span class="apx-entry-t"><b>신청자 확인</b><small>${me.level === 1 ? '관리자 · 심사위원에게만 보입니다' : '심사위원에게만 보입니다'}</small></span>
     <span class="apx-entry-n"><b>${n}</b>명</span><span class="apx-chev" aria-hidden="true">›</span></a>`;
 }
 const initial = (name) => esc(String(name || '?').trim().slice(0, 1));
 const statusTag = (st) => `<span class="apx-tag st-${esc(String(st).toLowerCase())}">${esc(STATUS[st] || st)}</span>`;
 const onlyAdmin = (ctx, msgPage, needLogin, back) => {
   if (ctx.me.kind === 'guest') return needLogin(ctx, back);
-  if (ctx.me.level !== 1) return msgPage(ctx, '볼 수 없는 곳입니다', '관리자만 볼 수 있습니다.', '<div class="actions center"><a class="btn" href="/member/apply">장학금 신청으로</a></div>', 403);
+  if (!isJudge(ctx.me)) return msgPage(ctx, '볼 수 없는 곳입니다', '관리자 · 심사위원만 볼 수 있습니다.', '<div class="actions center"><a class="btn" href="/member/apply">장학금 신청으로</a></div>', 403);
   return null;
 };
 
@@ -361,7 +366,8 @@ export async function applicantsPage(ctx, { page, msgPage, needLogin }) {
   const stop = onlyAdmin(ctx, msgPage, needLogin, '/member/apply/list');
   if (stop) return stop;
   const round = await viewRound(db, site, Number(ctx.url.searchParams.get('round')) || 0);
-  if (!round) return msgPage(ctx, '신청 기간이 없습니다', '관리 화면에서 신청 기간을 먼저 만들어 주세요.', '<div class="actions center"><a class="btn primary" href="/xms/#/apply/rounds/new">신청 기간 만들기</a></div>');
+  const admin = ctx.me.level === 1; // 엑셀 · 관리 화면 가는 길은 레벨1만
+  if (!round) return msgPage(ctx, '신청 기간이 없습니다', admin ? '관리 화면에서 신청 기간을 먼저 만들어 주세요.' : '아직 신청 기간이 정해지지 않았습니다.', admin ? '<div class="actions center"><a class="btn primary" href="/xms/#/apply/rounds/new">신청 기간 만들기</a></div>' : '');
   const [{ results: rounds }, { results }] = await db.batch([
     db.prepare('SELECT r.id, r.title, (SELECT COUNT(*) FROM applications a WHERE a.round_id = r.id) AS n FROM apply_rounds r WHERE r.site = ? AND r.deleted_at IS NULL ORDER BY r.starts_on DESC, r.id DESC').bind(site),
     db.prepare('SELECT a.*, mb.name AS m_name, mb.login_id FROM applications a LEFT JOIN members mb ON mb.id = a.member_id WHERE a.site = ? AND a.round_id = ? ORDER BY a.created_at DESC').bind(site, round.id),
@@ -395,11 +401,11 @@ export async function applicantsPage(ctx, { page, msgPage, needLogin }) {
   </div>
   ${list.length ? `<div class="apx-tools"><input class="input apx-q" type="search" placeholder="이름 · 학과 · 학번으로 찾기" data-apx-q aria-label="신청자 찾기">
     <select class="input apx-sort" data-apx-sort aria-label="정렬"><option value="at">접수 순</option><option value="sum">합계 높은 순</option></select>
-    <a class="btn apx-xls" href="/xms-api/admin/apply/export?round=${round.id}">엑셀</a></div>
+    ${admin ? `<a class="btn apx-xls" href="/xms-api/admin/apply/export?round=${round.id}">엑셀</a>` : ''}</div>
   <div class="apx-list">${list.map(card).join('')}</div>
   <p class="apx-none" data-apx-none hidden>조건에 맞는 신청자가 없습니다.</p>`
     : '<div class="apx-empty"><b>아직 신청자가 없습니다</b><span>회원이 신청서를 내면 여기에 바로 나옵니다.</span></div>'}
-  <p class="apx-foot"><a href="/xms/#/apply?round=${round.id}">관리 화면에서 보기 →</a></p>
+  ${admin ? `<p class="apx-foot"><a href="/xms/#/apply?round=${round.id}">관리 화면에서 보기 →</a></p>` : ''}
 </div>`, { noindex: true });
 }
 
@@ -430,6 +436,7 @@ export async function applicantPage(ctx, id, { page, msgPage, needLogin }) {
   const selected = a.status === 'SELECTED';
   const meId = ctx.me.kind === 'member' ? ctx.me.member.id : 0;
   const mine = scores.find((x) => x.member_id === meId)?.score || 0;
+  const admin = ctx.me.level === 1; // 최종 선정 · 관리 화면 가는 길은 레벨1만
   return page(ctx, `${row.name} 신청서`, `<div class="apx" data-apx-view data-id="${a.id}">
   <div class="apx-topnav"><a class="apx-back" href="/member/apply/list?round=${a.round_id}">‹ 신청자 목록</a><span>${i + 1} / ${ids.length}</span></div>
   <div class="apx-hero">
@@ -453,8 +460,8 @@ export async function applicantPage(ctx, id, { page, msgPage, needLogin }) {
     </div>
     <div class="apx-final${selected ? ' on' : ''}" data-apx-final>
       <div><span class="apx-judge-l">최종 선정</span>
-        <p data-final-note>${selected ? `<b>선정됐습니다</b>${selBy ? ` · ${esc(selBy.name)}` : ''}${a.selected_at ? ` · ${fmtTime(a.selected_at)}` : ''}` : '점수를 보고 레벨1 중 한 분이 정합니다. 여러 명을 선정할 수 있습니다.'}</p></div>
-      <button type="button" class="btn ${selected ? '' : 'primary'}" data-final="${selected ? 'SUBMITTED' : 'SELECTED'}">${selected ? '선정 취소' : '선정하기'}</button>
+        <p data-final-note>${selected ? `<b>선정됐습니다</b>${selBy ? ` · ${esc(selBy.name)}` : ''}${a.selected_at ? ` · ${fmtTime(a.selected_at)}` : ''}` : '점수를 보고 관리자(레벨1) 중 한 분이 정합니다. 여러 명을 선정할 수 있습니다.'}</p></div>
+      ${admin ? `<button type="button" class="btn ${selected ? '' : 'primary'}" data-final="${selected ? 'SUBMITTED' : 'SELECTED'}">${selected ? '선정 취소' : '선정하기'}</button>` : ''}
     </div>
   </div>
   ${FORM.sections.map((s) => `<div class="apx-sec"><h2>${esc(s.title)}</h2><dl class="apx-kv">${s.fields.map(kv).join('')}</dl></div>`).join('')}
@@ -467,7 +474,7 @@ export async function applicantPage(ctx, id, { page, msgPage, needLogin }) {
   </div>
   ${a.memo ? `<div class="apx-sec apx-memo"><h2>관리자 메모</h2><p>${esc(a.memo)}</p></div>` : ''}
   <nav class="apx-pager">${step(prev, '‹ 이전', '')}${step(next, '다음 신청자 ›', 'primary')}</nav>
-  <p class="apx-foot"><a href="/xms/#/apply/${a.id}">관리 화면에서 열기 (메모 · 지우기) →</a></p>
+  ${admin ? `<p class="apx-foot"><a href="/xms/#/apply/${a.id}">관리 화면에서 열기 (메모 · 지우기) →</a></p>` : ''}
 </div>`, { noindex: true });
 }
 
@@ -492,7 +499,7 @@ function roundValues(b) {
   if (s > e) throw bad('마감일이 시작일보다 앞설 수 없습니다.');
   return { title, s, e, notice: str(b.notice, 3000), visible: b.visible === false || b.visible === '0' ? 0 : 1 };
 }
-// 심사 점수: 레벨1 이 신청서마다 1~10점 (한 사람당 하나, 다시 누르면 바뀜). 목록에 사람별 점수 + 합계 (사용자 지시 2026-11-11)
+// 심사 점수: 심사위원(레벨1 · 2)이 신청서마다 1~10점 (한 사람당 하나, 다시 누르면 바뀜). 목록에 사람별 점수 + 합계 (사용자 지시 2026-11-11)
 export async function scoresOf(db, site, appIds) {
   const map = new Map(appIds.map((id) => [id, []]));
   if (!appIds.length) return map;
@@ -505,9 +512,9 @@ export async function scoresOf(db, site, appIds) {
   return map;
 }
 const sumOf = (list) => list.reduce((t, x) => t + x.score, 0);
-// 심사위원 = 이 사이트의 레벨1 회원 전원 (점수를 안 준 사람도 '–' 로 보여 누가 남았는지 안다). 지금은 없는 사람이 준 점수도 그대로 보인다.
+// 심사위원 = 이 사이트의 레벨1 · 레벨2 회원 전원 (점수를 안 준 사람도 '–' 로 보여 누가 남았는지 안다). 지금은 없는 사람이 준 점수도 그대로 보인다.
 export async function judgesOf(db, site) {
-  const { results } = await db.prepare("SELECT id, name FROM members WHERE site = ? AND level = 1 AND status = 'ACTIVE' ORDER BY id").bind(site).all();
+  const { results } = await db.prepare("SELECT id, name FROM members WHERE site = ? AND level IN (1, 2) AND status = 'ACTIVE' ORDER BY level, id").bind(site).all();
   return results;
 }
 const scoreLine = (list, judges = []) => {
@@ -523,6 +530,27 @@ const appRow = (a) => {
   return { id: a.id, round_id: a.round_id, name: v.name || a.m_name || '', dept: v.dept || '', student_no: v.student_no || '', gpa: v.gpa || '', state: v.status || '',
     role: v.role || '', mobile: v.mobile || '', status: a.status, created_at: a.created_at, updated_at: a.updated_at, login_id: a.login_id || '' };
 };
+
+// 심사 점수 주기 (심사위원 본인 몫): { score: 1~10 | 0(빼기) } — 방문자용 API(/xms-api/apply/<번호>/score)와 관리 API 가 함께 쓴다
+async function giveScore(ctx, id) {
+  const { request, env, site, me } = ctx;
+  const db = env.DB;
+  if (me.kind !== 'member') throw bad('관리자 계정으로 로그인해야 점수를 줄 수 있습니다.');
+  if (!isJudge(me)) throw new HttpError(403, '관리자 · 심사위원만 점수를 줄 수 있습니다.');
+  const a = await db.prepare('SELECT id, answers FROM applications WHERE id = ? AND site = ?').bind(id, site).first();
+  if (!a) throw notFound('없는 신청서입니다.');
+  const score = Number((await body(request)).score);
+  if (!(Number.isInteger(score) && score >= 0 && score <= 10)) throw bad('점수는 1~10점입니다.');
+  const t = now();
+  if (score === 0) await db.prepare('DELETE FROM apply_scores WHERE site = ? AND application_id = ? AND member_id = ?').bind(site, a.id, me.member.id).run();
+  else {
+    await db.prepare(`INSERT INTO apply_scores (site, application_id, member_id, score, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(application_id, member_id) DO UPDATE SET score = excluded.score, updated_at = excluded.updated_at`).bind(site, a.id, me.member.id, score, t, t).run();
+  }
+  await audit(db, site, me, request, 'APPLY_SCORE', parse(a.answers, {}).name || String(a.id), score ? `${score}점` : '점수 뺌');
+  const list = (await scoresOf(db, site, [a.id])).get(a.id);
+  return json({ ok: true, mine: score, scores: list, sum: sumOf(list), html: scoreLine(list, await judgesOf(db, site)) });
+}
 
 export async function adminApply(ctx, path, method) {
   const { request, env, site, me, url } = ctx;
@@ -587,23 +615,8 @@ export async function adminApply(ctx, path, method) {
     return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="applications-${round}-${kstDay()}.csv"`, 'Cache-Control': 'no-store' } });
   }
 
-  // 심사 점수 주기 (레벨1 회원 본인 몫): PUT /apply/<번호>/score { score: 1~10 | 0(빼기) }
-  if ((m = path.match(/^\/apply\/(\d+)\/score$/)) && method === 'PUT') {
-    if (me.kind !== 'member') throw bad('관리자 계정으로 로그인해야 점수를 줄 수 있습니다.');
-    const a = await db.prepare('SELECT id, answers FROM applications WHERE id = ? AND site = ?').bind(+m[1], site).first();
-    if (!a) throw notFound('없는 신청서입니다.');
-    const score = Number((await body(request)).score);
-    if (!(Number.isInteger(score) && score >= 0 && score <= 10)) throw bad('점수는 1~10점입니다.');
-    const t = now();
-    if (score === 0) await db.prepare('DELETE FROM apply_scores WHERE site = ? AND application_id = ? AND member_id = ?').bind(site, a.id, me.member.id).run();
-    else {
-      await db.prepare(`INSERT INTO apply_scores (site, application_id, member_id, score, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(application_id, member_id) DO UPDATE SET score = excluded.score, updated_at = excluded.updated_at`).bind(site, a.id, me.member.id, score, t, t).run();
-    }
-    await audit(db, site, me, request, 'APPLY_SCORE', parse(a.answers, {}).name || String(a.id), score ? `${score}점` : '점수 뺌');
-    const list = (await scoresOf(db, site, [a.id])).get(a.id);
-    return json({ ok: true, mine: score, scores: list, sum: sumOf(list), html: scoreLine(list, await judgesOf(db, site)) });
-  }
+  // 심사 점수 주기: PUT /apply/<번호>/score { score: 1~10 | 0(빼기) }
+  if ((m = path.match(/^\/apply\/(\d+)\/score$/)) && method === 'PUT') return giveScore(ctx, +m[1]);
 
   // 신청서 하나
   if ((m = path.match(/^\/apply\/(\d+)$/))) {
@@ -642,5 +655,5 @@ export async function adminApply(ctx, path, method) {
   return null;
 }
 
-// 서류 파일을 열어 볼 수 있는 사람: 관리자 · 올린 본인
-export const canSeeApplyFile = (u, me) => me.level === 1 || (me.kind === 'member' && u.created_by === me.member.id);
+// 서류 파일을 열어 볼 수 있는 사람: 관리자 · 심사위원(레벨2) · 올린 본인
+export const canSeeApplyFile = (u, me) => isJudge(me) || (me.kind === 'member' && u.created_by === me.member.id);
