@@ -512,24 +512,23 @@ const LAYOUT_LABEL = { TABLE: '테이블', CARD: '카드', BLOG: '블로그' };
 async function boardsPage() {
   const d = await api('/boards');
   main.innerHTML = `${head('사이트', '게시판', d.boards.length ? `홈페이지에 붙어 있는 게시판 ${d.boards.length}개입니다. 여기 순서는 이 목록의 차례이고, 홈페이지 메뉴 차례는 <a href="#/menus">메뉴</a>에서 정합니다.` : '', '<a class="btn primary" href="#/boards/new">+ 게시판 만들기</a>')}
-    <div class="panel">${d.boards.length ? `<table class="tbl cardy wide"><thead><tr><th>순서</th><th>이름</th><th>주소</th><th>목록 모양</th><th>제한</th><th>글</th><th>메뉴 위치</th><th>관리</th></tr></thead><tbody id="brows">
-      ${d.boards.map((b) => `<tr data-id="${b.id}"><td><button type="button" class="handle" aria-label="끌어서 순서 바꾸기">⠿</button></td>
-        <td><b>${esc(b.name)}</b>${b.visible ? '' : ' <span class="tag">숨김</span>'}</td>
-        <td data-l="주소"><a href="/board/${esc(b.slug)}" target="_blank" rel="noopener">/board/${esc(b.slug)}</a></td>
-        <td data-l="목록 모양">${LAYOUT_LABEL[b.list_layout]}</td><td data-l="제한">${b.allow_guest_list ? '<span class="dash">—</span>' : '<span class="tag blue">회원만</span>'}</td>
-        <td data-l="글">${b.post_count}</td><td data-l="메뉴 위치">${b.menu ? esc(b.menu) : '<span class="dash">메뉴에 없음</span>'}</td>
-        <td><div class="mng"><a class="btn sm" href="#/boards/${b.id}">설정</a><button class="btn sm danger" type="button" data-del>삭제</button></div></td></tr>`).join('')}</tbody></table>`
+    <div class="panel">${d.boards.length ? `<div class="brows" id="brows">
+      ${d.boards.map((b) => `<div class="brow" data-id="${b.id}"><button type="button" class="handle" aria-label="끌어서 순서 바꾸기">⠿</button>
+        <div class="brow-name"><b>${esc(b.name)}</b>${b.visible ? '' : ' <span class="tag">숨김</span>'}<a href="/board/${esc(b.slug)}" target="_blank" rel="noopener">/board/${esc(b.slug)}</a></div>
+        <div class="brow-meta"><span><i>목록</i>${LAYOUT_LABEL[b.list_layout]}</span><span><i>글</i>${b.post_count}</span><span><i>메뉴</i>${b.menu ? esc(b.menu) : '<em class="dash">없음</em>'}</span>
+          ${b.options?.kind === 'sermon' ? '<span class="tag blue">설교 게시판</span>' : ''}${b.options?.pdf_view ? `<span class="tag">${b.options.pdf_view === 'book' ? '전자책 뷰어' : 'PDF 뷰어'}</span>` : ''}${b.allow_guest_list ? '' : '<span class="tag blue">회원만</span>'}</div>
+        <div class="mng"><a class="btn sm" href="#/boards/${b.id}">설정</a><button class="btn sm danger" type="button" data-del>삭제</button></div></div>`).join('')}</div>`
     : empty('아직 게시판이 없습니다', '공지사항이나 자유게시판처럼, 글을 올릴 자리를 만들어 보세요.', '<a class="btn primary" href="#/boards/new">첫 게시판 만들기</a>')}</div>
     ${d.trash.length ? `<section class="panel pad"><h2>지운 게시판은 30일 동안 여기 있습니다</h2>
       ${d.trash.map((b) => `<div class="tree-row" data-tid="${b.id}"><div class="tt"><b>${esc(b.name)}</b><small>/board/${esc(b.slug)} · 글 ${b.post_count}건 · <b>${fmtDate(b.deleted_at + 30 * 86400000)}</b> 완전 삭제 예정</small></div>
         <div class="mng"><button class="btn sm" type="button" data-restore>되살리기</button></div></div>`).join('')}
       <p class="meta gap">지우는 즉시 주소가 풀려서, 그사이 다른 게시판이 같은 주소를 쓰면 되살릴 수 없습니다. 메뉴는 함께 되살아나지 않습니다.</p></section>` : ''}`;
   if (d.boards.length) {
-    sortable($('#brows'), { rowSel: 'tr[data-id]', onDrop: (list) => busy(null, null, async () => {
+    sortable($('#brows'), { rowSel: '.brow[data-id]', onDrop: (list) => busy(null, null, async () => {
       await api('/boards/order', { method: 'PUT', data: { ids: list.map((r) => Number(r.id)) } }); toast('순서를 저장했습니다.');
     }) });
   }
-  $$('#brows tr').forEach((tr) => {
+  $$('#brows .brow').forEach((tr) => {
     const b = d.boards.find((x) => x.id === +tr.dataset.id);
     tr.querySelector('[data-del]').onclick = (e) => confirmInline(e.currentTarget, `"${esc(b.name)}" 게시판이 글 ${b.post_count}건과 함께 30일 보관되며 그동안 복원할 수 있습니다. 주소 /board/${esc(b.slug)} 와 메뉴는 즉시 사라집니다.`, '게시판 삭제', async () => {
       await api(`/boards/${b.id}`, { method: 'DELETE' }); toast('보관함으로 옮겼습니다.'); route();
@@ -554,7 +553,7 @@ async function boardPage(id) {
     name: '', slug: '', list_layout: 'TABLE', list_levels: [1, 2, 3, 4, 5, 6, 7, 8, 9], read_levels: [1, 2, 3, 4, 5, 6, 7, 8, 9], write_levels: [1],
     comment_levels: [1, 2, 3, 4, 5, 6, 7, 8, 9], allow_guest_list: true, allow_guest_read: true, allow_guest_write: false, guest_menu: true,
     use_comment: true, use_secret: false, visible: true,
-    options: { list_show: { no: true, writer: true, date: true, views: true }, view_show: { writer: true, date: true, views: true }, writer_mode: 'NAME', page_size: 20 },
+    options: { list_show: { no: true, writer: true, date: true, views: true }, view_show: { writer: true, date: true, views: true }, writer_mode: 'NAME', page_size: 20, pdf_view: 'pdf' },
   };
   const o = v.options;
   const chk = (name, on, label) => `<label class="check"><input type="checkbox" name="${name}"${on ? ' checked' : ''}> ${label}</label>`;

@@ -117,6 +117,10 @@ export function mountPdf(host) {
       const underPage = under.querySelector('.xv-leafpage');
       if (single(nsp)) slide(underPage, (sideOf(nsp) * w) / 2, 0);
       stage.insertBefore(under, row);
+      // 한 장(표지 · 끝에 홀로 남은 쪽)에서 넘길 때: 넘어가는 장이 내려앉을 자리의 쪽이 먼저 보이면 안 된다(2026-11-18 표지를 넘기기도 전에 2쪽이 왼쪽에 보이던 것)
+      //   → 그 쪽은 다 넘어간 뒤에 보인다. (펼친 두 쪽에서 넘길 때는 지금 쪽이 그 자리를 가리고 있어 괜찮다)
+      let land = null;
+      if (single(sp)) { land = nsp.length > 1 ? under.querySelector(dir > 0 ? '.xv-leafpage.l' : '.xv-leafpage.r') : underPage; if (land) land.style.visibility = 'hidden'; }
       let face;
       if (one) { row.style.visibility = 'hidden'; face = row.querySelector('.xv-leafpage'); }
       else { face = single(sp) ? curPage : row.querySelector(dir > 0 ? '.xv-leafpage.r' : '.xv-leafpage.l'); face.style.visibility = 'hidden'; }
@@ -129,7 +133,7 @@ export function mountPdf(host) {
       Object.assign(leaf.style, { left: `${ref.left - sr.left}px`, top: `${ref.top - sr.top}px`, width: `${ref.width}px`, height: `${ref.height}px` });
       stage.appendChild(leaf); void leaf.offsetWidth; leaf.classList.add('turn');
       setTimeout(() => {
-        cur = to; leaf.remove(); row.remove();
+        cur = to; if (land) land.style.visibility = ''; leaf.remove(); row.remove();
         under.classList.remove('under'); setPage(); navState();
         if (single(nsp)) { slide(underPage, 0, SLIDE); setTimeout(() => { busy = false; }, SLIDE); } else busy = false;
       }, 720);

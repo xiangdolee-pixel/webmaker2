@@ -694,7 +694,8 @@ export function boardOptions(o = {}) {
     // 게시판 유형 (사용자 지시 2026-11-18): '' = 일반, sermon = 설교 게시판 — 글마다 '성경본문' · '설교자' 칸이 생기고(posts.extra) 목록 · 글에 보인다
     kind: o.kind === 'sermon' ? 'sermon' : '',
     // PDF 첨부 보기 (사용자 지시 2026-11-18): '' = 끔(첨부 목록만), pdf = 글 안에서 아래로 이어 보기, book = 전자책(책장 넘기기) — js/pdfview.js
-    pdf_view: ['pdf', 'book'].includes(o.pdf_view) ? o.pdf_view : '',
+    //   기본은 켜짐 · PDF 뷰어 (사용자 지시 2026-11-18 "모든 게시판은 늘 이렇게") — 값이 아예 없던 게시판 · 새 게시판 = pdf, 일부러 끈 게시판만 ''
+    pdf_view: o.pdf_view === 'book' ? 'book' : o.pdf_view === '' ? '' : 'pdf',
     // 목록 주소: 사이트 디자인 안에 따로 만든 목록 화면(예: bsf /archive.html) — 있으면 글 등록 · 수정 · 삭제 뒤, '목록' 단추가 그리로 간다 (사용자 지시 2026-11-13)
     list_url: /^\/[a-z0-9._\/-]{0,80}$/i.test(String(o.list_url || '')) ? String(o.list_url) : '',
   };

@@ -13,7 +13,7 @@ body.xe-on [data-xe]:hover{outline-color:#3b82f6;background-color:rgba(59,130,24
 body.xe-on [data-xe]:focus{outline:2px solid #3b82f6;background-color:rgba(59,130,246,.1);box-shadow:0 0 0 4px rgba(255,255,255,.55)}
 body.xe-on [data-xe].xe-dirty,body.xe-on a[data-xl].xe-dirty{outline:2px solid #f59e0b;outline-offset:2px}
 body.xe-on img[data-xi]{cursor:pointer}
-.xe-pick{position:absolute;z-index:2147482990;pointer-events:none;border:3px solid #3b82f6;border-radius:6px;box-shadow:0 0 0 9999px rgba(15,23,42,.2);transition:all .15s}
+.xe-pick{position:absolute;z-index:2147482990;pointer-events:none;border:3px solid #fde047;border-radius:6px;box-shadow:0 0 0 2px rgba(17,24,39,.85),0 0 0 9999px rgba(15,23,42,.2)}
 .xe-pick.dirty{border-color:#f59e0b}
 body.xe-on .xms-test{bottom:calc(max(16px,env(safe-area-inset-bottom)) + 66px)}
 .xe-bar{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2147483000;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;
@@ -27,13 +27,22 @@ body.xe-on .xms-test{bottom:calc(max(16px,env(safe-area-inset-bottom)) + 66px)}
 .xe-bar button.xe-save:hover{background:#fff;color:#1d4ed8}
 .xe-bar button:disabled{opacity:.4;cursor:default;background:transparent;color:#fff}
 .xe-bar button[hidden]{display:none}
+.xe-bar button.xe-hot{background:#fde047;border-color:#fde047;color:#111827;font-weight:800;animation:xe-pop .45s cubic-bezier(.22,.8,.24,1)}
+.xe-bar button.xe-hot:hover{background:#fff;border-color:#fff}
+@keyframes xe-pop{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.08)}100%{transform:none;opacity:1}}
+.xe-chip{position:absolute;z-index:2147482995;display:inline-flex;align-items:center;gap:7px;height:42px;padding:0 16px;border:0;border-radius:999px;background:#fde047;color:#111827;cursor:pointer;white-space:nowrap;
+ font:800 15px/1 "Pretendard Variable",Pretendard,system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35),0 0 0 3px rgba(17,24,39,.9);animation:xe-pop .4s cubic-bezier(.22,.8,.24,1);-webkit-tap-highlight-color:transparent}
+.xe-chip:hover{background:#fff}
+.xe-chip[hidden]{display:none}
+.xe-chip svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.xe-chip:focus-visible{outline:3px solid #3b82f6;outline-offset:3px}
 .xe-bar button:focus-visible,.xe-link input:focus-visible{outline:2px solid #fde047;outline-offset:2px}
 .xe-link{display:flex;align-items:center;gap:6px;flex:1 1 100%;order:9}
 .xe-link[hidden]{display:none}
 .xe-link input{flex:1;min-width:0;height:38px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.3);background:#1f2937;color:#fff;font:500 14px/1.3 inherit}
 .xe-toast{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:2147483001;max-width:calc(100vw - 24px);padding:10px 16px;border-radius:12px;background:#065f46;color:#fff;font:600 14px/1.4 "Pretendard Variable",Pretendard,system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .xe-toast.err{background:#991b1b}
-@media (prefers-reduced-motion: reduce){body.xe-on [data-xe],.xe-pick{transition:none}}
+@media (prefers-reduced-motion: reduce){body.xe-on [data-xe],.xe-pick{transition:none}.xe-chip,.xe-bar button.xe-hot{animation:none}}
 `;
 
 const nodesOf = (el) => {
@@ -142,6 +151,13 @@ export function startEdit() {
   const pick = document.createElement('div');   // 고른 사진 둘레 표시
   pick.className = 'xe-pick'; pick.hidden = true;
   document.body.append(pick);
+  // 고른 자리 바로 옆에 뜨는 단추 — "여기서 하면 되겠다" (사진 = 사진 한가운데, 링크 = 글자 바로 아래)
+  const IC_IMG = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4 4 3 3-2 4 3"/></svg>';
+  const IC_LINK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/></svg>';
+  const chipI = document.createElement('button'), chipL = document.createElement('button');
+  chipI.type = chipL.type = 'button'; chipI.className = chipL.className = 'xe-chip'; chipI.hidden = chipL.hidden = true;
+  chipI.innerHTML = `${IC_IMG}사진 바꾸기`; chipL.innerHTML = `${IC_LINK}링크 바꾸기`;
+  document.body.append(chipI, chipL);
   const file = document.createElement('input');
   file.type = 'file'; file.accept = 'image/png,image/jpeg,image/webp,image/gif'; file.hidden = true;
   document.body.append(file);
@@ -154,6 +170,24 @@ export function startEdit() {
     pick.hidden = false; pick.classList.toggle('dirty', dirtyI.has(curImg));
     Object.assign(pick.style, { left: `${r.left + scrollX}px`, top: `${r.top + scrollY}px`, width: `${r.width}px`, height: `${r.height}px` });
   };
+  const placeChips = () => {
+    const vw = innerWidth, vh = innerHeight;
+    if (curImg) {
+      const r = curImg.getBoundingClientRect();
+      // 사진의 보이는 부분 한가운데 (머리 메뉴 · 아래 막대에 가리지 않게)
+      const x0 = Math.max(r.left, 0), x1 = Math.min(r.right, vw), y0 = Math.max(r.top, 90), y1 = Math.min(r.bottom, vh - 90);
+      chipI.hidden = x1 - x0 < 40 || y1 - y0 < 30;
+      if (!chipI.hidden) Object.assign(chipI.style, { left: `${(x0 + x1) / 2 - chipI.offsetWidth / 2 + scrollX}px`, top: `${(y0 + y1) / 2 - 21 + scrollY}px` });
+    } else chipI.hidden = true;
+    const a = curLink();
+    if (a && linkForm.hidden) {
+      const r = (curImg || current || a).getBoundingClientRect();
+      chipL.hidden = false;
+      const left = Math.min(Math.max(8, curImg ? (Math.max(r.left, 0) + Math.min(r.right, vw)) / 2 - chipL.offsetWidth / 2 : r.left), vw - chipL.offsetWidth - 8);
+      const top = curImg ? Math.min(Math.max(r.top, 90), vh - 180) + 52 + Math.max(0, (Math.min(r.bottom, vh - 90) - Math.max(r.top, 90)) / 2 - 21) : (r.bottom + 54 < vh - 80 ? r.bottom + 10 : r.top - 52);
+      Object.assign(chipL.style, { left: `${left + scrollX}px`, top: `${top + scrollY}px` });
+    } else chipL.hidden = true;
+  };
   function paint() {
     const n = count();
     $('[data-c]').textContent = n ? `고친 곳 ${n}군데` : (curImg ? '사진을 골랐습니다' : '글자 · 사진을 눌러 고치세요');
@@ -161,11 +195,13 @@ export function startEdit() {
     const a = curLink();
     $('[data-a="link"]').hidden = !a;
     $('[data-a="img"]').hidden = !curImg;
+    $('[data-a="link"]').classList.toggle('xe-hot', !!a && !curImg);   // 지금 할 수 있는 일을 노랗게
+    $('[data-a="img"]').classList.toggle('xe-hot', !!curImg);
     const undoable = curImg ? srcOf(curImg) !== (ORIG[ikey(curImg)] || [])[0]
       : current ? (!same(valuesOf(current), ORIG[keyOf(current)]) || (a && hrefOf(a) !== (ORIG[lkey(a)] || [])[0])) : false;
     $('[data-a="undo"]').disabled = !undoable;
     $('[data-a="exit"]').textContent = $('[data-a="exit"]').dataset.sure ? '저장 안 하고 끝내기' : '끝내기';
-    placePick();
+    placePick(); placeChips();
   }
   const touched = () => { delete $('[data-a="exit"]').dataset.sure; paint(); };
   const mark = (el) => {
@@ -181,7 +217,7 @@ export function startEdit() {
 
   // 링크 · 단추를 눌러도 넘어가지 않게. 글자가 아닌 곳을 누르면 그 자리의 사진을 고른다.
   const block = (e) => {
-    if (bar.contains(e.target) || e.target.closest('.xa-menu, .xms-test, .xe-dlg')) return;
+    if (bar.contains(e.target) || e.target.closest('.xa-menu, .xms-test, .xe-dlg, .xe-chip')) return;
     const el = e.target.closest('[data-xe]');
     if (e.target.closest('a,button') || el) e.preventDefault();
     if (el) { if (curImg) { curImg = null; paint(); } return; }
@@ -206,7 +242,14 @@ export function startEdit() {
     document.execCommand('insertText', false, text);
   };
   const leave = (e) => { if (count()) { e.preventDefault(); e.returnValue = ''; } };
-  const onMove = () => placePick();
+  const onMove = () => { placePick(); placeChips(); };
+  // 흐르는 사진처럼 저절로 움직이는 자리도 따라간다
+  let raf = 0;
+  const follow = () => { if (!on) return; if (curImg || !chipL.hidden) onMove(); raf = requestAnimationFrame(follow); };
+  raf = requestAnimationFrame(follow);
+  chipI.addEventListener('click', (e) => { e.preventDefault(); if (curImg) file.click(); });
+  chipL.addEventListener('mousedown', (e) => e.preventDefault());   // 글자에서 커서가 빠지지 않게
+  chipL.addEventListener('click', (e) => { e.preventDefault(); openLink(); });
   document.addEventListener('click', block, true);
   document.addEventListener('input', onInput, true);
   document.addEventListener('focusin', onFocus, true);
@@ -219,12 +262,12 @@ export function startEdit() {
   // ── 링크 바꾸기: 막대 안에서 주소를 고친다 ──
   const linkForm = $('.xe-link'), linkIn = linkForm.querySelector('input');
   let linkEl = null;
-  function closeLink() { linkForm.hidden = true; linkEl = null; }
+  function closeLink() { linkForm.hidden = true; linkEl = null; placeChips(); }
   function openLink() {
     linkEl = curLink();
     if (!linkEl) return;
     linkIn.value = hrefOf(linkEl);
-    linkForm.hidden = false;
+    linkForm.hidden = false; chipL.hidden = true;
     setTimeout(() => { linkIn.focus(); linkIn.select(); }, 0);
   }
   linkForm.addEventListener('submit', (e) => {
@@ -241,14 +284,14 @@ export function startEdit() {
     file.value = '';
     if (!f || !im) return;
     const b = $('[data-a="img"]');
-    b.disabled = true; b.textContent = '올리는 중…';
+    b.disabled = true; b.textContent = '올리는 중…'; chipI.disabled = true; chipI.lastChild.textContent = '올리는 중…';
     try {
       const url = await uploadSiteImage(f);
       await new Promise((ok) => { const t = new Image(); t.onload = t.onerror = ok; t.src = url; });   // 다 받은 뒤에 바꿔 깜빡이지 않게
       setImg(im, url); markI(im);
       toast('사진을 바꿨습니다. 저장을 눌러야 방문자에게도 보입니다.');
     } catch (e) { toast(e.message || '사진을 올리지 못했습니다.', true); }
-    b.disabled = false; b.textContent = '사진 바꾸기';
+    b.disabled = false; b.textContent = '사진 바꾸기'; chipI.disabled = false; chipI.lastChild.textContent = '사진 바꾸기';
     paint();
   });
 
@@ -329,7 +372,8 @@ export function startEdit() {
     removeEventListener('beforeunload', leave);
     removeEventListener('scroll', onMove);
     removeEventListener('resize', onMove);
-    bar.remove(); style.remove(); pick.remove(); file.remove();
+    cancelAnimationFrame(raf);
+    bar.remove(); style.remove(); pick.remove(); file.remove(); chipI.remove(); chipL.remove();
   }
   paint();
   toast(imgs.length ? '수정 모드 — 글자는 눌러서 고치고, 사진은 눌러서 고른 뒤 "사진 바꾸기". 링크는 글자를 고른 뒤 "링크 바꾸기".' : '수정 모드 — 파란 점선 글자를 눌러 고치고 저장하세요.');
