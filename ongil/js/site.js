@@ -216,7 +216,7 @@
     var draw = function (list) {
       if (!list || !list.length) return;
       ul.innerHTML = list.map(function (p) {
-        return '<li><a href="' + esc(p.url) + '">' + (p.thumb && ul.hasAttribute('data-thumb') ? '<img src="' + esc(p.thumb) + '" alt="" loading="lazy" width="84" height="56">' : '') +
+        return '<li><a href="' + esc(p.url) + '">' + (p.thumb && ul.hasAttribute('data-thumb') ? '<img src="' + esc(String(p.thumb).replace('/hqdefault.jpg', '/mqdefault.jpg')) + '" alt="" loading="lazy" width="84" height="56">' : '') +
           '<span class="pt"><b>' + esc(p.title) + '</b>' + (p.sub ? '<small>' + esc(p.sub) + '</small>' : '') + '</span><time>' + esc(p.date) + '</time></a></li>';
       }).join('');
     };
@@ -256,6 +256,24 @@
   });
   doc.addEventListener('click', function () { palShow(false); });
   doc.addEventListener('keydown', function (e) { if (e.key === 'Escape') palShow(false); });
+
+  /* 꼬리의 이메일 주소: 누르면 주소가 복사된다 (메일 프로그램을 여는 대신) */
+  var toastEl = null, toastT = 0;
+  var toast = function (msg) {
+    if (!toastEl) { toastEl = doc.createElement('div'); toastEl.className = 'toast'; toastEl.setAttribute('role', 'status'); doc.body.appendChild(toastEl); }
+    toastEl.textContent = msg; void toastEl.offsetWidth; toastEl.classList.add('on');
+    clearTimeout(toastT); toastT = setTimeout(function () { toastEl.classList.remove('on'); }, 2000);
+  };
+  $$('.ft a[href^="mailto:"]').forEach(function (a) {
+    var mail = a.getAttribute('href').slice(7);
+    a.title = '누르면 이메일 주소가 복사됩니다';
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var done = function () { toast('이메일 주소를 복사했습니다 · ' + mail); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(mail).then(done, function () { location.href = 'mailto:' + mail; });
+      else { var ta = doc.createElement('textarea'); ta.value = mail; doc.body.appendChild(ta); ta.select(); try { doc.execCommand('copy'); done(); } catch (x) { location.href = 'mailto:' + mail; } doc.body.removeChild(ta); }
+    });
+  });
 
   /* 주소 복사 */
   $$('[data-copy]').forEach(function (b) {

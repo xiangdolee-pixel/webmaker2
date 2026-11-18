@@ -226,6 +226,7 @@ main { flex: 1; }
 .posts li { border-bottom: 1px solid var(--line); }
 .posts li:last-child { border-bottom: 0; }
 .posts a { display: flex; align-items: center; gap: 16px; padding: 16px 0; transition: color .2s; }
+@media (min-width: 768px) { .posts a { min-height: 89px; } }   /* 두 카드의 줄 높이를 같게 (그림이 있는 설교 줄 = 그림 56 + 여백) → 줄이 나란히 맞는다 */
 .posts a:hover { color: var(--gold-ink); }
 .posts img { flex: none; width: 84px; height: 56px; object-fit: cover; border-radius: 10px; background: var(--soft); }
 .posts .pt { flex: 1; min-width: 0; display: grid; gap: 1px; }
@@ -404,6 +405,11 @@ body .xms-top { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 66px); }
 .ft-bottom span { margin-left: 14px; }
 .ft-make a { color: rgba(255, 255, 255, .82); }
 .ft-make a:hover { color: #fff; }
+
+/* 잠깐 뜨는 알림 (이메일 주소 복사 등) */
+.toast { position: fixed; left: 50%; bottom: 28px; z-index: 2147482003; max-width: calc(100vw - 32px); padding: 12px 18px; border-radius: 12px; background: #fff; color: var(--ink); font-size: 15px; font-weight: 600; box-shadow: 0 10px 30px rgba(10, 14, 30, .35), 0 0 0 1px rgba(10, 14, 30, .08); opacity: 0; visibility: hidden; transform: translate(-50%, 10px); transition: opacity .25s, transform .3s var(--ease), visibility .25s; }
+.toast.on { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+.ft a[href^="mailto:"] { cursor: copy; }
 
 /* ───── 태블릿 ───── */
 @media (max-width: 1023px) {
