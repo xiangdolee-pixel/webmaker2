@@ -392,7 +392,7 @@ export async function applicantsPage(ctx, { page, msgPage, needLogin }) {
     <p class="apx-eyebrow"><i class="apx-dot st-${state[0]}"></i>${state[1]} · ${esc(periodLabel(round))}</p>
     <h1>신청자 확인</h1>
     <p class="apx-sub">${esc(round.title)}</p>
-    ${rounds.length > 1 ? `<select class="input apx-round" data-apx-round aria-label="신청 기간 고르기">${rounds.map((r) => `<option value="${r.id}"${r.id === round.id ? ' selected' : ''}>${esc(r.title)} · ${r.n}명</option>`).join('')}</select>` : ''}
+    <select class="input apx-round" data-apx-round aria-label="신청 기간 고르기">${rounds.map((r) => `<option value="${r.id}"${r.id === round.id ? ' selected' : ''}>${esc(r.title)} · ${r.n}명</option>`).join('')}</select>
   </header>
   <div class="apx-stats" role="group" aria-label="상태로 거르기">
     <button type="button" class="apx-stat on" data-f="all" aria-pressed="true"><b>${list.length}</b><span>전체</span></button>

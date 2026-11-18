@@ -1795,7 +1795,7 @@ async function applyList(qs) {
   const list = await api(`/apply/list?round=${r.id}`);
   const count = (k) => list.filter((a) => a.status === k).length;
   main.innerHTML = `${head('장학금 신청', '신청서 보기', `${roundTag(r)} ${esc(r.title)} · ${esc(r.period)}`, list.length ? `<a class="btn green" href="/xms-api/admin/apply/export?round=${r.id}">엑셀로 내려받기</a>` : '')}
-    ${rounds.length > 1 ? `<label class="field apl-round"><span>신청 기간</span><select class="input" id="apl-round">${rounds.map((x) => `<option value="${x.id}"${x.id === r.id ? ' selected' : ''}>${esc(x.title)} (${esc(x.period)}) · ${x.count}명</option>`).join('')}</select></label>` : ''}
+    <label class="field apl-round"><span>신청 기간 — 고른 기간에 들어온 신청서만 보입니다</span><select class="input" id="apl-round">${rounds.map((x) => `<option value="${x.id}"${x.id === r.id ? ' selected' : ''}>${esc(x.title)} (${esc(x.period)}) · ${x.count}명</option>`).join('')}</select></label>
     <div class="apl-bar"><div class="tabs" id="apl-tabs"></div><input class="input apl-q" id="apl-q" type="search" placeholder="이름 · 학과 · 학번 찾기"></div>
     <div id="apl-list"></div>`;
   const card = (a) => `<a class="apl-card" href="#/apply/${a.id}">
