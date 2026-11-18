@@ -179,6 +179,37 @@
     fetch('/xms-api/boards/' + slug + '/latest?n=' + n).then(function (r) { return r.ok ? r.json() : []; }).then(draw).catch(function () {});
   });
 
+  /* 색 바꿔 보기 (오른쪽 아래 무지개 단추): 고른 색은 html[data-pal] 로 걸고 이 브라우저에 기억 — 첫 그림 전에 거는 건 <head> 의 한 줄 */
+  var PALS = [
+    ['', '온길 네이비', '#20344E'], ['royal', '로열 블루', '#2A44C0'], ['steel', '스틸 블루', '#2F5179'], ['teal', '딥 틸', '#0E5E6A'],
+    ['emerald', '에메랄드', '#0D6650'], ['forest', '포레스트', '#2F4A36'], ['wine', '버건디', '#7A1E3A'], ['plum', '플럼', '#5A2B5F'],
+    ['terracotta', '테라코타', '#A9502E'], ['mocha', '모카', '#5B4234'], ['charcoal', '차콜', '#2E333D'], ['black', '블랙 · 골드', '#0B0B0D'],
+    ['pastel-pink', '블러시 핑크', '#F4C9D3'], ['hotpink', '핫 핑크', '#D63A78'], ['pastel-yellow', '버터 옐로우', '#F5E2A8'], ['pastel-sky', '스카이 블루', '#C3DFF0']
+  ];
+  var root = doc.documentElement, curPal = root.getAttribute('data-pal') || '';
+  var pw = doc.createElement('div');
+  pw.className = 'pal';
+  pw.innerHTML = '<div class="pal-panel" id="pal-panel" hidden><p class="pal-t">색 바꿔 보기</p><div class="pal-list" role="radiogroup" aria-label="사이트 색">' +
+    PALS.map(function (p) {
+      return '<button type="button" role="radio" data-pal="' + p[0] + '" aria-checked="' + (p[0] === curPal) + '"><i style="background:' + p[2] + '"></i><span>' + p[1] + '</span></button>';
+    }).join('') + '</div><p class="pal-note">시안 확인용 · 고른 색은 이 브라우저에 기억됩니다</p></div>' +
+    '<button type="button" class="pal-btn" aria-expanded="false" aria-controls="pal-panel" aria-label="사이트 색 바꾸기"><i></i></button>';
+  doc.body.appendChild(pw);
+  var pBtn = $('.pal-btn', pw), pPanel = $('.pal-panel', pw);
+  var palShow = function (v) { pPanel.hidden = !v; pBtn.setAttribute('aria-expanded', v ? 'true' : 'false'); };
+  pBtn.addEventListener('click', function (e) { e.stopPropagation(); palShow(pPanel.hidden); });
+  pPanel.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var b = e.target.closest ? e.target.closest('[data-pal]') : null;
+    if (!b) return;
+    var id = b.getAttribute('data-pal');
+    if (id) root.setAttribute('data-pal', id); else root.removeAttribute('data-pal');
+    try { if (id) localStorage.setItem('ongil-pal', id); else localStorage.removeItem('ongil-pal'); } catch (x) { /* 기억만 못 함 */ }
+    $$('[data-pal]', pPanel).forEach(function (x) { x.setAttribute('aria-checked', x === b ? 'true' : 'false'); });
+  });
+  doc.addEventListener('click', function () { palShow(false); });
+  doc.addEventListener('keydown', function (e) { if (e.key === 'Escape') palShow(false); });
+
   /* 주소 복사 */
   $$('[data-copy]').forEach(function (b) {
     b.addEventListener('click', function () {
