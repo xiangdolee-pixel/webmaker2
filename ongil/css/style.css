@@ -228,7 +228,9 @@ main { flex: 1; }
 .posts a { display: flex; align-items: center; gap: 16px; padding: 16px 0; transition: color .2s; }
 .posts a:hover { color: var(--gold-ink); }
 .posts img { flex: none; width: 84px; height: 56px; object-fit: cover; border-radius: 10px; background: var(--soft); }
-.posts b { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.posts .pt { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.posts b { min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.posts small { min-width: 0; font-size: 14px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }   /* 설교: 성경본문 · 설교자 */
 .posts time { flex: none; font-size: 14px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .posts .empty { padding: 34px 0 20px; text-align: center; color: var(--ink-3); font-size: 16px; }
 

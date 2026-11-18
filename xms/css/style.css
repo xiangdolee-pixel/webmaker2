@@ -1491,3 +1491,14 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .xv-leaf.one .xv-face.backface { display: none; }
 @media (max-width: 599px) { .xv-dl span { display: none; } .xv-dl { width: 38px; padding: 0; } .xv-nav { width: 38px; height: 38px; margin-top: -19px; } .xv-prev { left: 4px; } .xv-next { right: 4px; } }
 @media (prefers-reduced-motion: reduce) { .xv-leaf { transition: none; } }
+
+/* 설교 게시판 (게시판 유형 sermon): 성경본문 · 설교자 */
+.sm-line { display: flex; flex-wrap: wrap; gap: 2px 0; margin-top: 3px; color: var(--sub); font-size: 13.5px; font-weight: 500; line-height: 1.5; }
+.sm-line span + span::before { content: "·"; margin: 0 6px; color: var(--mute); }
+.pcard-b .sm-line { margin-top: 2px; }
+.blog-row .sm-line { margin: 2px 0 6px; font-size: 14px; }
+.sm-info { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 0 0 18px; padding: 14px 18px; border-radius: 12px; background: var(--line-2, #f3f5f8); }
+.sm-info div { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.sm-info dt { flex: none; color: var(--mute); font-size: 13.5px; font-weight: 600; }
+.sm-info dd { margin: 0; color: var(--ink); font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+.pcard .thumb img[src*="i.ytimg.com"] { transform: scale(1.34); }   /* 유튜브 미리보기 그림의 위아래 검은 띠를 잘라 낸다 */

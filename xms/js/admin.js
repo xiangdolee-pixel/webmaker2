@@ -556,6 +556,9 @@ async function boardPage(id) {
   const sec1 = `<section class="panel pad" data-sec="basic"><h2>이름과 주소</h2>
       <div class="row2"><label class="field"><span>게시판 이름</span><input class="input" name="name" required maxlength="40" value="${esc(v.name)}" placeholder="공지사항"></label>
       <label class="field"><span>주소</span><input class="input" name="slug" required pattern="[a-z0-9][a-z0-9\\-]{0,39}" value="${esc(v.slug)}" placeholder="notice"><small>${esc(INFO.site.domain || '')}/board/<b data-slug>${esc(v.slug) || '…'}</b></small></label></div>
+      <div class="perm"><b>게시판 유형</b><div class="choices"><label class="check"><input type="radio" name="board_kind" value=""${o.kind !== 'sermon' ? ' checked' : ''}> 일반 게시판</label>
+        <label class="check"><input type="radio" name="board_kind" value="sermon"${o.kind === 'sermon' ? ' checked' : ''}> 설교 게시판</label></div>
+        <small class="meta">설교 게시판은 글마다 성경본문 · 설교자 칸이 생기고, 목록과 글에도 보입니다. 영상만 넣은 글은 영상 미리보기 그림이 목록에 나옵니다.</small></div>
       ${b ? chk('visible', v.visible, '메뉴와 목록에 보입니다') : ''}
       ${b ? '' : `<div class="perm"><b>메뉴에 붙이기</b>${chk('attach_menu', true, '만들면서 메뉴에도 바로 붙입니다')}
         <label class="field"><span>상위 메뉴</span><select class="input" name="parent_menu_id"><option value="">맨 위 (대메뉴)</option>${parentOpts}</select></label></div>`}
@@ -621,7 +624,7 @@ async function boardPage(id) {
       list_levels: f.list_levels || [], read_levels: f.read_levels || [], write_levels: f.write_levels || [], comment_levels: f.comment_levels || [],
       allow_guest_list: f.allow_guest_list, allow_guest_read: f.allow_guest_read, allow_guest_write: f.allow_guest_write, guest_menu: f.guest_menu,
       use_comment: f.use_comment, use_secret: f.use_secret,
-      options: { list_show: { no: f.ls_no, writer: f.ls_writer, date: f.ls_date, views: f.ls_views }, view_show: { writer: f.vs_writer, date: f.vs_date, views: f.vs_views }, writer_mode: f.writer_mode, page_size: Number(f.page_size), pdf_view: f.pdf_on ? (f.pdf_view === 'book' ? 'book' : 'pdf') : '' },
+      options: { list_show: { no: f.ls_no, writer: f.ls_writer, date: f.ls_date, views: f.ls_views }, view_show: { writer: f.vs_writer, date: f.vs_date, views: f.vs_views }, writer_mode: f.writer_mode, page_size: Number(f.page_size), pdf_view: f.pdf_on ? (f.pdf_view === 'book' ? 'book' : 'pdf') : '', kind: f.board_kind === 'sermon' ? 'sermon' : '' },
     };
     if (b) data.visible = f.visible; else { data.attach_menu = f.attach_menu; data.parent_menu_id = f.parent_menu_id; }
     busy(form.querySelector('[type=submit]'), null, async () => {

@@ -374,7 +374,20 @@ const canWrite = (b, me) => canBy(b.write_levels, b.allow_guest_write, me, true)
 const canComment = (b, me) => me.level > 0 && canBy(b.comment_levels, 0, me, true);
 const isMine = (p, me) => me.kind === 'member' && p.writer_id === me.member.id;
 const writerOf = (b, p, me) => (b.opt.writer_mode === 'HIDDEN' && me.level !== 1 && !isMine(p, me) ? '비공개' : p.writer_name);
-const firstImage = (h) => (String(h).match(/<img[^>]+src="([^"]+)"/i) || [])[1] || '';
+const firstImage = (h) => {
+  const s = String(h);
+  const img = (s.match(/<img[^>]+src="([^"]+)"/i) || [])[1];
+  if (img) return img;
+  const yt = (s.match(/youtube(?:-nocookie)?\.com\/embed\/([\w-]{11})/) || [])[1];   // 그림이 없으면 유튜브 영상의 미리보기 그림
+  return yt ? `https://i.ytimg.com/vi/${yt}/hqdefault.jpg` : '';
+};
+// 설교 게시판(게시판 유형 sermon): 글마다 성경본문 · 설교자 (posts.extra JSON)
+const extraOf = (p) => { try { return JSON.parse(p?.extra || '{}') || {}; } catch { return {}; } };
+const sermonLine = (b, p) => {
+  if (b.opt.kind !== 'sermon') return '';
+  const x = extraOf(p), parts = [x.scripture, x.preacher].filter(Boolean);
+  return parts.length ? `<span class="sm-line">${parts.map((t) => `<span>${esc(t)}</span>`).join('')}</span>` : '';
+};
 
 async function boardList(ctx, b) {
   const { env, me, url } = ctx;
@@ -387,7 +400,7 @@ async function boardList(ctx, b) {
   const where = ['board_id = ?', 'deleted_at IS NULL', 'is_notice = 0'];
   const args = [b.id];
   if (!admin) { where.push('published_at <= ?', 'is_hidden = 0'); args.push(now()); }
-  if (q) { where.push('(title LIKE ? OR content_html LIKE ?)'); args.push(`%${q}%`, `%${q}%`); }
+  if (q) { where.push("(title LIKE ? OR content_html LIKE ? OR COALESCE(extra, '') LIKE ?)"); args.push(`%${q}%`, `%${q}%`, `%${q}%`); }
   const w = where.join(' AND ');
   // 개수 · 목록 · 공지를 동시에 (DB 왕복 줄이기)
   const [cnt, listRes, ntsRes] = await Promise.all([
@@ -417,16 +430,16 @@ async function boardList(ctx, b) {
     list = `<div class="cards">${all.map((p) => {
       const img = secretHidden(p) ? '' : firstImage(p.content_html);
       return `<a class="pcard${hid(p)}" href="${link(p)}" data-pid="${p.id}">${pick(p)}<div class="thumb">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : '<span>No Image</span>'}</div>
-        <div class="pcard-b">${p._notice ? '<span class="tag notice">공지</span>' : ''}<b>${titleHtml(p)}</b>${ls.date ? `<small>${fmtDate(p.published_at)}</small>` : ''}</div></a>`;
+        <div class="pcard-b">${p._notice ? '<span class="tag notice">공지</span>' : ''}<b>${titleHtml(p)}</b>${secretHidden(p) ? '' : sermonLine(b, p)}${ls.date ? `<small>${fmtDate(p.published_at)}</small>` : ''}</div></a>`;
     }).join('')}</div>`;
   } else if (b.list_layout === 'BLOG') {
     list = `<div class="blog">${all.map((p) => `<article class="blog-row${hid(p)}" data-pid="${p.id}">${pick(p)}<a href="${link(p)}">${p._notice ? '<span class="tag notice">공지</span>' : ''}<h3>${titleHtml(p)}</h3>
-      ${secretHidden(p) ? '' : `<p>${esc(plainText(p.content_html).slice(0, 160))}</p>`}</a>
+      ${secretHidden(p) ? '' : `${sermonLine(b, p)}<p>${esc(plainText(p.content_html).slice(0, 160))}</p>`}</a>
       <div class="meta">${ls.writer ? `<span>${esc(writerOf(b, p, me))}</span>` : ''}${ls.date ? `<span>${fmtDate(p.published_at)}</span>` : ''}${ls.views ? `<span>조회 ${p.view_count}</span>` : ''}</div></article>`).join('')}</div>`;
   } else {
     list = `<table class="ptable"><thead><tr>${admin ? '<th class="c-pick"></th>' : ''}${ls.no ? '<th class="c-no">번호</th>' : ''}<th>제목</th>${ls.writer ? '<th class="c-w">작성자</th>' : ''}${ls.date ? '<th class="c-d">작성일</th>' : ''}${ls.views ? '<th class="c-v">조회</th>' : ''}</tr></thead><tbody>
       ${all.map((p, i) => `<tr class="${p._notice ? 'is-notice' : ''}${hid(p)}" data-pid="${p.id}">${admin ? `<td class="c-pick">${pick(p)}</td>` : ''}${ls.no ? `<td class="c-no">${p._notice ? '<span class="tag notice">공지</span>' : total - (pg - 1) * size - (i - notices.length)}</td>` : ''}
-        <td class="c-t"><a href="${link(p)}">${!ls.no && p._notice ? '<span class="tag notice">공지</span>' : ''}${titleHtml(p)}</a></td>
+        <td class="c-t"><a href="${link(p)}">${!ls.no && p._notice ? '<span class="tag notice">공지</span>' : ''}${titleHtml(p)}</a>${secretHidden(p) ? '' : sermonLine(b, p)}</td>
         ${ls.writer ? `<td class="c-w">${esc(writerOf(b, p, me))}</td>` : ''}${ls.date ? `<td class="c-d">${fmtDate(p.published_at)}</td>` : ''}${ls.views ? `<td class="c-v">${p.view_count}</td>` : ''}</tr>`).join('')}
       </tbody></table>`;
   }
@@ -486,6 +499,7 @@ async function postView(ctx, b, id) {
       <h1>${p.is_hidden ? '<span class="tag gray">숨김</span>' : ''}${p.is_notice ? '<span class="tag notice">공지</span>' : ''}${p.is_secret ? '<span class="tag">비밀</span>' : ''}${esc(p.title)}</h1>
       <div class="meta">${vs.writer ? `<span>${esc(writerOf(b, p, me))}</span>` : ''}${vs.date ? `<span>${fmtDate(p.published_at, true)}</span>` : ''}${vs.views ? `<span>조회 ${p.view_count + 1}</span>` : ''}
         ${p.published_at > now() ? `<span class="tag warn">${fmtDate(p.published_at, true)} 공개 예약</span>` : ''}</div>
+      ${b.opt.kind === 'sermon' && (extraOf(p).scripture || extraOf(p).preacher) ? `<dl class="sm-info">${extraOf(p).scripture ? `<div><dt>성경본문</dt><dd>${esc(extraOf(p).scripture)}</dd></div>` : ''}${extraOf(p).preacher ? `<div><dt>설교자</dt><dd>${esc(extraOf(p).preacher)}</dd></div>` : ''}</dl>` : ''}
       ${imgs.length ? `<div class="post-photos">${imgs.map((u) => `<a href="${u.url}" target="_blank" rel="noopener"><img src="${u.url}" alt="${esc(u.name)}" loading="lazy"></a>`).join('')}</div>` : ''}
       <div class="prose"${b.opt.pdf_view ? ` data-xv-inline="${b.opt.pdf_view}"` : ''}>${bodyHtml}</div>
       ${b.opt.pdf_view ? files.filter((u) => /\.pdf$/i.test(u.name) || u.mime === 'application/pdf').map((u) => `<div class="xv" data-xv="${b.opt.pdf_view}" data-src="${esc(u.url)}" data-dl="${esc(u.dl || `${u.url}?dl=1`)}" data-name="${esc(u.name)}"></div>`).join('') : ''}
@@ -548,6 +562,8 @@ async function postForm(ctx, b, id) {
     <header class="write-head"><h1>${id ? '글 수정' : '글쓰기'}</h1><a class="write-board" href="${esc(b.opt.list_url || `/board/${b.slug}`)}">${esc(b.name)}</a></header>
     <form data-form="post" data-board="${esc(b.slug)}" data-id="${id || ''}"${b.opt.list_url ? ` data-after="${esc(b.opt.list_url)}"` : ''}>
       <label class="field"><span>제목</span><input class="input big" name="title" maxlength="200" required value="${esc(p?.title)}"></label>
+      ${b.opt.kind === 'sermon' ? `<div class="row2 sm-fields"><label class="field"><span>성경본문</span><input class="input" name="scripture" maxlength="120" value="${esc(extraOf(p).scripture)}" placeholder="예) 사무엘하 6:9–15"></label>
+        <label class="field"><span>설교자</span><input class="input" name="preacher" maxlength="60" value="${esc(extraOf(p).preacher)}" placeholder="예) 김도현 목사"></label></div>` : ''}
       ${guest
         ? '<label class="field"><span>이름</span><input class="input half" name="writer_name" maxlength="20" required><small>비회원으로 남기는 글입니다. 수정·삭제는 관리자에게 문의해 주세요.</small></label>'
         : `<div class="field"><span>작성자</span><input class="input half readonly" value="${esc(writer)}" readonly tabindex="-1"></div>`}
@@ -678,13 +694,14 @@ export async function publicApi(ctx) {
     const b = await loadBoard(db, site, m[1]);
     if (!b || !b.visible || !canList(b, me)) return json([]);
     const n = Math.min(12, Math.max(1, Number(url.searchParams.get('n')) || 4));
-    const { results } = await db.prepare(`SELECT id, title, content_html, published_at FROM posts
+    const { results } = await db.prepare(`SELECT id, title, content_html, extra, published_at FROM posts
       WHERE board_id = ? AND deleted_at IS NULL AND is_secret = 0 AND is_hidden = 0 AND published_at <= ? ORDER BY published_at DESC, id DESC LIMIT ?`).bind(b.id, now(), n).all();
     const ids = results.map((p) => p.id);
     const atts = ids.length ? (await db.prepare(`SELECT post_id, id FROM uploads WHERE site = ? AND kind = 'IMAGE' AND post_id IN (${ids.map(() => '?').join(',')}) ORDER BY sort`).bind(site, ...ids).all()).results : [];
     const attOf = (id) => atts.find((a) => a.post_id === id);
     return new Response(JSON.stringify(results.map((p) => ({
       id: p.id, title: p.title, date: fmtDate(p.published_at), url: `/board/${b.slug}/${p.id}`,
+      ...(b.opt.kind === 'sermon' ? { sub: [extraOf(p).scripture, extraOf(p).preacher].filter(Boolean).join(' · ') } : {}),
       thumb: firstImage(p.content_html) || (attOf(p.id) ? `/xms/upload/${attOf(p.id).id}` : ''),
     }))), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=30' } });
   }
@@ -823,8 +840,8 @@ export async function publicApi(ctx) {
     const raw = await body(request);
     const v = await postValues(b, me, raw, null);
     const t = now();
-    const r = await db.prepare(`INSERT INTO posts (site, board_id, title, content_html, blocks, is_notice, is_secret, writer_id, writer_name, published_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(site, b.id, v.title, v.content, v.blocks, v.is_notice, v.is_secret,
+    const r = await db.prepare(`INSERT INTO posts (site, board_id, title, content_html, blocks, extra, is_notice, is_secret, writer_id, writer_name, published_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(site, b.id, v.title, v.content, v.blocks, v.extra, v.is_notice, v.is_secret,
       me.kind === 'member' ? me.member.id : null, v.writer_name, v.published_at ?? t, t, t).run();
     await syncPostFiles(env, site, r.meta.last_row_id, v.content, raw.attachments, me);
     return json({ id: r.meta.last_row_id });
@@ -838,8 +855,8 @@ export async function publicApi(ctx) {
     if (method === 'PUT') {
       const raw = await body(request);
       const v = await postValues({ ...b, opt: boardOptions(JSON.parse(b.options || '{}')) }, me, raw, p);
-      await db.prepare('UPDATE posts SET title = ?, content_html = ?, blocks = ?, is_notice = ?, is_secret = ?, published_at = ?, updated_at = ? WHERE id = ?')
-        .bind(v.title, v.content, v.blocks, v.is_notice, v.is_secret, v.published_at ?? p.published_at, now(), p.id).run();
+      await db.prepare('UPDATE posts SET title = ?, content_html = ?, blocks = ?, extra = ?, is_notice = ?, is_secret = ?, published_at = ?, updated_at = ? WHERE id = ?')
+        .bind(v.title, v.content, v.blocks, v.extra, v.is_notice, v.is_secret, v.published_at ?? p.published_at, now(), p.id).run();
       await syncPostFiles(env, site, p.id, v.content, raw.attachments, me); // 글에서 뺀 그림 · 첨부는 저장 공간에서도 지운다
       return json({ ok: true });
     }
@@ -922,6 +939,8 @@ async function postValues(b, me, raw, cur) {
   }
   return {
     title, content, writer_name: writer, published_at: published, blocks: blocks ? JSON.stringify(blocks) : null,
+    // 설교 게시판: 성경본문 · 설교자 (다른 게시판은 있던 값 그대로)
+    extra: b.opt?.kind === 'sermon' ? JSON.stringify({ scripture: str(raw.scripture, 120), preacher: str(raw.preacher, 60) }) : (cur?.extra ?? null),
     is_notice: admin ? (raw.is_notice ? 1 : 0) : (cur?.is_notice || 0),
     is_secret: b.use_secret ? (raw.is_secret ? 1 : 0) : (cur?.is_secret || 0),
   };

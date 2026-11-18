@@ -217,7 +217,7 @@
       if (!list || !list.length) return;
       ul.innerHTML = list.map(function (p) {
         return '<li><a href="' + esc(p.url) + '">' + (p.thumb && ul.hasAttribute('data-thumb') ? '<img src="' + esc(p.thumb) + '" alt="" loading="lazy" width="84" height="56">' : '') +
-          '<b>' + esc(p.title) + '</b><time>' + esc(p.date) + '</time></a></li>';
+          '<span class="pt"><b>' + esc(p.title) + '</b>' + (p.sub ? '<small>' + esc(p.sub) + '</small>' : '') + '</span><time>' + esc(p.date) + '</time></a></li>';
       }).join('');
     };
     var emb = doc.getElementById('xms-latest-' + slug);
