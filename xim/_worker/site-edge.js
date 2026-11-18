@@ -11,39 +11,12 @@ const DYN = /^\/(xms|xms-api|member|board|site-api|admin|cdn-cgi|api|ws|rss\.xml
 const PASS_MS = 3600000;   // html 이 아닌 주소라는 표시를 믿는 시간(배포하면 열쇠가 바뀌어 새로)
 const TRACK = /^(utm_|fbclid$|gclid$|n_|nclid$|_ga$|ref$)/;
 const FRESH_MS = 30000;
-const MEDIA = /\.(mp4|webm)$/i;
-
-// 영상 파일(2026-11-18): Workers 정적 파일은 '부분 요청(Range)'에 통째로 답한다 → 아이폰 사파리는 부분 요청이 안 되면 영상을 틀지 않고,
-//   다른 브라우저도 앞부분만 받아 바로 재생하지 못한다. 그래서 가장자리 캐시에 통째로 한 번 넣어 두고(캐시는 부분 요청에 206 으로 답한다) 거기서 준다.
-//   처음 한 번(캐시에 없을 때)은 여기서 직접 잘라 준다.
-async function media(request, env, ctx, url) {
-  const cache = caches.default, range = request.headers.get('Range');
-  const hit = await cache.match(new Request(url.href, range ? { headers: { Range: range } } : undefined)).catch(() => null);
-  if (hit) return hit;
-  const h = new Headers(request.headers);
-  h.delete('Range'); h.delete('Cookie');
-  const r = await env.CORE.fetch(new Request(request.url, { headers: h }));
-  if (r.status !== 200) return r;
-  const buf = await r.arrayBuffer(), len = buf.byteLength;
-  const head = new Headers(r.headers);
-  head.set('Cache-Control', url.searchParams.has('v') ? 'public, max-age=31536000, immutable' : 'public, max-age=86400');
-  head.set('Accept-Ranges', 'bytes'); head.set('Content-Length', String(len));
-  head.delete('Set-Cookie'); head.delete('Cf-Placement');
-  ctx.waitUntil(cache.put(new Request(url.href), new Response(buf, { headers: head })).catch(() => {}));
-  const m = /^bytes=(\d*)-(\d*)$/.exec(range || '');
-  if (!m || (!m[1] && !m[2])) return new Response(buf, { headers: head });
-  const s = m[1] ? +m[1] : Math.max(0, len - +m[2]), e = m[1] && m[2] ? Math.min(+m[2], len - 1) : len - 1;
-  if (s > e || s >= len) { head.set('Content-Range', `bytes */${len}`); head.delete('Content-Length'); return new Response(null, { status: 416, headers: head }); }
-  head.set('Content-Range', `bytes ${s}-${e}/${len}`); head.set('Content-Length', String(e - s + 1));
-  return new Response(buf.slice(s, e + 1), { status: 206, headers: head });
-}
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname;
     const cookie = request.headers.get('Cookie') || '';
-    if (request.method === 'GET' && MEDIA.test(p)) return media(request, env, ctx, url);
     const pageLike = /(^|\/)[^./]*$/.test(p) || /\.html?$/i.test(p) || p.endsWith('/');
     if (request.method !== 'GET' || !pageLike || DYN.test(p) || /(^|;\s*)xms_sess=/.test(cookie) || request.headers.get('X-Edge-Fill') || request.headers.get('Upgrade')) return env.CORE.fetch(request);
     const qs = [...url.searchParams.keys()].filter((k) => !TRACK.test(k));

@@ -452,8 +452,8 @@
     counts.forEach(function (el) { el.firstChild.nodeValue = el.getAttribute('data-count'); });
   }
 
-  /* 첫 화면: 배경 영상 한 번 → 사진 3장 차례로 → 다시 영상부터 (사용자 지시 2026-11-12)
-     영상이 안 열리거나 움직임 줄이기면 사진만 돈다. */
+  /* 첫 화면: 배경 영상(Vimeo) 한 번 → 사진 3장 차례로 → 다시 영상부터 (사용자 지시 2026-11-12)
+     영상이 안 열리거나 움직임 줄이기면 사진만 돈다. Vimeo 와는 postMessage 로 주고받는다(재생 · 끝남 · 처음으로) */
   var hero = $('.hero'), slides = $$('.slide'), hv = $('.hero-video');
   var cur = 0, bar = $('.hero-cap .bar i'), cnt = $('.hero-cap .count'), caps = $$('[data-cap]'), timer = 0, SLIDE_MS = 6500;
   function show(i) {
@@ -468,36 +468,48 @@
     (function next() { timer = setTimeout(function () { if (!doc.hidden) show((cur + 1) % slides.length); next(); }, SLIDE_MS); })();
   }
   // 순서: 영상 첫 화면(그림) → 영상 → 사진 1 · 2 · 3 → 다시 영상. 사진은 영상이 끝난 뒤에만 보인다(.slides-on)
-  // 영상은 html 에 바로 든 <video>(자체 mp4) — 외부 플레이어를 기다리지 않고 들어오자마자 재생된다
-  var vd = hv && hv.querySelector('video'), vPlaying = false, waiting = 0;
+  // 영상 iframe 은 index.html 에 바로 들어 있다(이 파일 · CSS 를 기다리지 않고 페이지를 읽자마자 받기 시작 — 재생이 1초쯤 빨라진다).
+  // Vimeo 와는 postMessage 로 직접 주고받는다(재생 · 끝남 · 처음으로) — 따로 받는 player.js 를 기다리지 않는다.
+  var fr = hv && hv.querySelector('iframe'), vPlaying = false, waiting = 0, VIMEO = 'https://player.vimeo.com';
+  function tell(method, value) { if (fr && fr.contentWindow) try { fr.contentWindow.postMessage(JSON.stringify(value === undefined ? { method: method } : { method: method, value: value }), VIMEO); } catch (e) {} }
+  function listen() { ['playing', 'timeupdate', 'ended'].forEach(function (ev) { tell('addEventListener', ev); }); }
   function photos() { hero.classList.add('slides-on'); hero.classList.remove('has-video'); }
-  function videoOn() { if (vPlaying || !vd) return; vPlaying = true; clearTimeout(waiting); clearTimeout(timer); hero.classList.remove('slides-on'); hero.classList.add('has-video'); vd.classList.add('loaded'); }
-  function replay() { try { vd.currentTime = 0; } catch (e) {} var p = vd.play(); if (p && p.catch) p.catch(function () { slidesForever(); }); }
+  function videoOn() { if (vPlaying || !fr) return; vPlaying = true; clearTimeout(waiting); clearTimeout(timer); hero.classList.remove('slides-on'); hero.classList.add('has-video'); fr.classList.add('loaded'); }
   function videoEnded() {
     if (!vPlaying) return;
     vPlaying = false;
+    tell('pause');
     show(0); photos();
     var k = 0;
     clearTimeout(timer);
     (function next() {
       timer = setTimeout(function () {
         if (++k < slides.length) { show(k); next(); return; }
-        replay();
+        if (!fr) { slidesForever(); return; }
+        again = true; tell('setCurrentTime', 0); tell('play');
       }, SLIDE_MS);
     })();
   }
-  function fallback() { if (vd) vd.remove(); vd = null; photos(); slidesForever(); }   // 영상이 안 되면 사진만
-  if (vd && !reduce) {
-    vd.muted = true;
-    vd.addEventListener('playing', videoOn);
-    vd.addEventListener('ended', videoEnded);
-    // source 의 오류는 위로 안 올라와 잡는 쪽(capture)으로. 화면 폭이 안 맞아 건너뛴 source 도 오류를 내므로 마지막 source · video 자신의 오류만 본다
-    vd.addEventListener('error', function (e) { if (!vPlaying && vd && (e.target === vd || e.target === vd.querySelector('source:last-of-type'))) fallback(); }, true);
+  var again = false;   // 다시 틀 때: 처음으로 돌아간 뒤의 재생만 받는다(끝자리의 묵은 시간 알림에 켜지지 않게)
+  function fallback() { if (fr) fr.remove(); fr = null; photos(); slidesForever(); }   // 영상이 안 되면 사진만
+  if (fr && !reduce) {
+    window.addEventListener('message', function (e) {
+      if (e.origin !== VIMEO || !fr || e.source !== fr.contentWindow) return;
+      var d = e.data;
+      if (typeof d === 'string') { try { d = JSON.parse(d); } catch (x) { return; } }
+      if (!d) return;
+      var t = d.data || {};
+      if (d.event === 'ready') { listen(); tell('play'); }
+      else if (d.event === 'ended') videoEnded();
+      else if (d.event === 'playing') { if (!again) videoOn(); }
+      else if (d.event === 'timeupdate') {
+        if (vPlaying) { if (t.duration && t.seconds >= t.duration - .35) videoEnded(); }   // 'ended' 가 안 올 때 대비
+        else if (t.seconds > 0 && (!again || t.seconds < 3)) { again = false; videoOn(); }   // 'playing' 을 놓쳤을 때 · 다시 틀 때
+      }
+    });
+    listen();   // 플레이어가 이미 떠 있으면 바로 듣기 시작(아직이면 'ready' 때 다시)
     waiting = setTimeout(function () { if (!vPlaying) fallback(); }, 12000);
-    if (vd.error || vd.networkState === 3) fallback();   // 이 코드보다 먼저 못 여는 것으로 끝난 경우
-    else if (!vd.paused && vd.currentTime > 0) videoOn();   // 이 코드보다 먼저 재생이 시작된 경우
-    else if (vd.paused) { var pp = vd.play(); if (pp && pp.catch) pp.catch(function () {}); }
-  } else if (hero) { if (vd) { vd.remove(); vd = null; } photos(); if (slides.length > 1 && !reduce) slidesForever(); }   // 하위 페이지엔 첫 화면 슬라이드가 없다
+  } else if (hero) { if (fr) { fr.remove(); fr = null; } photos(); if (slides.length > 1 && !reduce) slidesForever(); }   // 하위 페이지엔 첫 화면 슬라이드가 없다
   if (bar && slides.length > 1) bar.classList.add('run');
 
   /* 선언문: 스크롤을 내리면 글자가 차례로 채워진다 */

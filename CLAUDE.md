@@ -17,7 +17,7 @@ xim 에서 만드는 모든 서비스(고객 사이트 · xim · xms)는 **보�
 - 링크는 `.html` 없이(307 왕복 금지 — site-worker `cleanHref` 가 고침), 모든 페이지는 마우스 · 손가락이 닿으면 미리 그림(speculationrules prerender, 방문 통계는 /site-api/visit 비콘으로).
 - 사진은 R2 서울 서명 주소, 앞 4장만 바로 · 나머지 lazy, css · js 는 `?v=` 번호. 페이지가 뜬 뒤 따로 받는 요청(API · 목록)은 Worker 가 html 에 함께 넣는다.
 - 렌더를 막는 외부 CSS · 폰트 · 스크립트를 늘리지 않는다. 큰 영상 · 지도 · 위젯은 늦게(lazy · 첫 화면 뒤).
-- **첫 화면 배경 영상은 바깥 플레이어(Vimeo · YouTube iframe)로 넣지 않는다**(사용자 지시 2026-11-18 "들어오자마자 바로 재생") — 플레이어를 받느라 몇 초 늦는다. 사이트 폴더 `video/` 에 mp4(H.264, 소리 없음, `-movflags +faststart`, PC 1080p · 폰 720p)를 두고 html 에 바로 `<video muted playsinline autoplay preload="auto">` + `<source media>` 로. 영상이 든 폴더는 build.mjs 가 Worker 를 거치게 하고 가장자리(`site-edge.js` `media`)가 부분 요청(206)으로 준다 — 정적 파일 그대로는 Range 가 안 돼 아이폰이 못 튼다. 파일당 25MB 까지. 참고: `bsf` 첫 화면.
+- **첫 화면 배경 영상은 Vimeo 로 튼다 — 영상 파일(mp4)을 리포 · Worker 에 올리지 않는다**(사용자 지시 2026-11-18 "용량을 20mb 가 차지하게 둘 수는 없어"). 대신 빨리 시작하게: iframe 을 js 로 만들지 말고 **html 에 바로** 두고(css · js 를 기다리지 않음), player.js 없이 postMessage 로 직접 주고받는다. Vimeo 자체가 재생까지 3초쯤 걸리는 것은 줄일 수 없다(부모 페이지의 preconnect 는 iframe 에 안 통한다). 참고: `bsf` 첫 화면.
 - 확인: CDP 로 ttfb · FCP · 요청 목록(스크래치 perf.mjs 방식), curl 로 연결 재사용 응답 시간.
 
 ## 웹페이지 공통 제작 규칙 (사용자가 따로 말하지 않아도 모두 적용)
