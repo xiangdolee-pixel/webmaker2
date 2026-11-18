@@ -305,8 +305,13 @@ main { flex: 1; }
 .times .tl li { padding: 20px 0; align-items: center; }
 .times .tl b { font-size: 19px; }
 .times .tl .t { font-size: clamp(20px, 2.2vw, 26px); font-weight: 800; letter-spacing: -.02em; }
-.times .give { grid-column: 1 / -1; }
-.times .give .tl li { flex-wrap: wrap; gap: 4px 16px; }
+/* 온라인헌금: 강조색 띠 — 왼쪽 계좌, 오른쪽 복사 버튼 */
+.give { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px 32px; padding: clamp(24px, 2.8vw, 36px) clamp(22px, 3.2vw, 44px); border-radius: var(--r); background: var(--accent); color: var(--on-accent); }
+.times .give h2 { padding: 0; border: 0; font-size: 15px; font-weight: 700; letter-spacing: 0; opacity: .72; }
+.give-no { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; margin-top: 8px; font-size: clamp(17px, 1.5vw, 19px); font-weight: 600; line-height: 1.35; }
+.give-no b { font-size: clamp(23px, 2.6vw, 32px); font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.give-own { margin-top: 6px; font-size: 15px; opacity: .72; }
+.give .btn { flex: none; min-width: 148px; }
 .banner { position: relative; border-radius: 30px; overflow: hidden; color: #fff; background: var(--dark); padding: clamp(32px, 5vw, 72px); display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .banner > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .5; }
 .banner > div { position: relative; }
