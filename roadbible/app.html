@@ -737,7 +737,7 @@ body.has-listen main{padding-bottom:calc(44px + env(safe-area-inset-bottom) + va
 /* ── 배경 테마 (보기 설정 › 화면) ─────────────────
    0 기본은 :root 그대로. 테마는 html[data-skin] 에서 변수만 바꾸고,
    종이 · 테두리는 main::before 한 장으로 그린다(본문 쪽 넘김과 무관하게 제자리). */
-/* 고르는 칸: 작은 미리보기 9개 — 5칸씩 두 줄 */
+/* 고르는 칸: 작은 미리보기 10개 — 5칸씩 두 줄 */
 .skin-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px 6px;padding:6px 0 4px}
 .skin-sw{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:2px 0;
   font-size:12px;font-weight:600;color:var(--panel-soft);white-space:nowrap;transition:color .2s}
@@ -765,6 +765,7 @@ body.has-listen main{padding-bottom:calc(44px + env(safe-area-inset-bottom) + va
 .sw6{--sw-bg:#F4EBD8;--sw-ink:#6C1F27;--sw-bar:#55202A}
 .sw7{--sw-bg:#F3EEEA;--sw-ink:#1F2D4D;--sw-bar:#1F2D4D}
 .sw8{--sw-bg:#EBDDC6;--sw-ink:#4A3626;--sw-bar:#5E4C3E}
+.sw9{--sw-bg:#FBF9F7;--sw-ink:#2B3F63;--sw-bar:#FBF9F7;--sw-line:#C9CDD6}
 
 /* 테마 공통: 큰 장 번호 · 절 번호는 명조 숫자, 소제목은 본문 크기 */
 html[data-skin] .chnum-in{font-family:"Times New Roman",Times,"Noto Serif","Noto Serif KR Variable",serif;font-weight:700;font-size:2.7em;margin:2px 10px 0 0}
@@ -879,9 +880,36 @@ html[data-skin="6"] main::before{
   box-shadow:2px 0 0 -1px #E4D8BE,4px 0 0 -2px #CDBE9E,6px 0 0 -3px #E4D8BE,0 3px 12px rgba(0,0,0,.5);   /* 오른쪽에 겹친 책장 */
 }
 /* 가죽 메뉴(양피지 · 가죽) 위의 형광펜 버튼 · 오프라인 표시도 새 바탕에서 보이게 */
-/* 7 모던 — 남색 표지의 흰 책장 / 8 석판 — 돌판. 그림 한 장을 네 모서리는 그대로 두고 가운데만 늘려 깐다(화면 비율이 달라도 테두리가 안 찌그러짐).
+/* 7 로열 — 남색 표지의 흰 책장 / 8 석판 — 돌판. 그림 한 장을 네 모서리는 그대로 두고 가운데만 늘려 깐다(화면 비율이 달라도 테두리가 안 찌그러짐).
    --sw = 그림이 깔리는 폭, 테두리 두께는 그림 속 치수(941px 기준)에 비례 */
 html[data-skin="7"],html[data-skin="8"]{--sw:calc(min(100vw,640px) - 14px)}
+/* 9 흰책 — 펼친 흰 책 한 권이 화면 전체. 위 · 아래 메뉴도 책장 위에 얹힌다(메뉴 바탕 투명, 아래 메뉴 위에 가는 줄만) */
+html[data-skin="9"]{
+  --sw:min(100vw,640px);
+  --paper:#FBF9F7;--desk:#FEFEFE;
+  --ink:#111214;--ink-soft:#6B6E75;--line:#E4E3E1;--gilt:#9AA3B5;--gilt-soft:#DDDFE4;
+  --gold:#2B3F63;--vnum:#2B3F63;--cap:#2B3F63;--mark:#2B3F63;--head-ink:#111214;
+  --parch1:#FBFAF9;--parch2:#F1F0EE;--panel-ink:#111214;--panel-soft:#73767D;
+  --card:#ffffff;--card-act:#ECEBE9;--head-bg:linear-gradient(180deg,#EDECEA,#E4E3E1);--seg-bg:#E9E8E6;
+  --bar-bg:transparent;--bar-paper:#FBF9F7;--bar-line:transparent;--bar-edge:#2B3F63;--bar-fill:transparent;
+  --bar-mark:#2B3F63;--pill-bg:#FBF9F7;--pill-line:#DDDCDA;
+  --fx:16px;--fy:6px;
+}
+html[data-skin="9"] main::before{
+  top:env(safe-area-inset-top);bottom:0;left:0;right:0;
+  border-style:solid;border-color:transparent;
+  border-width:calc(var(--sw)*.045) calc(var(--sw)*.091) min(calc(var(--sw)*.052),20px) calc(var(--sw)*.081);
+  border-image:url("assets/img/app/skin-white.webp?v=1") 45 90 85 80 fill stretch;
+}
+html[data-skin="9"] header{   /* 아래 메뉴 위 가는 줄 — 책장 안쪽 폭만큼만 */
+  box-shadow:none;
+  background:linear-gradient(#DAD9D6,#DAD9D6) center top/calc(var(--sw)*.8) 1px no-repeat;
+}
+html[data-skin="9"] .rh-in{padding-left:calc(var(--px) + var(--fx));padding-right:calc(var(--px) + var(--fx))}
+html[data-skin="9"] .ribbon{left:max(34px,calc(50% - 280px))}
+html[data-skin="9"] .chnum-in{font-family:var(--ui);font-weight:800;font-size:2.5em}
+html[data-skin="9"] .verse sup{font-family:var(--ui);font-weight:700}
+html[data-skin="9"] .bsec{font-family:var(--ui);font-weight:800}
 html[data-skin="7"]{
   --paper:#F3EEEA;--desk:linear-gradient(180deg,#22304F,#131D33);
   --ink:#1D2230;--ink-soft:#666B78;--line:#E3DDD6;--gilt:#A99A7C;--gilt-soft:#DDD5C8;
@@ -917,7 +945,7 @@ html[data-skin="8"] main::before{
 }
 /* 석판: 위가 둥근 아치라 본문은 아치 어깨 아래에서 시작 */
 html[data-skin="8"] main{padding-top:calc(36px + env(safe-area-inset-top) + var(--py) + var(--sw)*.2)}
-@media (min-width:560px){html[data-skin="7"]{--fx:34px;--fy:30px}html[data-skin="8"]{--fx:30px;--fy:40px}}
+@media (min-width:560px){html[data-skin="7"]{--fx:34px;--fy:30px}html[data-skin="8"]{--fx:30px;--fy:40px}html[data-skin="9"]{--fx:44px;--fy:10px}}
 html[data-skin="3"] .hl-ico,html[data-skin="6"] .hl-ico,html[data-skin="7"] .hl-ico,html[data-skin="8"] .hl-ico{color:var(--bar-paper);background:var(--bar-soft);box-shadow:inset 0 -3px 0 rgba(0,0,0,.35)}
 html[data-skin="2"] .hl-ico{background:rgba(221,184,118,.3);box-shadow:inset 0 -3px 0 #B8935A}
 </style>
@@ -1007,8 +1035,9 @@ html[data-skin="2"] .hl-ico{background:rgba(221,184,118,.3);box-shadow:inset 0 -
     <button class="skin-sw sw4" data-sk="4" aria-pressed="false"><i aria-hidden="true">가</i>홍선</button>
     <button class="skin-sw sw5" data-sk="5" aria-pressed="false"><i aria-hidden="true">가</i>금장</button>
     <button class="skin-sw sw6" data-sk="6" aria-pressed="false"><i aria-hidden="true">가</i>가죽</button>
-    <button class="skin-sw sw7" data-sk="7" aria-pressed="false"><i aria-hidden="true">가</i>모던</button>
+    <button class="skin-sw sw7" data-sk="7" aria-pressed="false"><i aria-hidden="true">가</i>로열</button>
     <button class="skin-sw sw8" data-sk="8" aria-pressed="false"><i aria-hidden="true">가</i>석판</button>
+    <button class="skin-sw sw9" data-sk="9" aria-pressed="false"><i aria-hidden="true">가</i>흰책</button>
   </div>
   <div class="set-sec"><span>글자</span></div>
   <div class="set-row" data-key="ft">
@@ -1247,7 +1276,7 @@ if(last){const[b,c]=last.split("/");if(chapCount(b)>=+c)cur={book:b,chap:+c}}
 
 /* 보기 설정: 기본값·증감폭·최소값만 두고 상한 없음 */
 const SETTINGS={
-  /* sk: 배경 테마 (0 기본 / 1 한지 / 2 밤 / 3 양피지 / 4 홍선 / 5 금장 / 6 가죽 / 7 모던 / 8 석판) — html[data-skin] 으로 CSS 가 바꾼다 */
+  /* sk: 배경 테마 (0 기본 / 1 한지 / 2 밤 / 3 양피지 / 4 홍선 / 5 금장 / 6 가죽 / 7 로열 / 8 석판 / 9 흰책) — html[data-skin] 으로 CSS 가 바꾼다 */
   sk:{def:0,  step:1,   min:0,   fmt:v=>v,                css:v=>v},
   /* ft: 본문 글꼴 (선택형 — 0 프리텐다드 / 1 Noto Serif KR / 2 KoPub 바탕 / 3 나눔명조 / 4 마루부리 / 5 SUIT).
      css값은 --ft 변수로 들어간다 */
@@ -1282,7 +1311,7 @@ function loadFont(i){
   const l=document.createElement("link");l.rel="stylesheet";l.href=u;l.dataset.ft=i;
   document.head.appendChild(l);
 }
-const SKIN_MAX=8;
+const SKIN_MAX=9;
 const setVal={};
 for(const k in SETTINGS){
   const saved=parseFloat(store.get("set."+k));
