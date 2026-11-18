@@ -175,10 +175,12 @@ main { flex: 1; }
 .mani em, .accent { font-style: normal; color: var(--gold-ink); font-weight: 700; }
 
 /* 흐르는 사진 */
-.gal { overflow: hidden; padding-bottom: var(--sec-y); }
-.gal-track { display: flex; align-items: flex-end; gap: 20px; width: max-content; padding-left: 20px; animation: drift 60s linear infinite; }
-.gal:hover .gal-track { animation-play-state: paused; }
-@keyframes drift { to { transform: translateX(-50%); } }
+/* 저절로 흐르다가, 손가락으로 밀거나 마우스로 끌면 그대로 따라온다 (움직임은 js 가 scrollLeft 로) */
+.gal { overflow-x: auto; overflow-y: hidden; padding-bottom: var(--sec-y); scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; cursor: grab; }
+.gal::-webkit-scrollbar { display: none; }
+.gal.drag { cursor: grabbing; user-select: none; }
+.gal-track { display: flex; align-items: flex-end; gap: 20px; width: max-content; padding: 0 20px; }
+.gal img { -webkit-user-drag: none; user-select: none; }
 .gal figure { flex: none; width: clamp(220px, 23vw, 300px); }
 .gal figure.wide { width: clamp(280px, 32vw, 420px); }
 .gal img { width: 100%; aspect-ratio: 5 / 6; object-fit: cover; border-radius: var(--r); background: var(--soft); }
@@ -480,7 +482,6 @@ body .xms-top { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 66px); }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   [data-reveal] { opacity: 1; transform: none; }
-  .gal { overflow-x: auto; }
   .phil li::before { transform: none; }
   @view-transition { navigation: none; }
 }

@@ -122,14 +122,61 @@
     if (imgs.length > 1 && !reduce) setInterval(function () { if (!doc.hidden) show((at + 1) % imgs.length); }, 6500);
   }
 
-  /* 흐르는 사진: 한 번 더 이어 붙여 끊김 없이 */
+  /* 흐르는 사진: 한 번 더 이어 붙여 끊김 없이 흐르고, 손가락으로 밀거나 마우스로 끌면 그대로 따라온다 */
   var track = $('[data-drift]');
-  if (track && !reduce) {
+  if (track) {
+    var gal = track.parentNode, first = $('figure', track), n0 = $$('figure', track).length;
     $$('figure', track).forEach(function (f) {
       var c = f.cloneNode(true); c.setAttribute('aria-hidden', 'true');
       track.appendChild(c);
     });
-  } else if (track) track.style.animation = 'none';
+    var loopW = function () { var c = $$('figure', track)[n0]; return c ? c.offsetLeft - first.offsetLeft : 0; };   // 한 바퀴 길이
+    var wrap = function () {
+      var w = loopW(); if (!w) return;
+      if (gal.scrollLeft >= w) { gal.scrollLeft -= w; pos = gal.scrollLeft; }
+      else if (gal.scrollLeft <= 0 && held) { gal.scrollLeft += w; pos = gal.scrollLeft; if (dragging) startL += w; }
+    };
+    var pos = 0, held = false, dragging = false, startX = 0, startL = 0, moved = 0, wake = 0, seen = true, last = 0;
+    var hold = function () { held = true; clearTimeout(wake); };
+    var release = function (ms) { clearTimeout(wake); wake = setTimeout(function () { held = false; pos = gal.scrollLeft; }, ms); };
+    // 손가락: 브라우저가 알아서 민다 — 미는 동안 멈췄다가 잠시 뒤 다시 흐른다
+    gal.addEventListener('touchstart', hold, { passive: true });
+    gal.addEventListener('touchend', function () { release(2600); }, { passive: true });
+    gal.addEventListener('touchcancel', function () { release(2600); }, { passive: true });
+    gal.addEventListener('wheel', function (e) { if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) { hold(); release(2000); } }, { passive: true });
+    // 마우스: 누른 채 끌기
+    gal.addEventListener('mouseenter', hold);
+    gal.addEventListener('mouseleave', function () { if (!dragging) release(300); });
+    gal.addEventListener('mousedown', function (e) {
+      if (e.button) return;
+      dragging = true; moved = 0; startX = e.clientX; startL = gal.scrollLeft; hold(); gal.classList.add('drag'); e.preventDefault();
+    });
+    win.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      moved = Math.abs(e.clientX - startX);
+      gal.scrollLeft = startL - (e.clientX - startX); wrap();
+    });
+    win.addEventListener('mouseup', function () {
+      if (!dragging) return;
+      dragging = false; gal.classList.remove('drag');
+      if (!gal.matches(':hover')) release(300);
+    });
+    gal.addEventListener('scroll', function () { if (held) wrap(); }, { passive: true });
+    if ('IntersectionObserver' in win) new IntersectionObserver(function (es) { seen = es[0].isIntersecting; }).observe(gal);
+    if (!reduce) {
+      var step = function (t) {
+        var dt = Math.min(64, t - (last || t)); last = t;
+        if (!held && seen && !doc.hidden) {
+          pos += dt * 0.032;   // 1초에 32px
+          var w = loopW();
+          if (w && pos >= w) pos -= w;
+          gal.scrollLeft = pos;
+        }
+        requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+  }
 
   /* 사역 미리보기: 목록에 닿으면 왼쪽 사진이 바뀐다 */
   var mini = $('.mini');
