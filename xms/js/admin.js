@@ -114,7 +114,12 @@ const SIDE = [
 ];
 // 강의 기능을 켠 사이트만 '강의' 묶음이 생긴다 (회원 다음)
 // 신청서 기능을 켠 사이트만 '신청서' 묶음 (맨 위 — 신청 기간에 가장 많이 본다)
-const sideGroups = () => [
+// 테스트모드(사본 안): 회원 · 문의 · 신청서 같은 개인정보 화면은 메뉴에서 빼고, 주소로 들어와도 게시판으로 보낸다
+const TEST = () => !!INFO?.test;
+const HOME = () => (TEST() ? '#/boards' : '#/members');
+const PRIVATE = ['#/members', '#/members/withdrawn', '#/inquiries'];
+const sideGroups = () => (TEST() ? sideAll().filter((g) => !/신청/.test(g[0] || '')).map(([g, items]) => [g, items.filter((it) => !PRIVATE.includes(it[0]))]) : sideAll());
+const sideAll = () => [
   ...(INFO.features?.apply ? [['장학금 신청', [['#/apply/rounds', '신청 기간 · 켜고 끄기', 'rounds'], ['#/apply', '신청서 보기', 'apply']]]] : []),
   SIDE[0], SIDE[1], ...(INFO.features?.courses ? [['강의', [['#/courses', '강의 관리', 'courses']]]] : []), ...SIDE.slice(2)];
 // 왼쪽 위 사이트 표시: 파비콘을 올렸으면 그 그림, 없으면 이름 두 글자
@@ -124,10 +129,10 @@ function renderSide() {
   const pct = s.quota_mb ? Math.round((s.used_mb / s.quota_mb) * 100) : 0;
   $('#side').innerHTML = `<a class="brand" href="/" target="_blank" rel="noopener"><i>${esc(s.slug.slice(0, 2).toUpperCase())}<img src="/xms/file/favicon-192.png?v=${favVer}" alt="" onload="this.parentElement.classList.add('has-fav')" onerror="this.remove()"></i><span><b>${esc(s.name)}</b><small>${esc(s.domain || s.slug)} <button type="button" class="dom-copy" data-url="${esc(s.domain ? `https://${s.domain}` : location.origin)}" title="사이트 주소 복사">복사</button></small></span></a>
     ${sideGroups().map(([group, items]) => `${group ? `<h4>${group}</h4>` : ''}${items.map(([href, label, icon]) => `<a href="${href}">${SIDE_ICON[icon] || ''}<span class="lbl">${label}</span>${icon === 'storage' ? `<span class="meter${pct >= 90 ? ' full' : ''}">${pct}%</span>` : ''}</a>`).join('')}`).join('')}
-    <p class="foot">${esc(s.name)} 관리자 화면</p>`;
+    <p class="foot">${esc(s.name)} 관리자 화면${TEST() ? '<br>테스트모드 — 회원 · 문의 같은 개인정보 화면은 보이지 않습니다.' : ''}</p>`;
 }
 function markSide() {
-  const h = (location.hash || '#/members').split('?')[0];
+  const h = (location.hash || HOME()).split('?')[0];
   const cands = $$('#side a[href^="#/"]');
   const best = cands.filter((a) => h === a.getAttribute('href') || h.startsWith(`${a.getAttribute('href')}/`))
     .sort((a, b) => b.getAttribute('href').length - a.getAttribute('href').length)[0];
@@ -184,8 +189,9 @@ async function route() {
   markSide();
   setTimeout(reqBadge, 300);
   setTimeout(inqBadge, 300);
-  const h = (location.hash || '#/members').slice(1);
+  const h = (location.hash || HOME()).slice(1);
   const parts = h.split('?')[0].split('/').filter(Boolean);
+  if (TEST() && ['members', 'inquiries', 'apply'].includes(parts[0])) { location.hash = '#/boards'; return; }
   const qs = new URLSearchParams(h.split('?')[1] || '');
   main.innerHTML = '';
   scrollTo(0, 0);
@@ -225,7 +231,7 @@ async function route() {
     if (parts[0] === 'stats') return await statsPage();
     if (parts[0] === 'account') return accountPage();
     if (parts[0] === 'audit') return await auditPage(qs);
-    location.hash = '#/members';
+    location.hash = HOME();
   } catch (e) {
     if (e.status === 401 || e.status === 403) return showLogin('다시 로그인해 주세요.');
     main.innerHTML = `<div class="panel empty"><b>불러오지 못했습니다</b>${esc(e.message)}</div>`;

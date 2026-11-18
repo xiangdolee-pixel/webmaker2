@@ -400,6 +400,9 @@ body .xms-top { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 66px); }
 .ft-dl div:first-child { padding-top: 5px; }
 .ft-dl dd { color: #fff; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ft address { font-style: normal; line-height: 1.95; }
+.ft-contact div { display: flex; gap: 12px; }
+.ft-contact span { flex: none; width: 2.2em; color: rgba(255, 255, 255, .5); font-weight: 600; }
+.ft-contact a { overflow-wrap: anywhere; }
 .ft address a { color: #fff; }
 .ft-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 24px; margin-top: clamp(32px, 4vw, 52px); padding-top: 22px; border-top: 1px solid rgba(255, 255, 255, .14); font-size: 14px; color: rgba(255, 255, 255, .56); }
 .ft-bottom span { margin-left: 14px; }

@@ -39,6 +39,11 @@ export async function adminApi(ctx) {
   let m;
   // 테스트모드(test.js): 유지보수 요청은 운영자에게 가는 실제 일이라 보내지 못한다 (목록은 빈 것으로 보인다)
   if (ctx.test && method !== 'GET' && /^\/requests(\/|$)/.test(path)) throw new HttpError(403, '테스트모드에서는 유지보수 요청을 보낼 수 없습니다.');
+  // 테스트모드: 회원 · 문의 · 신청서 같은 개인정보 화면은 아예 열리지 않는다 (사용자 지시 2026-11-18 "개인정보니까") — 관리 화면 메뉴에서도 뺀다(admin.js)
+  if (ctx.test) {
+    if (path === '/inquiries/unread') return json({ n: 0 });
+    if (/^\/(members|inquiries|apply)(\/|$)/.test(path)) throw new HttpError(400, '테스트모드에서는 회원 · 문의 같은 개인정보 화면을 볼 수 없습니다.');
+  }
 
   // ───── 공통 정보 ─────
   if (path === '/me') {
@@ -53,6 +58,7 @@ export async function adminApi(ctx) {
       me: me.kind === 'staff' ? { staff: true, name: '운영자' } : { staff: false, name: me.member.name, login_id: me.member.login_id },
       levelNames,
       features: { courses: await featureOn(db, site, 'courses'), apply: await featureOn(db, site, 'apply') },
+      test: !!ctx.test,   // 테스트모드: 관리 화면이 개인정보 메뉴(회원 · 문의 · 신청서)를 뺀다
     });
   }
   // 부가 기능: 맨 위로 버튼 (스크롤하면 오른쪽 아래)
