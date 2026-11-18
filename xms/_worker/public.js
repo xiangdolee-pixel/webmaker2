@@ -495,7 +495,7 @@ async function postView(ctx, b, id) {
   const files = atts.filter((u) => u.kind === 'FILE');
   return page(ctx, p.title, `<section class="pub-box wide">
     <p class="crumb"><a href="/board/${b.slug}">${esc(b.name)}</a></p>
-    <article class="post">
+    <article class="post${b.opt.kind === 'sermon' ? ' sermon' : ''}">
       <h1>${p.is_hidden ? '<span class="tag gray">숨김</span>' : ''}${p.is_notice ? '<span class="tag notice">공지</span>' : ''}${p.is_secret ? '<span class="tag">비밀</span>' : ''}${esc(p.title)}</h1>
       <div class="meta">${vs.writer ? `<span>${esc(writerOf(b, p, me))}</span>` : ''}${vs.date ? `<span>${fmtDate(p.published_at, true)}</span>` : ''}${vs.views ? `<span>조회 ${p.view_count + 1}</span>` : ''}
         ${p.published_at > now() ? `<span class="tag warn">${fmtDate(p.published_at, true)} 공개 예약</span>` : ''}</div>
@@ -560,7 +560,7 @@ async function postForm(ctx, b, id) {
   const guest = me.kind === 'guest';
   return page(ctx, id ? '글 수정' : '글쓰기', `<section class="pub-box wide write-box">
     <header class="write-head"><h1>${id ? '글 수정' : '글쓰기'}</h1><a class="write-board" href="${esc(b.opt.list_url || `/board/${b.slug}`)}">${esc(b.name)}</a></header>
-    <form data-form="post" data-board="${esc(b.slug)}" data-id="${id || ''}"${b.opt.list_url ? ` data-after="${esc(b.opt.list_url)}"` : ''}>
+    <form data-form="post" data-board="${esc(b.slug)}" data-id="${id || ''}"${b.opt.kind === 'sermon' ? ' data-kind="sermon"' : ''}${b.opt.list_url ? ` data-after="${esc(b.opt.list_url)}"` : ''}>
       <label class="field"><span>제목</span><input class="input big" name="title" maxlength="200" required value="${esc(p?.title)}"></label>
       ${b.opt.kind === 'sermon' ? `<div class="row2 sm-fields"><label class="field"><span>성경본문</span><input class="input" name="scripture" maxlength="120" value="${esc(extraOf(p).scripture)}" placeholder="예) 사무엘하 6:9–15"></label>
         <label class="field"><span>설교자</span><input class="input" name="preacher" maxlength="60" value="${esc(extraOf(p).preacher)}" placeholder="예) 김도현 목사"></label></div>` : ''}
