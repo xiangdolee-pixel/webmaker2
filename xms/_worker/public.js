@@ -4,6 +4,7 @@ import {
   createSession, keepCookie, SESS_COOKIE, setCookie, ensureDocs, hashPassword, newPassword, sameText, sanitizeHtml, plainText, clientIp, tooManyFails, recordFail, isAdmin, audit, verOf,
   memberValues, uniqueProblem,
 } from './lib.js';
+import { testEnabled } from './test.js';
 import { boardOptions } from './admin-api.js';
 import { postAttachments, syncPostFiles, removePostFiles, setAvatar, avatarOf, directGetUrl, directUrls, uploadIdsIn } from './uploads.js';
 import { sendSignupCode, verifySignupCode, takeTicket, turnstileKeys } from './signup.js';
@@ -177,6 +178,12 @@ const avatarPick = (src, note) => `<div class="mb-pick" data-avatar-pick>
 async function loginPage(ctx) {
   if (ctx.me.kind === 'member') return Response.redirect(`${ctx.url.origin}/member/mypage`, 302);
   const next = safeNext(ctx.url.searchParams.get('next'));
+  // 테스트모드(test.js): xim 에서 켠 사이트만 — 관리자처럼 둘러보는 단추. 사본 안(이미 테스트 중)에서는 안 보인다.
+  const testBox = !ctx.test && (await testEnabled(ctx.env, ctx.site)) ? `<div class="mb-test">
+      <button class="btn wide" type="button" data-test-start>테스트모드로 둘러보기</button>
+      <p>관리자처럼 글자 · 사진을 고치고 관리 화면도 써 볼 수 있습니다. 로그아웃하면 모두 원래대로 돌아가고, 실제 홈페이지는 바뀌지 않습니다.</p>
+      <p class="err" role="alert"></p>
+    </div>` : '';
   return page(ctx, '로그인', `<section class="mb">
   <div class="mb-card">
     ${mbHead('lock', '로그인', '이메일과 비밀번호로 로그인하세요.')}
@@ -188,6 +195,7 @@ async function loginPage(ctx) {
       <button class="btn primary wide mb-go" type="submit">로그인</button>
     </form>
     ${socialButtons(await socialList(ctx.env, ctx.site, ctx.url), next, '로그인')}
+    ${testBox}
     <div class="mb-foot"><span>아직 회원이 아니신가요?</span><a href="/member/signup">회원가입</a></div>
   </div>
   <p class="mb-note">비밀번호를 잊으셨으면 사이트 관리자에게 새 비밀번호를 받으세요.</p>

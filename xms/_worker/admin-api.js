@@ -37,6 +37,8 @@ export async function adminApi(ctx) {
   const method = request.method;
   const q = url.searchParams;
   let m;
+  // 테스트모드(test.js): 유지보수 요청은 운영자에게 가는 실제 일이라 보내지 못한다 (목록은 빈 것으로 보인다)
+  if (ctx.test && method !== 'GET' && /^\/requests(\/|$)/.test(path)) throw new HttpError(403, '테스트모드에서는 유지보수 요청을 보낼 수 없습니다.');
 
   // ───── 공통 정보 ─────
   if (path === '/me') {

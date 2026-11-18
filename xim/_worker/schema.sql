@@ -280,3 +280,5 @@ CREATE TABLE IF NOT EXISTS contracts (
   updated_at INTEGER NOT NULL
 );
 
+-- 2026-11-18 테스트모드 (xms test.js) — 한 번만 실행:
+--   ALTER TABLE sites ADD COLUMN test_mode INTEGER NOT NULL DEFAULT 0;  -- 1 이면 그 사이트 로그인 화면에 '테스트모드로 둘러보기' (xim 사이트 줄의 스위치)

@@ -35,11 +35,20 @@ async function siteStatus(env, request) {
   return statusCache.value;
 }
 
+// 테스트모드(xms test.js): 쿠키 xms_test 가 있으면 xms 에게 사본 이름(<사이트>--t<10자>)으로 묻는다 — 실제 자료는 건드리지 않게.
+//   사본이 없거나 지났으면 xms 가 실제 사이트의 보통 방문자로 돌린다. 로그인 쿠키(xms_sess)가 같이 있을 때만 — 캐시를 건너뛰는 요청에서만 쓰이게.
+const testId = (request) => {
+  const c = request.headers.get('Cookie') || '';
+  const m = /(?:^|;\s*)xms_test=([0-9a-f]{10})(?:;|$)/.exec(c);
+  return m && /(?:^|;\s*)xms_sess=/.test(c) ? m[1] : '';
+};
+const siteKey = (request, env) => { const t = testId(request); return t ? `${env.XIM_SITE}--t${t}` : env.XIM_SITE; };
+
 function forward(binding, request, env, pathname) {
   const url = new URL(request.url);
   if (pathname) url.pathname = pathname;
   const req = new Request(url, request);
-  req.headers.set('X-Xim-Site', env.XIM_SITE);
+  req.headers.set('X-Xim-Site', siteKey(request, env));
   return binding.fetch(req);
 }
 
@@ -165,7 +174,7 @@ export function countVisit(request, env, ctx, res, beacon = false) {
     }
   } catch { /* 바로 들어옴 */ }
   const path = p === '/index.html' || p === '/index' ? '/' : p.replace(/\.html?$/i, '').replace(/(.)\/+$/, '$1');
-  ctx.waitUntil(env.XMS.visit(env.XIM_SITE, { path, fresh, ref, rq, mobile: MOBILE.test(ua), sess, ip: h.get('CF-Connecting-IP') || '' }).catch(() => {}));
+  if (!testId(request)) ctx.waitUntil(env.XMS.visit(env.XIM_SITE, { path, fresh, ref, rq, mobile: MOBILE.test(ua), sess, ip: h.get('CF-Connecting-IP') || '' }).catch(() => {}));
   if (!fresh) return res;
   const out = new Response(res.body, res);
   out.headers.append('Set-Cookie', `xms_v=${day}; Path=/; Max-Age=172800; SameSite=Lax${url.protocol === 'https:' ? '; Secure' : ''}`);
@@ -211,6 +220,7 @@ async function handle(request, env, ctx) {
       const j = (d, status = 200) => new Response(JSON.stringify(d), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
       if (pathname === '/site-api/inquiry-key') return j({ sitekey: await env.XIM.inquiryKey(env.XIM_SITE).catch(() => '') });
       if (request.method !== 'POST') return j({ error: 'POST 로 보내 주세요.' }, 405);
+      if (testId(request)) return j({ ok: true });   // 테스트모드: 보낸 것처럼만 (실제 문의함에 쌓지 않는다)
       let raw = {}; try { raw = await request.json(); } catch { return j({ error: '내용을 읽지 못했습니다.' }, 400); }
       const r = await env.XIM.inquiry(env.XIM_SITE, raw, request.headers.get('CF-Connecting-IP') || '').catch((e) => ({ error: `잠시 뒤 다시 보내 주세요. (${e.message || e})` }));
       return r.error ? j({ error: r.error }, 400) : j({ ok: true });
@@ -241,7 +251,7 @@ async function handle(request, env, ctx) {
 async function embedPage(request, env) {
   const url = new URL(request.url);
   const req = new Request(url, request);
-  req.headers.set('X-Xim-Site', env.XIM_SITE);
+  req.headers.set('X-Xim-Site', siteKey(request, env));
   req.headers.set('X-Xms-Embed', '1');
   // 걸린 시간을 Server-Timing 으로 (브라우저 개발자 도구 · curl 로 어디가 느린지 본다)
   const t0 = Date.now(); const tm = {};
@@ -291,7 +301,7 @@ async function siteHead(request, env, home) {
       if (hit) return await hit.json();
     }
     const req = new Request(`${url.origin}/xms-api/site-head?path=${encodeURIComponent(path)}${home ? '&home=1' : ''}`, { headers: { Cookie: cookie } });
-    req.headers.set('X-Xim-Site', env.XIM_SITE);
+    req.headers.set('X-Xim-Site', siteKey(request, env));
     const res = await env.XMS.fetch(req);
     if (!res.ok) return null;
     const data = await res.json();
@@ -497,6 +507,8 @@ async function withXms(res, request, env, data) {
     const T = JSON.stringify(data.texts || {}).replace(/</g, '\\u003c'); // </script> 가 글자에 있어도 스크립트가 끊기지 않게
     tail.push(`<script>${XE_APPLY.replace('__T__', () => T)}</script>`);
   }
+  // ⑦ 테스트모드(xms test.js) 알림 띠 — 사본 안에 있는 동안 왼쪽 아래에: 방문자 화면 보기 / 관리자로 돌아가기 · 테스트 끝내기
+  if (data?.me?.test) tail.push(TEST_BAR.replace('__V__', data.me.admin ? 'guest' : 'admin').replace('__VL__', data.me.admin ? '방문자 화면 보기' : '관리자로 돌아가기'));
   if (tail.length) rw = rw.on('body', { element(el) { el.onEndTag((end) => { end.before(tail.join('\n'), { html: true }); }); } });
   // 사람마다 다른 html 이므로 브라우저가 묵혀 두지 않게: 늘 새로 받는다 (ETag 를 지워 304 로 예전 것을 쓰지 않게)
   const t = rw.transform(res);
@@ -507,6 +519,18 @@ async function withXms(res, request, env, data) {
   }
   return out;
 }
+
+// 테스트모드 알림 띠 (xms test.js): 끝내면 사본이 지워지고 실제 사이트로 돌아간다
+const TEST_BAR = `<style>.xms-test{position:fixed;left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));z-index:2147482002;max-width:calc(100vw - 96px);display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;
+padding:10px 12px 10px 16px;border-radius:16px;background:#15181d;color:#fff;font:600 14px/1.4 Pretendard,system-ui,sans-serif;box-shadow:0 10px 30px rgba(10,14,30,.3);-webkit-tap-highlight-color:transparent}
+.xms-test b{color:#ffd978}.xms-test span{opacity:.82;font-weight:500}
+.xms-test button{font:inherit;font-size:13px;min-height:34px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;cursor:pointer}
+.xms-test button[data-end]{background:#fff;color:#15181d;border-color:#fff}.xms-test button:disabled{opacity:.6}
+.xms-test button:focus-visible{outline:2px solid #ffd978;outline-offset:2px}
+@media(max-width:600px){.xms-test span{display:none}}</style>
+<div class="xms-test" role="status" data-xe-off><b>테스트모드</b><span>마음껏 고쳐 보세요. 끝내면 모두 원래대로 돌아갑니다.</span><button type="button" data-view="__V__">__VL__</button><button type="button" data-end>테스트 끝내기</button></div>
+<script>(function(){var w=document.querySelector('.xms-test');if(!w)return;function go(p,b){b.disabled=true;fetch(p,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(){location.href='/'}).catch(function(){b.disabled=false})}
+w.querySelector('[data-view]').onclick=function(){go('/xms-api/test/'+this.getAttribute('data-view'),this)};w.querySelector('[data-end]').onclick=function(){go('/xms-api/test/end',this)}})()</script>`;
 
 // 맨 위로 버튼 — 스크롤을 조금 내리면 오른쪽 아래에 동그라미가 떠오른다. 누르면 맨 위로 부드럽게.
 //   색은 사이트 CSS 에서 --xms-top-bg(동그라미) · --xms-top-fg(화살표) · --xms-top-line(테두리)로 바꾼다 (기본 흰 동그라미).

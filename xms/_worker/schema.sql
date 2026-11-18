@@ -479,3 +479,7 @@ CREATE TABLE IF NOT EXISTS member_social (
   PRIMARY KEY (site, provider, uid)
 );
 CREATE INDEX IF NOT EXISTS member_social_member ON member_social (member_id);
+
+-- 2026-11-18 테스트모드(test.js): 테스트로 들어온 사람마다 만든 사본(site = '<사이트>--t<10자>'). 끝내면(로그아웃 · 2시간) 사본의 줄을 모두 지운다.
+--   켜는 곳: xim DB sites.test_mode (xim 사이트 줄의 스위치)
+CREATE TABLE IF NOT EXISTS test_sandboxes (site TEXT PRIMARY KEY, base TEXT NOT NULL, ip TEXT NOT NULL DEFAULT '', admin_id INTEGER, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL);

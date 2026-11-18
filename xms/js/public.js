@@ -13,6 +13,14 @@ navBtn?.addEventListener('click', () => {
   navBtn.setAttribute('aria-expanded', String(open));
 });
 
+// 테스트모드로 둘러보기 (로그인 화면, xim 에서 켠 사이트만): 사본을 만들고 테스트 관리자로 들어간다
+$('[data-test-start]')?.addEventListener('click', async (e) => {
+  const b = e.currentTarget, err = b.parentNode.querySelector('.err'), label = b.textContent;
+  b.disabled = true; b.textContent = '테스트 화면을 준비하는 중…'; err.textContent = '';
+  try { await api('/test/start', { method: 'POST', data: {} }); location.href = '/'; }
+  catch (x) { err.textContent = x.message || '잠시 뒤 다시 눌러 주세요.'; b.disabled = false; b.textContent = label; }
+});
+
 $('[data-logout]')?.addEventListener('click', async () => {
   try { await api('/logout', { method: 'POST', data: {} }); } catch { /* 이미 끊김 */ }
   location.href = '/';

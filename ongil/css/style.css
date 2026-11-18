@@ -190,6 +190,7 @@ main { flex: 1; }
 /* 네 가지 마음 (어두운 사진 위) */
 .vals { position: relative; color: #fff; background: var(--dark); overflow: hidden; }
 .vals-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .62; }
+@media (min-width: 1500px) { .vals-bg { object-position: 50% 22%; } }   /* 넓은 화면: 위아래가 많이 잘리니 사진 위쪽(벽의 십자가 빛)이 보이게 */
 .vals::before { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(var(--dark-rgb), .5), rgba(var(--dark-rgb), .2) 40%, rgba(var(--dark-rgb), .82)); }
 .vals .wrap { position: relative; z-index: 2; }
 .vals .sec-head p { color: rgba(255, 255, 255, .82); }

@@ -250,6 +250,16 @@ async function renderSites() {
       if (w) w.location = r.url; else location.href = r.url;
     });
     el.querySelector('[data-act="toggle"]').onclick = (e) => toggleSite(site, e.currentTarget);
+    // 테스트모드 켜기 · 끄기 — 누르는 즉시 저장, 실패하면 되돌린다
+    const ts = el.querySelector('[data-test]');
+    ts.onchange = () => {
+      const on = ts.checked;
+      ts.disabled = true;
+      api(`/sites/${site.id}/test`, { method: 'POST', data: { on } })
+        .then(() => { site.test_mode = on ? 1 : 0; toast(on ? `"${site.name}" 테스트모드를 켰습니다. 로그인 화면에 '테스트모드로 둘러보기' 단추가 생깁니다.` : `"${site.name}" 테스트모드를 껐습니다.`); })
+        .catch((e) => { ts.checked = !on; toast(e.message); })
+        .finally(() => { ts.disabled = false; });
+    };
     // 포트폴리오 켜기 · 끄기 — 누르는 즉시 저장, 실패하면 되돌린다
     const pf = el.querySelector('[data-pf]');
     pf.onchange = () => {
@@ -548,6 +558,7 @@ function siteRow(s) {
       <span>DB ${mb(u.db)}</span><span>파일 ${mb(u.files)} / ${s.quota_mb}MB</span><span>홈 ${s.static_mb ? `${s.static_mb}MB` : '—'}</span>
       <div class="quota" aria-hidden="true"><i style="width:${pct}%"></i></div></div>
     <div class="sr-act">
+      <label class="pf-sw" title="켜면 이 사이트 로그인 화면에 '테스트모드로 둘러보기' 단추가 생깁니다. 누구나 관리자처럼 고쳐 볼 수 있고, 로그아웃하면 원래대로 돌아갑니다(실제 자료는 바뀌지 않음)"><input type="checkbox" data-test${s.test_mode ? ' checked' : ''}><i aria-hidden="true"></i>테스트모드</label>
       <label class="pf-sw" title="켜면 포트폴리오(portfolio.plators.com)에 나옵니다"><input type="checkbox" data-pf${s.portfolio ? ' checked' : ''}><i aria-hidden="true"></i>포트폴리오</label>
       <a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">홈</a>
       <button class="btn sm" type="button" data-act="qr" title="주소가 담긴 QR 코드 — 폰 카메라로 찍으면 바로 접속">QR</button>

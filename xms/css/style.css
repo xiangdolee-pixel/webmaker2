@@ -412,6 +412,9 @@ tr.dragging td { background: var(--surface); }
 .mb-go { min-height: 54px !important; margin-top: 6px; font-size: 17px !important; font-weight: 700; }
 .mb .err:empty { display: none; }
 .mb .err { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); font-size: 14px; font-weight: 600; }
+.mb-test { margin-top: 20px; padding-top: 20px; border-top: 1px solid #eef0f4; }
+.mb-test p { margin: 10px 0 0; color: var(--sub); font-size: 13.5px; line-height: 1.6; text-align: center; }
+.mb-test .err:empty { display: none; }
 .mb-foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 22px -28px -32px; padding: 16px 20px; border-top: 1px solid #eef0f4; border-radius: 0 0 var(--mb-r) var(--mb-r); background: #fafbfc; font-size: 15px; color: var(--sub); }
 .mb-foot a { color: var(--brand); font-weight: 700; text-decoration: none; }
 .mb-or { display: flex; align-items: center; gap: 12px; margin: 20px 0 14px; color: var(--mute); font-size: 13px; }

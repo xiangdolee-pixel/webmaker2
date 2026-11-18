@@ -19,6 +19,7 @@ import { uploadApi, directUploadApi, serveUpload, avatarOf, staticMap } from './
 import { embedCss } from './css-scope.js';
 import { recordVisit } from './visits.js';
 import { publicCourses } from './courses.js';
+import { testOf, sandboxAlive, sandboxEnv, startTest, endTest, testView } from './test.js';
 
 const SITE_RE = /^[a-z0-9][a-z0-9-]{1,39}$/;
 const headCache = new Map();
@@ -70,10 +71,16 @@ export class Cms extends WorkerEntrypoint {
   }
 
   async fetch(request) {
-    const env = this.env;
+    let env = this.env;
     const url = new URL(request.url);
-    const site = request.headers.get('X-Xim-Site') || '';
+    let site = request.headers.get('X-Xim-Site') || '';
     if (!SITE_RE.test(site)) return new Response('xms: 사이트를 알 수 없습니다.', { status: 400 });
+    // 테스트모드(test.js): 사본 이름(<사이트>--t…)으로 온 요청. 살아 있는 사본이면 그 안에서만, 아니면(지난 · 지어낸 쿠키) 실제 사이트의 보통 방문자로.
+    let test = testOf(site);
+    if (test) {
+      if (await sandboxAlive(env.DB, site)) env = sandboxEnv(env, site, test.base);
+      else { site = test.base; test = null; }
+    }
     const p = url.pathname;
 
     try {
@@ -114,7 +121,7 @@ export class Cms extends WorkerEntrypoint {
       const t0 = Date.now();
       const me = await whoAmI(env.DB, request, site);
       const tWho = Date.now() - t0;
-      const ctx = { request, env, site, me, url };
+      const ctx = { request, env, site, me, url, test };
       // 걸린 시간을 Server-Timing 으로 (어디가 느린지 본다): who = 로그인 확인, xmsall = xms 전체
       const timed = async (p) => {
         const r = await p;
@@ -136,11 +143,18 @@ export class Cms extends WorkerEntrypoint {
           data = { at: Date.now(), menu: ma.menu, blocked: ma.blocked, head, popups, top: topBtn?.on ? { except: topBtn.except || [] } : null };
           if (me.level !== 1) headCache.set(key, data);
         }
-        const who = me.kind === 'guest' ? { guest: true } : me.kind === 'staff' ? { staff: true, admin: true } : { name: me.member.name, admin: me.level === 1, avatar: avatarOf(me.member) };
+        const who0 = me.kind === 'guest' ? { guest: true } : me.kind === 'staff' ? { staff: true, admin: true } : { name: me.member.name, admin: me.level === 1, avatar: avatarOf(me.member) };
+        const who = test ? { ...who0, test: true } : who0;
         const texts = await pageTexts(env.DB, site, url.searchParams.get('path') || '', me.level === 1);
         if (who.admin) { try { who.inq = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_inquiries WHERE site = ? AND read_at = 0').bind(site).first()).n; } catch { who.inq = 0; } }   // 관리자에게만: 새 문의 수
-        return new Response(JSON.stringify({ menu: data.menu, blocked: data.blocked, head: data.head, popups: data.popups, me: who, texts, top: data.top, account_css: await accountCss(env), ver: verOf(env), st: await staticMap(env, site).catch(() => null) }),
+        return new Response(JSON.stringify({ menu: data.menu, blocked: data.blocked, head: data.head, popups: data.popups, me: who, texts, top: data.top, account_css: await accountCss(env), ver: verOf(env), st: await staticMap(env, test ? test.base : site).catch(() => null) }),
           { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+      }
+      // 테스트모드: 시작(실제 사이트에서) · 끝내기 · 방문자 화면 / 관리자로 (사본 안에서). 사본 안의 로그아웃도 끝내기다.
+      if (p === '/xms-api/test/start' && request.method === 'POST') return await startTest(env, site, request);
+      if (test && request.method === 'POST') {
+        if (p === '/xms-api/test/end' || p === '/xms-api/logout') return await endTest(env, site);
+        if (p === '/xms-api/test/guest' || p === '/xms-api/test/admin') return await testView(env, site, me, p.slice(-5) === 'admin' ? 'admin' : 'guest');
       }
       if (p === '/xms-api/uploads' && request.method === 'POST') return await timed(uploadApi(ctx));
       if (p === '/xms-api/uploads/sign' && request.method === 'POST') return await timed(directUploadApi(ctx));

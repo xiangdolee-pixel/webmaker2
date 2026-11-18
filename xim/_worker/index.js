@@ -508,6 +508,17 @@ async function ximApi(request, env, url, ctx) {
     return json({ ok: true });
   }
 
+  // 테스트모드 켜기 · 끄기 (xms test.js): 켜면 그 사이트 로그인 화면에 '테스트모드로 둘러보기' 단추 — 누구나 관리자처럼 써 보고, 로그아웃하면 원래대로(실제 자료는 그대로)
+  m = path.match(/^\/api\/sites\/(\d+)\/test$/);
+  if (m && method === 'POST') {
+    const on = (await body(request)).on ? 1 : 0;
+    const s = await db.prepare('SELECT slug, name FROM sites WHERE id = ?').bind(+m[1]).first();
+    if (!s) return json({ error: '사이트를 찾을 수 없습니다.' }, 404);
+    await db.prepare('UPDATE sites SET test_mode = ? WHERE id = ?').bind(on, +m[1]).run();
+    await audit(db, request, 'SITE_UPDATE', `${s.name} (${s.slug})`, `테스트모드 ${on ? '켬' : '끔'}`);
+    return json({ ok: true });
+  }
+
   // 포트폴리오(portfolio.plators.com)에 보이기 켜기 · 끄기
   m = path.match(/^\/api\/sites\/(\d+)\/portfolio$/);
   if (m && method === 'POST') {
