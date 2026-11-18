@@ -21,6 +21,7 @@ E:\ws\WebMaker2 작업 프로젝트 모음 — 폴더 하나 = 웹사이트 하�
 - domains/ — 도메인 연결 도구 (xim 메뉴 '도메인 연결', 따로 https://domains.plators.com) · 다른 도메인을 plators.com(Pro) IP 로 태우는 Cloudflare for SaaS 등록 · 인증서 TXT · 회색 CNAME 바꾸기를 화면에서 · 비밀번호 = Worker 비밀값 DOMAINS_PASS · xim 연결 안 함 · 자세한 건 domains/README.md
 - bsf/ — BSF COMPANY 의류 OEM · ODM 해외생산 소싱 회사 홈페이지 (https://bsf.xiangdolee.workers.dev) · xim 연결됨 · 6쪽(홈 · 회사소개 · 생산역량 · 납품실적 · 자체브랜드 · 생산 문의) · 문의는 /site-api/inquiry → xim 제작문의 · html 은 bsf/_dev/gen.py 로 만든다(머리 · 꼬리 공통) · 고객 원본 자료 · 기획안은 bsf/_src(리포에 안 올림)
 - gamsa365/ — 감사노트365 (thanks365.plators.com) · xim 연결됨 · 하루 3 · 5 · 10가지 감사("~해서 감사합니다.") · 처음 들어오면 하루 몇 개 · 도움 질문 여부를 묻고 설정에서 바꿈 · 마음 날씨 · 빛 달력(연속 기록 없음) · 이웃 나눔(빛 보내기, 신고 3번이면 숨김, 이름 비우면 익명 · 사진 없음) · 한 줄 기도(하루 하나, 나만 봄, 설정에서 끔) · 기억 꺼내기 · 시간대 하늘 그림 · 알림 = Web Push(본체 gamsa365-core cron 10분, 비밀값 VAPID_JWK) · 기록은 D1 `gamsa365` (회원 = xms 이메일)
+- ongil/ — 온길교회 교회 홈페이지 (https://ongil.xiangdolee.workers.dev) · xim 연결됨 · 6쪽(홈 · 교회소개 · 담임목사 · 예배시간 · 오시는 길 · 교회사역) + 게시판 sermon(설교말씀, 카드) · news(주보·소식, 표) · gallery(갤러리, 카드) · 교회소개 아래 4쪽은 알약 탭(페이지를 옮겨도 미끄러짐)과 머리 메뉴 아래 메뉴(js/site.js ABOUT) · 첫 화면 최근 글은 data-xms-latest(공통 사이트 Worker 가 페이지에 함께 넣음) · 사진은 GPT 로 만든 것(담임목사 사진은 받은 것) · 주소 · 전화 · 메일은 예시 값
 - xim/ — 고객 사이트 통합 관리(고객·사이트·정지·용량·수정요청). https://xim.xiangdolee.workers.dev , 자세한 건 xim/README.md
 - xms/ — 업체별 홈페이지 관리(회원·게시판·메뉴). 각 사이트주소/admin/ , 자세한 건 xms/README.md
 

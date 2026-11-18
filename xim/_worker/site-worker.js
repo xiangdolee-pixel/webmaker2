@@ -367,6 +367,19 @@ async function withXms(res, request, env, data) {
       } catch { /* 페이지가 따로 받는다 */ }
     },
   });
+  //   ③ [data-xms-latest="<게시판>"] (첫 화면의 최근 글 · data-n 개수)도 같은 방식으로 함께 보낸다
+  rw = rw.on('[data-xms-latest]', {
+    async element(el) {
+      const slug = el.getAttribute('data-xms-latest') || '';
+      if (!/^[a-z0-9-]{1,40}$/.test(slug)) return;
+      try {
+        const u = new URL(request.url);
+        u.search = `?n=${Math.min(12, Math.max(1, Number(el.getAttribute('data-n')) || 4))}`;
+        const r = await forward(env.XMS, new Request(u, { headers: request.headers }), env, `/xms-api/boards/${slug}/latest`);
+        if (r.ok) el.after(`<script type="application/json" id="xms-latest-${slug}">${(await r.text()).replace(/</g, '\\u003c')}</script>`, { html: true });
+      } catch { /* 페이지가 따로 받는다 */ }
+    },
+  });
   // 사진은 R2(서울) 서명 주소로 — 국내 접속이 미국 서부 가장자리로 가서 사진마다 1~2초 걸리던 것 (xms staticMap, 2026-11-13)
   const st = data?.st && typeof data.st === 'object' ? data.st : null;
   if (st) {
