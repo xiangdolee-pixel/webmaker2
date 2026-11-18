@@ -696,6 +696,8 @@ tr.dragging td { background: var(--surface); }
 .post h1 { margin-bottom: 8px; overflow-wrap: anywhere; }
 .post > .meta { padding-bottom: 14px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
 .post .prose { min-height: 120px; margin-bottom: 24px; }
+.post .prose:empty { min-height: 0; margin-bottom: 0; }   /* 내용 없이 제목 · 첨부만 있는 글(주보 PDF 등): 빈 자리를 남기지 않는다 (2026-11-18) */
+.post .prose:empty + .xv { margin-top: 0; }
 .comments { margin-top: 28px; padding-top: 8px; border-top: 2px solid var(--line-2); }
 .cmt { padding: 12px 0; border-bottom: 1px solid var(--line-2); }
 .cmt .meta b { color: var(--ink); }
