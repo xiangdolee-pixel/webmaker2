@@ -428,6 +428,8 @@ body .xms-top { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 66px); }
   .gnb-group { display: block; }
   .gnb-sub { position: static; opacity: 1; visibility: visible; transform: none; margin: 0 0 6px; padding: 0 0 0 14px; border: 0; box-shadow: none; background: none; display: grid; grid-template-columns: 1fr 1fr; transition: none; }
   .gnb-sub::before { display: none; }
+  /* 손가락을 대면(hover) PC 용 '가운데로 옮기기'가 다시 걸려 아래 메뉴가 왼쪽으로 반 칸 밀리던 것 — 교회소개를 눌렀는데 담임목사로 가던 원인 (2026-11-18) */
+  .gnb-group:hover .gnb-sub, .gnb-group:focus-within .gnb-sub { transform: none; }
   .gnb .gnb-sub a { height: 44px; font-size: 16px; font-weight: 500; color: var(--ink-2); }
   .gnb .hd-cta { display: flex; width: 100%; min-height: 52px; margin: 8px 0 0; font-size: 16.5px; }
   .val-grid { grid-template-columns: repeat(2, 1fr); }
