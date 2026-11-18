@@ -571,6 +571,10 @@ async function boardPage(id) {
       <div class="perm"><b>작성자 표시</b><div class="choices"><label class="check"><input type="radio" name="writer_mode" value="NAME"${o.writer_mode !== 'HIDDEN' ? ' checked' : ''}> 이름 그대로</label>
         <label class="check"><input type="radio" name="writer_mode" value="HIDDEN"${o.writer_mode === 'HIDDEN' ? ' checked' : ''}> 비공개로 가리기</label></div></div>
       <div class="perm"><b>목록 개수</b><div class="choices">${[10, 20, 30].map((n) => `<label class="check"><input type="radio" name="page_size" value="${n}"${o.page_size === n ? ' checked' : ''}> ${n}개</label>`).join('')}</div><small class="meta">방문자가 바꿀 수도 있습니다.</small></div>
+      <div class="perm"><b>PDF 첨부 보기</b><div class="choices">${chk('pdf_on', !!o.pdf_view, 'PDF 를 글 안에서 뷰어로 보여 주기')}</div>
+        <div class="choices" data-pdf-modes${o.pdf_view ? '' : ' hidden'}><label class="check"><input type="radio" name="pdf_view" value="pdf"${o.pdf_view !== 'book' ? ' checked' : ''}> PDF 뷰어 <small class="meta">아래로 이어 보기</small></label>
+        <label class="check"><input type="radio" name="pdf_view" value="book"${o.pdf_view === 'book' ? ' checked' : ''}> 전자책 뷰어 <small class="meta">책장 넘기기</small></label></div>
+        <small class="meta">켜면 이 게시판 글에 첨부한 PDF(본문에 넣은 PDF 도)가 고른 뷰어로 글 안에 바로 열립니다.</small></div>
     </section>
     <section class="panel pad" data-sec="look"><h2>게시판 권한</h2>
       <div class="perm"><b>목록을 볼 수 있는 등급</b>${levelChecks('list_levels', v.list_levels, { guest: v.allow_guest_list, guestName: 'allow_guest_list' })}
@@ -595,6 +599,9 @@ async function boardPage(id) {
     $$(`input[name="${name}"]`, form).forEach((i) => { i.checked = !!a.dataset.all; });
     dirty = true;
   });
+  // PDF 첨부 보기를 켜면 뷰어 고르기(PDF 뷰어 · 전자책 뷰어)가 나온다
+  const pdfOn = form.querySelector('[name="pdf_on"]');
+  pdfOn?.addEventListener('change', () => { form.querySelector('[data-pdf-modes]').hidden = !pdfOn.checked; });
   if (b) {
     const show = (k) => {
       $$('[data-sec]', form).forEach((s) => { s.hidden = s.dataset.sec !== k; });
@@ -614,7 +621,7 @@ async function boardPage(id) {
       list_levels: f.list_levels || [], read_levels: f.read_levels || [], write_levels: f.write_levels || [], comment_levels: f.comment_levels || [],
       allow_guest_list: f.allow_guest_list, allow_guest_read: f.allow_guest_read, allow_guest_write: f.allow_guest_write, guest_menu: f.guest_menu,
       use_comment: f.use_comment, use_secret: f.use_secret,
-      options: { list_show: { no: f.ls_no, writer: f.ls_writer, date: f.ls_date, views: f.ls_views }, view_show: { writer: f.vs_writer, date: f.vs_date, views: f.vs_views }, writer_mode: f.writer_mode, page_size: Number(f.page_size) },
+      options: { list_show: { no: f.ls_no, writer: f.ls_writer, date: f.ls_date, views: f.ls_views }, view_show: { writer: f.vs_writer, date: f.vs_date, views: f.vs_views }, writer_mode: f.writer_mode, page_size: Number(f.page_size), pdf_view: f.pdf_on ? (f.pdf_view === 'book' ? 'book' : 'pdf') : '' },
     };
     if (b) data.visible = f.visible; else { data.attach_menu = f.attach_menu; data.parent_menu_id = f.parent_menu_id; }
     busy(form.querySelector('[type=submit]'), null, async () => {

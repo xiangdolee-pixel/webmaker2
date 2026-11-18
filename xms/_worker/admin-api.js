@@ -673,6 +673,8 @@ export function boardOptions(o = {}) {
     writer_mode: o.writer_mode === 'HIDDEN' ? 'HIDDEN' : 'NAME',
     page_size: [10, 20, 30].includes(Number(o.page_size)) ? Number(o.page_size) : 20,
     new_hours: 72,
+    // PDF 첨부 보기 (사용자 지시 2026-11-18): '' = 끔(첨부 목록만), pdf = 글 안에서 아래로 이어 보기, book = 전자책(책장 넘기기) — js/pdfview.js
+    pdf_view: ['pdf', 'book'].includes(o.pdf_view) ? o.pdf_view : '',
     // 목록 주소: 사이트 디자인 안에 따로 만든 목록 화면(예: bsf /archive.html) — 있으면 글 등록 · 수정 · 삭제 뒤, '목록' 단추가 그리로 간다 (사용자 지시 2026-11-13)
     list_url: /^\/[a-z0-9._\/-]{0,80}$/i.test(String(o.list_url || '')) ? String(o.list_url) : '',
   };

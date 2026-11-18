@@ -487,7 +487,8 @@ async function postView(ctx, b, id) {
       <div class="meta">${vs.writer ? `<span>${esc(writerOf(b, p, me))}</span>` : ''}${vs.date ? `<span>${fmtDate(p.published_at, true)}</span>` : ''}${vs.views ? `<span>조회 ${p.view_count + 1}</span>` : ''}
         ${p.published_at > now() ? `<span class="tag warn">${fmtDate(p.published_at, true)} 공개 예약</span>` : ''}</div>
       ${imgs.length ? `<div class="post-photos">${imgs.map((u) => `<a href="${u.url}" target="_blank" rel="noopener"><img src="${u.url}" alt="${esc(u.name)}" loading="lazy"></a>`).join('')}</div>` : ''}
-      <div class="prose">${bodyHtml}</div>
+      <div class="prose"${b.opt.pdf_view ? ` data-xv-inline="${b.opt.pdf_view}"` : ''}>${bodyHtml}</div>
+      ${b.opt.pdf_view ? files.filter((u) => /\.pdf$/i.test(u.name) || u.mime === 'application/pdf').map((u) => `<div class="xv" data-xv="${b.opt.pdf_view}" data-src="${esc(u.url)}" data-dl="${esc(u.dl || `${u.url}?dl=1`)}" data-name="${esc(u.name)}"></div>`).join('') : ''}
       ${files.length ? `<div class="post-files"><b>첨부파일</b>${files.map((u) => `<a href="${u.dl || `${u.url}?dl=1`}">${esc(u.name)} <small>${fmtSize(u.size)}</small></a>`).join('')}</div>` : ''}
     </article>
     <div class="actions"><a class="btn" href="${b.opt.list_url || `/board/${b.slug}`}">목록</a>${mine ? `<a class="btn" href="/board/${b.slug}/${p.id}/edit">수정</a>
