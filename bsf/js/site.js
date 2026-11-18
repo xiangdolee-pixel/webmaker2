@@ -182,6 +182,9 @@
           var underPage = $('.pv-leafpage', under);
           if (single(nsp)) slide(underPage, sideOf(nsp) * w / 2, 0);
           stageEl.insertBefore(under, row);
+          // 한 장(표지 · 끝에 홀로 남은 쪽)에서 넘길 때: 넘어가는 장이 내려앉을 자리의 쪽이 먼저 보이면 안 된다 (2026-11-18 표지를 넘기기도 전에 2쪽이 왼쪽에 보이던 것) → 다 넘어간 뒤에 보인다
+          var land = null;
+          if (single(sp)) { land = nsp.length > 1 ? $(dir > 0 ? '.pv-leafpage.l' : '.pv-leafpage.r', under) : underPage; if (land) land.style.visibility = 'hidden'; }
           var face;
           if (one) { row.style.visibility = 'hidden'; face = row; }
           else {
@@ -195,7 +198,7 @@
           leaf.style.left = (ref.left - sr.left) + 'px'; leaf.style.top = (ref.top - sr.top) + 'px'; leaf.style.width = ref.width + 'px'; leaf.style.height = ref.height + 'px';
           stageEl.appendChild(leaf); leaf.offsetWidth; leaf.classList.add('turn');
           setTimeout(function () {
-            pvCur = to; stageEl.removeChild(leaf); stageEl.removeChild(row);
+            pvCur = to; if (land) land.style.visibility = ''; stageEl.removeChild(leaf); stageEl.removeChild(row);
             under.classList.remove('under'); setPage(); navState();
             if (single(nsp)) { slide(underPage, 0, SLIDE); setTimeout(function () { pvBusy = false; }, SLIDE); }
             else pvBusy = false;
