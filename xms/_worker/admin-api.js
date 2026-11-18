@@ -117,11 +117,17 @@ export async function adminApi(ctx) {
       const k = String(it.k || '');
       if (!/^[0-9a-z]{1,8}\.\d{1,4}$/.test(k)) continue;
       const pth = it.g === '*' ? '*' : page;
-      const kind = /^l[0-9a-z]{7}\./.test(k) ? 'link' : /^i[0-9a-z]{7}\./.test(k) ? 'img' : 'text';
+      const kind = /^l[0-9a-z]{7}\./.test(k) ? 'link' : /^i[0-9a-z]{7}\./.test(k) ? 'img' : /^m[0-9a-z]{7}\./.test(k) ? 'map' : 'text';
+      // 지도: [주소, 이름표]
+      if (kind === 'map' && it.t !== null) {
+        const addr = str(Array.isArray(it.t) ? it.t[0] : '', 120).replace(/[<>"]/g, ''), name = str(Array.isArray(it.t) ? it.t[1] : '', 40).replace(/[<>"]/g, '');
+        if (!addr) throw bad('지도에 표시할 주소를 넣어 주세요.');
+        it.t = [addr, name];
+      }
       if (kind === 'img') { const was = await oldImg(pth, k); if (was && !(Array.isArray(it.t) && String(it.t[0]).slice(-32) === was)) drop.push(was); }
       if (kind === 'link' && it.t !== null && !(Array.isArray(it.t) && LINK_OK.test(String(it.t[0] || '')))) throw bad('링크 주소는 https:// 나 / 로 시작하게 넣어 주세요.');
       if (kind === 'img' && it.t !== null) { if (!(Array.isArray(it.t) && IMG_OK.test(String(it.t[0] || '')))) throw bad('사진을 다시 골라 주세요.'); keep.push(String(it.t[0]).slice(-32)); }
-      if (kind !== 'text' && it.t !== null) it.t = [String(it.t[0])];
+      if ((kind === 'link' || kind === 'img') && it.t !== null) it.t = [String(it.t[0])];
       if (it.t === null) { stmts.push(db.prepare('DELETE FROM page_texts WHERE site = ? AND path = ? AND k = ?').bind(site, pth, k)); continue; }
       if (!Array.isArray(it.t) || it.t.length > 200) continue;
       const t = JSON.stringify(it.t.map((x) => String(x ?? '').slice(0, 5000)));

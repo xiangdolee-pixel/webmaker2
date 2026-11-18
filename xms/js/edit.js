@@ -3,14 +3,15 @@
 //     글자  [data-xe]  (글자가 든 요소)   — 글자 조각(text node)만 바꾸므로 굵게 · 색 같은 모양은 사이트 그대로
 //     링크  a[data-xl]                   — 눌렀을 때 가는 주소 (2026-11-18)
 //     사진  img[data-xi]                 — 다른 사진으로 바꾸기 (2026-11-18, 올린 사진은 xms 저장 공간에)
+//     지도  iframe[data-xm]              — xim 공용 지도의 주소 · 이름표 (2026-11-18)
 //   원래 값은 window.__XE_ORIG. 저장하면 xms(page_texts)에 들어가 다음부터 모든 방문자에게 고친 대로 보인다. 원래대로 되돌리면 저장할 때 지운다.
 //   게시판 화면(/board/…)에서는 '게시판 설정' 단추로 목록 모양 · 기능 · 권한을 그 자리에서 고친다 (board-set.js).
 let on = false;
 
 const CSS = `
-body.xe-on [data-xe]{outline:1.5px dashed rgba(59,130,246,.55);outline-offset:2px;border-radius:2px;cursor:text;transition:outline-color .15s,background-color .15s}
-body.xe-on [data-xe]:hover{outline-color:#3b82f6;background-color:rgba(59,130,246,.07)}
-body.xe-on [data-xe]:focus{outline:2px solid #3b82f6;background-color:rgba(59,130,246,.1);box-shadow:0 0 0 4px rgba(255,255,255,.55)}
+body.xe-on [data-xe]{outline:1.5px dashed rgba(59,130,246,.55);outline-offset:2px;cursor:text;transition:outline-color .15s}
+body.xe-on [data-xe]:hover{outline-color:#3b82f6}
+body.xe-on [data-xe]:focus{outline:2px solid #3b82f6;box-shadow:0 0 0 4px rgba(59,130,246,.28)}
 body.xe-on [data-xe].xe-dirty,body.xe-on a[data-xl].xe-dirty{outline:2px solid #f59e0b;outline-offset:2px}
 body.xe-on img[data-xi]{cursor:pointer}
 .xe-pick{position:absolute;z-index:2147482990;pointer-events:none;border:3px solid #fde047;border-radius:6px;box-shadow:0 0 0 2px rgba(17,24,39,.85),0 0 0 9999px rgba(15,23,42,.2)}
@@ -39,6 +40,12 @@ body.xe-on .xms-test{bottom:calc(max(16px,env(safe-area-inset-bottom)) + 66px)}
 .xe-bar button:focus-visible,.xe-link input:focus-visible{outline:2px solid #fde047;outline-offset:2px}
 .xe-link{display:flex;align-items:center;gap:6px;flex:1 1 100%;order:9}
 .xe-link[hidden]{display:none}
+.xe-link input.xe-name{flex:0 1 180px}
+.xe-link input[hidden],.xe-link select[hidden],.xe-seg[hidden]{display:none}
+.xe-seg{display:inline-flex;flex:none;padding:3px;border-radius:999px;background:#1f2937}
+.xe-bar .xe-seg button{height:32px;padding:0 12px;border:0;border-radius:999px;font-size:13.5px;color:rgba(255,255,255,.7)}
+.xe-bar .xe-seg button[aria-pressed="true"]{background:#fde047;color:#111827;font-weight:800}
+.xe-link select{flex:1;min-width:0;height:38px;padding:0 10px;border-radius:10px;border:1px solid rgba(255,255,255,.3);background:#1f2937;color:#fff;font:500 14px/1.3 inherit}
 .xe-link input{flex:1;min-width:0;height:38px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.3);background:#1f2937;color:#fff;font:500 14px/1.3 inherit}
 .xe-toast{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:2147483001;max-width:calc(100vw - 24px);padding:10px 16px;border-radius:12px;background:#065f46;color:#fff;font:600 14px/1.4 "Pretendard Variable",Pretendard,system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .xe-toast.err{background:#991b1b}
@@ -103,6 +110,13 @@ export function startEdit() {
   const els = [...document.querySelectorAll('[data-xe]')];
   const links = [...document.querySelectorAll('a[data-xl]')];
   const imgs = [...document.querySelectorAll('img[data-xi]')];
+  const maps = [...document.querySelectorAll('iframe[data-xm]')];
+  const mkey = (m) => m.dataset.xmG + m.dataset.xm;
+  const startMap = new Map(maps.map((m) => [m, m.getAttribute('src')]));
+  const mapVal = (m) => { try { const q = new URL(m.getAttribute('src'), location.href); return [q.searchParams.get('addr') || '', q.searchParams.get('name') || '']; } catch { return ['', '']; } };
+  maps.forEach((m) => { m.style.pointerEvents = 'none'; });   // 지도 안으로 눌림이 빨려 들어가지 않게 (눌러서 고를 수 있게)
+  const dirtyM = new Set();      // 지도
+  let curMap = null;             // 지금 고른 지도
   const start = new Map(els.map((el) => [el, valuesOf(el)])); // 수정 모드에 들어올 때 보이던 글자
   const hrefOf = (a) => a.getAttribute('href') || '';
   const srcOf = (im) => im.getAttribute('src') || im.getAttribute('data-src') || '';
@@ -118,7 +132,7 @@ export function startEdit() {
   const dirtyI = new Set();      // 사진
   let current = null;            // 지금 고른 글자 요소
   let curImg = null;             // 지금 고른 사진
-  const count = () => dirty.size + dirtyL.size + dirtyI.size;
+  const count = () => dirty.size + dirtyL.size + dirtyI.size + dirtyM.size;
 
   const style = document.createElement('style');
   style.id = 'xe-style';
@@ -141,11 +155,12 @@ export function startEdit() {
   bar.innerHTML = '<b>수정 모드</b><span data-c></span>' +
     '<button type="button" data-a="link" hidden>링크 바꾸기</button>' +
     '<button type="button" data-a="img" hidden>사진 바꾸기</button>' +
+    '<button type="button" data-a="map" hidden>지도 주소 바꾸기</button>' +
     '<button type="button" data-a="undo" disabled>원래대로</button>' +
     (board ? '<button type="button" data-a="board">게시판 설정</button>' : '') +
     '<button type="button" data-a="save" class="xe-save" disabled>저장</button>' +
     '<button type="button" data-a="exit">끝내기</button>' +
-    '<form class="xe-link" hidden><input type="text" inputmode="url" autocomplete="off" spellcheck="false" aria-label="링크 주소" placeholder="https://… 또는 /about 같은 사이트 안 주소"><button type="submit">확인</button><button type="button" data-a="link-x">취소</button></form>';
+    '<form class="xe-link" hidden><span class="xe-seg" role="group" aria-label="링크 종류" hidden><button type="button" data-m="in" aria-pressed="true">홈페이지 안</button><button type="button" data-m="out" aria-pressed="false">바깥 주소</button></span><select class="xe-sel" aria-label="이동할 메뉴" hidden></select><input type="text" autocomplete="off" spellcheck="false" aria-label="링크 주소" placeholder="https://… 또는 /about 같은 사이트 안 주소"><input type="text" class="xe-name" autocomplete="off" spellcheck="false" aria-label="지도 이름표" placeholder="지도에 뜨는 이름" hidden><button type="submit">확인</button><button type="button" data-a="link-x">취소</button></form>';
   document.body.append(bar);
   const $ = (s) => bar.querySelector(s);
   const pick = document.createElement('div');   // 고른 사진 둘레 표시
@@ -155,19 +170,23 @@ export function startEdit() {
   const IC_IMG = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4 4 3 3-2 4 3"/></svg>';
   const IC_LINK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/></svg>';
   const chipI = document.createElement('button'), chipL = document.createElement('button');
-  chipI.type = chipL.type = 'button'; chipI.className = chipL.className = 'xe-chip'; chipI.hidden = chipL.hidden = true;
-  chipI.innerHTML = `${IC_IMG}사진 바꾸기`; chipL.innerHTML = `${IC_LINK}링크 바꾸기`;
-  document.body.append(chipI, chipL);
+  const IC_MAP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg>';
+  const chipM = document.createElement('button');
+  chipI.type = chipL.type = chipM.type = 'button'; chipI.className = chipL.className = chipM.className = 'xe-chip'; chipI.hidden = chipL.hidden = chipM.hidden = true;
+  chipI.innerHTML = `${IC_IMG}사진 바꾸기`; chipL.innerHTML = `${IC_LINK}링크 바꾸기`; chipM.innerHTML = `${IC_MAP}지도 주소 바꾸기`;
+  document.body.append(chipI, chipL, chipM);
   const file = document.createElement('input');
-  file.type = 'file'; file.accept = 'image/png,image/jpeg,image/webp,image/gif'; file.hidden = true;
+  file.type = 'file'; file.accept = 'image/png,image/jpeg,image/webp,image/gif'; file.tabIndex = -1; file.setAttribute('aria-hidden', 'true');
+  file.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';
   document.body.append(file);
 
   // 지금 고른 것에 걸린 링크 (글자가 링크이거나 링크 안에 있을 때 · 사진이 링크 안에 있을 때)
   const curLink = () => (curImg || current)?.closest?.('a[data-xl]') || null;
   const placePick = () => {
-    if (!curImg) { pick.hidden = true; return; }
-    const r = curImg.getBoundingClientRect();
-    pick.hidden = false; pick.classList.toggle('dirty', dirtyI.has(curImg));
+    const sel = curImg || curMap;
+    if (!sel) { pick.hidden = true; return; }
+    const r = sel.getBoundingClientRect();
+    pick.hidden = false; pick.classList.toggle('dirty', dirtyI.has(sel) || dirtyM.has(sel));
     Object.assign(pick.style, { left: `${r.left + scrollX}px`, top: `${r.top + scrollY}px`, width: `${r.width}px`, height: `${r.height}px` });
   };
   const placeChips = () => {
@@ -179,6 +198,12 @@ export function startEdit() {
       chipI.hidden = x1 - x0 < 40 || y1 - y0 < 30;
       if (!chipI.hidden) Object.assign(chipI.style, { left: `${(x0 + x1) / 2 - chipI.offsetWidth / 2 + scrollX}px`, top: `${(y0 + y1) / 2 - 21 + scrollY}px` });
     } else chipI.hidden = true;
+    if (curMap && linkForm.hidden) {
+      const r = curMap.getBoundingClientRect();
+      const x0 = Math.max(r.left, 0), x1 = Math.min(r.right, vw), y0 = Math.max(r.top, 90), y1 = Math.min(r.bottom, vh - 90);
+      chipM.hidden = x1 - x0 < 40 || y1 - y0 < 30;
+      if (!chipM.hidden) Object.assign(chipM.style, { left: `${(x0 + x1) / 2 - chipM.offsetWidth / 2 + scrollX}px`, top: `${(y0 + y1) / 2 - 21 + scrollY}px` });
+    } else chipM.hidden = true;
     const a = curLink();
     if (a && linkForm.hidden) {
       const r = (curImg || current || a).getBoundingClientRect();
@@ -190,14 +215,16 @@ export function startEdit() {
   };
   function paint() {
     const n = count();
-    $('[data-c]').textContent = n ? `고친 곳 ${n}군데` : (curImg ? '사진을 골랐습니다' : '글자 · 사진을 눌러 고치세요');
+    $('[data-c]').textContent = n ? `고친 곳 ${n}군데` : (curImg ? '사진을 골랐습니다' : curMap ? '지도를 골랐습니다' : '글자 · 사진을 눌러 고치세요');
     $('[data-a="save"]').disabled = !n;
     const a = curLink();
     $('[data-a="link"]').hidden = !a;
     $('[data-a="img"]').hidden = !curImg;
     $('[data-a="link"]').classList.toggle('xe-hot', !!a && !curImg);   // 지금 할 수 있는 일을 노랗게
     $('[data-a="img"]').classList.toggle('xe-hot', !!curImg);
-    const undoable = curImg ? srcOf(curImg) !== (ORIG[ikey(curImg)] || [])[0]
+    $('[data-a="map"]').hidden = !curMap;
+    $('[data-a="map"]').classList.toggle('xe-hot', !!curMap);
+    const undoable = curMap ? curMap.getAttribute('src') !== (ORIG[mkey(curMap)] || [])[0] : curImg ? srcOf(curImg) !== (ORIG[ikey(curImg)] || [])[0]
       : current ? (!same(valuesOf(current), ORIG[keyOf(current)]) || (a && hrefOf(a) !== (ORIG[lkey(a)] || [])[0])) : false;
     $('[data-a="undo"]').disabled = !undoable;
     $('[data-a="exit"]').textContent = $('[data-a="exit"]').dataset.sure ? '저장 안 하고 끝내기' : '끝내기';
@@ -210,6 +237,8 @@ export function startEdit() {
     touched();
   };
   const markL = (a) => { const d = hrefOf(a) !== startHref.get(a); dirtyL[d ? 'add' : 'delete'](a); a.classList.toggle('xe-dirty', d); touched(); };
+  const markM = (m) => { dirtyM[m.getAttribute('src') !== startMap.get(m) ? 'add' : 'delete'](m); touched(); };
+  const mapAt = (x, y) => maps.find((m) => { const r = m.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; }) || null;
   const markI = (im) => { const s = startImg.get(im); const d = srcOf(im) !== (s.src || s.ds || ''); dirtyI[d ? 'add' : 'delete'](im); touched(); };
 
   // 누른 자리에 있는 사진 (글 뒤에 깔린 첫 화면 사진도 고를 수 있게 그 자리의 요소를 모두 본다 — 겹쳐 있으면 보이는 것)
@@ -220,18 +249,38 @@ export function startEdit() {
     if (bar.contains(e.target) || e.target.closest('.xa-menu, .xms-test, .xe-dlg, .xe-chip')) return;
     const el = e.target.closest('[data-xe]');
     if (e.target.closest('a,button') || el) e.preventDefault();
-    if (el) { if (curImg) { curImg = null; paint(); } return; }
+    if (el) { if (curImg || curMap) { curImg = curMap = null; paint(); } return; }
+    const mp = mapAt(e.clientX, e.clientY);
+    if (mp) { e.preventDefault(); curMap = mp; curImg = null; current = null; closeLink(); paint(); return; }
     const im = imgAt(e.clientX, e.clientY);
-    if (im) { e.preventDefault(); curImg = im; current = null; closeLink(); paint(); }
-    else if (curImg) { curImg = null; paint(); }
+    if (im) { e.preventDefault(); curImg = im; curMap = null; current = null; closeLink(); paint(); }
+    else if (curImg || curMap) { curImg = curMap = null; paint(); }
   };
   const onInput = (e) => { const el = e.target.closest?.('[data-xe]'); if (el) mark(el); };
-  const onFocus = (e) => { const el = e.target.closest?.('[data-xe]'); if (el) { current = el; curImg = null; closeLink(); paint(); } };
-  // 엔터 = 줄바꿈 대신 다 고침, Ctrl+S = 저장
+  const onFocus = (e) => { const el = e.target.closest?.('[data-xe]'); if (el) { current = el; curImg = curMap = null; closeLink(); paint(); } };
+  // 엔터 = 줄바꿈 (2026-11-18): 글자 조각에 줄바꿈 글자를 넣고, 그 요소는 줄바꿈이 보이게(white-space: pre-line) 한다. Esc = 다 고침, Ctrl+S = 저장
+  const breakable = (el) => {
+    if (el.dataset.xeNl) return;
+    el.dataset.xeNl = '1';
+    // html 을 여러 줄로 써 둔 자리는 그 줄바꿈이 화면에 나오지 않게 먼저 빈칸으로 (커서가 든 조각은 그대로)
+    const here = getSelection().anchorNode;
+    nodesOf(el).forEach((n) => { if (n !== here && /\n/.test(n.nodeValue)) n.nodeValue = n.nodeValue.replace(/\s*\n\s*/g, ' '); });
+    el.style.whiteSpace = 'pre-line';
+  };
   const onKey = (e) => {
     const el = e.target.closest?.('[data-xe]');
     if (!el) return;
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); }
+    if (e.key === 'Escape') { e.preventDefault(); el.blur(); }
+    if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault(); breakable(el);
+      // 글 맨 끝에서는 줄바꿈 하나로는 새 줄이 안 보인다 → 끝이면 하나 더
+      const s = getSelection(), r = s.rangeCount ? s.getRangeAt(0) : null;
+      let atEnd = false;
+      if (r) { const t = document.createRange(); t.selectNodeContents(el); t.setStart(r.endContainer, r.endOffset); atEnd = !t.toString().length; }
+      document.execCommand('insertText', false, atEnd && !/\n$/.test(el.textContent) ? '\n\n' : '\n');
+      if (atEnd) { const s2 = getSelection(); if (s2.rangeCount && s2.anchorNode?.nodeType === 3 && /\n\n$/.test(s2.anchorNode.nodeValue)) { s2.collapse(s2.anchorNode, s2.anchorNode.nodeValue.length - 1); } }
+      mark(el);
+    }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
   };
   const onPaste = (e) => {
@@ -245,11 +294,20 @@ export function startEdit() {
   const onMove = () => { placePick(); placeChips(); };
   // 흐르는 사진처럼 저절로 움직이는 자리도 따라간다
   let raf = 0;
-  const follow = () => { if (!on) return; if (curImg || !chipL.hidden) onMove(); raf = requestAnimationFrame(follow); };
+  const follow = () => {
+    if (!on) return;
+    if (curImg && +getComputedStyle(curImg).opacity < 0.3) {
+      const r = curImg.getBoundingClientRect(), other = imgAt(Math.min(Math.max(r.left + r.width / 2, 1), innerWidth - 1), Math.min(Math.max(r.top + r.height / 2, 1), innerHeight - 1));
+      if (other && other !== curImg) { curImg = other; paint(); }
+    }
+    if (curImg || curMap || !chipL.hidden) onMove();
+    raf = requestAnimationFrame(follow);
+  };
   raf = requestAnimationFrame(follow);
   chipI.addEventListener('click', (e) => { e.preventDefault(); if (curImg) file.click(); });
   chipL.addEventListener('mousedown', (e) => e.preventDefault());   // 글자에서 커서가 빠지지 않게
   chipL.addEventListener('click', (e) => { e.preventDefault(); openLink(); });
+  chipM.addEventListener('click', (e) => { e.preventDefault(); openMap(); });
   document.addEventListener('click', block, true);
   document.addEventListener('input', onInput, true);
   document.addEventListener('focusin', onFocus, true);
@@ -261,18 +319,67 @@ export function startEdit() {
 
   // ── 링크 바꾸기: 막대 안에서 주소를 고친다 ──
   const linkForm = $('.xe-link'), linkIn = linkForm.querySelector('input');
-  let linkEl = null;
-  function closeLink() { linkForm.hidden = true; linkEl = null; placeChips(); }
-  function openLink() {
-    linkEl = curLink();
-    if (!linkEl) return;
-    linkIn.value = hrefOf(linkEl);
-    linkForm.hidden = false; chipL.hidden = true;
+  const nameIn = linkForm.querySelector('.xe-name'), seg = linkForm.querySelector('.xe-seg'), sel = linkForm.querySelector('.xe-sel');
+  // 홈페이지 안 = 메뉴(이름 — 주소)에서 고르기, 바깥 주소 = 직접 넣기 (사용자 지시 2026-11-18)
+  let linkMode = 'out', menusP = null;
+  const pathOf = (h) => { try { const u = new URL(h, location.href); return u.origin === location.origin ? (u.pathname.replace(/\/index\.html?$/i, '/').replace(/\.html?$/i, '').replace(/(.)\/+$/, '$1') || '/') + u.hash : ''; } catch { return ''; } };
+  const loadMenus = () => (menusP ||= fetch('/xms-api/menu', { credentials: 'same-origin' }).then((r) => r.json()).then((tree) => {
+    const out = [{ title: '홈 (첫 화면)', href: '/', d: 0 }], seen = new Set(['/']);
+    const walk = (list, d) => (list || []).forEach((m) => {
+      const h = !m.external && m.href ? pathOf(m.href) : '';
+      if (h && !seen.has(h)) { seen.add(h); out.push({ title: m.title, href: h, d }); }
+      walk(m.children, d + 1);
+    });
+    walk(Array.isArray(tree) ? tree : tree.menu || [], 0);
+    return out;
+  }).catch(() => [{ title: '홈 (첫 화면)', href: '/', d: 0 }]));
+  const setMode = (m) => {
+    linkMode = m;
+    seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.m === m)));
+    sel.hidden = m !== 'in'; linkIn.hidden = m === 'in';
+    setTimeout(() => (m === 'in' ? sel : linkIn).focus(), 0);
+  };
+  seg.addEventListener('click', (e) => { const b = e.target.closest('button[data-m]'); if (b) setMode(b.dataset.m); });
+  let linkEl = null, mapEl = null;
+  function closeLink() { linkForm.hidden = true; linkEl = null; mapEl = null; nameIn.hidden = true; seg.hidden = true; sel.hidden = true; linkIn.hidden = false; placeChips(); }
+  // 지도 주소 바꾸기: 주소(도로명 주소) + 지도에 뜨는 이름표
+  function openMap() {
+    if (!curMap) return;
+    mapEl = curMap; linkEl = null;
+    const [addr, name] = mapVal(mapEl);
+    seg.hidden = true; sel.hidden = true; linkIn.hidden = false;
+    linkIn.value = addr; linkIn.placeholder = '도로명 주소 (예: 서울 도봉구 도봉로 696)'; linkIn.setAttribute('aria-label', '지도 주소');
+    nameIn.value = name; nameIn.hidden = false;
+    linkForm.hidden = false; chipM.hidden = true;
     setTimeout(() => { linkIn.focus(); linkIn.select(); }, 0);
+  }
+  function openLink() {
+    linkEl = curLink(); mapEl = null;
+    if (!linkEl) return;
+    nameIn.hidden = true; linkIn.placeholder = 'https://… (전화는 tel:, 메일은 mailto:)'; linkIn.setAttribute('aria-label', '바깥 주소');
+    const now = hrefOf(linkEl), inside = pathOf(now);
+    linkIn.value = now;
+    linkForm.hidden = false; chipL.hidden = true; seg.hidden = false;
+    // 메뉴 목록을 채운다: "이름 — /주소" (하위 메뉴는 들여서). 지금 주소가 메뉴에 없으면 그 주소도 맨 아래에 넣어 둔다
+    const el0 = linkEl;
+    loadMenus().then((list) => {
+      if (linkEl !== el0) return;
+      const items = inside && !list.some((m) => m.href === inside) ? [...list, { title: '지금 주소', href: inside, d: 0 }] : list;
+      sel.innerHTML = items.map((m) => `<option value="${m.href.replace(/"/g, '&quot;')}">${'\u3000'.repeat(Math.min(m.d, 3))}${String(m.title).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}  —  ${m.href.replace(/[&<>]/g, '')}</option>`).join('');
+      if (inside) sel.value = inside;
+    });
+    setMode(inside || !now ? 'in' : 'out');
   }
   linkForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const v = linkIn.value.trim();
+    const v = (!mapEl && linkMode === 'in' ? sel.value : linkIn.value).trim();
+    if (mapEl) {   // 지도: 주소 · 이름표를 바꿔 바로 다시 그린다
+      if (!v) { toast('지도에 표시할 주소를 넣어 주세요.', true); return; }
+      try { const q = new URL(mapEl.getAttribute('src'), location.href); q.searchParams.set('addr', v); q.searchParams.set('name', nameIn.value.trim()); mapEl.setAttribute('src', q.href); } catch { /* 그대로 */ }
+      markM(mapEl); closeLink();
+      toast('지도를 바꿨습니다. 주소 글자와 "지도에서 보기" 링크도 함께 고쳐 주세요.');
+      return;
+    }
     if (!LINK_OK.test(v)) { toast('주소는 https:// 나 / 로 시작하게 넣어 주세요. (전화는 tel:, 메일은 mailto:)', true); return; }
     if (linkEl) { linkEl.setAttribute('href', v); markL(linkEl); }
     closeLink();
@@ -298,9 +405,13 @@ export function startEdit() {
   async function save() {
     if (!count()) return;
     const items = [
-      ...[...dirty].map((el) => { const v = valuesOf(el); return { g: el.dataset.xeG, k: el.dataset.xe, t: same(v, ORIG[keyOf(el)]) ? null : v }; }),
+      ...[...dirty].map((el) => {
+        if (el.dataset.xeNl) { const ns = nodesOf(el), last = ns[ns.length - 1]; if (last && /\n+$/.test(last.nodeValue)) last.nodeValue = last.nodeValue.replace(/\n+$/, ''); }   // 끝에 남은 빈 줄은 뗀다
+        const v = valuesOf(el); return { g: el.dataset.xeG, k: el.dataset.xe, t: same(v, ORIG[keyOf(el)]) ? null : v };
+      }),
       ...[...dirtyL].map((a) => ({ g: a.dataset.xlG, k: a.dataset.xl, t: hrefOf(a) === (ORIG[lkey(a)] || [])[0] ? null : [hrefOf(a)] })),
       ...[...dirtyI].map((im) => ({ g: im.dataset.xiG, k: im.dataset.xi, t: srcOf(im) === (ORIG[ikey(im)] || [])[0] ? null : [srcOf(im)] })),
+      ...[...dirtyM].map((m) => ({ g: m.dataset.xmG, k: m.dataset.xm, t: m.getAttribute('src') === (ORIG[mkey(m)] || [])[0] ? null : mapVal(m) })),
     ];
     $('[data-a="save"]').disabled = true;
     try {
@@ -313,7 +424,8 @@ export function startEdit() {
       dirty.forEach((el) => { start.set(el, valuesOf(el)); el.classList.remove('xe-dirty'); });
       dirtyL.forEach((a) => { startHref.set(a, hrefOf(a)); a.classList.remove('xe-dirty'); });
       dirtyI.forEach((im) => { startImg.set(im, shot(im)); });
-      dirty.clear(); dirtyL.clear(); dirtyI.clear();
+      dirtyM.forEach((m) => { startMap.set(m, m.getAttribute('src')); });
+      dirty.clear(); dirtyL.clear(); dirtyI.clear(); dirtyM.clear();
       toast('저장했습니다. 방문자에게도 곧 고친 대로 보입니다.');
     } catch (e) {
       toast(e.message || '저장하지 못했습니다.', true);
@@ -327,11 +439,16 @@ export function startEdit() {
     if (a === 'link') openLink();
     if (a === 'link-x') closeLink();
     if (a === 'img' && curImg) file.click();
+    if (a === 'map') openMap();
     if (a === 'board') {
       try { (await import(`./board-set.js${new URL(import.meta.url).search}`)).openBoardSettings(board); } catch (x) { toast('게시판 설정을 열지 못했습니다.', true); console.error(x); }
     }
     if (a === 'undo') {
-      if (curImg) {   // 사진: 사이트의 원래 사진으로
+      if (curMap) {   // 지도: 사이트의 원래 주소로
+        const o = (ORIG[mkey(curMap)] || [])[0];
+        if (o) curMap.setAttribute('src', o);
+        markM(curMap);
+      } else if (curImg) {   // 사진: 사이트의 원래 사진으로
         const o = (ORIG[ikey(curImg)] || [])[0], s = startImg.get(curImg);
         if (o && (s.src || s.ds) === o) putImg(curImg, s); else if (o) setImg(curImg, o);
         markI(curImg);
@@ -356,6 +473,7 @@ export function startEdit() {
       });
       dirtyL.forEach((l) => { l.setAttribute('href', startHref.get(l)); l.classList.remove('xe-dirty'); });
       dirtyI.forEach((im) => putImg(im, startImg.get(im)));
+      dirtyM.forEach((m) => m.setAttribute('src', startMap.get(m)));
       stop();
     }
   });
@@ -373,8 +491,9 @@ export function startEdit() {
     removeEventListener('scroll', onMove);
     removeEventListener('resize', onMove);
     cancelAnimationFrame(raf);
-    bar.remove(); style.remove(); pick.remove(); file.remove(); chipI.remove(); chipL.remove();
+    maps.forEach((m) => { m.style.pointerEvents = ''; });
+    bar.remove(); style.remove(); pick.remove(); file.remove(); chipI.remove(); chipL.remove(); chipM.remove();
   }
   paint();
-  toast(imgs.length ? '수정 모드 — 글자는 눌러서 고치고, 사진은 눌러서 고른 뒤 "사진 바꾸기". 링크는 글자를 고른 뒤 "링크 바꾸기".' : '수정 모드 — 파란 점선 글자를 눌러 고치고 저장하세요.');
+  toast(imgs.length || maps.length ? '수정 모드 — 글자는 눌러서 고치고, 사진 · 지도는 누르면 뜨는 노란 단추로 바꿉니다. 링크는 글자를 고른 뒤 "링크 바꾸기".' : '수정 모드 — 파란 점선 글자를 눌러 고치고 저장하세요.');
 }

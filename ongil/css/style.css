@@ -315,7 +315,7 @@ main { flex: 1; }
 .banner.light > div { z-index: 1; }
 .banner.light p { color: var(--ink-2); }
 .banner h2 { font-size: clamp(24px, 3vw, 38px); font-weight: 800; letter-spacing: -.03em; line-height: 1.3; }
-.banner p { margin-top: 10px; color: rgba(255, 255, 255, .86); max-width: 30em; }
+.banner p { margin-top: 10px; color: rgba(255, 255, 255, .86); max-width: 38em; text-wrap: balance; }   /* 마지막 줄에 한 단어만 남지 않게 */
 
 /* 오시는 길 */
 .map-big { height: clamp(320px, 46vw, 540px); border-radius: 28px; overflow: hidden; }

@@ -379,7 +379,7 @@ async function ximApi(request, env, url, ctx) {
     // 데이터베이스 전체 크기 (D1 이 돌려주는 size_after) · R2 에 올린 파일 합계
     const [ximMeta, xmsMeta, r2] = await Promise.all([
       db.prepare('SELECT 1').run(), env.XMS_DB.prepare('SELECT 1').run(),
-      env.XMS_DB.prepare('SELECT COALESCE(SUM(size), 0) AS n FROM uploads WHERE r2_key IS NOT NULL').first(),
+      env.XMS_DB.prepare('SELECT COALESCE(SUM(size), 0) AS n FROM (SELECT MAX(size) AS size FROM uploads WHERE r2_key IS NOT NULL GROUP BY r2_key)').first(),   // 여러 글이 함께 쓰는 파일은 한 번만
     ]);
     return json({
       customers: r[0].results[0].n,
@@ -905,7 +905,7 @@ async function siteUsage(env) {
   ];
   const res = await x.batch([
     ...DB_QUERIES.map((q) => x.prepare(q)),
-    x.prepare("SELECT site, COUNT(*) AS c, COALESCE(SUM(size), 0) AS total, COALESCE(SUM(CASE WHEN r2_key IS NOT NULL THEN size ELSE 0 END), 0) AS r2 FROM uploads GROUP BY site"),
+    x.prepare("SELECT site, COUNT(*) AS c, COALESCE(SUM(size), 0) AS total, COALESCE(SUM(CASE WHEN r2_key IS NOT NULL THEN size ELSE 0 END), 0) AS r2 FROM (SELECT site, MAX(size) AS size, MAX(r2_key) AS r2_key FROM uploads GROUP BY site, COALESCE(r2_key, id)) GROUP BY site"),   // 여러 글이 함께 쓰는 파일은 한 번만
     x.prepare('SELECT site, COUNT(*) AS c, COALESCE(SUM(length(data)), 0) * 3 / 4 AS total FROM site_files GROUP BY site'),
   ]);
   const upRows = res[DB_QUERIES.length];

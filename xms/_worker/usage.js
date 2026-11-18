@@ -22,7 +22,8 @@ export async function usageOf(env, site) {
   const res = await x.batch([
     ...DB_QUERIES.map((q) => x.prepare(q).bind(site)),
     x.prepare(`SELECT COUNT(*) AS c, COALESCE(SUM(size), 0) AS total, COALESCE(SUM(CASE WHEN r2_key IS NOT NULL THEN size ELSE 0 END), 0) AS r2,
-      COALESCE(SUM(CASE WHEN kind = 'FILE' THEN size ELSE 0 END), 0) AS files_only FROM uploads WHERE site = ?`).bind(site),
+      COALESCE(SUM(CASE WHEN kind = 'FILE' THEN size ELSE 0 END), 0) AS files_only
+      FROM (SELECT MAX(size) AS size, MAX(r2_key) AS r2_key, MAX(kind) AS kind FROM uploads WHERE site = ? GROUP BY COALESCE(r2_key, id))`).bind(site),   // 여러 글이 함께 쓰는 파일은 한 번만
     x.prepare('SELECT COUNT(*) AS c, COALESCE(SUM(length(data)), 0) * 3 / 4 AS total FROM site_files WHERE site = ?').bind(site),
   ]);
   const db = res.slice(0, DB_QUERIES.length).reduce((s, r) => s + (r.results[0]?.n || 0), 0);

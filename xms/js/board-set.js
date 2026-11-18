@@ -33,6 +33,10 @@ const CSS = `
 .xe-btn.go{border-color:#2f5fd0;background:#2f5fd0;color:#fff}
 .xe-btn:disabled{opacity:.5;cursor:default}
 .xe-btn:focus-visible,.xe-x:focus-visible{outline:2px solid #2f5fd0;outline-offset:2px}
+.xe-dlg{background:transparent;pointer-events:none}
+.xe-pan{pointer-events:auto}
+.xe-pvnote{position:fixed;left:16px;top:16px;z-index:1;padding:9px 14px;border-radius:999px;background:#fde047;color:#111827;font-weight:800;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.xe-pvnote[hidden]{display:none}
 @media (prefers-reduced-motion: reduce){.xe-pan{animation:none}}
 `;
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -77,16 +81,15 @@ export async function openBoardSettings(slug) {
   </form>`;
   document.body.append(dlg);
   const form = dlg.querySelector('form'), err = dlg.querySelector('footer p');
-  const close = () => { dlg.remove(); document.removeEventListener('keydown', onKey, true); };
+  const close = () => { undoPreview(); dlg.remove(); document.removeEventListener('keydown', onKey, true); };
   const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
   document.addEventListener('keydown', onKey, true);
-  dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('.xe-x, [data-x]')) close(); });
+  dlg.addEventListener('click', (e) => { if (e.target.closest('.xe-x, [data-x]')) close(); });   // 왼쪽 화면을 그대로 볼 수 있게 바탕은 가리지 않는다
   form.querySelector('.xe-x').focus();
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  const read = () => {
     const fd = new FormData(form), on = (n) => fd.get(n) !== null, nums = (n) => fd.getAll(n).map(Number);
-    const data = {
+    return {
       ...b,
       list_layout: fd.get('list_layout') || b.list_layout,
       list_levels: nums('list_levels'), read_levels: nums('read_levels'), write_levels: nums('write_levels'), comment_levels: nums('comment_levels'),
@@ -98,6 +101,36 @@ export async function openBoardSettings(slug) {
         writer_mode: fd.get('writer_mode'), page_size: Number(fd.get('page_size')), pdf_view: fd.get('pdf_view') || '', kind: fd.get('kind') || '',
       },
     };
+  };
+  // 미리보기: 고칠 때마다 저장하지 않고 그 설정으로 그린 화면을 받아 와 왼쪽(게시판 자리)만 바꾼다. 닫으면(취소) 원래 화면으로.
+  const box = document.querySelector('.xms-c');
+  const before = box ? box.innerHTML : null;
+  let seq = 0, timer = 0, previewed = false;
+  const preview = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      if (!box) return;
+      const d = read(), n = ++seq;
+      const u = new URL(location.href);
+      u.searchParams.delete('xe');
+      u.searchParams.set('xpv', JSON.stringify({ list_layout: d.list_layout, use_comment: d.use_comment, options: d.options }));
+      try {
+        const html = await fetch(u, { credentials: 'same-origin' }).then((r) => r.text());
+        if (n !== seq) return;
+        const got = new DOMParser().parseFromString(html, 'text/html').querySelector('.xms-c');
+        if (got) { box.innerHTML = got.innerHTML; previewed = true; note.hidden = false; }
+      } catch { /* 미리보기만 못 함 */ }
+    }, 180);
+  };
+  const note = document.createElement('div');
+  note.className = 'xe-pvnote'; note.hidden = true; note.textContent = '미리보기 — 아직 저장하지 않았습니다';
+  dlg.append(note);
+  form.addEventListener('change', preview);
+  const undoPreview = () => { clearTimeout(timer); seq++; if (previewed && box && before != null) box.innerHTML = before; };
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = read();
     const go = form.querySelector('.go');
     go.disabled = true; err.textContent = '';
     try {

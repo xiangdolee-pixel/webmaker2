@@ -17,7 +17,8 @@ const APPLY_MAX = 10 * 1024 * 1024;
 const SAFE_INLINE = /^(image\/(png|jpeg|gif|webp)|application\/pdf)$/;
 
 async function usage(env, site) {
-  const r = await env.DB.prepare('SELECT COALESCE(SUM(size), 0) AS n FROM uploads WHERE site = ?').bind(site).first();
+  // 같은 파일을 여러 글이 함께 쓰면(r2_key 가 같음) 한 번만 센다
+  const r = await env.DB.prepare('SELECT COALESCE(SUM(size), 0) AS n FROM (SELECT MAX(size) AS size FROM uploads WHERE site = ? GROUP BY COALESCE(r2_key, id))').bind(site).first();
   return r.n;
 }
 
@@ -102,7 +103,15 @@ export const uploadIdsIn = (...texts) => [...new Set(texts.join(' ').match(/\/xm
 export async function removeUploads(env, site, where, binds = []) {
   const { results } = await env.DB.prepare(`SELECT id, r2_key FROM uploads WHERE site = ? AND (${where})`).bind(site, ...binds).all();
   if (!results.length) return 0;
-  const keys = results.map((u) => u.r2_key).filter(Boolean);
+  // 같은 파일(r2_key)을 다른 글도 쓰고 있으면 파일은 남긴다 — 줄만 지운다 (같은 첨부를 한 파일로 합쳐 둔 글들, 2026-11-18)
+  let keys = [...new Set(results.map((u) => u.r2_key).filter(Boolean))];
+  const shared = new Set();
+  for (let i = 0; i < keys.length; i += 40) {
+    const part = keys.slice(i, i + 40);
+    const { results: used } = await env.DB.prepare(`SELECT DISTINCT r2_key FROM uploads WHERE r2_key IN (${part.map(() => '?').join(',')}) AND NOT (site = ? AND (${where}))`).bind(...part, site, ...binds).all();
+    used.forEach((x) => shared.add(x.r2_key));
+  }
+  keys = keys.filter((k) => !shared.has(k));
   for (let i = 0; i < keys.length; i += 500) if (env.FILES) await env.FILES.delete(keys.slice(i, i + 500));
   const ids = results.map((u) => u.id);
   for (let i = 0; i < ids.length; i += 90) {

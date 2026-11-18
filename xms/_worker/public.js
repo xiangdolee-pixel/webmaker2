@@ -617,6 +617,16 @@ export async function publicPage(ctx) {
   if (m) {
     const b = await loadBoard(ctx.env.DB, ctx.site, m[1]);
     if (!b || (!b.visible && ctx.me.level !== 1)) return msgPage(ctx, '게시판이 없습니다', '주소가 바뀌었거나 없는 게시판입니다.', '<div class="actions center"><a class="btn" href="/">홈으로</a></div>', 404);
+    // 게시판 설정 미리보기 (수정 모드 › 게시판 설정, board-set.js): 관리자가 ?xpv=<JSON> 을 붙이면 저장하지 않고 그 모양 · 옵션으로 그려 본다
+    const xpv = ctx.me.level === 1 && ctx.url.searchParams.get('xpv');
+    if (xpv) {
+      try {
+        const v = JSON.parse(xpv);
+        if (['TABLE', 'CARD', 'BLOG'].includes(v.list_layout)) b.list_layout = v.list_layout;
+        if (typeof v.use_comment === 'boolean') b.use_comment = v.use_comment ? 1 : 0;
+        if (v.options && typeof v.options === 'object') b.opt = boardOptions({ ...b.opt, ...v.options });
+      } catch { /* 미리보기 값이 깨졌으면 저장된 대로 */ }
+    }
     if (!m[2]) return boardList(ctx, b);
     if (m[2] === 'write') return postForm(ctx, b, null);
     if (m[3]) return postForm(ctx, b, Number(m[2]));

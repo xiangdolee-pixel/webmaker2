@@ -119,7 +119,7 @@
         pre.src = (win.matchMedia('(max-width: 767px)').matches && im.getAttribute('data-src-m')) || im.getAttribute('data-src');
       } else go();
     };
-    if (imgs.length > 1 && !reduce) setInterval(function () { if (!doc.hidden) show((at + 1) % imgs.length); }, 6500);
+    if (imgs.length > 1 && !reduce) setInterval(function () { if (!doc.hidden && !doc.body.classList.contains('xe-on')) show((at + 1) % imgs.length); }, 6500);
   }
 
   /* 흐르는 사진: 한 번 더 이어 붙여 끊김 없이 흐르고, 손가락으로 밀거나 마우스로 끌면 그대로 따라온다 */
