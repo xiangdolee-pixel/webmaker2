@@ -274,7 +274,7 @@ async function membersPage(qs) {
       ${filtered ? '<a class="btn" href="#/members">조건 지우기</a>' : ''}
       <a class="btn green right" href="/xms-api/admin/members/export?${exportQs}">엑셀로 내려받기</a>
     </form>
-    <div class="panel">${d.rows.length ? `<table class="tbl cardy"><thead><tr><th>이름</th><th>아이디</th><th>연락처</th>${extraFields.map((f) => `<th>${esc(f.label)}</th>`).join('')}<th>등급</th><th>최근 로그인</th><th>관리</th></tr></thead><tbody>
+    <div class="panel">${d.rows.length ? `<table class="tbl cardy wide"><thead><tr><th>이름</th><th>아이디</th><th>연락처</th>${extraFields.map((f) => `<th>${esc(f.label)}</th>`).join('')}<th>등급</th><th>최근 로그인</th><th>관리</th></tr></thead><tbody>
       ${d.rows.map((m) => `<tr data-id="${m.id}">
         <td><button type="button" class="who-btn" data-detail>${esc(m.name)}</button>${m.nickname ? ` <span class="num">(${esc(m.nickname)})</span>` : ''}${m.status === 'LOCKED' ? ' <span class="tag red">잠김</span>' : ''}</td>
         <td data-l="아이디">${esc(m.login_id)}${String(m.social || '').split(',').filter(Boolean).map((p) => (p === 'kakao' ? ' <span class="tag yellow">카카오</span>' : p === 'naver' ? ' <span class="tag green">네이버</span>' : p === 'google' ? ' <span class="tag blue">Google</span>' : '')).join('')}</td>
@@ -506,7 +506,7 @@ const LAYOUT_LABEL = { TABLE: '테이블', CARD: '카드', BLOG: '블로그' };
 async function boardsPage() {
   const d = await api('/boards');
   main.innerHTML = `${head('사이트', '게시판', d.boards.length ? `홈페이지에 붙어 있는 게시판 ${d.boards.length}개입니다. 여기 순서는 이 목록의 차례이고, 홈페이지 메뉴 차례는 <a href="#/menus">메뉴</a>에서 정합니다.` : '', '<a class="btn primary" href="#/boards/new">+ 게시판 만들기</a>')}
-    <div class="panel">${d.boards.length ? `<table class="tbl cardy"><thead><tr><th>순서</th><th>이름</th><th>주소</th><th>목록 모양</th><th>제한</th><th>글</th><th>메뉴 위치</th><th>관리</th></tr></thead><tbody id="brows">
+    <div class="panel">${d.boards.length ? `<table class="tbl cardy wide"><thead><tr><th>순서</th><th>이름</th><th>주소</th><th>목록 모양</th><th>제한</th><th>글</th><th>메뉴 위치</th><th>관리</th></tr></thead><tbody id="brows">
       ${d.boards.map((b) => `<tr data-id="${b.id}"><td><button type="button" class="handle" aria-label="끌어서 순서 바꾸기">⠿</button></td>
         <td><b>${esc(b.name)}</b>${b.visible ? '' : ' <span class="tag">숨김</span>'}</td>
         <td data-l="주소"><a href="/board/${esc(b.slug)}" target="_blank" rel="noopener">/board/${esc(b.slug)}</a></td>
@@ -1481,7 +1481,7 @@ async function popupsPage(qs) {
   main.innerHTML = `${head('사이트', '팝업', live ? `지금 홈 화면에 팝업 ${live}개가 떠 있습니다. 여러 개면 모두 나란히 보이고, 누르면 크게 볼 수 있습니다.` : '홈 화면에 들어온 방문자에게 창을 띄웁니다. 여러 개를 켜면 모두 나란히 보이고, 방문자가 누르면 크게 볼 수 있습니다.', '<a class="btn primary" href="#/popups/new">+ 팝업 만들기</a>')}
     ${list.length ? `<div class="tabs" id="ptabs"></div>
       <p class="meta gap">${tab === 'expired' ? '기간이 지난 팝업입니다. 다시 쓰려면 열어서 기간만 고치면 됩니다.' : sortableOn ? '줄을 끌어서 차례를 바꿀 수 있습니다 — 여러 개가 함께 뜨면 방문자가 이 차례로 넘겨 봅니다.' : '차례는 [전체]에서 끌어서 바꿉니다.'}</p>
-      <div class="panel">${shown.length ? `<table class="tbl cardy"><thead><tr>${sortableOn ? '<th>차례</th>' : ''}<th>그림</th><th>이름</th><th>노출 기간</th><th>상태</th><th>운영 모드</th><th>관리</th></tr></thead><tbody id="prows">
+      <div class="panel">${shown.length ? `<table class="tbl cardy wide"><thead><tr>${sortableOn ? '<th>차례</th>' : ''}<th>그림</th><th>이름</th><th>노출 기간</th><th>상태</th><th>운영 모드</th><th>관리</th></tr></thead><tbody id="prows">
         ${shown.map((p) => `<tr data-id="${p.id}">${sortableOn ? '<td><button type="button" class="handle" aria-label="끌어서 차례 바꾸기">⠿</button></td>' : ''}
           <td>${p.image ? `<img class="pop-thumb" src="${esc(p.image)}" alt="">` : '<span class="tag">글만</span>'}</td>
           <td><b>${esc(p.title)}</b>${p.link_url ? `<small>누르면 → ${esc(p.link_url)}</small>` : ''}</td>
@@ -1574,7 +1574,7 @@ const thumbChip = (c) => `<span class="c-thumb t-${esc(c.thumb)}"><b>${esc(c.no_
 async function coursesPage() {
   const list = await api('/courses');
   main.innerHTML = `${head('강의', '강의 관리', '홈페이지 [강의] 메뉴에 나오는 강의입니다. 줄을 끌어서 목록 차례를 바꿀 수 있습니다.', '<a class="btn primary" href="#/courses/new">+ 강의 만들기</a>')}
-    <div class="panel">${list.length ? `<table class="tbl cardy"><thead><tr><th>차례</th><th>썸네일</th><th>강의</th><th>분야 · 수준</th><th>강의 수</th><th>수강생</th><th>공개</th><th>관리</th></tr></thead><tbody id="crows">
+    <div class="panel">${list.length ? `<table class="tbl cardy wide"><thead><tr><th>차례</th><th>썸네일</th><th>강의</th><th>분야 · 수준</th><th>강의 수</th><th>수강생</th><th>공개</th><th>관리</th></tr></thead><tbody id="crows">
       ${list.map((c) => `<tr data-id="${c.id}"><td><button type="button" class="handle" aria-label="끌어서 차례 바꾸기">⠿</button></td>
         <td>${thumbChip(c)}</td>
         <td><b>${esc(c.title)}</b><small>${esc(c.description.slice(0, 60))}</small></td>
