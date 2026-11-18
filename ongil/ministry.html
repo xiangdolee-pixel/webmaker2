@@ -19,8 +19,8 @@
 <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="css/style.css?v=20261118b">
-<script src="js/site.js?v=20261118b" defer></script>
+<link rel="stylesheet" href="css/style.css?v=20261118e">
+<script src="js/site.js?v=20261118e" defer></script>
 </head>
 <body>
 <a class="sr" href="#main">본문 바로가기</a>
@@ -86,17 +86,36 @@
 
 <footer class="ft">
   <div class="wrap">
-    <div class="ft-top">
-      <div>
-        <a class="logo" href="./"><img class="logo-mark" src="images/logo-symbol.webp" width="257" height="288" alt=""><span class="logo-word">온길교회</span></a>
-        <p class="ft-slogan">말씀으로 세워지고, 사랑으로 이어지는 교회</p>
+    <div class="ft-grid">
+      <div class="ft-brand">
+        <a class="logo" href="./"><img class="logo-mark" src="images/logo-symbol.webp" width="257" height="288" loading="lazy" alt=""><span class="logo-word">온길교회</span></a>
+        <p class="ft-slogan">말씀으로 세워지고, <br>사랑으로 이어지는 교회</p>
       </div>
-      <nav class="ft-nav" aria-label="아래 메뉴">
-        <a href="about.html">교회소개</a><a href="pastor.html">담임목사</a><a href="worship.html">예배시간</a><a href="location.html">오시는 길</a><a href="/board/sermon">설교말씀</a><a href="ministry.html">교회사역</a><a href="/board/news">주보·소식</a><a href="/board/gallery">갤러리</a>
+      <nav class="ft-col" aria-label="교회소개 메뉴">
+        <h2>교회소개</h2>
+        <a href="about.html">교회소개</a><a href="pastor.html">담임목사</a><a href="worship.html">예배시간</a><a href="location.html">오시는 길</a>
       </nav>
+      <nav class="ft-col" aria-label="말씀과 소식 메뉴">
+        <h2>말씀 · 소식</h2>
+        <a href="/board/sermon">설교말씀</a><a href="ministry.html">교회사역</a><a href="/board/news">주보·소식</a><a href="/board/gallery">갤러리</a>
+      </nav>
+      <div class="ft-col">
+        <h2>예배 시간</h2>
+        <dl class="ft-dl">
+          <div><dt>주일 오전예배</dt><dd>오전 11:00</dd></div>
+          <div><dt>수요기도회</dt><dd>오후 7:30</dd></div>
+          <div><dt>새벽기도회</dt><dd>월~금 오전 6:00</dd></div>
+        </dl>
+      </div>
+      <div class="ft-col">
+        <h2>오시는 길</h2>
+        <address>서울 도봉구 도봉로 696, 3층<br><a href="tel:0212345678">02-1234-5678</a><br><a href="mailto:ongil-church@gmail.com">ongil-church@gmail.com</a></address>
+      </div>
     </div>
-    <p class="ft-info"><span>대한예수교장로회(합동) 온길교회</span><span>담임목사 김도현</span><span>서울 도봉구 도봉로 696, 3층</span><a href="tel:0212345678">02-1234-5678</a><a href="mailto:ongil-church@gmail.com">ongil-church@gmail.com</a></p>
-    <p class="ft-copy">© 온길교회</p>
+    <div class="ft-bottom">
+      <p>대한예수교장로회(합동) 온길교회 <span>담임목사 김도현</span></p>
+      <p class="ft-copy">© 온길교회</p>
+    </div>
   </div>
 </footer>
 </body>
