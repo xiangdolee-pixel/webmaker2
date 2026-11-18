@@ -874,23 +874,59 @@ p.meta, small.meta { display: block; }
 /* 폰: 관리자 표를 카드처럼 */
 /* 표 ↔ 카드는 창 폭이 아니라 표가 놓인 칸(.panel)의 폭으로 정한다 — 왼쪽 메뉴가 자리를 차지하는 중간 폭(노트북 · 창을 줄였을 때)에서
    칸이 모자라 버튼이 칸 밖으로 삐져나오던 것을 막는다. 칸이 많은 표(.wide: 가입회원 · 게시판 · 팝업 · 강의)는 더 일찍 카드로.
-   카드 안은 폭이 되는 만큼 2~3단, 폰에서는 한 줄씩. */
+   카드 안은(2026-11-18 다시 정리): 이름은 맨 위 한 줄, 항목은 이름표 폭을 맞춘 2단, 관리 단추는 오른쪽 아래. 손잡이 · 그림은 왼쪽에 따로. 폰에서는 한 줄씩. */
 .panel:has(> .tbl.cardy) { container-type: inline-size; overflow-x: auto; }
 @container (max-width: 720px) {
   .tbl.cardy thead { display: none; }
-  .tbl.cardy, .tbl.cardy tbody, .tbl.cardy td { display: block; width: 100%; }
-  .tbl.cardy tr { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 0 24px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
-  .tbl.cardy td { padding: 3px 0; border: 0; }
-  .tbl.cardy td[data-l]::before { content: attr(data-l); display: inline-block; min-width: 72px; color: var(--mute); font-size: 13px; }
+  .tbl.cardy, .tbl.cardy tbody { display: block; width: 100%; }
+  .tbl.cardy tr { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 28px; align-items: center; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+  .tbl.cardy tr:last-child { border-bottom: 0; }
+  .tbl.cardy td { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; width: auto; min-width: 0; padding: 0; border: 0; overflow-wrap: anywhere; }
+  .tbl.cardy td:not([data-l]) { grid-column: 1 / -1; }                       /* 이름 · 관리 단추 = 한 줄 전체 */
+  .tbl.cardy td:not([data-l]) b, .tbl.cardy td:not([data-l]) .who-btn { font-size: 16px; }
+  .tbl.cardy td:not([data-l]) small { flex-basis: 100%; }
+  .tbl.cardy td[data-l]::before { content: attr(data-l); flex: none; width: 76px; color: var(--mute); font-size: 13px; }
+  .tbl.cardy td:has(> .mng) { justify-content: flex-end; padding-top: 2px; }   /* 관리 단추는 오른쪽 아래 */
+  .tbl.cardy .mng { justify-content: flex-end; }
   .tbl.cardy .lv { display: inline-flex; vertical-align: middle; }
+  /* 손잡이(차례 바꾸기)는 왼쪽에 따로 */
+  .tbl.cardy tr:has(> td > .handle) { padding-left: 52px; }
+  .tbl.cardy td:has(> .handle) { position: absolute; grid-column: 1; left: 0; top: 12px; margin-left: -44px; }   /* 첫 칸 자리를 기준으로 왼쪽 여백 안에 */
+  /* 그림이 있는 줄(팝업 등): 그림은 왼쪽, 나머지는 그 옆에 */
+  .tbl.cardy tr:has(> td > img) { grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); }
+  .tbl.cardy tr:has(> td > img) > td:not([data-l]):has(> img) { grid-column: 1; grid-row: 1 / span 4; align-self: start; }
+  .tbl.cardy tr:has(> td > img) > td:not([data-l]):not(:has(> img)):not(:has(> .handle)) { grid-column: 2 / -1; }
+}
+@container (max-width: 560px) {
+  .tbl.cardy tr { grid-template-columns: minmax(0, 1fr); }
+  .tbl.cardy tr:has(> td > img) { grid-template-columns: auto minmax(0, 1fr); }
+  .tbl.cardy td:has(> .mng), .tbl.cardy .mng { justify-content: flex-start; }
 }
 @container (max-width: 1100px) {
   .tbl.cardy.wide thead { display: none; }
-  .tbl.cardy.wide, .tbl.cardy.wide tbody, .tbl.cardy.wide td { display: block; width: 100%; }
-  .tbl.cardy.wide tr { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 0 24px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
-  .tbl.cardy.wide td { padding: 3px 0; border: 0; }
-  .tbl.cardy.wide td[data-l]::before { content: attr(data-l); display: inline-block; min-width: 72px; color: var(--mute); font-size: 13px; }
+  .tbl.cardy.wide, .tbl.cardy.wide tbody { display: block; width: 100%; }
+  .tbl.cardy.wide tr { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 28px; align-items: center; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+  .tbl.cardy.wide tr:last-child { border-bottom: 0; }
+  .tbl.cardy.wide td { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; width: auto; min-width: 0; padding: 0; border: 0; overflow-wrap: anywhere; }
+  .tbl.cardy.wide td:not([data-l]) { grid-column: 1 / -1; }                       /* 이름 · 관리 단추 = 한 줄 전체 */
+  .tbl.cardy.wide td:not([data-l]) b, .tbl.cardy.wide td:not([data-l]) .who-btn { font-size: 16px; }
+  .tbl.cardy.wide td:not([data-l]) small { flex-basis: 100%; }
+  .tbl.cardy.wide td[data-l]::before { content: attr(data-l); flex: none; width: 76px; color: var(--mute); font-size: 13px; }
+  .tbl.cardy.wide td:has(> .mng) { justify-content: flex-end; padding-top: 2px; }   /* 관리 단추는 오른쪽 아래 */
+  .tbl.cardy.wide .mng { justify-content: flex-end; }
   .tbl.cardy.wide .lv { display: inline-flex; vertical-align: middle; }
+  /* 손잡이(차례 바꾸기)는 왼쪽에 따로 */
+  .tbl.cardy.wide tr:has(> td > .handle) { padding-left: 52px; }
+  .tbl.cardy.wide td:has(> .handle) { position: absolute; grid-column: 1; left: 0; top: 12px; margin-left: -44px; }   /* 첫 칸 자리를 기준으로 왼쪽 여백 안에 */
+  /* 그림이 있는 줄(팝업 등): 그림은 왼쪽, 나머지는 그 옆에 */
+  .tbl.cardy.wide tr:has(> td > img) { grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); }
+  .tbl.cardy.wide tr:has(> td > img) > td:not([data-l]):has(> img) { grid-column: 1; grid-row: 1 / span 4; align-self: start; }
+  .tbl.cardy.wide tr:has(> td > img) > td:not([data-l]):not(:has(> img)):not(:has(> .handle)) { grid-column: 2 / -1; }
+}
+@container (max-width: 560px) {
+  .tbl.cardy.wide tr { grid-template-columns: minmax(0, 1fr); }
+  .tbl.cardy.wide tr:has(> td > img) { grid-template-columns: auto minmax(0, 1fr); }
+  .tbl.cardy.wide td:has(> .mng), .tbl.cardy.wide .mng { justify-content: flex-start; }
 }
 @media (max-width: 767px) {
   .ptable .c-w, .ptable .c-v, .ptable th.c-w, .ptable th.c-v { display: none; }
