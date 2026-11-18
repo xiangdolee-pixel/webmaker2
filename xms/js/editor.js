@@ -184,7 +184,12 @@ export function mountEditor(host, { modeBox = null, placeholder = '내용을 입
   let saved = null;
   const save = () => { const s = getSelection(); if (s.rangeCount && area.contains(s.anchorNode)) saved = s.getRangeAt(0).cloneRange(); };
   const restore = () => { area.focus(); if (saved) { const s = getSelection(); s.removeAllRanges(); s.addRange(saved); } };
-  const insert = (html) => { restore(); document.execCommand('insertHTML', false, html); sync(); };
+  // 넣기 창(모달)이 떠 있는 동안에는 본문에 커서를 둘 수 없어 아무것도 안 들어간다 → 창이 닫힌 바로 뒤에 넣는다 (2026-11-18 동영상 · 링크가 안 들어가던 것)
+  const insert = (html) => setTimeout(() => {
+    restore();
+    if (!document.execCommand('insertHTML', false, html)) area.insertAdjacentHTML('beforeend', html);
+    sync();
+  }, 0);
 
   async function insertImage(file) {
     if (!file) return;
@@ -234,7 +239,7 @@ export function mountEditor(host, { modeBox = null, placeholder = '내용을 입
       save();
       ask('링크 넣기', '주소', 'https://', (v) => {
         if (!/^(https?:\/\/|\/|mailto:|tel:)/i.test(v)) return '주소는 https:// 로 시작하게 넣어 주세요.';
-        restore(); document.execCommand('createLink', false, v); sync(); return null;
+        setTimeout(() => { restore(); document.execCommand('createLink', false, v); sync(); }, 0); return null;
       });
       return;
     }

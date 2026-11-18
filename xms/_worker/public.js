@@ -907,7 +907,7 @@ async function postValues(b, me, raw, cur) {
   const title = str(raw.title, 200);
   if (!title) throw bad('제목을 넣어 주세요.');
   const content = await sanitizeHtml(raw.content);
-  if (!plainText(content) && !/<(img|iframe)/i.test(content) && !(Array.isArray(raw.attachments) && raw.attachments.length)) throw bad('내용을 넣어 주세요.');
+  // 내용이 비어 있어도 제목만으로 올릴 수 있다 (사용자 지시 2026-11-18)
   const admin = me.level === 1;
   let writer = '';
   if (!cur) {
