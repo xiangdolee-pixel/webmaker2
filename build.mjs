@@ -257,10 +257,12 @@ if (CONNECT) {
   //   (bsf 58KB 사진 첫 바이트 1.2~1.9초 — 2026-11-13). html 이 없는 맨 위 폴더와 맨 위의 html 아닌 파일만 뺀다.
   const RESERVED_TOP = new Set(['xms', 'xms-api', 'member', 'board', 'site-api', 'admin', 'cdn-cgi']);
   const hasHtml = (dir) => fs.readdirSync(dir, { withFileTypes: true }).some((e) => (e.isDirectory() ? hasHtml(path.join(dir, e.name)) : /\.html?$/i.test(e.name)));
+  // 영상(mp4 · webm)이 든 폴더는 Worker 를 거친다 — 정적 파일은 부분 요청(Range)에 통째로 답해서 아이폰이 영상을 못 튼다(site-edge.js media 가 206 으로 잘라 줌)
+  const hasVideo = (dir) => fs.readdirSync(dir, { withFileTypes: true }).some((e) => (e.isDirectory() ? hasVideo(path.join(dir, e.name)) : /\.(mp4|webm)$/i.test(e.name)));
   const skip = [];
   for (const e of fs.readdirSync(OUT, { withFileTypes: true })) {
     if (e.name.startsWith('.') || e.name.startsWith('_') || RESERVED_TOP.has(e.name)) continue;
-    if (e.isDirectory()) { if (!hasHtml(path.join(OUT, e.name))) skip.push(`!/${e.name}/*`); }
+    if (e.isDirectory()) { if (!hasHtml(path.join(OUT, e.name)) && !hasVideo(path.join(OUT, e.name))) skip.push(`!/${e.name}/*`); }
     else if (!/\.html?$/i.test(e.name) && !/^(robots\.txt|sitemap\.xml)$/i.test(e.name)) skip.push(`!/${e.name}`);
   }
   config.assets.run_worker_first = skip.length ? ['/*', ...skip] : true;

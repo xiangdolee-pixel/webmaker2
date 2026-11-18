@@ -452,8 +452,8 @@
     counts.forEach(function (el) { el.firstChild.nodeValue = el.getAttribute('data-count'); });
   }
 
-  /* 첫 화면: 배경 영상(Vimeo) 한 번 → 사진 3장 차례로 → 다시 영상부터 (사용자 지시 2026-11-12)
-     영상이 안 열리거나 움직임 줄이기면 사진만 돈다. Vimeo 와는 postMessage 로 주고받는다(재생 · 끝남 · 처음으로) */
+  /* 첫 화면: 배경 영상 한 번 → 사진 3장 차례로 → 다시 영상부터 (사용자 지시 2026-11-12)
+     영상이 안 열리거나 움직임 줄이기면 사진만 돈다. */
   var hero = $('.hero'), slides = $$('.slide'), hv = $('.hero-video');
   var cur = 0, bar = $('.hero-cap .bar i'), cnt = $('.hero-cap .count'), caps = $$('[data-cap]'), timer = 0, SLIDE_MS = 6500;
   function show(i) {
@@ -468,43 +468,36 @@
     (function next() { timer = setTimeout(function () { if (!doc.hidden) show((cur + 1) % slides.length); next(); }, SLIDE_MS); })();
   }
   // 순서: 영상 첫 화면(그림) → 영상 → 사진 1 · 2 · 3 → 다시 영상. 사진은 영상이 끝난 뒤에만 보인다(.slides-on)
-  var fr = null, player = null, vPlaying = false;
+  // 영상은 html 에 바로 든 <video>(자체 mp4) — 외부 플레이어를 기다리지 않고 들어오자마자 재생된다
+  var vd = hv && hv.querySelector('video'), vPlaying = false, waiting = 0;
   function photos() { hero.classList.add('slides-on'); hero.classList.remove('has-video'); }
-  function videoOn() { vPlaying = true; clearTimeout(timer); hero.classList.remove('slides-on'); hero.classList.add('has-video'); fr.classList.add('loaded'); }
+  function videoOn() { if (vPlaying || !vd) return; vPlaying = true; clearTimeout(waiting); clearTimeout(timer); hero.classList.remove('slides-on'); hero.classList.add('has-video'); vd.classList.add('loaded'); }
+  function replay() { try { vd.currentTime = 0; } catch (e) {} var p = vd.play(); if (p && p.catch) p.catch(function () { slidesForever(); }); }
   function videoEnded() {
     if (!vPlaying) return;
     vPlaying = false;
-    player.pause().catch(function () {});
     show(0); photos();
     var k = 0;
     clearTimeout(timer);
     (function next() {
       timer = setTimeout(function () {
         if (++k < slides.length) { show(k); next(); return; }
-        player.setCurrentTime(0).then(function () { return player.play(); }).catch(function () { slidesForever(); });
+        replay();
       }, SLIDE_MS);
     })();
   }
-  function fallback() { if (fr) fr.remove(); fr = null; photos(); slidesForever(); }   // 영상이 안 되면 사진만
-  if (hv && hv.getAttribute('data-vimeo') && !reduce) {
-    fr = doc.createElement('iframe');
-    fr.src = 'https://player.vimeo.com/video/' + hv.getAttribute('data-vimeo') + '?background=1&autoplay=1&loop=0&muted=1&autopause=0&dnt=1';
-    fr.allow = 'autoplay; fullscreen; picture-in-picture'; fr.title = '배경 영상'; fr.setAttribute('tabindex', '-1');
-    hv.appendChild(fr);
-    var waiting = setTimeout(function () { if (!vPlaying) fallback(); }, 12000);
-    var sc = doc.createElement('script');
-    sc.src = 'https://player.vimeo.com/api/player.js';
-    sc.onload = function () {
-      player = new window.Vimeo.Player(fr);
-      player.setLoop(false).catch(function () {});
-      player.on('playing', function () { if (!vPlaying) { clearTimeout(waiting); setTimeout(videoOn, 250); } });
-      player.on('ended', videoEnded);
-      player.on('timeupdate', function (d) { if (vPlaying && d.duration && d.seconds >= d.duration - .35) videoEnded(); });   // 'ended' 가 안 올 때 대비
-      player.play().catch(function () {});
-    };
-    sc.onerror = fallback;
-    doc.head.appendChild(sc);
-  } else if (hero) { photos(); if (slides.length > 1 && !reduce) slidesForever(); }   // 하위 페이지엔 첫 화면 슬라이드가 없다
+  function fallback() { if (vd) vd.remove(); vd = null; photos(); slidesForever(); }   // 영상이 안 되면 사진만
+  if (vd && !reduce) {
+    vd.muted = true;
+    vd.addEventListener('playing', videoOn);
+    vd.addEventListener('ended', videoEnded);
+    // source 의 오류는 위로 안 올라와 잡는 쪽(capture)으로. 화면 폭이 안 맞아 건너뛴 source 도 오류를 내므로 마지막 source · video 자신의 오류만 본다
+    vd.addEventListener('error', function (e) { if (!vPlaying && vd && (e.target === vd || e.target === vd.querySelector('source:last-of-type'))) fallback(); }, true);
+    waiting = setTimeout(function () { if (!vPlaying) fallback(); }, 12000);
+    if (vd.error || vd.networkState === 3) fallback();   // 이 코드보다 먼저 못 여는 것으로 끝난 경우
+    else if (!vd.paused && vd.currentTime > 0) videoOn();   // 이 코드보다 먼저 재생이 시작된 경우
+    else if (vd.paused) { var pp = vd.play(); if (pp && pp.catch) pp.catch(function () {}); }
+  } else if (hero) { if (vd) { vd.remove(); vd = null; } photos(); if (slides.length > 1 && !reduce) slidesForever(); }   // 하위 페이지엔 첫 화면 슬라이드가 없다
   if (bar && slides.length > 1) bar.classList.add('run');
 
   /* 선언문: 스크롤을 내리면 글자가 차례로 채워진다 */
