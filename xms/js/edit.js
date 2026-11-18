@@ -246,6 +246,9 @@ export function startEdit() {
 
   // 링크 · 단추를 눌러도 넘어가지 않게. 글자가 아닌 곳을 누르면 그 자리의 사진을 고른다.
   const block = (e) => {
+    // 파일 고르는 칸을 코드로 누를 때 생기는 눌림(자리 0,0)은 건드리지 않는다 — 화면 왼쪽 위에 사진이 있으면(첫 화면) 그 사진을 고른 것으로 알고 막아 버려
+    //   파일 창이 안 뜨던 것 (2026-11-18 "사진 바꾸기 눌러도 반응이 없다")
+    if (e.target === file) return;
     if (bar.contains(e.target) || e.target.closest('.xa-menu, .xms-test, .xe-dlg, .xe-chip')) return;
     const el = e.target.closest('[data-xe]');
     if (e.target.closest('a,button') || el) e.preventDefault();
