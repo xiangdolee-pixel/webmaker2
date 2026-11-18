@@ -549,10 +549,18 @@ b.addEventListener('click',function(){var r=matchMedia('(prefers-reduced-motion:
 // 수정 모드 글자 넣기 — 페이지 끝에서 바로 돈다(사이트 스크립트보다 먼저, 화면이 바뀌어 보이지 않게).
 //   글자가 든 요소(바깥쪽 것)마다 원래 글자의 지문(k = 해시.몇 번째)을 붙이고, 고친 값이 있으면 글자 조각을 바꾼다.
 //   머리(header) · 꼬리(footer) 안은 모든 페이지 공통('*'). xms 메뉴 · 계정 버튼 · 게시판 본문은 빼고.
+//   링크(a[href] → data-xl, 지문 = 'l' + 원래 주소 · 글자) · 사진(img → data-xi, 지문 = 'i' + 원래 파일 경로)도 같은 방식 — 값은 [바꾼 주소] 하나. 글자를 바꾸기 전에 먼저 돌아 원래 글자로 지문을 낸다. (2026-11-18)
 const XE_APPLY = `(function(T){window.__XE_T=T;var S='h1,h2,h3,h4,h5,h6,p,li,a,button,label,figcaption,blockquote,dt,dd,th,td,small,span,b,strong,em',
 X='script,style,svg,noscript,textarea,select,[data-xms-account],[data-xms-menu],.xms-c,.xa-menu,[data-xe-off]',seen={},O=window.__XE_ORIG={};
 function h(s){var x=2166136261;for(var i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619)}return(x>>>0).toString(36)}
 function tn(e){var w=document.createTreeWalker(e,4),a=[],n;while((n=w.nextNode()))a.push(n);return a}
+function pd(s){return('0000000'+s).slice(-7)}function vv(g,k){return((g==='*'?T.all:T.page)||{})[k]}
+document.querySelectorAll('a[href]').forEach(function(e){if(e.closest(X))return;var u=e.getAttribute('href')||'',g=e.closest('header,footer')?'*':'.',k='l'+pd(h(u+'|'+e.textContent.replace(/\\s+/g,' ').trim()));
+seen[g+k]=(seen[g+k]||0)+1;k=k+'.'+seen[g+k];e.setAttribute('data-xl',k);e.setAttribute('data-xl-g',g);O[g+k]=[u];var v=vv(g,k);if(v&&/^(https?:\\/\\/|\\/(?!\\/)|#|mailto:|tel:)/i.test(v[0]))e.setAttribute('href',v[0])});
+document.querySelectorAll('img').forEach(function(e){if(e.closest(X))return;var u=e.getAttribute('src')||e.getAttribute('data-src')||'';if(!u||/^data:/.test(u))return;var p;
+try{p=new URL(u,location.href).pathname.replace(/^\\/xms-files\\/static\\/[^\\/]+\\/[0-9a-f]{12}/,'')}catch(x){p=u}var g=e.closest('header,footer')?'*':'.',k='i'+pd(h(p));
+seen[g+k]=(seen[g+k]||0)+1;k=k+'.'+seen[g+k];e.setAttribute('data-xi',k);e.setAttribute('data-xi-g',g);O[g+k]=[u];var v=vv(g,k);if(v&&/^\\/xms\\/upload\\/[0-9a-f]{32}$/.test(v[0])){
+e.removeAttribute('srcset');e.removeAttribute('sizes');e.removeAttribute('data-src-m');if(e.getAttribute('src'))e.setAttribute('src',v[0]);else e.setAttribute('data-src',v[0])}});
 document.querySelectorAll(S).forEach(function(e){if(e.closest(X)||(e.parentElement&&e.parentElement.closest('[data-xe]')))return;
 var t=e.textContent.replace(/\s+/g,' ').trim();if(!t)return;var g=e.closest('header,footer')?'*':'.',k=h(t);seen[g+k]=(seen[g+k]||0)+1;k=k+'.'+seen[g+k];
 e.setAttribute('data-xe',k);e.setAttribute('data-xe-g',g);var ns=tn(e);O[g+k]=ns.map(function(n){return n.nodeValue});

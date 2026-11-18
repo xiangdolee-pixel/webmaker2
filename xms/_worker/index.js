@@ -89,7 +89,11 @@ export class Cms extends WorkerEntrypoint {
       let fm = p.match(/^\/xms\/file\/(favicon-(?:32|180|192|512)|og|popup-\d+)(?:\.png)?$/);
       if (fm) return await serveFile(env, site, fm[1]);
       const um = p.match(/^[/]xms[/]upload[/]([0-9a-f]{32})$/);
-      if (um) return await serveUpload(env, site, um[1], url.searchParams.get('dl') === '1', request);
+      if (um) {
+        const r = await serveUpload(env, site, um[1], url.searchParams.get('dl') === '1', request);
+        // 테스트 사본에 없는 파일(수정 모드로 바꿔 둔 사진 등)은 실제 사이트 것을 보여 준다 — 읽기만
+        return test && r.status === 404 ? serveUpload(this.env, test.base, um[1], url.searchParams.get('dl') === '1', request) : r;
+      }
       if (p === '/xms/css/embed.css') return new Response(await embedCss(env), { headers: { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': url.searchParams.has('v') ? 'public, max-age=31536000, immutable' : 'public, max-age=60' } });
       if (p === '/robots.txt') return await serveRobots(env, site, url.origin);
       if (p === '/ads.txt') return await serveAdsTxt(env, site);

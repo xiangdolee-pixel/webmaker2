@@ -185,7 +185,7 @@ main { flex: 1; }
 .gal figure.wide { width: clamp(280px, 32vw, 420px); }
 .gal img { width: 100%; aspect-ratio: 5 / 6; object-fit: cover; border-radius: var(--r); background: var(--soft); }
 .gal .wide img { aspect-ratio: 3 / 2; }
-.gal figcaption { margin-top: 12px; font-size: 14.5px; font-weight: 600; color: var(--ink-2); }
+.gal figcaption { margin-top: 14px; font-size: clamp(16px, 1.3vw, 18px); font-weight: 700; color: var(--ink); }
 
 /* 네 가지 마음 (어두운 사진 위) */
 .vals { position: relative; color: #fff; background: var(--dark); overflow: hidden; }

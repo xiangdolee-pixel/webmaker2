@@ -32,6 +32,9 @@ export async function uploadApi(ctx) {
     // 신청서 서류 — 회원이면 등급 상관없이 (신청은 회원가입만 하면 된다)
     if (me.kind !== 'member') throw new HttpError(401, '로그인한 뒤 서류를 올릴 수 있습니다.');
     if (!(await applyOn(env.DB, site))) throw notFound('이 사이트는 신청서를 받지 않습니다.');
+  } else if (url.searchParams.get('for') === 'site') {
+    // 수정 모드에서 홈페이지 사진을 바꿀 때 — 관리자(레벨1) · 운영자만. 저장하면 post_id = 0 으로 묶여 묵은 파일 정리에서 빠진다(admin-api page-texts)
+    if (me.level !== 1) throw forbidden('관리자만 올릴 수 있습니다.');
   } else if (url.searchParams.get('for') === 'request') {
     // 관리 화면 수정 요청에 붙이는 파일 — 관리자(레벨1) · 운영자만. 그 사이트 몫으로 저장돼 용량에 들어간다.
     if (me.level !== 1) throw forbidden('관리자만 올릴 수 있습니다.');

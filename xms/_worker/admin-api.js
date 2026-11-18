@@ -1,5 +1,5 @@
 // xms 관리자 API (/xms-api/admin/*) — 등급 1(관리자) 또는 xim 에서 대신 들어온 운영자만
-import { removePostFiles, claimForRequest, uploadIdsIn } from './uploads.js';
+import { removePostFiles, claimForRequest, uploadIdsIn, removeUploads } from './uploads.js';
 import { deleteRequest } from '../../xim/_worker/request-files.js'; // xim 과 같은 코드
 import {
   DAY, now, bad, forbidden, notFound, json, str, body, audit, isAdmin, siteSettings, saveSettings, BUILTIN_FIELDS,
@@ -109,10 +109,19 @@ export async function adminApi(ctx) {
     const items = Array.isArray(b.items) ? b.items.slice(0, 300) : [];
     if (!items.length) throw bad('고친 글자가 없습니다.');
     const stmts = [];
+    // 글자 말고도: 링크(k = 'l' + 7자) · 사진(k = 'i' + 7자) — 값은 [주소] 하나. 글자 지문은 7자까지라 겹치지 않는다. (사용자 지시 2026-11-18)
+    const LINK_OK = /^(https?:\/\/|\/(?!\/)|#|mailto:|tel:)[^\s<>"']{0,500}$/i, IMG_OK = /^\/xms\/upload\/[0-9a-f]{32}$/;
+    const keep = [], drop = [];   // 새로 쓰는 사진 · 더는 안 쓰는 사진 (올린 파일 번호)
+    const oldImg = async (pth, k) => { const r = await db.prepare('SELECT t FROM page_texts WHERE site = ? AND path = ? AND k = ?').bind(site, pth, k).first(); try { const v = JSON.parse(r?.t || '[]')[0]; return IMG_OK.test(v || '') ? v.slice(-32) : ''; } catch { return ''; } };
     for (const it of items) {
       const k = String(it.k || '');
       if (!/^[0-9a-z]{1,8}\.\d{1,4}$/.test(k)) continue;
       const pth = it.g === '*' ? '*' : page;
+      const kind = /^l[0-9a-z]{7}\./.test(k) ? 'link' : /^i[0-9a-z]{7}\./.test(k) ? 'img' : 'text';
+      if (kind === 'img') { const was = await oldImg(pth, k); if (was && !(Array.isArray(it.t) && String(it.t[0]).slice(-32) === was)) drop.push(was); }
+      if (kind === 'link' && it.t !== null && !(Array.isArray(it.t) && LINK_OK.test(String(it.t[0] || '')))) throw bad('링크 주소는 https:// 나 / 로 시작하게 넣어 주세요.');
+      if (kind === 'img' && it.t !== null) { if (!(Array.isArray(it.t) && IMG_OK.test(String(it.t[0] || '')))) throw bad('사진을 다시 골라 주세요.'); keep.push(String(it.t[0]).slice(-32)); }
+      if (kind !== 'text' && it.t !== null) it.t = [String(it.t[0])];
       if (it.t === null) { stmts.push(db.prepare('DELETE FROM page_texts WHERE site = ? AND path = ? AND k = ?').bind(site, pth, k)); continue; }
       if (!Array.isArray(it.t) || it.t.length > 200) continue;
       const t = JSON.stringify(it.t.map((x) => String(x ?? '').slice(0, 5000)));
@@ -120,6 +129,9 @@ export async function adminApi(ctx) {
       stmts.push(db.prepare('INSERT INTO page_texts (site, path, k, t, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(site, path, k) DO UPDATE SET t = excluded.t, updated_at = excluded.updated_at').bind(site, pth, k, t, now()));
     }
     if (stmts.length) await db.batch(stmts);
+    // 바꾼 사진: 묵은 파일 정리에 지워지지 않게 사이트 몫으로 묶고(post_id = 0), 더는 안 쓰는 사진은 지운다
+    for (const id of keep) await db.prepare('UPDATE uploads SET post_id = 0 WHERE site = ? AND id = ? AND post_id IS NULL').bind(site, id).run();
+    for (const id of drop.filter((x) => !keep.includes(x))) await removeUploads(env, site, 'id = ? AND post_id = 0', [id]).catch(() => {});
     await audit(db, site, me, request, '글자 수정', page, `${stmts.length}곳`);
     return json({ ok: true, saved: stmts.length });
   }
