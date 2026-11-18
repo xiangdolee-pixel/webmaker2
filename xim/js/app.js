@@ -547,19 +547,23 @@ function siteRow(s) {
     + tagOf(s.bot_status, s.bot_note, '봇확인', '아직 만들기 전 — 가입할 때 봇 확인 없이 진행됩니다') : '';
   const find = [s.name, s.slug, s.domain, c?.name, c?.contact, c?.phone, c?.email, s.status === 'active' ? '운영' : '정지', fmtDate(s.created_at).slice(0, 10)].filter(Boolean).join(' ').toLowerCase();
   return `
-  <article class="card srow${s.status === 'active' ? '' : ' off'}" data-site="${s.id}" data-cat="${esc(catOf(s))}" data-find="${esc(find)}">
+  <article class="card srow srow2${s.status === 'active' ? '' : ' off'}" data-site="${s.id}" data-cat="${esc(catOf(s))}" data-find="${esc(find)}">
+    <div class="sr-top">
     <div class="sr-name">
       <a class="site-name" href="${esc(s.url)}" target="_blank" rel="noopener" title="${esc(s.name)} — 홈페이지 열기">${s.favicon ? `<img class="site-fav" src="${esc(s.favicon)}" alt="" width="20" height="20" onerror="this.remove()">` : ''}<b>${esc(s.name)}</b></a>
     </div>
     <div class="sr-cust"${c ? ` title="${esc([c.name, c.contact, c.phone, c.email].filter(Boolean).join(' · '))}"` : ''}><span class="sr-meta">${badge(s.status)}<small>${esc(s.slug)}</small></span>${c ? `<b>${esc(c.name)}</b>${c.contact ? `<span>${esc(c.contact)}</span>` : ''}${c.phone ? `<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : ''}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ''}` : '<span class="dim">고객 없음</span>'}</div>
+    </div>
+    <div class="sr-sw">
+      <label class="pf-sw" title="켜면 이 사이트 로그인 화면에 '테스트모드로 둘러보기' 단추가 생깁니다. 누구나 관리자처럼 고쳐 볼 수 있고, 로그아웃하면 원래대로 돌아갑니다(실제 자료는 바뀌지 않음)"><input type="checkbox" data-test${s.test_mode ? ' checked' : ''}><i aria-hidden="true"></i>테스트모드</label>
+      <label class="pf-sw" title="켜면 포트폴리오(portfolio.plators.com)에 나옵니다"><input type="checkbox" data-pf${s.portfolio ? ' checked' : ''}><i aria-hidden="true"></i>포트폴리오</label>
+    </div>
     <div class="sr-addr">${s.domain ? link(s.url, s.domain) : '<span class="dim">도메인 없음</span>'}${link(dev, 'workers.dev')}${tags}</div>
     <div class="sr-num"><span class="sr-visit" title="오늘 방문자 ${s.visits?.today.visitors || 0}명 · 페이지뷰 ${s.visits?.today.views || 0} / 어제 방문자 ${s.visits?.yesterday.visitors || 0}명 · 페이지뷰 ${s.visits?.yesterday.views || 0}">오늘 <b>${s.visits?.today.visitors || 0}</b>명<small>어제 ${s.visits?.yesterday.visitors || 0}</small></span><span class="sr-made" title="사이트를 만든 날 ${esc(fmtDate(s.created_at))}">제작 <b>${esc(fmtDate(s.created_at).slice(0, 10))}</b></span><span>관리자 <b>${s.admin_count}</b></span>${s.open_requests ? `<button type="button" class="link-btn" data-go-reqs="${esc(s.slug)}">요청 <b>${s.open_requests}</b></button>` : '<span>요청 0</span>'}</div>
     <div class="sr-use" title="DB ${mb(u.db)} · 파일 ${u.file_count}개(R2 ${mb(u.r2)} · DB ${mb(u.d1_files)}) · 홈페이지 ${s.static_mb || 0}MB">
       <span>DB ${mb(u.db)}</span><span>파일 ${mb(u.files)} / ${s.quota_mb}MB</span><span>홈 ${s.static_mb ? `${s.static_mb}MB` : '—'}</span>
       <div class="quota" aria-hidden="true"><i style="width:${pct}%"></i></div></div>
     <div class="sr-act">
-      <label class="pf-sw" title="켜면 이 사이트 로그인 화면에 '테스트모드로 둘러보기' 단추가 생깁니다. 누구나 관리자처럼 고쳐 볼 수 있고, 로그아웃하면 원래대로 돌아갑니다(실제 자료는 바뀌지 않음)"><input type="checkbox" data-test${s.test_mode ? ' checked' : ''}><i aria-hidden="true"></i>테스트모드</label>
-      <label class="pf-sw" title="켜면 포트폴리오(portfolio.plators.com)에 나옵니다"><input type="checkbox" data-pf${s.portfolio ? ' checked' : ''}><i aria-hidden="true"></i>포트폴리오</label>
       <a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">홈</a>
       <button class="btn sm" type="button" data-act="qr" title="주소가 담긴 QR 코드 — 폰 카메라로 찍으면 바로 접속">QR</button>
       <button class="btn sm primary" type="button" data-act="cms">xms</button>

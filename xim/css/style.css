@@ -996,3 +996,40 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .pf2-url-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .pf2-priv { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--ink); cursor: pointer; }
 .pf2-priv input { width: 16px; height: 16px; margin: 0; accent-color: var(--brand); }
+
+/* 사이트 목록 한 줄 다시 정리 (2026-11-18): 윗줄 = 이름 · 상태 · 고객 | 스위치,  아랫줄 = 주소 · 숫자 · 사용량 | 버튼 (칸마다 자리가 정해져 줄이 흐트러지지 않게) */
+.srow.srow2 { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "sw" "addr" "num" "use" "act"; gap: 8px 20px; padding: 12px 16px; align-items: center; }
+.srow2 > .sr-top { grid-area: top; gap: 6px 14px; }
+.srow2 > .sr-sw { grid-area: sw; gap: 4px 16px; }
+.srow2 > .sr-addr { grid-area: addr; }
+.srow2 > .sr-num { grid-area: num; max-width: none; gap: 2px 14px; }
+.srow2 > .sr-use { grid-area: use; }
+.srow2 > .sr-act { grid-area: act; grid-column: auto; justify-content: flex-start; flex-wrap: wrap !important; max-width: none; }
+.sr-top > div { display: flex; align-items: center; gap: 4px 8px; min-width: 0; }
+.sr-top .sr-name { flex: none; max-width: 100%; }
+.sr-top .sr-name .site-name { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.sr-top .sr-name .site-name b { font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr-top .sr-cust { flex-wrap: wrap; }
+.srow2 .pf-sw { flex-basis: auto; margin: 0; }
+@media (min-width: 900px) {
+  .srow.srow2 { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "top sw" "addr use" "num act"; }
+  .srow2 > .sr-sw, .srow2 > .sr-act { justify-content: flex-end; }
+  .srow2 > .sr-use { justify-self: end; }
+  .srow2 > .sr-act { flex-wrap: nowrap !important; }
+  .srow2 > .sr-top { flex-wrap: nowrap; }
+  .sr-top .sr-cust { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
+}
+@media (min-width: 1500px) {
+  /* 넓은 화면: 아랫줄을 한 줄로 — 주소 | 숫자 | 사용량 | 버튼. 윗줄과 아랫줄 사이에 가는 선 */
+  .srow.srow2 { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto auto; grid-template-areas: "top top top sw" "addr num use act"; row-gap: 10px; }
+  .srow2 > .sr-addr, .srow2 > .sr-num, .srow2 > .sr-use, .srow2 > .sr-act { padding-top: 10px; align-self: stretch; align-content: center; position: relative; }
+  .srow2 > .sr-addr::before { content: ""; position: absolute; left: 0; top: 0; height: 1px; width: 100vw; max-width: none; background: var(--line, #e6e8ee); pointer-events: none; }
+  .srow.srow2 { overflow: hidden; }
+  .srow2 > .sr-num { flex-wrap: nowrap !important; white-space: nowrap; }
+  .srow2 > .sr-use { justify-self: start; }
+}
+@media (min-width: 1500px) {
+  /* 줄마다 칸이 같은 자리에 오게: 사용량 · 버튼 칸은 폭을 정해 둔다 */
+  .srow2 > .sr-use { width: 250px; }
+  .srow2 > .sr-act { min-width: 322px; }
+}
