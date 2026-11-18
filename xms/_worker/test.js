@@ -179,7 +179,7 @@ async function wipe(env, sand) {
   const db = env.DB;
   // site 칸이 있는 표: 만든 문장(sql)에 site 칸이 적힌 것 (나중에 생긴 표도 저절로 들어온다)
   const tables = (await allOf(db, "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name != 'test_sandboxes'"))
-    .filter((x) => /^[a-z_0-9]+$/.test(x.name) && /[(,]\s*"?site"?\s+TEXT/i.test(x.sql || '')).map((x) => x.name);
+    .filter((x) => /^[a-z_0-9]+$/.test(x.name) && /(^|[\s(,])"?site"?\s+TEXT/im.test(String(x.sql || '').replace(/--[^\n]*/g, ''))).map((x) => x.name);   // 주석을 떼고 본다 (칸 사이에 주석이 있으면 놓치던 것 — uploads · visit_refs, 2026-11-18)
   await db.batch([
     db.prepare('DELETE FROM member_agreements WHERE member_id IN (SELECT id FROM members WHERE site = ?)').bind(sand),
     ...tables.map((n) => db.prepare(`DELETE FROM ${n} WHERE site = ?`).bind(sand)),
