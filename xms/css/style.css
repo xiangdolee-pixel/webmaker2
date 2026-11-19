@@ -1586,16 +1586,18 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .mrow .lv .btn, .mrow .mng .btn { flex: none; white-space: nowrap; }
 .mrow .mng { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; min-width: 0; }
 .mrow .mng .confirm { flex-basis: 100%; }
-@container (max-width: 1040px) {
+/* 중간 폭(왼쪽 메뉴가 있는 노트북 화면): 두 줄 — 왼쪽 이름 · 아이디, 가운데 연락처 · 최근 로그인, 오른쪽 등급 · 관리 (2026-11-19 "효율적으로") */
+@container (max-width: 1180px) {
   .mhead { display: none; }
-  .mrow { grid-template-columns: minmax(0, 1fr) 304px; grid-template-areas: "who lv" "info mng" "last mng"; gap: 6px 20px; padding: 16px 18px; }
-  .m-who { grid-area: who; } .m-info { grid-area: info; } .m-last { grid-area: last; }
+  .mrow { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) 304px; grid-template-areas: "who info lv" "who last mng"; gap: 6px 20px; padding: 12px 18px; }
+  .m-who { grid-area: who; } .m-info { grid-area: info; align-self: end; } .m-last { grid-area: last; align-self: start; }
   .m-last::before { content: '최근 로그인 '; color: var(--mute); }
   .mrow .lv { grid-area: lv; justify-self: end; width: 196px; }
-  .mrow .mng { grid-area: mng; align-self: end; }
+  .mrow .mng { grid-area: mng; }
 }
-@container (max-width: 600px) {
-  .mrow { grid-template-columns: minmax(0, 1fr); grid-template-areas: "who" "info" "last" "lv" "mng"; gap: 8px; }
+@container (max-width: 680px) {
+  .mrow { grid-template-columns: minmax(0, 1fr); grid-template-areas: "who" "info" "last" "lv" "mng"; gap: 8px; padding: 16px 18px; }
+  .m-info, .m-last { align-self: auto; }
   .mrow .lv { justify-self: stretch; width: auto; }
   .mrow .mng { justify-content: flex-start; margin-top: 2px; }
 }
