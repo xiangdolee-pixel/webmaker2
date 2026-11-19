@@ -115,6 +115,9 @@ function pad() {
   });
   const end = () => { if (cur) preview(); cur = null; };
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  // 폰(카카오톡 등 앱 안 브라우저)에서 서명을 위아래로 그으면 화면 · 주소창이 따라 움직이던 것 막음 (사용자 지시 2026-11-19):
+  //   touch-action: none 만으로는 앱 안 브라우저의 주소창 접힘이 안 막힌다 → 서명 칸에서 시작한 터치는 통째로 우리가 쓴다고 알린다
+  ['touchstart', 'touchmove', 'touchend'].forEach((t) => wrap.addEventListener(t, (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false }));
   addEventListener('resize', size);
   size();
   box.querySelector('[data-clear]').onclick = () => { strokes = []; redraw(); preview(); };
