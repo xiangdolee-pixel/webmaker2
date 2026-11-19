@@ -45,12 +45,15 @@ async function getEul(db) {
 //   호스팅 용량은 {용량} 자리가 있는 계약서만 넣는다(그 전에 서명한 계약서의 지문이 바뀌지 않게)
 const docHash = (c, eul) => sha256(JSON.stringify([c.code, c.client_name, c.client_phone, c.build_fee, c.yearly_fee, c.contract_date, c.body, eul.name, eul.phone, ...(String(c.body).includes('{용량}') ? [c.hosting || '1GB'] : []),
   // 이메일 · 기간도 같다: 이메일 줄이 보이는 계약서(을 이메일 있음) · {기간} 자리가 있는 계약서만 넣는다
-  ...(eul.email ? [c.client_email || '', eul.email] : []), ...(String(c.body).includes('{기간}') ? [yearsNum(c.hosting_years)] : [])]));
+  ...(eul.email ? [c.client_email || '', eul.email] : []), ...(String(c.body).includes('{기간}') ? [yearsNum(c.hosting_years)] : []),
+  // VAT 표시도 같다: 고른 계약서만 넣는다
+  ...(vatNum(c.build_vat) || vatNum(c.hosting_vat) ? [vatNum(c.build_vat), vatNum(c.hosting_vat)] : [])]));
+const vatNum = (v) => { const n = Number(v) || 0; return n === 1 || n === 2 ? n : 0; };   // VAT 표시: 0 없음 · 1 포함 · 2 별도
 const yearsNum = (v) => Math.min(99, Math.max(1, Math.floor(Number(String(v ?? '').replace(/[^\d]/g, '')) || 1)));   // 호스팅 · 유지보수 기간(년)
 const emailStr = (v) => { const s = str(v, 120); if (s && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) throw bad('갑 이메일을 확인해 주세요.'); return s; };
 const hostingStr = (v) => String(v ?? '').trim().slice(0, 20) || '1GB';   // 호스팅 저장 용량 (예: 1GB, 500MB)
 
-const LIST_COLS = 'id, code, client_name, client_phone, client_email, build_fee, yearly_fee, hosting_years, hosting, contract_date, status, viewed_at, signed_at, created_at, updated_at';
+const LIST_COLS = 'id, code, client_name, client_phone, client_email, build_fee, yearly_fee, build_vat, hosting_vat, hosting_years, hosting, contract_date, status, viewed_at, signed_at, created_at, updated_at';
 
 // ───────── 운영자 API (로그인 확인은 index.js 가 먼저 한다) ─────────
 export async function contractsApi(request, env, path, method, readBody, audit) {
@@ -69,9 +72,9 @@ export async function contractsApi(request, env, path, method, readBody, audit) 
     let code;
     for (let i = 0; i < 8; i++) { code = newCode(); if (!(await db.prepare('SELECT 1 FROM contracts WHERE code = ?').bind(code).first())) break; }
     const t = now();
-    const r = await db.prepare(`INSERT INTO contracts (code, client_name, client_phone, client_email, build_fee, yearly_fee, hosting_years, hosting, contract_date, body, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'wait', ?, ?)`)
-      .bind(code, name, str(b.client_phone, 40), emailStr(b.client_email), money(b.build_fee), money(b.yearly_fee), yearsNum(b.hosting_years), hostingStr(b.hosting), dateStr(b.contract_date), body, t, t).run();
+    const r = await db.prepare(`INSERT INTO contracts (code, client_name, client_phone, client_email, build_fee, yearly_fee, build_vat, hosting_vat, hosting_years, hosting, contract_date, body, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'wait', ?, ?)`)
+      .bind(code, name, str(b.client_phone, 40), emailStr(b.client_email), money(b.build_fee), money(b.yearly_fee), vatNum(b.build_vat), vatNum(b.hosting_vat), yearsNum(b.hosting_years), hostingStr(b.hosting), dateStr(b.contract_date), body, t, t).run();
     await audit('CONTRACT_NEW', name, `sign/${code}`);
     return json({ id: r.meta.last_row_id, code });
   }
@@ -96,9 +99,9 @@ export async function contractsApi(request, env, path, method, readBody, audit) 
     if (!name) throw bad('갑(고객) 이름을 넣어 주세요.');
     const body = b.body === undefined ? c.body : str(b.body, 20000);
     if (!body) throw bad('계약서 내용이 비어 있습니다.');
-    await db.prepare('UPDATE contracts SET client_name = ?, client_phone = ?, client_email = ?, build_fee = ?, yearly_fee = ?, hosting_years = ?, hosting = ?, contract_date = ?, body = ?, updated_at = ? WHERE id = ?')
+    await db.prepare('UPDATE contracts SET client_name = ?, client_phone = ?, client_email = ?, build_fee = ?, yearly_fee = ?, build_vat = ?, hosting_vat = ?, hosting_years = ?, hosting = ?, contract_date = ?, body = ?, updated_at = ? WHERE id = ?')
       .bind(name, b.client_phone === undefined ? c.client_phone : str(b.client_phone, 40), b.client_email === undefined ? c.client_email : emailStr(b.client_email),
-        b.build_fee === undefined ? c.build_fee : money(b.build_fee), b.yearly_fee === undefined ? c.yearly_fee : money(b.yearly_fee), b.hosting_years === undefined ? c.hosting_years : yearsNum(b.hosting_years), b.hosting === undefined ? c.hosting : hostingStr(b.hosting),
+        b.build_fee === undefined ? c.build_fee : money(b.build_fee), b.yearly_fee === undefined ? c.yearly_fee : money(b.yearly_fee), b.build_vat === undefined ? c.build_vat : vatNum(b.build_vat), b.hosting_vat === undefined ? c.hosting_vat : vatNum(b.hosting_vat), b.hosting_years === undefined ? c.hosting_years : yearsNum(b.hosting_years), b.hosting === undefined ? c.hosting : hostingStr(b.hosting),
         b.contract_date === undefined ? c.contract_date : dateStr(b.contract_date), body, now(), id).run();
     await audit('CONTRACT_EDIT', name, `sign/${c.code}`);
     return json({ ok: true });
@@ -154,7 +157,7 @@ async function signApi(request, env, code) {
   if (request.method === 'GET') {
     if (!c.viewed_at && c.status !== 'signed') await db.prepare('UPDATE contracts SET viewed_at = ? WHERE id = ?').bind(now(), c.id).run();
     return json({
-      code: c.code, client_name: c.client_name, client_phone: c.client_phone, client_email: c.client_email, build_fee: c.build_fee, yearly_fee: c.yearly_fee, hosting_years: c.hosting_years, hosting: c.hosting,
+      code: c.code, client_name: c.client_name, client_phone: c.client_phone, client_email: c.client_email, build_fee: c.build_fee, yearly_fee: c.yearly_fee, build_vat: c.build_vat, hosting_vat: c.hosting_vat, hosting_years: c.hosting_years, hosting: c.hosting,
       contract_date: c.contract_date, body: c.body, status: c.status, signed_at: c.signed_at, client_sign: c.client_sign, doc_hash: c.doc_hash,
       eul: { name: eul.name, phone: eul.phone, email: eul.email, sign: eul.sign }, host: SIGN_HOST,
     });

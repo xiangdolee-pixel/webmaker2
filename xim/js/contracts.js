@@ -1,8 +1,9 @@
 // xim 계약서 — 홈페이지 제작 계약서 만들기 · 고치기 · 서명 주소 보내기 (사용자 지시 2026-11-12)
 //   새 계약서: 갑 이름 · 연락처 · 이메일 · 제작비 · 호스팅 기간(년, 직접 입력) · 그 기간 관리비 · 호스팅 저장 용량 → 만들면 바로 글자 고치기 창이 열린다
+//   제작비 · 관리비마다 VAT 별도 / 포함 / 표시 안 함 을 고른다 → 계약서 금액 뒤에 붙는다 (사용자 지시 2026-11-19)
 //   갑은 sign.plators.com/<5자> 에서 직접 서명 → 완료. 서명이 끝나면 고칠 수 없고 PDF 로 내려받는다.
-import { $, esc, toast, openDialog, busy, fmtDate } from './common.js';
-import { DEFAULT_BODY, contractHtml, a4Overflow, downloadPdf, won, today, markImage, lineText, upgradeBody, years } from './contract-doc.js';
+import { $, esc, toast, openDialog, busy, fmtDate, pillTabs } from './common.js';
+import { DEFAULT_BODY, contractHtml, a4Overflow, downloadPdf, won, today, markImage, lineText, upgradeBody, years, vatText } from './contract-doc.js';
 
 let deps = null; // { view, api, shrinkImage }
 let data = { items: [], eul: {}, host: 'sign.plators.com' };
@@ -37,13 +38,14 @@ function row(c) {
     : c.viewed_at ? `<span class="badge doing">열어 봄</span><small>${fmtDate(c.viewed_at)}</small>` : '<span class="badge new">서명 대기</span>';
   return `<div class="card crow ct-row" data-open="${c.id}" title="눌러서 계약서 보기 · 고치기">
     <div class="cr-name"><b>${esc(c.client_name)}</b>${c.client_phone ? `<span>${esc(c.client_phone)}</span>` : ''}</div>
-    <div class="ct-fees"><span>제작비 <b>${won(c.build_fee)}</b></span><span>${years(c)}년 관리비 <b>${won(c.yearly_fee)}</b></span><span>호스팅 <b>${esc(c.hosting || '1GB')}</b></span></div>
+    <div class="ct-fees"><span>제작비 <b>${won(c.build_fee)}</b>${vatNote(c.build_vat)}</span><span>${years(c)}년 관리비 <b>${won(c.yearly_fee)}</b>${vatNote(c.hosting_vat)}</span><span>호스팅 <b>${esc(c.hosting || '1GB')}</b></span></div>
     <div class="ct-link"><a href="${esc(signUrl(c.code))}" target="_blank" rel="noopener">${esc(data.host)}/${esc(c.code)}</a><button class="btn sm" type="button" data-copy="${esc(c.code)}">복사</button></div>
     <div class="sr-meta ct-state">${state}</div>
     <div class="sr-act">${signed ? `<button class="btn sm primary" type="button" data-pdf="${c.id}">PDF</button>` : ''}<button class="btn sm" type="button" data-edit="${c.id}">${signed ? '보기' : '보기 · 고치기'}</button></div>
   </div>`;
 }
 
+const vatNote = (v) => (vatText(v) ? ` <small>${vatText(v)}</small>` : '');
 const full = (id) => deps.api(`/contracts/${id}`).then((c) => ({ ...c, host: data.host }));
 
 // ───────── 새 계약서: 금액 · 갑 정보만 받고, 글자는 기본 문구로 만든 뒤 고치기 창에서 ─────────
@@ -57,11 +59,11 @@ function newContract() {
       </div>
       <div class="row2">
         <label class="field"><span>갑 이메일</span><input class="input" type="email" name="client_email" inputmode="email" maxlength="120" placeholder="name@example.com"></label>
-        <label class="field"><span>홈페이지 제작비(원)</span><input class="input ct-money" name="build_fee" inputmode="numeric" placeholder="0"></label>
+        <label class="field"><span>홈페이지 제작비(원)</span><input class="input ct-money" name="build_fee" inputmode="numeric" placeholder="0"><div class="tabs seg ct-vat" data-vat="build_vat" data-v="2" role="group" aria-label="VAT 표시"></div><input type="hidden" name="build_vat" value="2"></label>
       </div>
       <div class="row2">
         <label class="field"><span>호스팅 · 유지보수 기간(년)</span><input class="input" name="hosting_years" inputmode="numeric" maxlength="2" value="1" data-years><small>몇 년치로 계약할지 숫자로 적습니다.</small></label>
-        <label class="field"><span data-fee-label>1년 호스팅 · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" placeholder="0"></label>
+        <label class="field"><span>호스팅 · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" placeholder="0"><div class="tabs seg ct-vat" data-vat="hosting_vat" data-v="2" role="group" aria-label="VAT 표시"></div><input type="hidden" name="hosting_vat" value="2"></label>
       </div>
       <div class="row2">
         <label class="field"><span>호스팅 저장 용량</span><input class="input" name="hosting" list="ct-hosting" maxlength="20" value="1GB" placeholder="예: 1GB"><datalist id="ct-hosting"><option value="500MB"><option value="1GB"><option value="2GB"><option value="3GB"><option value="5GB"><option value="10GB"></datalist><small>고르거나 직접 적습니다(예: 500MB, 2GB).</small></label>
@@ -92,9 +94,15 @@ function moneyInputs(root) {
     i.value = comma(i.value);
     i.addEventListener('input', () => { i.value = comma(i.value); });
   });
-  // 기간(년): 숫자만, 적는 대로 관리비 칸 이름도 'N년 …' 으로
-  const y = root.querySelector('[data-years]'); const label = root.querySelector('[data-fee-label]');
-  if (y) y.addEventListener('input', () => { y.value = digits(y.value).replace(/^0+/, '').slice(0, 2); if (label) label.textContent = `${years({ hosting_years: y.value })}년 호스팅 · 유지보수 관리비(원)`; });
+  // 기간(년): 숫자만
+  const y = root.querySelector('[data-years]');
+  if (y) y.addEventListener('input', () => { y.value = digits(y.value).replace(/^0+/, '').slice(0, 2); });
+  // VAT 표시: 알약 탭으로 고르면 숨은 칸에 넣고, 폼이 바뀐 것으로 알린다(미리보기를 다시 그리게)
+  root.querySelectorAll('[data-vat]').forEach((box) => {
+    const hid = root.querySelector(`input[name="${box.dataset.vat}"]`);
+    pillTabs(box, [['2', 'VAT 별도'], ['1', 'VAT 포함'], ['0', '표시 안 함']], String(box.dataset.v), (v) => { hid.value = v; hid.dispatchEvent(new Event('input', { bubbles: true })); });
+    box.addEventListener('click', (e) => e.preventDefault());   // label 안이라 금액 칸으로 초점이 튀지 않게
+  });
 }
 
 // ───────── 계약서 화면: 왼쪽에서 고치면 오른쪽 A4 미리보기에 바로 (사용자 지시 2026-11-12 "보면서 수정") ─────────
@@ -119,11 +127,11 @@ async function editContract(id, fresh = false) {
       </div>
       <div class="row2">
         <label class="field"><span>갑 이메일</span><input class="input" type="email" name="client_email" inputmode="email" maxlength="120" value="${esc(c.client_email || '')}" placeholder="name@example.com"></label>
-        <label class="field"><span>홈페이지 제작비(원)</span><input class="input ct-money" name="build_fee" inputmode="numeric" value="${c.build_fee || ''}"></label>
+        <label class="field"><span>홈페이지 제작비(원)</span><input class="input ct-money" name="build_fee" inputmode="numeric" value="${c.build_fee || ''}"><div class="tabs seg ct-vat" data-vat="build_vat" data-v="${+c.build_vat || 0}" role="group" aria-label="VAT 표시"></div><input type="hidden" name="build_vat" value="${+c.build_vat || 0}"></label>
       </div>
       <div class="row2">
         <label class="field"><span>호스팅 · 유지보수 기간(년)</span><input class="input" name="hosting_years" inputmode="numeric" maxlength="2" value="${years(c)}" data-years></label>
-        <label class="field"><span data-fee-label>${years(c)}년 호스팅 · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" value="${c.yearly_fee || ''}"></label>
+        <label class="field"><span>호스팅 · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" value="${c.yearly_fee || ''}"><div class="tabs seg ct-vat" data-vat="hosting_vat" data-v="${+c.hosting_vat || 0}" role="group" aria-label="VAT 표시"></div><input type="hidden" name="hosting_vat" value="${+c.hosting_vat || 0}"></label>
       </div>
       <div class="row2">
         <label class="field"><span>호스팅 저장 용량</span><input class="input" name="hosting" list="ct-hosting" maxlength="20" value="${esc(c.hosting || '1GB')}" placeholder="예: 1GB"><datalist id="ct-hosting"><option value="500MB"><option value="1GB"><option value="2GB"><option value="3GB"><option value="5GB"><option value="10GB"></datalist></label>

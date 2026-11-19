@@ -1034,3 +1034,8 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
   .srow2 > .sr-use { width: 250px; }
   .srow2 > .sr-act { min-width: 322px; }
 }
+
+/* 계약서 금액 칸 아래 VAT 표시 고르기 (별도 · 포함 · 표시 안 함) */
+.ct-vat { margin-top: 2px; }
+.ct-vat > button { min-height: 32px; padding: 0 12px; font-size: 13.5px; }
+.ct-fees small { color: var(--mute); font-size: 12.5px; }

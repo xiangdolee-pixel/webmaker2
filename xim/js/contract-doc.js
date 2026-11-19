@@ -1,5 +1,6 @@
 // 홈페이지 제작 계약서 — 문서 그리기 · A4 한 장 확인 · PDF 내려받기 (xim '계약서' 메뉴와 서명 화면 sign.html 이 같이 쓴다)
 //   계약서 글자(body) 안의 자리 표시: {갑} {을} {제작비} {연간비} {기간} {용량} {계약일}
+//   {제작비} · {연간비} 뒤에는 고른 대로 'VAT 포함' · 'VAT 별도' 가 붙는다 (c.build_vat · c.hosting_vat: 0 없음 · 1 포함 · 2 별도, 사용자 지시 2026-11-19)
 //   {기간} = 호스팅 · 유지보수 기간('2년'). {연간비} 는 그 기간치 관리비 (사용자 지시 2026-11-19 "몇 년으로 할지 직접 입력")
 //   줄 첫머리가 '제1조(…)' 면 조 제목(굵게), '①' 로 시작하면 항(들여쓰기). 빈 줄은 단락 띄움.
 import { esc } from './common.js';
@@ -54,7 +55,8 @@ export function hanNum(n) {
   }
   return out;
 }
-export const moneyText = (n) => `금 ${won(n)} (금 ${hanNum(n)}원정)`;
+export const vatText = (v) => (+v === 1 ? 'VAT 포함' : +v === 2 ? 'VAT 별도' : '');
+export const moneyText = (n, vat = 0) => `금 ${won(n)} (금 ${hanNum(n)}원정${vatText(vat) ? `, ${vatText(vat)}` : ''})`;
 
 export function dateKo(s) {
   const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -66,7 +68,7 @@ const stamp = (ms) => { const d = new Date(ms); return `${d.getFullYear()}.${p2(
 
 // 글자 → 단락 html (자리 표시를 채운다)
 function bodyHtml(c, eul, lines = false, edit = false) {
-  const fill = { '갑': c.client_name || '갑', '을': eul.name || '을', '제작비': moneyText(c.build_fee), '연간비': moneyText(c.yearly_fee), '기간': `${years(c)}년`, '용량': c.hosting || '1GB', '계약일': dateKo(c.contract_date) };
+  const fill = { '갑': c.client_name || '갑', '을': eul.name || '을', '제작비': moneyText(c.build_fee, c.build_vat), '연간비': moneyText(c.yearly_fee, c.hosting_vat), '기간': `${years(c)}년`, '용량': c.hosting || '1GB', '계약일': dateKo(c.contract_date) };
   const put = (t) => esc(t).replace(/\{(갑|을|제작비|연간비|기간|용량|계약일)\}/g, (_, k) => (edit ? `<b class="ct-ph" contenteditable="false" data-ph="${k}" title="왼쪽 칸 값이 들어가는 자리">${esc(fill[k])}</b>` : `<b>${esc(fill[k])}</b>`));
   return String(c.body || '').split(/\r?\n/).map((line, i) => {
     const t = line.trim();
