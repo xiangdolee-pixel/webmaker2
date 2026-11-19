@@ -9,7 +9,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/noto-serif-kr@5.2.5/index.css" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="style.css?v=30">
+<link rel="stylesheet" href="style.css?v=31">
 </head>
 <body class="page">
 <header class="ob-top">
@@ -24,8 +24,11 @@
   <section class="card" id="editCard" hidden>
     <label for="text">구절</label>
     <textarea id="text" placeholder="마음에 남은 문장을 적어 두세요"></textarea>
-    <label for="src">출처 (책·저자, 선택)</label>
-    <input type="text" id="src" placeholder="예: 세네카, 인생의 짧음에 관하여">
+    <label for="src">출처</label>
+    <div class="sug-box">
+      <input type="text" id="src" placeholder="책 · 사람 · 성경 장절" autocomplete="off">
+      <div class="sug" id="srcSug" hidden></div>
+    </div>
     <label>중요도</label>
     <div class="star-pick" id="starPick">
       <button type="button" data-v="1">★</button>
@@ -58,11 +61,15 @@
       <input type="text" id="q" placeholder="구절·출처 검색" style="flex:1;min-width:0">
       <button class="ghost small" id="backupBtn">⤓ 백업</button>
     </div>
+    <div class="row src-row">
+      <select id="srcSel" aria-label="출처별로 보기"><option value="">모든 출처</option></select>
+      <button class="ghost small" id="srcEdit" hidden>이름 고치기</button>
+    </div>
     <div class="card" id="list"></div>
     <div class="pager" id="pager"></div>
   </section>
 </div>
 
-<script src="admin.js?v=25"></script>
+<script src="admin.js?v=26"></script>
 </body>
 </html>

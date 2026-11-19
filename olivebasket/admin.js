@@ -99,18 +99,44 @@ async function loadList() {
   renderList();
 }
 
-// 검색어로 거른 뒤 한 페이지에 10구절씩
+// 출처 묶음 (서버 표 sources) — 구절이 많은 순. { id, name, n }
+function groups() {
+  const m = new Map();
+  items.forEach(it => {
+    if (!it.source_id) return;
+    const g = m.get(it.source_id) || { id: it.source_id, name: it.grp || it.source || '', n: 0 };
+    g.n++;
+    m.set(it.source_id, g);
+  });
+  return [...m.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ko'));
+}
+let srcF = ''; // 목록에서 고른 출처: '' 모두 · 'none' 출처 없음 · 그 밖 = 출처 id
+function renderSources() {
+  const gs = groups();
+  const none = items.filter(it => !it.source_id).length;
+  if (srcF && srcF !== 'none' && !gs.some(g => String(g.id) === srcF)) srcF = '';
+  if (srcF === 'none' && !none) srcF = '';
+  $('srcSel').innerHTML = `<option value="">모든 출처 (${items.length})</option>`
+    + gs.map(g => `<option value="${g.id}">${esc(g.name)} (${g.n})</option>`).join('')
+    + (none ? `<option value="none">출처 없음 (${none})</option>` : '');
+  $('srcSel').value = srcF;
+  $('srcEdit').hidden = !srcF || srcF === 'none';
+}
+
+// 출처 · 검색어로 거른 뒤 한 페이지에 10구절씩
 function renderList() {
+  renderSources();
   const q = $('q').value.trim().toLowerCase();
+  const inSrc = !srcF ? items : items.filter(it => srcF === 'none' ? !it.source_id : String(it.source_id) === srcF);
   const found = q
-    ? items.filter(it => (it.text + ' ' + (it.source || '')).toLowerCase().includes(q))
-    : items;
+    ? inSrc.filter(it => (it.text + ' ' + (it.source || '')).toLowerCase().includes(q))
+    : inSrc;
   const pages = Math.max(1, Math.ceil(found.length / PER_PAGE));
   page = Math.min(Math.max(1, page), pages);
   const shown = found.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
-  $('count').textContent = q
-    ? `검색 ${found.length}구절 / 모두 ${items.length}구절`
+  $('count').textContent = (q || srcF)
+    ? `${q ? '검색' : '이 출처'} ${found.length}구절 / 모두 ${items.length}구절`
     : '모두 ' + items.length + '구절';
   $('pager').innerHTML = pages > 1 ? `
     <button class="ghost small" data-pg="${page - 1}" ${page === 1 ? 'disabled' : ''}>‹ 이전</button>
@@ -130,6 +156,38 @@ function renderList() {
 }
 
 $('q').addEventListener('input', () => { page = 1; renderList(); });
+$('srcSel').addEventListener('change', () => { srcF = $('srcSel').value; page = 1; renderList(); });
+// 출처 이름 고치기 — 이미 있는 다른 출처와 같은 이름으로 고치면 하나로 합쳐진다
+$('srcEdit').addEventListener('click', async () => {
+  const g = groups().find(x => String(x.id) === srcF);
+  if (!g) return;
+  const name = (prompt('출처 이름을 고칩니다.\n이미 있는 다른 출처와 똑같이 적으면 하나로 합쳐집니다.', g.name) || '').trim();
+  if (!name || name === g.name) return;
+  try {
+    const r = await api('PUT', '/api/sources', { id: g.id, name });
+    if (r.error) return alert(r.error);
+    srcF = String(r.id);
+    loadList();
+  } catch {}
+});
+
+// 출처 칸: 적는 동안 이미 담은 출처를 아래에 보여 주고, 누르면 그대로 들어간다 (같은 출처가 다르게 적혀 흩어지지 않게)
+function showSug() {
+  const q = $('src').value.trim().toLowerCase();
+  const gs = groups().filter(g => g.name !== '성경' && g.name.toLowerCase().includes(q) && g.name.toLowerCase() !== q).slice(0, 8);
+  $('srcSug').innerHTML = gs.map(g => `<button type="button" data-name="${esc(g.name)}"><span class="nm">${esc(g.name)}</span><span class="n">${g.n}</span></button>`).join('');
+  $('srcSug').hidden = !gs.length;
+}
+$('src').addEventListener('focus', showSug);
+$('src').addEventListener('input', showSug);
+$('src').addEventListener('blur', () => setTimeout(() => { $('srcSug').hidden = true; }, 150));
+$('srcSug').addEventListener('pointerdown', e => {
+  const b = e.target.closest('button[data-name]');
+  if (!b) return;
+  e.preventDefault(); // 칸에서 초점이 빠지지 않게
+  $('src').value = b.dataset.name;
+  $('srcSug').hidden = true;
+});
 $('pager').addEventListener('click', e => {
   const btn = e.target.closest('button[data-pg]');
   if (!btn || btn.disabled) return;
@@ -148,15 +206,37 @@ $('list').addEventListener('click', e => {
   else remove(it);
 });
 
-// 성경 묵상 인증글 붙여넣기: "구절"시49:20 → 구절칸엔 인용문만, 출처칸엔 장절만
+// 붙여넣은 글에서 구절 · 출처를 나눈다 → { text, source } | null
+//  1) 예스24 eBook 에서 가져온 글 (사용자 지시 2026-11-19): 구절 / 빈 줄 / 책 제목 | 저자 / 빈 줄 / [크레마 예스24 eBook] + 주소
+//     → 첫 덩어리 = 구절, 둘째 덩어리 = 출처, [크레마 …] 줄과 주소는 버린다
+//  2) 성경 묵상 인증글: "구절"시49:20 → 구절칸엔 인용문만, 출처칸엔 장절만
+function splitPaste(raw) {
+  const s = raw.replace(/\r/g, '');
+  if (/예스24|yes24\.com/i.test(s)) {
+    const body = s
+      .replace(/(^|\n)[ \t]*\[[^\]\n]*예스24[^\]\n]*\][\s\S]*$/i, '')
+      .replace(/\s*https?:\/\/\S*yes24\.com\S*\s*$/i, '')
+      .trim();
+    const parts = body.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    if (parts.length < 2) return null;
+    const source = parts.pop().replace(/\s+/g, ' ');
+    return { text: parts.join('\n\n'), source };
+  }
+  const m = s.match(/["“”]([^"“”]+)["“”]\s*([가-힣]{1,5}\s*\d+\s*[:：]\s*\d+(?:\s*[-~,]\s*\d+)*)/);
+  return m ? { text: m[1].trim(), source: m[2].replace(/\s+/g, '') } : null;
+}
+function fillPaste(raw) {
+  const v = splitPaste(raw);
+  if (!v) return false;
+  $('text').value = v.text;
+  $('src').value = v.source;
+  return true;
+}
 $('text').addEventListener('paste', e => {
-  const raw = (e.clipboardData || window.clipboardData).getData('text');
-  const m = raw.match(/["“”]([^"“”]+)["“”]\s*([가-힣]{1,5}\s*\d+\s*[:：]\s*\d+(?:\s*[-~,]\s*\d+)*)/);
-  if (!m) return;
-  e.preventDefault();
-  $('text').value = m[1].trim();
-  $('src').value = m[2].replace(/\s+/g, '');
+  if (fillPaste((e.clipboardData || window.clipboardData).getData('text'))) e.preventDefault();
 });
+// 키보드의 클립보드 단추 · 공유로 들어온 글은 paste 가 안 온다 → 들어온 뒤에 나눈다 (예스24 글만)
+$('text').addEventListener('input', () => { if (/\[[^\]\n]*예스24[^\]\n]*\]/.test($('text').value)) fillPaste($('text').value); });
 
 // 담긴 구절 전체를 JSON 파일로 내려받기
 async function backup() {

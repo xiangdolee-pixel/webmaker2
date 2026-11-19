@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/noto-serif-kr@5.2.5/index.css" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="style.css?v=30">
+<link rel="stylesheet" href="style.css?v=31">
 <!-- 시작 화면(로고 · 이름): 설치한 앱으로 열면 휴대폰이 이미 로고 · 이름 화면을 보여 주므로 한 번 더 띄우지 않는다 (사용자 지시 2026-11-04).
      브라우저로 열 때만, 그것도 처음 한 번만 (당겨서 새로고침 때는 생략) -->
 <script>try { if (sessionStorage.getItem('ob_splash') || matchMedia('(display-mode: standalone)').matches || navigator.standalone) document.documentElement.classList.add('nosplash'); } catch {}</script>
@@ -29,6 +29,7 @@
 <div class="ptr" id="ptr" aria-hidden="true">↻</div>
 <header class="ob-top">
   <a class="ob-logo" href="/app"><span class="leaf-mark" aria-hidden="true"></span>올리브바스켓</a>
+  <button type="button" class="ob-src" id="srcBtn" aria-haspopup="dialog" hidden><span id="srcName">전체</span></button>
   <span class="ob-acc" data-xms-account></span>
 </header>
 <main class="stage" id="stage" aria-live="polite">
@@ -42,8 +43,16 @@
   </div>
 </main>
 
+<!-- 출처별로 보기: 고른 출처의 구절만 넘겨 본다 (기본 = 전체) -->
+<div class="src-sheet" id="srcSheet" hidden>
+  <div class="src-panel" role="dialog" aria-label="출처별로 보기">
+    <div class="src-head">출처별로 보기</div>
+    <div class="src-list" id="srcList"></div>
+  </div>
+</div>
+
 <a class="ob-fab" id="addLink" href="/basket" aria-label="올리브바스켓에 담기"><span class="ob-fab-plus" aria-hidden="true">+</span>담기</a>
 
-<script src="app.js?v=33"></script>
+<script src="app.js?v=34"></script>
 </body>
 </html>

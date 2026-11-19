@@ -343,3 +343,70 @@ a, button { -webkit-touch-callout: none; }
 body.page { padding-top: calc(56px + env(safe-area-inset-top)); }
 .page .ob-top { background: var(--bg); }
 .page .wrap { padding-top: 12px; }
+
+/* ---------- 출처 (2026-11-19): 담기 화면의 출처 고르기 · 구절 앱의 출처별로 보기 ---------- */
+.ob-logo { flex: none; }
+select {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink);
+  font: inherit; font-size: 16px; padding: 9px 12px; text-overflow: ellipsis;
+}
+.src-row { margin: 0 0 12px; }
+.src-row select { flex: 1; min-width: 0; }
+.src-row button { flex: none; white-space: nowrap; }
+/* 출처 칸 아래 뜨는 '이미 담은 출처' */
+.sug-box { position: relative; }
+.sug {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5;
+  max-height: 264px; overflow-y: auto;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 22px rgba(0, 0, 0, .12);
+}
+.sug button, .src-it {
+  display: flex; align-items: baseline; gap: 12px; width: 100%; text-align: left;
+  background: transparent; color: var(--ink); border: 0; border-radius: 0;
+  padding: 11px 13px; font-size: 16px; font-weight: 400; line-height: 1.5; word-break: keep-all;
+}
+.sug button + button { border-top: 1px solid var(--line); }
+.sug .nm, .src-it .nm { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.sug .n, .src-it .n { margin-left: auto; flex: none; color: var(--ink-soft); font-size: 14px; }
+
+/* 구절 앱 위쪽 '전체' 단추 — 색은 배경 장면을 따른다. 출처를 골랐으면(.on) 채운 색으로, 글자 · 화살표는 반대 색 */
+.ob-src {
+  margin-left: auto; flex: 0 1 auto; min-width: 0; max-width: 46vw;
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent); border-radius: 99px;
+  background: color-mix(in srgb, var(--b0, var(--card)) 55%, transparent); color: var(--ink-soft);
+  font-size: 14px; font-weight: 500;
+  transition: color 1.6s ease, border-color 1.6s ease, background-color 1.6s ease;
+}
+.ob-src span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-src::after { content: ''; flex: none; width: 6px; height: 6px; margin-top: -3px; border-right: 1.5px solid; border-bottom: 1.5px solid; transform: rotate(45deg); }
+.ob-src.on { background: var(--olive); color: var(--b0, #fff); border-color: transparent; }
+.ob-src:not([hidden]) + .ob-acc { margin-left: 0; }
+.ob-src:focus-visible, .src-it:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
+
+.src-sheet { position: fixed; inset: 0; z-index: 40; background: rgba(20, 24, 12, .3); opacity: 0; transition: opacity .22s ease; }
+.src-sheet.open { opacity: 1; }
+.src-panel {
+  position: absolute; left: 0; right: 0; bottom: 0; max-height: 72%;
+  display: flex; flex-direction: column;
+  padding: 6px 8px calc(10px + env(safe-area-inset-bottom));
+  background: var(--b0, var(--card)); color: var(--ink);
+  border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, .18);
+  transform: translateY(28px); transition: transform .3s cubic-bezier(.22, .8, .24, 1);
+}
+.src-sheet.open .src-panel { transform: none; }
+.src-head { flex: none; padding: 14px 13px 8px; font-size: 14px; color: var(--ink-soft); }
+.src-list { overflow-y: auto; overscroll-behavior: contain; }
+.src-it { border-radius: 10px; cursor: pointer; }
+.src-it.on { background: var(--olive); color: var(--b0, #fff); font-weight: 600; }
+.src-it.on .n { color: inherit; opacity: .8; }
+@media (hover: hover) { .src-it:not(.on):hover { background: color-mix(in srgb, var(--ink) 7%, transparent); } }
+@media (min-width: 720px) {
+  .src-sheet { background: transparent; }
+  .src-panel {
+    left: auto; right: 16px; top: 58px; bottom: auto; width: 380px; max-height: calc(100% - 80px);
+    padding-bottom: 8px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, .16); transform: translateY(-8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) { .src-sheet, .src-panel { transition: none; } }

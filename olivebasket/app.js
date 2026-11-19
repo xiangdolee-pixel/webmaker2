@@ -34,7 +34,7 @@ async function loadItems() {
     return;
   }
   if (!ri.ok) throw new Error('items ' + ri.status);
-  items = (await ri.json()).map(({ id, text, source, stars }) => ({ id, text, source, stars }));
+  items = (await ri.json()).map(({ id, text, source, stars, source_id, grp }) => ({ id, text, source, stars, source_id, grp }));
   if (rs.ok) mode = (await rs.json()).weight_mode || 'random';
   token = '1';
   try { localStorage.setItem('ob_items', JSON.stringify(items)); localStorage.setItem('ob_mode', mode); localStorage.setItem('ob_authed', '1'); } catch {}
@@ -128,11 +128,15 @@ function weighted(rows) {
 function pick() {
   if (!token) return INTRO;
   if (!items.length) return EMPTY;
+  // 출처를 골랐으면 그 출처의 구절만 (그 출처가 없어졌으면 전체로)
+  let base = src ? items.filter(r => String(r.source_id) === src) : items;
+  if (!base.length) { setSrc(''); base = items; }
   const not = new Set(seen);
-  let pool = items.filter(r => !not.has(r.id) && r.id !== lastId);
+  let pool = base.filter(r => !not.has(r.id) && r.id !== lastId);
   if (!pool.length) {
-    seen = [];
-    pool = items.length > 1 ? items.filter(r => r.id !== lastId) : items;
+    const mine = new Set(base.map(r => r.id));
+    seen = src ? seen.filter(id => !mine.has(id)) : []; // 이 출처만 새 바퀴 (전체 보기의 본 기록은 남긴다)
+    pool = base.length > 1 ? base.filter(r => r.id !== lastId) : base;
   }
   const it = weighted(pool);
   seen.push(it.id);
@@ -140,6 +144,70 @@ function pick() {
   try { localStorage.setItem('ob_seen', JSON.stringify(seen)); } catch {}
   return it;
 }
+
+// ---------- 출처별로 보기 (사용자 지시 2026-11-19): 기본은 전체, 위 단추로 출처를 고르면 그 출처의 구절만
+let src = ''; // '' = 전체 · 그 밖 = 출처 id (앱을 다시 열면 전체로)
+try { src = sessionStorage.getItem('ob_src') || ''; } catch {}
+const $srcBtn = document.getElementById('srcBtn');
+const $srcName = document.getElementById('srcName');
+const $srcSheet = document.getElementById('srcSheet');
+const $srcList = document.getElementById('srcList');
+function srcGroups() {
+  const m = new Map();
+  items.forEach(r => {
+    if (!r.source_id) return;
+    const g = m.get(r.source_id) || { id: String(r.source_id), name: r.grp || r.source || '', n: 0 };
+    g.n++;
+    m.set(r.source_id, g);
+  });
+  return [...m.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ko'));
+}
+function setSrc(v) {
+  src = v;
+  try { sessionStorage.setItem('ob_src', v); } catch {}
+  showSrc();
+}
+function showSrc() {
+  const gs = srcGroups();
+  const cur = gs.find(g => g.id === src);
+  $srcBtn.hidden = !token || !gs.length;
+  $srcName.textContent = cur ? cur.name : '전체';
+  $srcBtn.classList.toggle('on', !!cur);
+}
+function openSrc() {
+  const gs = srcGroups();
+  const row = (id, name, n) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'src-it' + (id === src ? ' on' : ''); b.dataset.id = id;
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = name;
+    const c = document.createElement('span'); c.className = 'n'; c.textContent = n;
+    b.append(nm, c);
+    return b;
+  };
+  $srcList.replaceChildren(row('', '전체', items.length), ...gs.map(g => row(g.id, g.name, g.n)));
+  $srcSheet.hidden = false;
+  void $srcSheet.offsetWidth;
+  $srcSheet.classList.add('open');
+  const on = $srcList.querySelector('.on');
+  if (on) on.scrollIntoView({ block: 'nearest' });
+}
+function closeSrc() {
+  $srcSheet.classList.remove('open');
+  setTimeout(() => { if (!$srcSheet.classList.contains('open')) $srcSheet.hidden = true; }, 280);
+}
+$srcBtn.addEventListener('click', openSrc);
+$srcSheet.addEventListener('click', e => {
+  const b = e.target.closest('.src-it');
+  if (!b) { if (!e.target.closest('.src-panel')) closeSrc(); return; }
+  closeSrc();
+  if (b.dataset.id === src) return;
+  setSrc(b.dataset.id);
+  hist.length = 0; idx = -1; // 고른 출처의 구절부터 새로
+  next();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$srcSheet.hidden) closeSrc(); });
+showSrc();
+ready.then(showSrc);
 
 function next() {
   if (idx < hist.length - 1) {
