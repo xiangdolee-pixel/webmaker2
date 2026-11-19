@@ -630,11 +630,13 @@ async function listMembers(db, site, q, withdrawn, all = false) {
   const w = where.join(' AND ');
   const total = (await db.prepare(`SELECT COUNT(*) AS n FROM members WHERE ${w}`).bind(...args).first()).n;
   const all_ = (await db.prepare(`SELECT COUNT(*) AS n FROM members WHERE site = ? AND ${withdrawn ? "status = 'WITHDRAWN'" : "status != 'WITHDRAWN'"}`).bind(site).first()).n;
-  const page = Math.max(1, Number(q.get('page')) || 1);
-  const sql = `SELECT *, (SELECT group_concat(s.provider) FROM member_social s WHERE s.site = members.site AND s.member_id = members.id) AS social FROM members WHERE ${w} ORDER BY ${withdrawn ? 'withdrawn_at DESC' : 'id DESC'}${all ? '' : ` LIMIT ${PAGE} OFFSET ${(page - 1) * PAGE}`}`;
+  // 한 쪽에 몇 명씩 (가입회원 화면에서 고른다 — 10 · 20 · 50 · 100, 없으면 20). 없는 쪽을 달라고 하면 마지막 쪽으로
+  const size = [10, 20, 50, 100].includes(Number(q.get('size'))) ? Number(q.get('size')) : PAGE;
+  const page = Math.min(Math.max(1, Number(q.get('page')) || 1), Math.max(1, Math.ceil(total / size)));
+  const sql = `SELECT *, (SELECT group_concat(s.provider) FROM member_social s WHERE s.site = members.site AND s.member_id = members.id) AS social FROM members WHERE ${w} ORDER BY ${withdrawn ? 'withdrawn_at DESC' : 'id DESC'}${all ? '' : ` LIMIT ${size} OFFSET ${(page - 1) * size}`}`;
   const { results } = await db.prepare(sql).bind(...args).all();
   const rows = results.map(({ pw_hash, pw_salt, ...r }) => ({ ...r, extra: JSON.parse(r.extra || '{}') }));
-  return { total, all: all_, page, size: PAGE, rows, fields, levelNames };
+  return { total, all: all_, page, size, rows, fields, levelNames };
 }
 
 async function fieldUsage(db, site, fields) {

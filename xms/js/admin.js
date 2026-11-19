@@ -243,9 +243,10 @@ function head(eyebrow, title, lede = '', action = '') {
   return `<header class="ph${action ? ' has-act' : ''}"><div><small>${eyebrow}</small><h1>${title}</h1>${lede ? `<p>${lede}</p>` : ''}</div>${action ? `<div class="ph-act">${action}</div>` : ''}</header>`;
 }
 const empty = (t, hint, action = '') => `<div class="empty"><b>${t}</b><span>${hint}</span>${action}</div>`;
-function pager(page, size, total, href) {
-  const pages = Math.ceil(total / size);
-  if (pages <= 1) return '';
+// always = 한 쪽뿐이어도 쪽 번호(1)를 보여 준다 (가입회원)
+function pager(page, size, total, href, always = false) {
+  const pages = Math.max(1, Math.ceil(total / size));
+  if (pages <= 1 && !always) return '';
   const start = Math.floor((page - 1) / 5) * 5 + 1;
   const nums = Array.from({ length: Math.min(5, pages - start + 1) }, (_, i) => start + i);
   return `<nav class="pager">${start > 1 ? `<a href="${href(start - 1)}">‹</a>` : ''}${nums.map((n) => (n === page ? `<b>${n}</b>` : `<a href="${href(n)}">${n}</a>`)).join('')}${start + 5 <= pages ? `<a href="${href(start + 5)}">›</a>` : ''}</nav>`;
@@ -263,7 +264,9 @@ function ctrlS(form) {
 // ───────── 가입회원 ─────────
 let tempNotice = '';
 async function membersPage(qs) {
-  const d = await api(`/members?${qs}`);
+  // 한 쪽에 몇 명씩: 고른 값을 이 브라우저에 기억 (기본 10명)
+  let msize = 10; try { msize = Number(localStorage.getItem('xms_msize')) || 10; } catch { /* 기본값 */ }
+  const d = await api(`/members?${qs}${qs.toString() ? '&' : ''}size=${msize}`);
   const extraFields = d.fields.filter((f) => !['name', 'email', 'mobile', 'nickname', 'phone'].includes(f.key));
   const filtered = qs.get('q') || qs.get('level') || qs.get('missing');
   const lede = filtered ? `조건에 맞는 회원 ${d.total}명입니다.` : `${d.all}명이 가입해 있습니다. 등급을 바꾸거나 로그인을 막을 수 있습니다.`;
@@ -298,8 +301,15 @@ async function membersPage(qs) {
       </div>`; }).join('')}</div>`
     : filtered ? empty('조건에 맞는 회원이 없습니다', '다른 이름이나 아이디로 찾아보세요.', '<a class="btn" href="#/members">조건 지우고 전체 보기</a>')
       : empty('아직 가입한 회원이 없습니다', '홈페이지에서 누군가 가입하면 여기에 나타납니다.')}</div>
-    ${pager(d.page, d.size, d.total, (n) => { const p = new URLSearchParams(qs); p.set('page', n); return `#/members?${p}`; })}`;
+    ${d.rows.length ? `<div class="plist-foot"><span class="pl-sum">${filtered ? '찾은' : '전체'} <b>${d.total}</b>명 중 ${(d.page - 1) * d.size + 1}–${(d.page - 1) * d.size + d.rows.length}번째</span>
+      ${pager(d.page, d.size, d.total, (n) => { const p = new URLSearchParams(qs); p.set('page', n); return `#/members?${p}`; }, true)}
+      <select class="input pl-size" id="msize" aria-label="한 쪽에 보이는 회원 수">${[10, 20, 50, 100].map((n) => `<option value="${n}"${n === d.size ? ' selected' : ''}>${n}명씩 보기</option>`).join('')}</select></div>` : ''}`;
 
+  $('#msize')?.addEventListener('change', (e) => {
+    try { localStorage.setItem('xms_msize', e.target.value); } catch { /* 이번만 */ }
+    const p = new URLSearchParams(qs); p.delete('page');   // 쪽 크기를 바꾸면 첫 쪽부터
+    go(p.toString() ? `#/members?${p}` : '#/members');
+  });
   $('[data-x]')?.addEventListener('click', (e) => { tempNotice = ''; e.target.closest('.notice-bar').remove(); });
   $('#msearch').addEventListener('submit', (e) => {
     e.preventDefault();

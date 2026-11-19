@@ -1601,3 +1601,11 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
   .mrow .lv { justify-self: stretch; width: auto; }
   .mrow .mng { justify-content: flex-start; margin-top: 2px; }
 }
+
+/* 목록 아래: 몇 명 중 몇 번째 · 쪽 번호 · 한 쪽에 몇 명씩 (가입회원) */
+.plist-foot { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px 16px; margin-top: 16px; }
+.plist-foot .pager { margin-top: 0; }
+.pl-sum { color: var(--sub); font-size: 14px; }
+.pl-sum b { color: var(--ink); }
+.plist-foot .pl-size { justify-self: end; width: auto; min-height: 38px; padding: 4px 30px 4px 10px; font-size: 14px; }
+@media (max-width: 640px) { .plist-foot { grid-template-columns: minmax(0, 1fr) auto; } .plist-foot .pager { grid-column: 1 / -1; grid-row: 1; } }
