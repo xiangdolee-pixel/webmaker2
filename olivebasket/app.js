@@ -68,7 +68,7 @@ function render(item) {
   changeScene();
   $quote.textContent = item.text;
   $source.textContent = item.source || '';
-  $pos.textContent = item.pos ? item.pos + ' / ' + item.of : ''; // 출처별로 볼 때만: 이 출처 12구절 중 2번째
+  $pos.textContent = item.pos ? item.pos + ' / ' + item.of : ''; // 12구절 중 2번째 (전체 보기 · 출처별 보기 모두)
   $stars.textContent = item.id ? '★'.repeat(item.stars || 1) : '';
   $stars.setAttribute('aria-label', item.id ? `중요도 ${item.stars || 1}` : '');
   lastId = item.id || 0;
@@ -144,8 +144,8 @@ function pick() {
   seen.push(it.id);
   if (mode !== 'random' && seen.length > 30) seen = seen.slice(-30); // 가중 모드는 최근 본 것만 피하면 된다
   try { localStorage.setItem('ob_seen', JSON.stringify(seen)); } catch {}
-  // 출처별로 볼 때는 몇 번째인지 함께 (이번 바퀴에 본 수 / 그 출처 구절 수). 전체 보기에는 없다
-  return src ? { ...it, pos: Math.min(base.length, seen.filter(id => mine.has(id)).length), of: base.length } : it;
+  // 몇 번째인지 함께: 이번 바퀴에 본 수 / 구절 수 (출처를 골랐으면 그 출처 안에서, 전체면 모든 구절에서)
+  return { ...it, pos: Math.min(base.length, seen.filter(id => mine.has(id)).length), of: base.length };
 }
 
 // ---------- 출처별로 보기 (사용자 지시 2026-11-19): 기본은 전체, 위 단추로 출처를 고르면 그 출처의 구절만
