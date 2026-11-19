@@ -405,6 +405,21 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .price-pay { flex: none; max-width: 40%; color: var(--ink); font-size: 14px; text-align: right; }
 .price-body { padding: 0 18px 16px; }
 .price-body > .btn { margin-top: 10px; }
+/* 고객에게 받는 요금 — 업계 평균 | 내 요금 */
+.fee { margin-bottom: 26px; }
+.fee-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin: 14px 0 18px; }
+.fee-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; min-width: 0; }
+.fee-label { grid-column: 1 / -1; font-size: 14px; font-weight: 700; color: var(--sub); }
+.fee-box { min-width: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; }
+.fee-box small { display: block; color: var(--mute); font-size: 13px; }
+.fee-box b { display: block; margin: 4px 0 2px; font-size: 21px; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.fee-box span { display: block; color: var(--sub); font-size: 13px; line-height: 1.45; }
+.fee-box.mine { border-color: var(--brand); background: var(--brand); }
+.fee-box.mine small, .fee-box.mine b, .fee-box.mine span { color: #fff; }
+.fee-box.mine small, .fee-box.mine span { opacity: .86; }
+.fee-tbl td { line-height: 1.55; vertical-align: top; }
+.fee-tbl td:last-child b { color: var(--brand); }
+@media (max-width: 380px) { .fee-box { padding: 12px; } .fee-box b { font-size: 18px; } }
 @media (prefers-reduced-motion: reduce) { .price-card summary::after { transition: none; } }
 @media (max-width: 599px) { .price-pay { display: none; } .price-card summary { padding: 14px 16px; } .price-body { padding: 0 16px 14px; } }
 .price-tbl td:first-child { white-space: nowrap; }

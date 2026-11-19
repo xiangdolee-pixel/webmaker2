@@ -1137,11 +1137,45 @@ const PRICING = [
     ],
   },
 ];
+// ───────── 고객에게 받는 요금 (사용자 지시 2026-11-19) ─────────
+//   기준 사이트: 온길교회(ongil.plators.com) 규모 — 맞춤 디자인 · 게시판 · 회원 · 관리 화면 · 모바일
+//   업계 평균은 어림값(공식 통계 아님). 내 요금을 바꾸면 여기만 고친다.
+const FEE_BASE = { name: '온길교회', url: 'https://ongil.plators.com/', what: '맞춤 디자인 · 게시판 3개 · 회원 로그인 · 관리 화면 · 모바일' };
+const FEE_TOP = [
+  { label: '제작비', avg: '300~600만원', avgNote: '제작 업체 · 프리랜서는 120~250만원', mine: '150만원', mineNote: '첫 1년 호스팅 포함' },
+  { label: '매달 비용', avg: '월 3~10만원', avgNote: '호스팅 + 유지보수', mine: '월 3,000원', mineNote: '호스팅 · 관리까지 맡기면 월 13,000원' },
+];
+const FEE_ROWS = [
+  ['제작비', '업체 300~600만원<br>프리랜서 120~250만원<br>템플릿형 30~80만원', '<b>150만원</b><br>교회 · 비영리 · 소개는 120만원까지'],
+  ['호스팅 (1GB)', '업체 월 1~3만원<br>직접 빌리면 월 500~2,200원(공간만)', '<b>월 3,000원</b> (연 36,000원)<br>첫 1년은 제작비에 포함'],
+  ['용량 추가', '1GB당 월 1,000~3,000원', '<b>1GB당 월 1,000원</b> (연 12,000원)'],
+  ['전송량', '하루 한도 · 넘으면 막히거나 추가 요금', '<b>무제한</b>'],
+  ['유지보수 관리', '월 3~10만원', '선택 — <b>월 10,000원</b> (연 12만원)<br>안 맡기면 수정 건당 30,000원부터'],
+  ['SSL 인증서', '연 5~10만원', '<b>무료</b> (자동 발급 · 갱신)'],
+  ['도메인', '연 2~3만원', '실비 — 고객 이름으로 직접 등록'],
+  ['기존 자료 옮기기', '50~150만원', '30~50만원 (글 수천 건 기준)'],
+  ['기능 추가 (결제 · 예약 · 다국어 등)', '건당 50만원부터', '건당 30만원부터'],
+];
+const feeHtml = () => `
+    <section class="card item fee">
+      <div class="price-head"><h3>고객에게 받는 요금</h3><a class="btn sm" href="${FEE_BASE.url}" target="_blank" rel="noopener">${FEE_BASE.name} 보기</a></div>
+      <p class="meta">기준: <b>${FEE_BASE.name}</b> 규모 — ${FEE_BASE.what}. 모두 VAT 별도.</p>
+      <div class="fee-grid">${FEE_TOP.map((t) => `<div class="fee-pair"><span class="fee-label">${t.label}</span>
+        <div class="fee-box"><small>업계 평균</small><b>${t.avg}</b><span>${t.avgNote}</span></div>
+        <div class="fee-box mine"><small>내 요금</small><b>${t.mine}</b><span>${t.mineNote}</span></div></div>`).join('')}</div>
+      <div class="tbl-wrap"><table class="tbl price-tbl fee-tbl"><thead><tr><th>항목</th><th>업계 평균</th><th>내 요금</th></tr></thead><tbody>
+        ${FEE_ROWS.map(([k, a, m]) => `<tr><td data-l="항목"><b>${k}</b></td><td data-l="업계 평균">${a}</td><td data-l="내 요금">${m}</td></tr>`).join('')}
+      </tbody></table></div>
+      <p class="meta price-note">업계 평균은 어림값입니다(공식 통계 아님, 2026-11 기준). 내 원가는 1GB 에 월 20원 안팎 — 받는 돈은 용량 값이 아니라 백업 · 장애 대응 · 수정의 값입니다.</p>
+    </section>`;
+
 function renderPricing() {
   const total = PRICE_FIXED.reduce((a, f) => a + f.usd, 0);
   const head = (g) => g.rows.find(([k]) => k === '월 요금')?.[2] || '';
   view.innerHTML = `
-    <div class="bar"><h2>Cloudflare 요금제</h2></div>
+    <div class="bar"><h2>요금제</h2></div>
+    ${feeHtml()}
+    <h3 class="price-sub">Cloudflare 에 내는 돈</h3>
     <section class="card item price-fixed">
       <div class="price-head"><h3>매달 나가는 돈</h3><b class="price-total">월 $${total}</b></div>
       <ul class="price-list">${PRICE_FIXED.map((f) => `<li><div><b>${f.name}</b><small>${f.what}</small></div><span>$${f.usd}${f.since ? `<small>${f.since}</small>` : ''}</span></li>`).join('')}</ul>
