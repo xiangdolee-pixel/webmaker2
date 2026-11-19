@@ -280,17 +280,22 @@ async function membersPage(qs) {
       ${filtered ? '<a class="btn" href="#/members">조건 지우기</a>' : ''}
       <a class="btn green right" href="/xms-api/admin/members/export?${exportQs}">엑셀로 내려받기</a>
     </form>
-    <div class="panel">${d.rows.length ? `<table class="tbl cardy wide"><thead><tr><th>이름</th><th>아이디</th><th>연락처</th>${extraFields.map((f) => `<th>${esc(f.label)}</th>`).join('')}<th>등급</th><th>최근 로그인</th><th>관리</th></tr></thead><tbody>
-      ${d.rows.map((m) => `<tr data-id="${m.id}">
-        <td><button type="button" class="who-btn" data-detail>${esc(m.name)}</button>${m.nickname ? ` <span class="num">(${esc(m.nickname)})</span>` : ''}${m.status === 'LOCKED' ? ' <span class="tag red">잠김</span>' : ''}</td>
-        <td data-l="아이디">${esc(m.login_id)}${String(m.social || '').split(',').filter(Boolean).map((p) => (p === 'kakao' ? ' <span class="tag yellow">카카오</span>' : p === 'naver' ? ' <span class="tag green">네이버</span>' : p === 'google' ? ' <span class="tag blue">Google</span>' : '')).join('')}</td>
-        <td data-l="연락처">${m.email || m.mobile ? `${esc(m.email)}${m.mobile ? `<small>${esc(fmtPhone(m.mobile))}</small>` : ''}` : '<span class="dash">—</span>'}</td>
-        ${extraFields.map((f) => { const v = m.extra[f.key]; const t = Array.isArray(v) ? v.join(', ') : v; return `<td data-l="${esc(f.label)}">${t ? esc(t) : '<span class="dash">—</span>'}</td>`; }).join('')}
-        <td data-l="등급"><div class="lv"><select class="input" aria-label="등급">${lvOpts(m.level)}</select><button class="btn sm" type="button" data-level>바꾸기</button></div></td>
-        <td data-l="최근 로그인">${m.last_login_at ? fmtDate(m.last_login_at) : '<span class="dash">—</span>'}</td>
-        <td><div class="mng"><button class="btn sm" type="button" data-lock>${m.status === 'LOCKED' ? '잠금 풀기' : '로그인 막기'}</button>
-          <button class="btn sm" type="button" data-temp>비밀번호 재발급</button><button class="btn sm danger" type="button" data-out>탈퇴</button></div></td>
-      </tr>`).join('')}</tbody></table>`
+    <div class="panel">${d.rows.length ? `<div class="mlist">
+      <div class="mrow mhead" aria-hidden="true"><span>이름 · 아이디</span><span>연락처${extraFields.length ? ' · 가입 항목' : ''}</span><span>최근 로그인</span><span>등급</span><span class="m-r">관리</span></div>
+      ${d.rows.map((m) => {
+        // 가입회원 한 줄 (2026-11-19 다시 정리 "정렬 안 되어 보인다"): 이름 · 아이디 | 연락처 | 최근 로그인 | 등급 | 관리 — 칸 폭을 고정해 줄마다 같은 자리에
+        const social = String(m.social || '').split(',').filter(Boolean).map((p) => (p === 'kakao' ? '<span class="tag yellow">카카오</span>' : p === 'naver' ? '<span class="tag green">네이버</span>' : p === 'google' ? '<span class="tag blue">Google</span>' : '')).join('');
+        const mail = m.email && m.email !== m.login_id ? m.email : '';   // 아이디가 이메일이면 연락처에 또 적지 않는다
+        const contact = [mail ? `<span>${esc(mail)}</span>` : '', m.mobile ? `<span>${esc(fmtPhone(m.mobile))}</span>` : ''].join('');
+        const extra = extraFields.map((f) => { const v = m.extra[f.key]; const t = Array.isArray(v) ? v.join(', ') : v; return t ? `<span><i>${esc(f.label)}</i>${esc(t)}</span>` : ''; }).join('');
+        return `<div class="mrow" data-id="${m.id}">
+        <div class="m-who"><div class="m-name"><button type="button" class="who-btn" data-detail>${esc(m.name)}</button>${m.nickname && m.nickname !== m.name ? `<span class="num">${esc(m.nickname)}</span>` : ''}${m.status === 'LOCKED' ? '<span class="tag red">잠김</span>' : ''}</div>
+          <div class="m-id"><span>${esc(m.login_id)}</span>${social}</div></div>
+        <div class="m-info">${contact ? `<div class="m-ct">${contact}</div>` : ''}${extra ? `<div class="m-ex">${extra}</div>` : ''}${contact || extra ? '' : '<span class="dash">—</span>'}</div>
+        <div class="m-last">${m.last_login_at ? fmtDate(m.last_login_at) : '<span class="dash">—</span>'}</div>
+        <div class="lv"><select class="input" aria-label="등급">${lvOpts(m.level)}</select><button class="btn sm" type="button" data-level>바꾸기</button></div>
+        <div class="mng"><button class="btn sm" type="button" data-lock>${m.status === 'LOCKED' ? '잠금 풀기' : '로그인 막기'}</button><button class="btn sm" type="button" data-temp>비밀번호 재발급</button><button class="btn sm danger" type="button" data-out>탈퇴</button></div>
+      </div>`; }).join('')}</div>`
     : filtered ? empty('조건에 맞는 회원이 없습니다', '다른 이름이나 아이디로 찾아보세요.', '<a class="btn" href="#/members">조건 지우고 전체 보기</a>')
       : empty('아직 가입한 회원이 없습니다', '홈페이지에서 누군가 가입하면 여기에 나타납니다.')}</div>
     ${pager(d.page, d.size, d.total, (n) => { const p = new URLSearchParams(qs); p.set('page', n); return `#/members?${p}`; })}`;
@@ -302,7 +307,7 @@ async function membersPage(qs) {
     go(`#/members?${p}`);
   });
   const reload = () => route();
-  $$('tr[data-id]').forEach((tr) => {
+  $('.mrow[data-id]').forEach((tr) => {
     const m = d.rows.find((x) => x.id === +tr.dataset.id);
     const who = `${m.name}(${m.login_id})`;
     tr.querySelector('[data-detail]').onclick = () => memberDetail(m, d.fields);
