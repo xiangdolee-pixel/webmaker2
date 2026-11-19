@@ -307,7 +307,7 @@ async function membersPage(qs) {
     go(`#/members?${p}`);
   });
   const reload = () => route();
-  $('.mrow[data-id]').forEach((tr) => {
+  $$('.mrow[data-id]').forEach((tr) => {
     const m = d.rows.find((x) => x.id === +tr.dataset.id);
     const who = `${m.name}(${m.login_id})`;
     tr.querySelector('[data-detail]').onclick = () => memberDetail(m, d.fields);
