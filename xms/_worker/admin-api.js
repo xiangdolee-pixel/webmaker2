@@ -6,7 +6,7 @@ import {
   MEMBER_COLUMNS, LOCKED_REQUIRED, maskFrom, levelsOf, ALL_LEVELS, newPassword, hashPassword, sameText, sanitizeHtml, HttpError, ensureDocs,
 } from './lib.js';
 import { settingsApi } from './site-meta.js';
-import { usageOf } from './usage.js';
+import { usageOf, filesUsed } from './usage.js';
 import { popupsApi } from './popups.js';
 import { statsApi } from './visits.js';
 import { adminCourses, featureOn } from './courses.js';
@@ -19,15 +19,6 @@ const LAYOUTS = ['TABLE', 'CARD', 'BLOG'];
 const FIELD_TYPES = ['TEXT', 'NUMBER', 'DATE', 'SELECT', 'RADIO', 'CHECKBOX'];
 const MODES = ['REQUIRED', 'OPTIONAL', 'EXCLUDED'];
 
-// 사용량(무거운 계산) 5분 기억 — 사이트마다
-const usageMem = new Map();
-async function usageCached(env, site) {
-  const hit = usageMem.get(site);
-  if (hit && Date.now() - hit.at < 300000) return hit.u;
-  const u = await usageOf(env, site);
-  usageMem.set(site, { u, at: Date.now() });
-  return u;
-}
 
 export async function adminApi(ctx) {
   const { request, env, site, me, url } = ctx;
@@ -47,14 +38,14 @@ export async function adminApi(ctx) {
 
   // ───── 공통 정보 ─────
   if (path === '/me') {
-    // 셋을 한꺼번에 (차례로 기다리면 느리다). 사용량은 계산이 무거워 5분 기억해 둔다 — 화면 위 '사용 중' 숫자에만 쓴다
+    // 셋을 한꺼번에 (차례로 기다리면 느리다). 사용량은 파일 크기만 가볍게 그때그때 센다 — 올리거나 지운 것이 바로 숫자에 보이게 (2026-11-19, 전에는 5분 기억)
     const [s, { levelNames }, u] = await Promise.all([
       env.XIM_DB.prepare('SELECT name, domain, quota_mb, used_mb, status FROM sites WHERE slug = ?').bind(site).first(),
       siteSettings(db, site),
-      usageCached(env, site),
+      filesUsed(env, site),
     ]);
     return json({
-      site: { slug: site, name: s?.name || site, domain: s?.domain || '', quota_mb: s?.quota_mb ?? 0, used_mb: Math.round((u.files / 1048576) * 10) / 10, status: s?.status },
+      site: { slug: site, name: s?.name || site, domain: s?.domain || '', quota_mb: s?.quota_mb ?? 0, used_mb: Math.round((u / 1048576) * 10) / 10, status: s?.status },
       me: me.kind === 'staff' ? { staff: true, name: '운영자' } : { staff: false, name: me.member.name, login_id: me.member.login_id },
       levelNames,
       features: { courses: await featureOn(db, site, 'courses'), apply: await featureOn(db, site, 'apply') },

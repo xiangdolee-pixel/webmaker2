@@ -1,12 +1,14 @@
 // 올린 파일 — 글 첨부(이미지 · 파일), 본문 안 그림 · PDF
 //   저장: env.FILES(R2) 바인딩이 있으면 R2, 없으면 D1 uploads.data(base64, 한 파일 1.4MB 까지)
 //   주소: /xms/upload/<id>  (내려받기는 ?dl=1). id 는 추측할 수 없는 임의 값.
-//   용량: 사이트 전체 크기를 xim sites.used_mb 에 적고, quota_mb 를 넘으면 받지 않는다.
+//   용량: 사이트 전체 크기(올린 파일 + 설정 그림, usage.js filesUsed)를 xim sites.used_mb 에 적고, quota_mb 를 넘으면 받지 않는다(checkQuota).
+//         넘으면 413 + { quota: true } — 화면은 안내 창(js/quota.js)을 띄운다 (사용자 지시 2026-11-19)
 //   주인: post_id > 0 = 그 글, post_id < 0 = 수정 요청(-요청번호), NULL = 아직 저장 안 한 글쓰기 중.
 //         프로필 사진 = AVATAR_BASE − 회원번호 (아주 작은 음수 — 수정 요청 번호와 겹치지 않고, 하루 지난 파일 정리에도 안 걸린다)
 //   지우기(저장 공간 아끼기, 사용자 지시 2026-11-03): 글에서 빼거나 글을 지우면 파일(R2)도 지운다. 저장 안 하고 하루 지난 것도 지운다.
 import { now, bad, forbidden, notFound, json, randomHex, HttpError, canBy, whoAmI } from './lib.js';
 import { applyOn, canSeeApplyFile } from './apply.js';
+import { filesUsed } from './usage.js';
 
 const D1_MAX = 1400000;
 export const AVATAR_BASE = -2000000000;
@@ -16,10 +18,19 @@ const KINDS = ['IMAGE', 'FILE', 'INLINE', 'APPLY']; // APPLY = 신청서 서류 
 const APPLY_MAX = 10 * 1024 * 1024;
 const SAFE_INLINE = /^(image\/(png|jpeg|gif|webp)|application\/pdf)$/;
 
-async function usage(env, site) {
-  // 같은 파일을 여러 글이 함께 쓰면(r2_key 가 같음) 한 번만 센다
-  const r = await env.DB.prepare('SELECT COALESCE(SUM(size), 0) AS n FROM (SELECT MAX(size) AS size FROM uploads WHERE site = ? GROUP BY COALESCE(r2_key, id))').bind(site).first();
-  return r.n;
+const usage = filesUsed;
+const saveUsed = (env, site, used) => env.XIM_DB.prepare('UPDATE sites SET used_mb = ? WHERE slug = ?').bind(Math.round((used / 1048576) * 10) / 10, site).run();
+// 설정 그림(팝업 · 파비콘 · 미리보기)을 바꾼 뒤: 사용량을 다시 적는다
+export const touchUsage = async (env, site) => saveUsed(env, site, await usage(env, site));
+// 저장 용량 초과 — 관리자에게는 요청 메뉴로 가는 길을, 그 밖의 사람에게는 관리자에게 알리라고 안내한다
+const quotaError = (me, used, quotaMb) => new HttpError(413, me?.level === 1
+  ? "저장 용량이 초과되었습니다. '수정 요청' 메뉴를 통해 용량 업그레이드를 요청해 주시기 바랍니다."
+  : '저장 용량이 초과되어 올릴 수 없습니다. 사이트 관리자에게 알려 주세요.', { quota: true, admin: me?.level === 1, used, quota_mb: quotaMb });
+// 올리기 전 확인: 지금 쓰는 크기 + 더할 크기(add 바이트)가 한도를 넘으면 받지 않는다. 한도 0 = 제한 없음
+export async function checkQuota(env, site, me, add = 0) {
+  const [s, used] = await Promise.all([env.XIM_DB.prepare('SELECT quota_mb FROM sites WHERE slug = ?').bind(site).first(), usage(env, site)]);
+  if (s?.quota_mb && used + add > s.quota_mb * 1048576) throw quotaError(me, used, s.quota_mb);
+  return used;
 }
 
 // POST /xms-api/uploads?board=<slug>&kind=IMAGE|FILE|INLINE  (본문 = 파일 그대로, 헤더 X-File-Name)
@@ -59,9 +70,7 @@ export async function uploadApi(ctx) {
   if (buf.byteLength > max) {
     throw bad(env.FILES ? `파일이 너무 큽니다 (${Math.round(max / 1048576)}MB 까지).` : `파일이 너무 큽니다. 지금은 ${(D1_MAX / 1e6).toFixed(1)}MB 까지 올릴 수 있습니다.`);
   }
-  const site_ = await env.XIM_DB.prepare('SELECT quota_mb FROM sites WHERE slug = ?').bind(site).first();
-  const used = await usage(env, site);
-  if (site_?.quota_mb && used + buf.byteLength > site_.quota_mb * 1024 * 1024) throw bad('저장 공간이 가득 찼습니다. 운영자에게 늘려 달라고 요청하세요.');
+  const used = await checkQuota(env, site, me, buf.byteLength);
 
   if (Math.random() < 0.2) await purgeOrphans(env, site).catch(() => {}); // 가끔 묵은 파일 정리
   const id = randomHex(16);
@@ -77,7 +86,7 @@ export async function uploadApi(ctx) {
   }
   await env.DB.prepare('INSERT INTO uploads (id, site, post_id, kind, name, mime, size, data, r2_key, created_by, created_at) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(id, site, kind, name, mime, buf.byteLength, data, r2Key, me.kind === 'member' ? me.member.id : null, now()).run();
-  await env.XIM_DB.prepare('UPDATE sites SET used_mb = ? WHERE slug = ?').bind(Math.round(((used + buf.byteLength) / 1048576) * 10) / 10, site).run();
+  await saveUsed(env, site, used + buf.byteLength);
   if (forAvatar) return setAvatar(env, site, me.member, id);
   return json({ id, url: `/xms/upload/${id}`, name, size: buf.byteLength, mime, kind });
 }
@@ -118,8 +127,7 @@ export async function removeUploads(env, site, where, binds = []) {
     const part = ids.slice(i, i + 90);
     await env.DB.prepare(`DELETE FROM uploads WHERE site = ? AND id IN (${part.map(() => '?').join(',')})`).bind(site, ...part).run();
   }
-  const used = await usage(env, site);
-  await env.XIM_DB.prepare('UPDATE sites SET used_mb = ? WHERE slug = ?').bind(Math.round((used / 1048576) * 10) / 10, site).run();
+  await touchUsage(env, site);
   return results.length;
 }
 
@@ -269,8 +277,13 @@ export async function directUploadApi(ctx, id) {
     const head = await env.FILES.head(u.r2_key);
     if (!head) throw bad('파일이 다 올라가지 않았습니다. 다시 올려 주세요.');
     await env.DB.prepare('UPDATE uploads SET size = ? WHERE id = ? AND site = ?').bind(head.size, id, site).run();
-    const used = await usage(env, site);
-    await env.XIM_DB.prepare('UPDATE sites SET used_mb = ? WHERE slug = ?').bind(Math.round((used / 1048576) * 10) / 10, site).run();
+    // 서명 받을 때 알린 크기보다 실제 파일이 커서 한도를 넘었으면 받지 않고 지운다
+    const [q, used] = await Promise.all([env.XIM_DB.prepare('SELECT quota_mb FROM sites WHERE slug = ?').bind(site).first(), usage(env, site)]);
+    if (q?.quota_mb && used > q.quota_mb * 1048576) {
+      await removeUploads(env, site, 'id = ?', [id]);
+      throw quotaError(me, used - head.size, q.quota_mb);
+    }
+    await saveUsed(env, site, used);
     return json({ id, url: `/xms/upload/${id}`, name: u.name, size: head.size, mime: u.mime, kind: 'FILE' });
   }
   // 서명 받기 — 권한은 uploadApi 와 같다(게시판 쓰기 권한 · 관리 화면 수정 요청은 관리자)
@@ -286,9 +299,7 @@ export async function directUploadApi(ctx, id) {
   if (size > DIRECT_MAX) throw bad(`파일이 너무 큽니다 (${DIRECT_MAX / 1048576}MB 까지).`);
   const name = String(raw.name || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 120) || 'file';
   const mime = String(raw.type || 'application/octet-stream').split(';')[0].trim().toLowerCase().slice(0, 100) || 'application/octet-stream';
-  const site_ = await env.XIM_DB.prepare('SELECT quota_mb FROM sites WHERE slug = ?').bind(site).first();
-  const used = await usage(env, site);
-  if (site_?.quota_mb && used + size > site_.quota_mb * 1024 * 1024) throw bad('저장 공간이 가득 찼습니다. 운영자에게 늘려 달라고 요청하세요.');
+  await checkQuota(env, site, me, size);
   if (Math.random() < 0.2) await purgeOrphans(env, site).catch(() => {});
   const nid = randomHex(16), key = `${site}/${nid}`;
   await env.DB.prepare('INSERT INTO uploads (id, site, post_id, kind, name, mime, size, data, r2_key, created_by, created_at) VALUES (?, ?, NULL, ?, ?, ?, ?, NULL, ?, ?, ?)')

@@ -6,6 +6,8 @@
 //     지도  iframe[data-xm]              — xim 공용 지도의 주소 · 이름표 (2026-11-18)
 //   원래 값은 window.__XE_ORIG. 저장하면 xms(page_texts)에 들어가 다음부터 모든 방문자에게 고친 대로 보인다. 원래대로 되돌리면 저장할 때 지운다.
 //   게시판 화면(/board/…)에서는 '게시판 설정' 단추로 목록 모양 · 기능 · 권한을 그 자리에서 고친다 (board-set.js).
+import { quotaAlert, quotaOpen } from './quota.js';
+
 let on = false;
 
 const CSS = `
@@ -69,6 +71,7 @@ const pagePath = () => {
 const LINK_OK = /^(https?:\/\/|\/(?!\/)|#|mailto:|tel:)\S*$/i;
 
 function toast(msg, err) {
+  if (quotaOpen()) return;   // 용량 초과 안내 창이 같은 말을 하고 있다
   const t = document.createElement('div');
   t.className = 'xe-toast' + (err ? ' err' : '');
   t.setAttribute('role', 'status');
@@ -99,7 +102,7 @@ async function uploadSiteImage(file) {
     method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': f.type, 'X-File-Name': encodeURIComponent(f.name || 'image') }, body: f,
   });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.error || '사진을 올리지 못했습니다.');
+  if (!r.ok) { quotaAlert(d); throw new Error(d.error || '사진을 올리지 못했습니다.'); }
   return d.url;
 }
 

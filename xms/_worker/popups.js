@@ -2,6 +2,7 @@
 //   status: WAITING 대기 | OPEN 노출 | CLOSED 종료
 //   close_mode: TODAY 오늘 하루 열지 않음 | FOREVER 다시 열지 않음 | ALWAYS 기간 내 무조건 열림
 import { now, bad, notFound, json, str, body, audit } from './lib.js';
+import { checkQuota, touchUsage } from './uploads.js';
 
 const STATUS = ['WAITING', 'OPEN', 'CLOSED'];
 const MODES = ['TODAY', 'FOREVER', 'ALWAYS'];
@@ -62,12 +63,13 @@ export async function popupsApi(ctx, path, method) {
     const f = fields(raw);
     const img = imageField(raw.image);
     if (!img && !f.body) throw bad('그림도 본문도 없습니다. 둘 중 하나는 있어야 저장됩니다.');
+    if (img) await checkQuota(env, site, me, img.b64.length * 0.75);   // 팝업 그림도 저장 용량에 든다
     const max = await db.prepare('SELECT MAX(sort) AS s FROM popups WHERE site = ?').bind(site).first();
     const t = now();
     const r = await db.prepare(`INSERT INTO popups (site, title, body, link_url, starts_at, ends_at, status, close_mode, sort, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(site, f.title, f.body, f.link_url, f.starts_at, f.ends_at, f.status, f.close_mode, (max?.s || 0) + 1, t, t).run();
     const id = r.meta.last_row_id;
-    if (img) await db.prepare('INSERT OR REPLACE INTO site_files (site, kind, mime, data, updated_at) VALUES (?, ?, ?, ?, ?)').bind(site, `popup-${id}`, img.mime, img.b64, t).run();
+    if (img) { await db.prepare('INSERT OR REPLACE INTO site_files (site, kind, mime, data, updated_at) VALUES (?, ?, ?, ?, ?)').bind(site, `popup-${id}`, img.mime, img.b64, t).run(); await touchUsage(env, site); }
     await audit(db, site, me, request, 'POPUP_CREATE', f.title);
     return json({ id });
   }
@@ -87,11 +89,13 @@ export async function popupsApi(ctx, path, method) {
       const img = imageField(raw.image);
       const hasImg = img === undefined ? !!(await images(db, site))[p.id] : !!img;
       if (!hasImg && !f.body) throw bad('그림도 본문도 없습니다. 둘 중 하나는 있어야 저장됩니다.');
+      if (img) await checkQuota(env, site, me, img.b64.length * 0.75);
       const t = now();
       await db.prepare('UPDATE popups SET title = ?, body = ?, link_url = ?, starts_at = ?, ends_at = ?, status = ?, close_mode = ?, updated_at = ? WHERE id = ?')
         .bind(f.title, f.body, f.link_url, f.starts_at, f.ends_at, f.status, f.close_mode, t, p.id).run();
       if (img) await db.prepare('INSERT OR REPLACE INTO site_files (site, kind, mime, data, updated_at) VALUES (?, ?, ?, ?, ?)').bind(site, `popup-${p.id}`, img.mime, img.b64, t).run();
       if (img === null) await db.prepare('DELETE FROM site_files WHERE site = ? AND kind = ?').bind(site, `popup-${p.id}`).run();
+      if (img !== undefined) await touchUsage(env, site);
       await audit(db, site, me, request, 'POPUP_UPDATE', f.title);
       return json({ ok: true });
     }

@@ -67,6 +67,12 @@ Worker `xms` + D1 `xms` (xiangdolee 계정). 업체 구분은 모든 표의 `sit
 
 접수함 · 번역 다듬기 · 솔루션 공지, 사진/파일 올리기(R2) + 저장 공간 집계, 설교 게시판 · 전자책, 비밀번호 찾기 메일, 답글, 태그, 사이트 디자인 안에 메뉴 끼워 넣기(지금은 /board · /member 화면 위쪽에만 메뉴가 나온다).
 
+## 저장 용량 (2026-11-19)
+
+- 한도 = xim 사이트 수정의 "저장 용량(MB)"(`sites.quota_mb`, 0 = 제한 없음). 드는 것 = 올린 파일(`uploads`: 게시판 사진 · 첨부, 수정 모드 사진, 수정 요청 첨부, 프로필 사진, 신청 서류) + 설정 그림(`site_files`: 팝업 · 파비콘 · 미리보기). 계산은 `_worker/usage.js` `filesUsed` 한 곳 — 올리기 전 확인, 관리 화면 옆 메뉴 숫자, 저장 공간 화면, xim 사이트 목록이 모두 같은 값.
+- 넘으면 어떤 길로도 올릴 수 없다: `_worker/uploads.js` `checkQuota` 가 413 + `{ quota: true, admin, used, quota_mb }` 를 주고, 화면은 `js/quota.js` 안내 창을 띄운다(관리자에게는 "수정 요청으로 이동" 단추). 새로 올리는 길을 만들면 `checkQuota` 를 먼저 부르고, 화면에서 `quotaAlert(응답)` 을 부른다.
+- 글을 지우거나 글에서 사진 · 첨부를 빼면 파일(R2)도 지워져 자리가 생긴다(`removePostFiles` · `syncPostFiles`).
+
 ## 구조
 
 ```

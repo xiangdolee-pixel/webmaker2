@@ -3,6 +3,7 @@
 //   도구: 이미지 · 동영상(유튜브) · PDF | 제목1~3 | 굵게 · 기울임 · 밑줄 · 취소선 | 글자 크기 | 목록 · 번호 · 인용 · 코드 | 정렬 | 링크 · 가로줄 | 되돌리기 · 다시
 import { openDialog, toast, slideTabs, esc } from './common.js';
 import { mountBlocks } from './blocks.js';
+import { quotaAlert } from './quota.js';
 
 const I = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
 const ICON = {
@@ -72,10 +73,10 @@ export async function uploadFile(board, kind, file, onProgress) {
       });
       const done = await fetch(`/xms-api/uploads/${s.id}/done`, { method: 'POST', credentials: 'same-origin' });
       const out = await done.json().catch(() => null);
-      if (!done.ok) throw new Error(out?.error || '올리지 못했습니다.');
+      if (!done.ok) { quotaAlert(out); throw new Error(out?.error || '올리지 못했습니다.'); }
       return out;
     }
-    if (sign.status !== 404) throw new Error(s?.error || '올리지 못했습니다.');
+    if (sign.status !== 404) { quotaAlert(s); throw new Error(s?.error || '올리지 못했습니다.'); }
   }
   // onProgress(0~1) 를 주면 올라간 만큼 알려 준다(큰 파일 — 첨부 목록에 '올리는 중 n%', 사용자 지시 2026-11-13)
   if (onProgress) {
@@ -88,7 +89,7 @@ export async function uploadFile(board, kind, file, onProgress) {
       x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
       x.onload = () => {
         let out = null; try { out = JSON.parse(x.responseText); } catch { /* 본문 없음 */ }
-        if (x.status >= 200 && x.status < 300 && out) resolve(out); else reject(new Error(out?.error || '올리지 못했습니다.'));
+        if (x.status >= 200 && x.status < 300 && out) resolve(out); else { quotaAlert(out); reject(new Error(out?.error || '올리지 못했습니다.')); }
       };
       x.onerror = () => reject(new Error('인터넷 연결이 끊겨 올리지 못했습니다.'));
       x.send(file);
@@ -100,7 +101,7 @@ export async function uploadFile(board, kind, file, onProgress) {
     body: file,
   });
   const out = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(out?.error || '올리지 못했습니다.');
+  if (!res.ok) { quotaAlert(out); throw new Error(out?.error || '올리지 못했습니다.'); }
   return out;
 }
 const pickFile = (accept) => new Promise((resolve) => {

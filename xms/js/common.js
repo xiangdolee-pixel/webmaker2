@@ -1,4 +1,5 @@
 // xms 관리자 · 방문자 화면 공용 도우미 (ES 모듈)
+import { quotaAlert, quotaOpen } from './quota.js';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -15,6 +16,7 @@ export function makeApi(base) {
     let out = null;
     try { out = await res.json(); } catch { /* 본문 없음 */ }
     if (!res.ok) {
+      quotaAlert(out);   // 저장 용량 초과면 안내 창 (팝업 · 파비콘 · 미리보기 그림 등)
       const err = new Error(out?.error || `요청이 실패했습니다 (${res.status})`);
       err.status = res.status;
       throw err;
@@ -40,6 +42,7 @@ export const fmtPhone = (v) => {
 
 let toastTimer;
 export function toast(msg) {
+  if (quotaOpen()) return;   // 용량 초과 안내 창이 같은 말을 하고 있다
   let el = $('.toast');
   if (!el) { el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); (document.querySelector('.xms-c') || document.body).append(el); }
   el.textContent = msg;

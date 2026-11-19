@@ -2,6 +2,7 @@
 import { $, $$, makeApi, formData, busy, toast, openDialog, confirmInline } from './common.js';
 import { shrinkImage } from './editor.js';
 import { cropCircle } from './crop.js';
+import { quotaAlert } from './quota.js';
 
 const api = makeApi('/xms-api');
 
@@ -346,7 +347,7 @@ async function uploadAvatar(file) {
     body: file,
   });
   const d = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(d.error || '사진을 올리지 못했습니다.');
+  if (!res.ok) { quotaAlert(d); throw new Error(d.error || '사진을 올리지 못했습니다.'); }
   return d.avatar;
 }
 const PERSON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="4" fill="currentColor"/><path d="M4 20.2c0-4.1 3.6-6.7 8-6.7s8 2.6 8 6.7" fill="currentColor"/></svg>';

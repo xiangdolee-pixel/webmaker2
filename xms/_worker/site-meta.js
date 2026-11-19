@@ -1,7 +1,7 @@
 // 파비콘 · 검색엔진 · 카카오톡 미리보기 — 관리 API, 공개 파일, robots.txt · sitemap.xml, 페이지 머리(head)에 넣을 값
 import { now, bad, notFound, json, str, body, audit, esc, canBy } from './lib.js';
 import { visibleMenus } from './public.js';
-import { siteFileDirect } from './uploads.js';
+import { siteFileDirect, checkQuota, touchUsage } from './uploads.js';
 
 const FAV_SIZES = [32, 180, 192, 512];
 const ENGINES = {
@@ -82,16 +82,21 @@ export async function settingsApi(ctx, path, method) {
   if (path === '/settings/favicon' && method === 'PUT') {
     const { icons } = await body(request);
     const t = now();
+    let add = 0;
     const stmts = FAV_SIZES.map((n) => {
       const d = dataUrl(icons?.[n], ['image/png'], 400000, `${n}px 아이콘`);
+      add += d.b64.length * 0.75;
       return db.prepare('INSERT OR REPLACE INTO site_files (site, kind, mime, data, updated_at) VALUES (?, ?, ?, ?, ?)').bind(site, `favicon-${n}`, d.mime, d.b64, t);
     });
+    await checkQuota(env, site, me, add);
     await db.batch(stmts);
+    await touchUsage(env, site);
     await audit(db, site, me, request, 'FAVICON_SET', '파비콘');
     return json({ ok: true });
   }
   if (path === '/settings/favicon' && method === 'DELETE') {
     await db.prepare("DELETE FROM site_files WHERE site = ? AND kind LIKE 'favicon-%'").bind(site).run();
+    await touchUsage(env, site);
     await audit(db, site, me, request, 'FAVICON_REMOVE', '파비콘');
     return json({ ok: true });
   }
@@ -132,12 +137,15 @@ export async function settingsApi(ctx, path, method) {
   }
   if (path === '/settings/share/image' && method === 'PUT') {
     const d = dataUrl((await body(request)).image, ['image/jpeg', 'image/png', 'image/webp'], 1200000, '그림');
+    await checkQuota(env, site, me, d.b64.length * 0.75);
     await db.prepare('INSERT OR REPLACE INTO site_files (site, kind, mime, data, updated_at) VALUES (?, ?, ?, ?, ?)').bind(site, 'og', d.mime, d.b64, now()).run();
+    await touchUsage(env, site);
     await audit(db, site, me, request, 'SHARE_IMAGE_SET', '미리보기 그림');
     return json({ ok: true });
   }
   if (path === '/settings/share/image' && method === 'DELETE') {
     await db.prepare("DELETE FROM site_files WHERE site = ? AND kind = 'og'").bind(site).run();
+    await touchUsage(env, site);
     await audit(db, site, me, request, 'SHARE_IMAGE_REMOVE', '미리보기 그림');
     return json({ ok: true });
   }

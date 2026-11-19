@@ -17,6 +17,16 @@ const DB_QUERIES = [
   'SELECT SUM(length(ref) + 30) AS n FROM visit_refs WHERE site = ?',
 ];
 
+// 저장 공간 한도에 드는 크기(바이트) = 올린 파일(uploads) + 설정 그림(site_files: 파비콘 · 미리보기 · 팝업)
+//   올리기 전 한도 확인 · 관리 화면 옆 메뉴 숫자 · xim 사이트 목록이 모두 이 계산을 쓴다(usageOf 의 files 와 같은 값). 가벼워서 기억해 두지 않는다
+export async function filesUsed(env, site) {
+  const [a, b] = await env.DB.batch([
+    env.DB.prepare('SELECT COALESCE(SUM(size), 0) AS n FROM (SELECT MAX(size) AS size FROM uploads WHERE site = ? GROUP BY COALESCE(r2_key, id))').bind(site),   // 여러 글이 함께 쓰는 파일은 한 번만
+    env.DB.prepare('SELECT COALESCE(SUM(length(data)), 0) * 3 / 4 AS n FROM site_files WHERE site = ?').bind(site),
+  ]);
+  return (a.results[0]?.n || 0) + (b.results[0]?.n || 0);
+}
+
 export async function usageOf(env, site) {
   const x = env.DB;
   const res = await x.batch([

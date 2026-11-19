@@ -534,6 +534,8 @@ function siteRow(s) {
   const u = s.usage || { db: 0, files: 0, file_count: 0, r2: 0, d1_files: 0 };
   const quotaB = (s.quota_mb || 0) * 1048576;
   const pct = quotaB ? Math.min(100, (u.files / quotaB) * 100) : 0;
+  // 저장 용량: 한도를 넘으면 그 사이트는 사진 · 파일을 더 올릴 수 없다(xms uploads.js checkQuota) — 빨강으로, 90% 부터는 주황으로
+  const useCl = !quotaB ? '' : u.files >= quotaB ? ' over' : pct >= 90 ? ' near' : '';
   const dev = `https://${s.slug}.xiangdolee.workers.dev`;
   const link = (href, label) => `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(label)}</a>`;
   const c = customers.find((x) => x.id === s.customer_id);
@@ -560,8 +562,8 @@ function siteRow(s) {
     </div>
     <div class="sr-addr">${s.domain ? link(s.url, s.domain) : '<span class="dim">도메인 없음</span>'}${link(dev, 'workers.dev')}${tags}</div>
     <div class="sr-num"><span class="sr-visit" title="오늘 방문자 ${s.visits?.today.visitors || 0}명 · 페이지뷰 ${s.visits?.today.views || 0} / 어제 방문자 ${s.visits?.yesterday.visitors || 0}명 · 페이지뷰 ${s.visits?.yesterday.views || 0}">오늘 <b>${s.visits?.today.visitors || 0}</b>명<small>어제 ${s.visits?.yesterday.visitors || 0}</small></span><span class="sr-made" title="사이트를 만든 날 ${esc(fmtDate(s.created_at))}">제작 <b>${esc(fmtDate(s.created_at).slice(0, 10))}</b></span><span>관리자 <b>${s.admin_count}</b></span>${s.open_requests ? `<button type="button" class="link-btn" data-go-reqs="${esc(s.slug)}">요청 <b>${s.open_requests}</b></button>` : '<span>요청 0</span>'}</div>
-    <div class="sr-use" title="DB ${mb(u.db)} · 파일 ${u.file_count}개(R2 ${mb(u.r2)} · DB ${mb(u.d1_files)}) · 홈페이지 ${s.static_mb || 0}MB">
-      <span>DB ${mb(u.db)}</span><span>파일 ${mb(u.files)} / ${s.quota_mb}MB</span><span>홈 ${s.static_mb ? `${s.static_mb}MB` : '—'}</span>
+    <div class="sr-use${useCl}" title="${useCl === ' over' ? '저장 용량 초과 — 이 사이트는 지금 사진 · 파일을 올릴 수 없습니다 · ' : ''}DB ${mb(u.db)} · 파일 ${u.file_count}개(R2 ${mb(u.r2)} · DB ${mb(u.d1_files)}) · 홈페이지 ${s.static_mb || 0}MB">
+      <span>DB ${mb(u.db)}</span><span class="use-f">파일 ${mb(u.files)} / ${s.quota_mb ? `${s.quota_mb}MB` : '제한 없음'}${useCl === ' over' ? ' <b>초과</b>' : ''}</span><span>홈 ${s.static_mb ? `${s.static_mb}MB` : '—'}</span>
       <div class="quota" aria-hidden="true"><i style="width:${pct}%"></i></div></div>
     <div class="sr-act">
       <a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">홈</a>

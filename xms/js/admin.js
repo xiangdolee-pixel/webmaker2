@@ -1012,9 +1012,11 @@ async function requestView(id) {
 
 // 요청 쓰기
 function requestWrite() {
+  // 저장 용량 초과 안내 창(quota.js)에서 넘어왔으면 제목을 채워 둔다
+  const aboutQuota = /[?&]about=quota\b/.test(location.hash);
   main.innerHTML = `${head('사이트', '수정 요청 쓰기', '바꾸고 싶은 곳과 내용을 적어 주세요. 사진 · 파일도 붙일 수 있습니다.')}
     <form class="panel pad write-box" id="rform">
-      <label class="field"><span>제목</span><input class="input" name="title" maxlength="120" required placeholder="예) 메인 사진 교체 부탁드립니다"></label>
+      <label class="field"><span>제목</span><input class="input" name="title" maxlength="120" required placeholder="예) 메인 사진 교체 부탁드립니다" value="${aboutQuota ? '저장 용량 업그레이드 요청' : ''}"></label>
       <div class="field"><span>첨부</span><div class="attach" data-attach>
         <div class="attach-btns"><button type="button" class="pill-btn" data-add="IMAGE">${IMG_ICON}이미지</button><button type="button" class="pill-btn" data-add="FILE">${ATT_ICON}파일</button></div>
         <div class="attach-list" data-list></div></div></div>
@@ -1224,7 +1226,7 @@ async function storagePage() {
   main.innerHTML = `${head('사이트', '저장 공간', `파일 ${size(u.files)} / ${u.quota_mb}MB 사용 중입니다 (${pctText}).`)}
     <div class="panel pad"><h2>파일 저장 공간 <small class="meta">사진 · 첨부 파일 · 팝업 · 파비콘 그림</small></h2>
       <div class="quota-bar"><i style="width:${pct}%"></i></div>
-      <p class="meta gap">${pct >= 100 ? '저장 공간이 가득 찼습니다. 운영자에게 늘려 달라고 요청하세요.' : pct >= 90 ? '저장 공간이 거의 찼습니다. 필요하면 운영자에게 늘려 달라고 요청하세요.' : `한도 ${u.quota_mb}MB 중 ${size(u.files)}를 쓰고 있습니다. 사진은 올릴 때 WEBP 로 줄여서 저장합니다.`}</p>
+      <p class="meta gap">${pct >= 100 ? '저장 용량이 초과되어 사진 · 파일을 더 올릴 수 없습니다. <a href="#/requests/new?about=quota">수정 요청</a>으로 용량 업그레이드를 요청해 주세요. 쓰지 않는 글 · 사진을 지워도 자리가 생깁니다.' : pct >= 90 ? '저장 공간이 거의 찼습니다. 필요하면 <a href="#/requests/new?about=quota">수정 요청</a>으로 용량 업그레이드를 요청해 주세요.' : `한도 ${u.quota_mb}MB 중 ${size(u.files)}를 쓰고 있습니다. 사진은 올릴 때 WEBP 로 줄여서 저장합니다.`}</p>
       <div class="stack-bar" aria-hidden="true"><i class="s1" style="width:${bar(u.images)}%"></i><i class="s2" style="width:${bar(u.attachments)}%"></i><i class="s3" style="width:${bar(u.settings_files)}%"></i></div>
       <dl class="use-list">
         <div><dt><i class="s1"></i>사진</dt><dd>${size(u.images)}</dd></div>
