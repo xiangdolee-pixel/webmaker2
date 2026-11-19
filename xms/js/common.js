@@ -31,7 +31,8 @@ export function fmtDate(ms, time = false) {
   return `${d.getFullYear()}.\u00a0${d.getMonth() + 1}.\u00a0${d.getDate()}.${time ? `\u00a0${p(d.getHours())}:${p(d.getMinutes())}` : ''}`;
 }
 export const fmtPhone = (v) => {
-  const d = String(v || '').replace(/\D/g, '');
+  let d = String(v || '').replace(/\D/g, '');
+  if (/^8210\d{7,8}$/.test(d)) d = `0${d.slice(2)}`;   // 카카오 로그인이 주는 +82 10… → 010…
   if (d.length === 11) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
   if (d.length === 10) return d.startsWith('02') ? `${d.slice(0, 2)}-${d.slice(2, 6)}-${d.slice(6)}` : `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
   return d;
