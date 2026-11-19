@@ -1,8 +1,8 @@
 // xim 계약서 — 홈페이지 제작 계약서 만들기 · 고치기 · 서명 주소 보내기 (사용자 지시 2026-11-12)
-//   새 계약서: 갑 이름 · 연락처 · 제작비 · 1년 호스팅 · 유지보수 관리비 · 호스팅 저장 용량 → 만들면 바로 글자 고치기 창이 열린다
+//   새 계약서: 갑 이름 · 연락처 · 이메일 · 제작비 · 호스팅 기간(년, 직접 입력) · 그 기간 관리비 · 호스팅 저장 용량 → 만들면 바로 글자 고치기 창이 열린다
 //   갑은 sign.plators.com/<5자> 에서 직접 서명 → 완료. 서명이 끝나면 고칠 수 없고 PDF 로 내려받는다.
 import { $, esc, toast, openDialog, busy, fmtDate } from './common.js';
-import { DEFAULT_BODY, contractHtml, a4Overflow, downloadPdf, won, today, markImage, lineText } from './contract-doc.js';
+import { DEFAULT_BODY, contractHtml, a4Overflow, downloadPdf, won, today, markImage, lineText, upgradeBody, years } from './contract-doc.js';
 
 let deps = null; // { view, api, shrinkImage }
 let data = { items: [], eul: {}, host: 'sign.plators.com' };
@@ -37,7 +37,7 @@ function row(c) {
     : c.viewed_at ? `<span class="badge doing">열어 봄</span><small>${fmtDate(c.viewed_at)}</small>` : '<span class="badge new">서명 대기</span>';
   return `<div class="card crow ct-row" data-open="${c.id}" title="눌러서 계약서 보기 · 고치기">
     <div class="cr-name"><b>${esc(c.client_name)}</b>${c.client_phone ? `<span>${esc(c.client_phone)}</span>` : ''}</div>
-    <div class="ct-fees"><span>제작비 <b>${won(c.build_fee)}</b></span><span>1년 관리비 <b>${won(c.yearly_fee)}</b></span><span>호스팅 <b>${esc(c.hosting || '1GB')}</b></span></div>
+    <div class="ct-fees"><span>제작비 <b>${won(c.build_fee)}</b></span><span>${years(c)}년 관리비 <b>${won(c.yearly_fee)}</b></span><span>호스팅 <b>${esc(c.hosting || '1GB')}</b></span></div>
     <div class="ct-link"><a href="${esc(signUrl(c.code))}" target="_blank" rel="noopener">${esc(data.host)}/${esc(c.code)}</a><button class="btn sm" type="button" data-copy="${esc(c.code)}">복사</button></div>
     <div class="sr-meta ct-state">${state}</div>
     <div class="sr-act">${signed ? `<button class="btn sm primary" type="button" data-pdf="${c.id}">PDF</button>` : ''}<button class="btn sm" type="button" data-edit="${c.id}">${signed ? '보기' : '보기 · 고치기'}</button></div>
@@ -56,8 +56,12 @@ function newContract() {
         <label class="field"><span>갑 연락처</span><input class="input" name="client_phone" inputmode="tel" maxlength="40" placeholder="010-0000-0000"></label>
       </div>
       <div class="row2">
+        <label class="field"><span>갑 이메일</span><input class="input" type="email" name="client_email" inputmode="email" maxlength="120" placeholder="name@example.com"></label>
         <label class="field"><span>홈페이지 제작비(원)</span><input class="input ct-money" name="build_fee" inputmode="numeric" placeholder="0"></label>
-        <label class="field"><span>1년 호스팅 · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" placeholder="0"></label>
+      </div>
+      <div class="row2">
+        <label class="field"><span>호스팅 · 유지보수 기간(년)</span><input class="input" name="hosting_years" inputmode="numeric" maxlength="2" value="1" data-years><small>몇 년치로 계약할지 숫자로 적습니다.</small></label>
+        <label class="field"><span data-fee-label>1년 호스팅 · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" placeholder="0"></label>
       </div>
       <div class="row2">
         <label class="field"><span>호스팅 저장 용량</span><input class="input" name="hosting" list="ct-hosting" maxlength="20" value="1GB" placeholder="예: 1GB"><datalist id="ct-hosting"><option value="500MB"><option value="1GB"><option value="2GB"><option value="3GB"><option value="5GB"><option value="10GB"></datalist><small>고르거나 직접 적습니다(예: 500MB, 2GB).</small></label>
@@ -88,6 +92,9 @@ function moneyInputs(root) {
     i.value = comma(i.value);
     i.addEventListener('input', () => { i.value = comma(i.value); });
   });
+  // 기간(년): 숫자만, 적는 대로 관리비 칸 이름도 'N년 …' 으로
+  const y = root.querySelector('[data-years]'); const label = root.querySelector('[data-fee-label]');
+  if (y) y.addEventListener('input', () => { y.value = digits(y.value).replace(/^0+/, '').slice(0, 2); if (label) label.textContent = `${years({ hosting_years: y.value })}년 호스팅 · 유지보수 관리비(원)`; });
 }
 
 // ───────── 계약서 화면: 왼쪽에서 고치면 오른쪽 A4 미리보기에 바로 (사용자 지시 2026-11-12 "보면서 수정") ─────────
@@ -97,6 +104,7 @@ async function editContract(id, fresh = false) {
   let c;
   try { c = await full(id); } catch (e) { return toast(e.message); }
   const signed = c.status === 'signed';
+  if (!signed) c.body = upgradeBody(c.body);   // 옛 '1년' 문장 → {기간} (저장하면 그대로 남는다)
   const state = signed ? `<span class="badge done">서명 완료 ${fmtDate(c.signed_at)}</span>` : c.viewed_at ? `<span class="badge doing">고객이 열어 봄 ${fmtDate(c.viewed_at)}</span>` : '<span class="badge new">서명 대기</span>';
   view.innerHTML = `
     <div class="bar ct-ed-bar"><button class="btn sm" type="button" data-back>← 목록</button><h2>${esc(c.client_name)} <small class="ct-dlg-no">No. ${esc(c.code)}</small></h2>${state}
@@ -110,8 +118,12 @@ async function editContract(id, fresh = false) {
         <label class="field"><span>갑 연락처</span><input class="input" name="client_phone" inputmode="tel" maxlength="40" value="${esc(c.client_phone)}"></label>
       </div>
       <div class="row2">
+        <label class="field"><span>갑 이메일</span><input class="input" type="email" name="client_email" inputmode="email" maxlength="120" value="${esc(c.client_email || '')}" placeholder="name@example.com"></label>
         <label class="field"><span>홈페이지 제작비(원)</span><input class="input ct-money" name="build_fee" inputmode="numeric" value="${c.build_fee || ''}"></label>
-        <label class="field"><span>1년 호스팅 · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" value="${c.yearly_fee || ''}"></label>
+      </div>
+      <div class="row2">
+        <label class="field"><span>호스팅 · 유지보수 기간(년)</span><input class="input" name="hosting_years" inputmode="numeric" maxlength="2" value="${years(c)}" data-years></label>
+        <label class="field"><span data-fee-label>${years(c)}년 호스팅 · 유지보수 관리비(원)</span><input class="input ct-money" name="yearly_fee" inputmode="numeric" value="${c.yearly_fee || ''}"></label>
       </div>
       <div class="row2">
         <label class="field"><span>호스팅 저장 용량</span><input class="input" name="hosting" list="ct-hosting" maxlength="20" value="${esc(c.hosting || '1GB')}" placeholder="예: 1GB"><datalist id="ct-hosting"><option value="500MB"><option value="1GB"><option value="2GB"><option value="3GB"><option value="5GB"><option value="10GB"></datalist></label>
@@ -119,7 +131,7 @@ async function editContract(id, fresh = false) {
       </div>
       <p class="ct-how"><b>계약서 문구는 오른쪽 문서를 눌러 바로 고칩니다.</b> Enter = 새 줄, 빈 줄에서 Backspace = 줄 지우기. 줄 첫머리 '제10조(…)' 는 조 제목, '①' 은 항이 됩니다. 색이 칠해진 이름 · 금액 · 날짜는 위 칸에서 바꿉니다.</p>
       <details class="ct-raw"><summary>글자 원문으로 고치기</summary><textarea class="input ct-text" name="body" spellcheck="false">${esc(c.body)}</textarea>
-        <small>{갑} {을} {제작비} {연간비} {용량} {계약일} 은 위 칸 값으로 바뀝니다.</small></details>
+        <small>{갑} {을} {제작비} {연간비} {기간} {용량} {계약일} 은 위 칸 값으로 바뀝니다.</small></details>
       <p class="ct-fit" data-fit></p>
       <p class="err" data-err></p>
       <div class="ct-ed-foot"><button class="btn sm danger" type="button" data-del>삭제</button><button class="btn sm" type="button" data-reset>기본 문구로</button><span class="iq-grow"></span><span class="ct-dirty" data-dirty></span><button class="btn primary" type="submit">저장</button></div>
@@ -161,7 +173,7 @@ async function editContract(id, fresh = false) {
   const f = view.querySelector('[data-f]');
   const ta = f.elements.body;
   const fit = view.querySelector('[data-fit]'); const dirty = view.querySelector('[data-dirty]');
-  const cur = () => { const v = Object.fromEntries(new FormData(f)); return { ...c, ...v, build_fee: +digits(v.build_fee) || 0, yearly_fee: +digits(v.yearly_fee) || 0 }; };
+  const cur = () => { const v = Object.fromEntries(new FormData(f)); return { ...c, ...v, build_fee: +digits(v.build_fee) || 0, yearly_fee: +digits(v.yearly_fee) || 0, hosting_years: years(v) }; };
   const measure = () => {
     fitSheet();
     const over = pv.firstElementChild.offsetHeight / 1123;
@@ -232,7 +244,7 @@ async function editContract(id, fresh = false) {
     busy(f.querySelector('[type=submit]'), f.querySelector('[data-err]'), async () => {
       const v = Object.fromEntries(new FormData(f));
       await deps.api(`/contracts/${id}`, { method: 'PATCH', data: { ...v, build_fee: digits(v.build_fee), yearly_fee: digits(v.yearly_fee) } });
-      c = { ...c, ...v, build_fee: +digits(v.build_fee) || 0, yearly_fee: +digits(v.yearly_fee) || 0 };
+      c = { ...c, ...v, build_fee: +digits(v.build_fee) || 0, yearly_fee: +digits(v.yearly_fee) || 0, hosting_years: years(v) };
       dirty.textContent = '';
       backBtn.dataset.sure = ''; backBtn.textContent = '← 목록';
       toast('저장했습니다.');
@@ -241,7 +253,8 @@ async function editContract(id, fresh = false) {
 }
 
 // 서명된 계약서는 서명 때의 을 정보로
-const eulFor = (c) => { try { return c.eul_snapshot ? { ...data.eul, ...JSON.parse(c.eul_snapshot) } : data.eul; } catch { return data.eul; } };
+//   (이메일 칸이 생기기 전에 서명한 계약서는 서명 때 정보에 이메일이 없다 → 이메일 줄 없이 그대로)
+const eulFor = (c) => { try { return c.eul_snapshot ? { ...data.eul, email: '', ...JSON.parse(c.eul_snapshot) } : data.eul; } catch { return data.eul; } };
 
 // ───────── 을 정보 · 사인 그림 ─────────
 function eulDialog() {
@@ -254,6 +267,7 @@ function eulDialog() {
         <label class="field"><span>을 이름</span><input class="input" name="name" maxlength="60" value="${esc(e.name)}"></label>
         <label class="field"><span>을 연락처</span><input class="input" name="phone" maxlength="40" value="${esc(e.phone)}"></label>
       </div>
+      <label class="field"><span>을 이메일</span><input class="input" value="${esc(e.email || '')}" readonly tabindex="-1"><small>을 이메일은 이 주소로 고정입니다.</small></label>
       <div class="field"><span>도장 · 사인 그림</span>
         <div class="ct-eul-sign" data-prev>${sign ? `<img src="${esc(sign)}" alt="을 사인">` : '<em>아직 없음</em>'}</div>
         <div class="ct-eul-act"><label class="btn sm">그림 고르기<input type="file" accept="image/png,image/jpeg,image/webp" hidden data-file></label><button class="btn sm danger" type="button" data-rm${sign ? '' : ' hidden'}>지우기</button></div>

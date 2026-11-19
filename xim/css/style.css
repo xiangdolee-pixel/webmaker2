@@ -877,6 +877,7 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .ct-party dl > div { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; min-height: 38px; }
 .ct-party dt { color: #6a717e; font-size: .88em; }
 .ct-party dd { margin: 0; font-weight: 600; }
+.ct-party .ct-mail { overflow-wrap: anywhere; }
 .ct-name { display: flex; align-items: center; gap: 36px; }
 .ct-name > span:first-child { min-width: 0; }
 /* (인) — 서명 · 도장은 이 동그라미 한가운데에 찍힌다 */

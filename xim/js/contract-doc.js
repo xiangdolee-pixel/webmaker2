@@ -1,5 +1,6 @@
 // 홈페이지 제작 계약서 — 문서 그리기 · A4 한 장 확인 · PDF 내려받기 (xim '계약서' 메뉴와 서명 화면 sign.html 이 같이 쓴다)
-//   계약서 글자(body) 안의 자리 표시: {갑} {을} {제작비} {연간비} {용량} {계약일}
+//   계약서 글자(body) 안의 자리 표시: {갑} {을} {제작비} {연간비} {기간} {용량} {계약일}
+//   {기간} = 호스팅 · 유지보수 기간('2년'). {연간비} 는 그 기간치 관리비 (사용자 지시 2026-11-19 "몇 년으로 할지 직접 입력")
 //   줄 첫머리가 '제1조(…)' 면 조 제목(굵게), '①' 로 시작하면 항(들여쓰기). 빈 줄은 단락 띄움.
 import { esc } from './common.js';
 
@@ -9,17 +10,27 @@ export const DEFAULT_BODY = `{갑}(이하 "갑")과 {을}(이하 "을")은 갑�
 제2조(제작 범위) 홈페이지의 구성 · 페이지 · 기능은 갑과 을이 협의한 내용에 따른다. 협의한 범위를 벗어나는 추가 작업은 따로 정한다.
 제3조(계약 금액)
 ① 홈페이지 제작비: {제작비}
-② 호스팅(저장 용량 {용량}) · 유지보수 관리비: 1년 {연간비}
+② 호스팅(저장 용량 {용량}) · 유지보수 관리비: {기간} {연간비}
 제4조(대금 지급)
 ① 제작비는 계약할 때 50%, 완성 · 검수 뒤 나머지 50%를 지급한다.
-② 호스팅 · 유지보수 관리비는 홈페이지를 연 날에 1년치를 지급하고, 그 뒤 해마다 같은 날에 갱신한다.
+② 호스팅 · 유지보수 관리비는 홈페이지를 연 날에 {기간}치를 지급하고, 그 뒤 {기간}마다 같은 날에 갱신한다.
 제5조(제작 및 검수) 을은 갑이 자료를 넘긴 뒤 협의한 기간 안에 제작을 마친다. 갑은 완성 알림을 받은 날부터 7일 안에 검수하며, 그 안에 의견이 없으면 검수를 마친 것으로 본다. 검수 중 수정은 2회까지 추가 비용 없이 한다.
 제6조(호스팅 및 유지보수)
 ① 을은 저장 용량 {용량}의 호스팅을 제공하고, 서버 운영 · 보안 점검 · 장애 복구와 글 · 사진 교체 같은 간단한 수정을 맡는다. 새 페이지나 새 기능은 따로 협의한다.
-② 기간은 홈페이지를 연 날부터 1년이며, 끝나기 30일 전까지 어느 쪽도 해지 뜻을 밝히지 않으면 같은 조건으로 1년씩 연장된다.
+② 기간은 홈페이지를 연 날부터 {기간}이며, 끝나기 30일 전까지 어느 쪽도 해지 뜻을 밝히지 않으면 같은 조건으로 {기간}씩 연장된다.
 제7조(자료와 권리) 갑이 준 글 · 사진 · 로고의 권리 책임은 갑에게 있다. 대금을 모두 치르면 완성된 홈페이지를 쓸 권리는 갑에게 있으며, 을은 이를 제작 사례로 소개할 수 있다.
 제8조(해지) 어느 한쪽이 계약을 어기고 14일 안에 바로잡지 않으면 상대방은 계약을 해지할 수 있다. 제작을 시작한 뒤 갑의 사정으로 해지하면 이미 진행한 작업의 비용은 돌려주지 않는다.
 제9조(기타) 이 계약에 없는 사항은 서로 협의해 정한다. 이 계약은 전자 서명으로 맺으며 서면 계약과 같은 효력을 가진다.`;
+
+// 기간 칸이 생기기 전(2026-11-19 전)에 만든 계약서의 '1년' 문장을 {기간} 자리로 바꾼다 — 기본 문구 그대로인 줄만
+const OLD_TERM = [
+  ['유지보수 관리비: 1년 {연간비}', '유지보수 관리비: {기간} {연간비}'],
+  ['홈페이지를 연 날에 1년치를 지급하고, 그 뒤 해마다 같은 날에 갱신한다.', '홈페이지를 연 날에 {기간}치를 지급하고, 그 뒤 {기간}마다 같은 날에 갱신한다.'],
+  ['홈페이지를 연 날부터 1년이며,', '홈페이지를 연 날부터 {기간}이며,'],
+  ['같은 조건으로 1년씩 연장된다.', '같은 조건으로 {기간}씩 연장된다.'],
+];
+export const upgradeBody = (body) => (String(body || '').includes('{기간}') ? body : OLD_TERM.reduce((s, [a, b]) => s.replace(a, b), String(body || '')));
+export const years = (c) => Math.min(99, Math.max(1, Math.floor(Number(c?.hosting_years) || 1)));
 
 export const won = (n) => `${Number(n || 0).toLocaleString('ko-KR')}원`;
 
@@ -55,8 +66,8 @@ const stamp = (ms) => { const d = new Date(ms); return `${d.getFullYear()}.${p2(
 
 // 글자 → 단락 html (자리 표시를 채운다)
 function bodyHtml(c, eul, lines = false, edit = false) {
-  const fill = { '갑': c.client_name || '갑', '을': eul.name || '을', '제작비': moneyText(c.build_fee), '연간비': moneyText(c.yearly_fee), '용량': c.hosting || '1GB', '계약일': dateKo(c.contract_date) };
-  const put = (t) => esc(t).replace(/\{(갑|을|제작비|연간비|용량|계약일)\}/g, (_, k) => (edit ? `<b class="ct-ph" contenteditable="false" data-ph="${k}" title="왼쪽 칸 값이 들어가는 자리">${esc(fill[k])}</b>` : `<b>${esc(fill[k])}</b>`));
+  const fill = { '갑': c.client_name || '갑', '을': eul.name || '을', '제작비': moneyText(c.build_fee), '연간비': moneyText(c.yearly_fee), '기간': `${years(c)}년`, '용량': c.hosting || '1GB', '계약일': dateKo(c.contract_date) };
+  const put = (t) => esc(t).replace(/\{(갑|을|제작비|연간비|기간|용량|계약일)\}/g, (_, k) => (edit ? `<b class="ct-ph" contenteditable="false" data-ph="${k}" title="왼쪽 칸 값이 들어가는 자리">${esc(fill[k])}</b>` : `<b>${esc(fill[k])}</b>`));
   return String(c.body || '').split(/\r?\n/).map((line, i) => {
     const t = line.trim();
     const l = (lines || edit ? ` data-l="${i}"` : '') + (edit ? ' contenteditable="plaintext-only" spellcheck="false"' : '');
@@ -77,16 +88,18 @@ export function contractHtml(c, eul, opt = {}) {
     <div class="ct-body">${bodyHtml(c, eul, opt.lines, opt.edit)}</div>
     <p class="ct-date">${esc(dateKo(c.contract_date) || '　　년　　월　　일')}</p>
     <div class="ct-parties">
-      ${party('갑', c.client_name, c.client_phone, c.client_sign || opt.preview || '', 'gap')}
-      ${party('을', eul.name, eul.phone, eul.sign, 'eul')}
+      ${party('갑', c.client_name, c.client_phone, c.client_sign || opt.preview || '', 'gap', eul.email ? c.client_email || '' : null)}
+      ${party('을', eul.name, eul.phone, eul.sign, 'eul', eul.email || null)}
     </div>
     ${signed ? `<footer class="ct-foot">전자 서명 완료 ${esc(stamp(c.signed_at))} · 문서 확인 ${esc(c.host || 'sign.plators.com')}/${esc(c.code)}${c.doc_hash ? ` · 지문 ${esc(c.doc_hash.slice(0, 16))}` : ''}</footer>` : ''}
   </article>`;
 }
-const party = (role, name, phone, mark, who) => `<section class="ct-party">
+// email 이 null 이면 이메일 줄을 그리지 않는다(이메일 칸이 생기기 전에 서명한 계약서는 서명 때 모습 그대로)
+const party = (role, name, phone, mark, who, email = null) => `<section class="ct-party">
   <h2>${role}</h2>
   <dl><div><dt>이름</dt><dd class="ct-name"><span>${esc(name || '')}</span><span class="ct-in ct-in-${who}" data-in="${who}"><i>인</i>${mark ? `<img src="${esc(mark)}" alt="${esc(name)} 서명 · 도장">` : ''}</span></dd></div>
-  <div><dt>연락처</dt><dd>${esc(phone || '')}</dd></div></dl>
+  <div><dt>연락처</dt><dd>${esc(phone || '')}</dd></div>${email === null ? '' : `
+  <div><dt>이메일</dt><dd class="ct-mail">${esc(email)}</dd></div>`}</dl>
 </section>`;
 
 // A4 한 장에 들어가는지 (PDF 크기로 몰래 그려 높이를 잰다). 넘으면 몇 % 넘는지

@@ -263,8 +263,10 @@ CREATE TABLE IF NOT EXISTS contracts (
   code TEXT NOT NULL UNIQUE,                 -- 주소 5자 (대소문자 · 숫자)
   client_name TEXT NOT NULL,
   client_phone TEXT NOT NULL DEFAULT '',
+  client_email TEXT NOT NULL DEFAULT '',     -- 갑 이메일 (2026-11-19 ALTER TABLE contracts ADD COLUMN client_email TEXT NOT NULL DEFAULT ''). 을 이메일은 코드에 고정
   build_fee INTEGER NOT NULL DEFAULT 0,      -- 제작비(원)
-  yearly_fee INTEGER NOT NULL DEFAULT 0,     -- 1년 호스팅 · 유지보수 관리비(원)
+  yearly_fee INTEGER NOT NULL DEFAULT 0,     -- 호스팅 · 유지보수 관리비(원) — hosting_years 년치
+  hosting_years INTEGER NOT NULL DEFAULT 1,  -- 호스팅 · 유지보수 기간(년) (2026-11-19 ALTER TABLE contracts ADD COLUMN hosting_years INTEGER NOT NULL DEFAULT 1)
   hosting TEXT NOT NULL DEFAULT '1GB',       -- 호스팅 저장 용량 (2026-11-13 ALTER TABLE contracts ADD COLUMN hosting TEXT NOT NULL DEFAULT '1GB')
   contract_date TEXT NOT NULL DEFAULT '',    -- YYYY-MM-DD
   body TEXT NOT NULL,                        -- 계약서 글자 ({갑} {을} {제작비} {연간비} 자리 표시)
