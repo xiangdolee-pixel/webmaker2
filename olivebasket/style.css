@@ -410,3 +410,7 @@ select {
   }
 }
 @media (prefers-reduced-motion: reduce) { .src-sheet, .src-panel { transition: none; } }
+
+/* 출처별로 볼 때 문구 아래 '2 / 12' (그 출처 12구절 중 2번째) */
+.pos { margin-top: 12px; color: var(--ink-soft); font-size: 13px; letter-spacing: .12em; font-variant-numeric: tabular-nums; opacity: .75; transition: color 1.6s ease; }
+.pos:empty { display: none; }
