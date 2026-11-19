@@ -123,6 +123,8 @@ export async function contractsPublic(request, env, url, staticFile) {
   const onSign = isSignHost(url);
   let m = p.match(/^\/api\/sign\/([A-Za-z0-9]{5})$/);
   if (m) return signApi(request, env, m[1]);
+  m = p.match(/^\/api\/sign\/([A-Za-z0-9]{5})\/mail$/);
+  if (m) return signMail(request, env, m[1]);
   if (onSign && (p.startsWith('/css/') || p.startsWith('/js/'))) return staticFile(request, env, url);
   m = onSign ? p.match(/^\/([A-Za-z0-9]{5})\/?$/) : p.match(/^\/sign\/([A-Za-z0-9]{5})\/?$/);
   if (m) return signPage(request, env, url, staticFile);
@@ -138,6 +140,57 @@ async function signPage(request, env, url, staticFile) {
   r.headers.set('X-Robots-Tag', 'noindex');
   r.headers.set('Referrer-Policy', 'no-referrer');   // 서명 주소가 다른 곳으로 새지 않게
   return r;
+}
+
+// 서명이 끝난 계약서 PDF 를 메일로 (사용자 지시 2026-11-19 "이메일로 발송하기")
+//   받는 곳은 계약서에 적어 둔 갑 이메일뿐 — 화면에서 주소를 받지 않는다(이 주소를 아는 사람이 아무에게나 보내지 못하게).
+//   PDF 는 화면이 만든 것을 받는다(서버에서는 못 만든다). 계약서 하나에 ${MAIL_MAX}번까지, 1분에 한 번.
+const MAIL_MAX = 5;
+const maskMail = (s) => String(s).replace(/^(.{1,2})[^@]*(@.*)$/, '$1***$2');
+async function signMail(request, env, code) {
+  if (request.method !== 'POST') return json({ error: '지원하지 않는 요청입니다.' }, 405);
+  const db = env.DB;
+  const c = CODE_RE.test(code) ? await db.prepare('SELECT id, code, client_name, client_email, status, mail_count, mailed_at FROM contracts WHERE code = ?').bind(code).first() : null;
+  if (!c) return json({ error: '없는 계약서 주소입니다.' }, 404);
+  if (c.status !== 'signed') throw bad('서명이 끝난 계약서만 보낼 수 있습니다.');
+  if (!c.client_email) throw bad('계약서에 갑 이메일이 적혀 있지 않습니다.');
+  if (!env.EMAIL || !env.MAIL_FROM) throw bad('지금은 메일을 보낼 수 없습니다.');
+  if (c.mail_count >= MAIL_MAX) throw bad(`이 계약서는 이미 ${MAIL_MAX}번 보냈습니다. PDF 내려받기를 써 주세요.`);
+  if (now() - c.mailed_at < 60000) throw bad('방금 보냈습니다. 1분 뒤에 다시 눌러 주세요.');
+  let b; try { b = await request.json(); } catch { throw bad('요청 내용을 읽을 수 없습니다.'); }
+  const pdf = String(b.pdf || '');
+  // %PDF 로 시작하는 base64 만, 8MB 까지
+  if (!pdf.startsWith('JVBERi') || pdf.length > 11_000_000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(pdf)) throw bad('PDF 를 읽을 수 없습니다. 다시 눌러 주세요.');
+  // 먼저 횟수를 올린다 (동시에 여러 번 눌러도 한 번만)
+  const t = now();
+  const r = await db.prepare('UPDATE contracts SET mail_count = mail_count + 1, mailed_at = ? WHERE id = ? AND mail_count < ? AND mailed_at < ?').bind(t, c.id, MAIL_MAX, t - 60000).run();
+  if (!r.meta.changes) throw bad('방금 보냈습니다. 1분 뒤에 다시 눌러 주세요.');
+  const url = `https://${SIGN_HOST}/${c.code}`;
+  const e = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+  const safe = c.client_name.replace(/[\\/:*?"<>|\s]+/g, '').slice(0, 30);
+  try {
+    await env.EMAIL.send({
+      to: c.client_email, from: { email: env.MAIL_FROM, name: '전자계약서' },
+      subject: `[전자계약서] 홈페이지 제작 계약서 — ${c.client_name}`,
+      text: `${c.client_name} 님, 홈페이지 제작 계약서(No. ${c.code}) 서명이 완료되었습니다.\n서명된 계약서를 PDF 파일로 첨부합니다. 보관해 주세요.\n\n온라인에서 보기: ${url}`,
+      html: `<div style="font-family:Pretendard,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;max-width:560px;margin:0 auto;color:#171c27;font-size:15px;line-height:1.7">
+        <p style="margin:0 0 6px;color:#5c6474;font-size:13px">전자계약서 · No. ${e(c.code)}</p>
+        <h1 style="margin:0 0 16px;font-size:21px">홈페이지 제작 계약서</h1>
+        <p style="margin:0 0 18px"><b>${e(c.client_name)}</b> 님, 계약서 서명이 완료되었습니다.<br>서명된 계약서를 <b>PDF 파일로 첨부</b>합니다. 보관해 주세요.</p>
+        <p style="margin:0"><a href="${e(url)}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#3b4cca;color:#fff;text-decoration:none;font-weight:700">온라인에서 보기</a></p>
+      </div>`,
+      attachments: [{ content: pdf, filename: `홈페이지제작계약서_${safe}_${c.code}.pdf`, type: 'application/pdf', disposition: 'attachment' }],
+    });
+  } catch (err) {
+    console.error('계약서 메일', c.code, err?.code, err?.message || err);
+    // 못 보냈으면 횟수를 되돌린다
+    await db.prepare('UPDATE contracts SET mail_count = MAX(0, mail_count - 1), mailed_at = 0 WHERE id = ?').bind(c.id).run();
+    return json({ error: '메일을 보내지 못했습니다. 잠시 뒤에 다시 눌러 주세요.' }, 502);
+  }
+  const ip = request.headers.get('CF-Connecting-IP') || 'local';
+  await db.prepare('INSERT INTO audit_log (action, target, detail, ip, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind('CONTRACT_MAIL', c.client_name.slice(0, 200), `sign/${c.code} PDF 메일 → ${maskMail(c.client_email)}`, ip, t).run().catch(() => {});
+  return json({ ok: true, to: maskMail(c.client_email), left: MAIL_MAX - c.mail_count - 1 });
 }
 
 async function signApi(request, env, code) {

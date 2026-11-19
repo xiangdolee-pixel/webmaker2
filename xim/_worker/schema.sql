@@ -280,6 +280,8 @@ CREATE TABLE IF NOT EXISTS contracts (
   signed_ua TEXT NOT NULL DEFAULT '',
   doc_hash TEXT NOT NULL DEFAULT '',         -- 서명 때 내용 지문(sha256)
   eul_snapshot TEXT NOT NULL DEFAULT '',
+  mail_count INTEGER NOT NULL DEFAULT 0,     -- 서명본 PDF 를 갑 이메일로 보낸 횟수 (2026-11-19 ALTER TABLE contracts ADD COLUMN mail_count INTEGER NOT NULL DEFAULT 0)
+  mailed_at INTEGER NOT NULL DEFAULT 0,      -- 마지막으로 보낸 때 (2026-11-19 ALTER TABLE contracts ADD COLUMN mailed_at INTEGER NOT NULL DEFAULT 0)
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

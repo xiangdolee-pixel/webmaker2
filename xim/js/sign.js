@@ -1,6 +1,6 @@
 // 계약서 서명 화면 (sign.plators.com/<5자>) — 갑이 계약서를 읽고, 손가락 · 마우스로 서명해 완료한 뒤 PDF 로 내려받는다
 import { $, esc, toast, pillTabs } from './common.js';
-import { contractHtml, downloadPdf, markImage } from './contract-doc.js';
+import { contractHtml, downloadPdf, pdfBase64, markImage } from './contract-doc.js';
 
 const box = $('#sign');
 const code = (location.pathname.match(/([A-Za-z0-9]{5})\/?$/) || [])[1];
@@ -26,7 +26,7 @@ function render() {
     <div class="sign-top">
       <span class="badge ${signed ? 'done' : 'new'}">${signed ? '서명 완료' : '서명 대기'}</span>
       <p>${signed ? '서명이 끝난 계약서입니다. PDF 로 내려받아 보관해 주세요.' : '계약서를 끝까지 읽고, 맨 아래에서 서명해 주세요.'}</p>
-      ${signed ? '<button class="btn primary" type="button" data-pdf>PDF 내려받기</button>' : ''}
+      ${signed ? `<span class="sign-acts"><button class="btn primary" type="button" data-pdf>PDF 내려받기</button>${c.client_email ? '<button class="btn" type="button" data-mail>이메일로 발송하기</button>' : ''}</span>` : ''}
     </div>
     <div data-doc>${contractHtml(c, c.eul)}</div>
     ${signed ? '' : `
@@ -47,6 +47,7 @@ function render() {
       <button class="btn primary sign-done" type="button" data-done>서명하고 완료</button>
     </section>`}`;
   box.querySelector('[data-pdf]')?.addEventListener('click', pdf);
+  box.querySelector('[data-mail]')?.addEventListener('click', mail);
   if (!signed) pad();
 }
 
@@ -55,6 +56,19 @@ async function pdf(e) {
   const orig = b.innerHTML;
   b.disabled = true; b.innerHTML = '<span class="spin" aria-hidden="true"></span>PDF 만드는 중…';
   try { await downloadPdf(c, c.eul); } catch (err) { toast(err.message || 'PDF 를 만들지 못했습니다.'); } finally { b.disabled = false; b.innerHTML = orig; }
+}
+
+// 서명된 계약서 PDF 를 계약서에 적힌 갑 이메일로 보낸다 (받는 주소는 서버가 정한다)
+async function mail(e) {
+  const b = e.currentTarget;
+  const orig = b.innerHTML;
+  b.disabled = true; b.innerHTML = '<span class="spin" aria-hidden="true"></span>보내는 중…';
+  try {
+    const r = await fetch(`${API}/mail`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdf: await pdfBase64(c, c.eul) }) });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(out.error || '메일을 보내지 못했습니다.');
+    toast(`${out.to} 으로 계약서 PDF 를 보냈습니다.`);
+  } catch (err) { toast(err.message || '메일을 보내지 못했습니다.'); } finally { b.disabled = false; b.innerHTML = orig; }
 }
 
 // ───────── 서명 칸 ─────────

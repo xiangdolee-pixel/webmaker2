@@ -128,7 +128,8 @@ const loadScript = (src) => new Promise((ok, no) => {
   document.head.append(s);
 });
 
-export async function downloadPdf(c, eul) {
+// → { pdf(jsPDF), name(파일 이름) }
+async function makePdf(c, eul) {
   await Promise.all(LIBS.map(loadScript));
   const box = document.createElement('div');
   box.className = 'ct-offscreen';
@@ -146,8 +147,17 @@ export async function downloadPdf(c, eul) {
     pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', (210 - w) / 2, 0, w, h);
     pdf.setProperties({ title: `홈페이지 제작 계약서 - ${c.client_name}`, subject: `No. ${c.code}` });
     const safe = String(c.client_name || '').replace(/[\\/:*?"<>|\s]+/g, '').slice(0, 30);
-    pdf.save(`홈페이지제작계약서_${safe}_${c.code}.pdf`);
+    return { pdf, name: `홈페이지제작계약서_${safe}_${c.code}.pdf` };
   } finally { box.remove(); }
+}
+export async function downloadPdf(c, eul) {
+  const { pdf, name } = await makePdf(c, eul);
+  pdf.save(name);
+}
+// 메일에 붙일 PDF (base64 글자)
+export async function pdfBase64(c, eul) {
+  const { pdf } = await makePdf(c, eul);
+  return pdf.output('datauristring').split(',').pop();
 }
 
 // 서명 · 도장 그림 올리기: 가로 600px 안으로 줄이고, 흰 바탕은 투명하게, 둘레 여백을 잘라 PNG data URL 로 (xim 을 사인 · 서명 화면 갑 도장 같이 씀)
