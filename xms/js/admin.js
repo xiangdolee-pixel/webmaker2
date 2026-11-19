@@ -243,10 +243,9 @@ function head(eyebrow, title, lede = '', action = '') {
   return `<header class="ph${action ? ' has-act' : ''}"><div><small>${eyebrow}</small><h1>${title}</h1>${lede ? `<p>${lede}</p>` : ''}</div>${action ? `<div class="ph-act">${action}</div>` : ''}</header>`;
 }
 const empty = (t, hint, action = '') => `<div class="empty"><b>${t}</b><span>${hint}</span>${action}</div>`;
-// always = 한 쪽뿐이어도 쪽 번호(1)를 보여 준다 (가입회원)
-function pager(page, size, total, href, always = false) {
-  const pages = Math.max(1, Math.ceil(total / size));
-  if (pages <= 1 && !always) return '';
+function pager(page, size, total, href) {
+  const pages = Math.ceil(total / size);
+  if (pages <= 1) return '';
   const start = Math.floor((page - 1) / 5) * 5 + 1;
   const nums = Array.from({ length: Math.min(5, pages - start + 1) }, (_, i) => start + i);
   return `<nav class="pager">${start > 1 ? `<a href="${href(start - 1)}">‹</a>` : ''}${nums.map((n) => (n === page ? `<b>${n}</b>` : `<a href="${href(n)}">${n}</a>`)).join('')}${start + 5 <= pages ? `<a href="${href(start + 5)}">›</a>` : ''}</nav>`;
@@ -264,15 +263,32 @@ function ctrlS(form) {
 // ───────── 가입회원 ─────────
 let tempNotice = '';
 async function membersPage(qs) {
-  // 한 쪽에 몇 명씩: 고른 값을 이 브라우저에 기억 (기본 10명)
-  let msize = 10; try { msize = Number(localStorage.getItem('xms_msize')) || 10; } catch { /* 기본값 */ }
-  const d = await api(`/members?${qs}${qs.toString() ? '&' : ''}size=${msize}`);
+  // 쪽 번호 없이, 아래로 내리면 20명씩 이어서 불러온다 (사용자 지시 2026-11-19 "스크롤 내리면 계속 불러와지는 형태")
+  const SIZE = 20;
+  const q0 = new URLSearchParams(qs); q0.delete('page'); q0.set('size', SIZE);
+  const fetchPage = (n) => api(`/members?${q0}&page=${n}`);
+  const d = await fetchPage(1);
   const extraFields = d.fields.filter((f) => !['name', 'email', 'mobile', 'nickname', 'phone'].includes(f.key));
   const filtered = qs.get('q') || qs.get('level') || qs.get('missing');
   const lede = filtered ? `조건에 맞는 회원 ${d.total}명입니다.` : `${d.all}명이 가입해 있습니다. 등급을 바꾸거나 로그인을 막을 수 있습니다.`;
   const exportQs = new URLSearchParams(qs); exportQs.delete('page');
   const reqFields = d.fields.filter((f) => f.mode === 'REQUIRED');
   const lvOpts = (sel) => Array.from({ length: 10 }, (_, i) => i + 1).map((n) => `<option value="${n}"${n === sel ? ' selected' : ''}>${esc(LV(n))}</option>`).join('');
+  // 가입회원 한 줄 (2026-11-19 다시 정리 "정렬 안 되어 보인다"): 이름 · 아이디 | 연락처 | 최근 로그인 | 등급 | 관리 — 칸 폭을 고정해 줄마다 같은 자리에
+  const rowHtml = (m) => {
+    const social = String(m.social || '').split(',').filter(Boolean).map((p) => (p === 'kakao' ? '<span class="tag yellow">카카오</span>' : p === 'naver' ? '<span class="tag green">네이버</span>' : p === 'google' ? '<span class="tag blue">Google</span>' : '')).join('');
+    const mail = m.email && m.email !== m.login_id ? m.email : '';   // 아이디가 이메일이면 연락처에 또 적지 않는다
+    const contact = [mail ? `<span>${esc(mail)}</span>` : '', m.mobile ? `<span>${esc(fmtPhone(m.mobile))}</span>` : ''].join('');
+    const extra = extraFields.map((f) => { const v = m.extra[f.key]; const t = Array.isArray(v) ? v.join(', ') : v; return t ? `<span><i>${esc(f.label)}</i>${esc(t)}</span>` : ''; }).join('');
+    return `<div class="mrow" data-id="${m.id}">
+        <div class="m-who"><div class="m-name"><button type="button" class="who-btn" data-detail>${esc(m.name)}</button>${m.nickname && m.nickname !== m.name ? `<span class="num">${esc(m.nickname)}</span>` : ''}${m.status === 'LOCKED' ? '<span class="tag red">잠김</span>' : ''}</div>
+          <div class="m-id"><span>${esc(m.login_id)}</span>${social}</div></div>
+        <div class="m-info">${contact ? `<div class="m-ct">${contact}</div>` : ''}${extra ? `<div class="m-ex">${extra}</div>` : ''}${contact || extra ? '' : '<span class="dash">—</span>'}</div>
+        <div class="m-last">${m.last_login_at ? fmtDate(m.last_login_at) : '<span class="dash">—</span>'}</div>
+        <div class="lv"><select class="input" aria-label="등급">${lvOpts(m.level)}</select><button class="btn sm" type="button" data-level>바꾸기</button></div>
+        <div class="mng"><button class="btn sm" type="button" data-lock>${m.status === 'LOCKED' ? '잠금 풀기' : '로그인 막기'}</button><button class="btn sm" type="button" data-temp>비밀번호 재발급</button><button class="btn sm danger" type="button" data-out>탈퇴</button></div>
+      </div>`;
+  };
   main.innerHTML = `${head('회원', '가입회원', lede)}
     ${tempNotice ? `<div class="notice-bar" role="status"><span>${tempNotice}</span><button type="button" aria-label="닫기" data-x>×</button></div>` : ''}
     <form class="search" id="msearch">
@@ -283,62 +299,86 @@ async function membersPage(qs) {
       ${filtered ? '<a class="btn" href="#/members">조건 지우기</a>' : ''}
       <a class="btn green right" href="/xms-api/admin/members/export?${exportQs}">엑셀로 내려받기</a>
     </form>
-    <div class="panel">${d.rows.length ? `<div class="mlist">
+    <div class="panel">${d.rows.length ? `<div class="mlist" id="mlist">
       <div class="mrow mhead" aria-hidden="true"><span>이름 · 아이디</span><span>연락처${extraFields.length ? ' · 가입 항목' : ''}</span><span>최근 로그인</span><span>등급</span><span class="m-r">관리</span></div>
-      ${d.rows.map((m) => {
-        // 가입회원 한 줄 (2026-11-19 다시 정리 "정렬 안 되어 보인다"): 이름 · 아이디 | 연락처 | 최근 로그인 | 등급 | 관리 — 칸 폭을 고정해 줄마다 같은 자리에
-        const social = String(m.social || '').split(',').filter(Boolean).map((p) => (p === 'kakao' ? '<span class="tag yellow">카카오</span>' : p === 'naver' ? '<span class="tag green">네이버</span>' : p === 'google' ? '<span class="tag blue">Google</span>' : '')).join('');
-        const mail = m.email && m.email !== m.login_id ? m.email : '';   // 아이디가 이메일이면 연락처에 또 적지 않는다
-        const contact = [mail ? `<span>${esc(mail)}</span>` : '', m.mobile ? `<span>${esc(fmtPhone(m.mobile))}</span>` : ''].join('');
-        const extra = extraFields.map((f) => { const v = m.extra[f.key]; const t = Array.isArray(v) ? v.join(', ') : v; return t ? `<span><i>${esc(f.label)}</i>${esc(t)}</span>` : ''; }).join('');
-        return `<div class="mrow" data-id="${m.id}">
-        <div class="m-who"><div class="m-name"><button type="button" class="who-btn" data-detail>${esc(m.name)}</button>${m.nickname && m.nickname !== m.name ? `<span class="num">${esc(m.nickname)}</span>` : ''}${m.status === 'LOCKED' ? '<span class="tag red">잠김</span>' : ''}</div>
-          <div class="m-id"><span>${esc(m.login_id)}</span>${social}</div></div>
-        <div class="m-info">${contact ? `<div class="m-ct">${contact}</div>` : ''}${extra ? `<div class="m-ex">${extra}</div>` : ''}${contact || extra ? '' : '<span class="dash">—</span>'}</div>
-        <div class="m-last">${m.last_login_at ? fmtDate(m.last_login_at) : '<span class="dash">—</span>'}</div>
-        <div class="lv"><select class="input" aria-label="등급">${lvOpts(m.level)}</select><button class="btn sm" type="button" data-level>바꾸기</button></div>
-        <div class="mng"><button class="btn sm" type="button" data-lock>${m.status === 'LOCKED' ? '잠금 풀기' : '로그인 막기'}</button><button class="btn sm" type="button" data-temp>비밀번호 재발급</button><button class="btn sm danger" type="button" data-out>탈퇴</button></div>
-      </div>`; }).join('')}</div>`
+      ${d.rows.map(rowHtml).join('')}</div>`
     : filtered ? empty('조건에 맞는 회원이 없습니다', '다른 이름이나 아이디로 찾아보세요.', '<a class="btn" href="#/members">조건 지우고 전체 보기</a>')
       : empty('아직 가입한 회원이 없습니다', '홈페이지에서 누군가 가입하면 여기에 나타납니다.')}</div>
-    ${d.rows.length ? `<div class="plist-foot"><span class="pl-sum">${filtered ? '찾은' : '전체'} <b>${d.total}</b>명 중 ${(d.page - 1) * d.size + 1}–${(d.page - 1) * d.size + d.rows.length}번째</span>
-      ${pager(d.page, d.size, d.total, (n) => { const p = new URLSearchParams(qs); p.set('page', n); return `#/members?${p}`; }, true)}
-      <select class="input pl-size" id="msize" aria-label="한 쪽에 보이는 회원 수">${[10, 20, 50, 100].map((n) => `<option value="${n}"${n === d.size ? ' selected' : ''}>${n}명씩 보기</option>`).join('')}</select></div>` : ''}`;
+    ${d.rows.length ? '<div class="more" id="mmore" role="status" aria-live="polite"></div>' : ''}`;
 
-  $('#msize')?.addEventListener('change', (e) => {
-    try { localStorage.setItem('xms_msize', e.target.value); } catch { /* 이번만 */ }
-    const p = new URLSearchParams(qs); p.delete('page');   // 쪽 크기를 바꾸면 첫 쪽부터
-    go(p.toString() ? `#/members?${p}` : '#/members');
-  });
   $('[data-x]')?.addEventListener('click', (e) => { tempNotice = ''; e.target.closest('.notice-bar').remove(); });
   $('#msearch').addEventListener('submit', (e) => {
     e.preventDefault();
     const p = new URLSearchParams(Object.entries(formData(e.target)).filter(([, v]) => v));
     go(`#/members?${p}`);
   });
-  const reload = () => route();
-  $$('.mrow[data-id]').forEach((tr) => {
-    const m = d.rows.find((x) => x.id === +tr.dataset.id);
-    const who = `${m.name}(${m.login_id})`;
-    tr.querySelector('[data-detail]').onclick = () => memberDetail(m, d.fields);
-    tr.querySelector('[data-level]').onclick = (e) => busy(e.currentTarget, null, async () => {
-      await api(`/members/${m.id}/level`, { method: 'POST', data: { level: Number(tr.querySelector('select').value) } });
-      toast(`${who} 님 등급을 바꿨습니다.`); reload();
+  const list = $('#mlist');
+  if (!list) return;
+  const more = $('#mmore');
+  let total = d.total;   // 조건에 맞는 회원 수 (탈퇴 처리하면 줄어든다)
+  let shown = 0;         // 지금까지 불러온 수
+  let page = 1;
+  let loading = false;
+  const done = () => shown >= total;
+  const status = () => { more.textContent = done() ? `${total}명을 모두 불러왔습니다.` : `${total}명 중 ${shown}명 · 아래로 내리면 더 불러옵니다`; more.classList.toggle('is-done', done()); };
+  // 줄마다 단추 연결 — 등급 · 잠금 · 탈퇴는 그 줄만 고친다(다시 불러오면 내려 본 자리를 잃는다)
+  const bind = (row, m) => {
+    const who = () => `${m.name}(${m.login_id})`;
+    row.querySelector('[data-detail]').onclick = () => memberDetail(m, d.fields);
+    row.querySelector('[data-level]').onclick = (e) => busy(e.currentTarget, null, async () => {
+      const level = Number(row.querySelector('select').value);
+      await api(`/members/${m.id}/level`, { method: 'POST', data: { level } });
+      m.level = level;
+      toast(`${who()} 님 등급을 바꿨습니다.`);
     });
-    tr.querySelector('[data-lock]').onclick = (e) => busy(e.currentTarget, null, async () => {
-      await api(`/members/${m.id}/lock`, { method: 'POST', data: { locked: m.status !== 'LOCKED' } });
-      toast(m.status === 'LOCKED' ? '잠금을 풀었습니다.' : '로그인을 막았습니다.'); reload();
+    row.querySelector('[data-lock]').onclick = (e) => busy(e.currentTarget, null, async () => {
+      const locked = m.status !== 'LOCKED';
+      await api(`/members/${m.id}/lock`, { method: 'POST', data: { locked } });
+      m.status = locked ? 'LOCKED' : 'ACTIVE';
+      toast(locked ? '로그인을 막았습니다.' : '잠금을 풀었습니다.');
+      const fresh = document.createElement('div'); fresh.innerHTML = rowHtml(m);
+      const next = fresh.firstElementChild; row.replaceWith(next); bind(next, m);
     });
-    tr.querySelector('[data-temp]').onclick = (e) => confirmInline(e.currentTarget, `<b>${esc(who)}</b> 님의 비밀번호가 즉시 바뀝니다. 지금 쓰는 비밀번호로는 로그인할 수 없게 되니, 바로 전달할 수 있을 때 발급하세요.`, '새 비밀번호 발급', async () => {
+    row.querySelector('[data-temp]').onclick = (e) => confirmInline(e.currentTarget, `<b>${esc(who())}</b> 님의 비밀번호가 즉시 바뀝니다. 지금 쓰는 비밀번호로는 로그인할 수 없게 되니, 바로 전달할 수 있을 때 발급하세요.`, '새 비밀번호 발급', async () => {
       const r = await api(`/members/${m.id}/temp-password`, { method: 'POST', data: {} });
       tempNotice = `<b>${esc(r.who)}</b> 님의 새 비밀번호 <code>${esc(r.password)}</code> — 이전 비밀번호는 이제 쓸 수 없습니다.`;
-      reload();
+      route();   // 새 비밀번호 알림은 맨 위에 뜬다
     });
-    tr.querySelector('[data-out]').onclick = (e) => confirmInline(e.currentTarget, `<b>${esc(who)}</b> 님이 가입회원 목록에서 사라지고 로그인할 수 없게 되며, 이 화면에서는 되돌릴 수 없습니다. 쓴 글과 댓글은 그대로 남습니다.`, '탈퇴 처리', async () => {
+    row.querySelector('[data-out]').onclick = (e) => confirmInline(e.currentTarget, `<b>${esc(who())}</b> 님이 가입회원 목록에서 사라지고 로그인할 수 없게 되며, 이 화면에서는 되돌릴 수 없습니다. 쓴 글과 댓글은 그대로 남습니다.`, '탈퇴 처리', async () => {
       await api(`/members/${m.id}/withdraw`, { method: 'POST', data: {} });
-      toast('탈퇴 처리했습니다.'); reload();
+      toast('탈퇴 처리했습니다.');
+      row.remove(); total -= 1; shown -= 1; status();
     });
-  });
+  };
+  const add = (rows) => {
+    rows.forEach((m) => {
+      if (list.querySelector(`.mrow[data-id="${m.id}"]`)) return;   // 그 사이 새 가입으로 한 칸 밀려 다시 온 회원
+      list.insertAdjacentHTML('beforeend', rowHtml(m));
+      bind(list.lastElementChild, m);
+    });
+  };
+  d.rows.forEach((m) => bind(list.querySelector(`.mrow[data-id="${m.id}"]`), m));
+  shown = d.rows.length;
+  status();
+  // 아래 끝이 보이면 다음 20명
+  const io = new IntersectionObserver(async (es) => {
+    if (!es.some((x) => x.isIntersecting) || loading || done()) return;
+    loading = true;
+    more.innerHTML = '<span class="spin" aria-hidden="true"></span>불러오는 중…';
+    try {
+      const r = await fetchPage(page + 1);
+      if (!more.isConnected) return;   // 그 사이 다른 화면으로 갔다
+      page += 1;
+      add(r.rows);
+      shown += r.rows.length;
+      if (!r.rows.length) total = shown;
+      status();
+    } catch (err) { if (more.isConnected) more.textContent = `더 불러오지 못했습니다. ${err.message || ''}`; } finally { loading = false; }
+    // 불러온 뒤에도 끝이 화면 안에 있으면(큰 화면) 이어서
+    if (more.isConnected && !done()) { io.unobserve(more); io.observe(more); }
+  }, { rootMargin: '400px 0px' });
+  io.observe(more);
+  addEventListener('hashchange', () => io.disconnect(), { once: true });
 }
 function memberDetail(m, fields) {
   const val = (f) => { const v = ['name', 'nickname', 'email', 'mobile', 'phone'].includes(f.key) ? m[f.key] : m.extra[f.key]; return Array.isArray(v) ? v.join(', ') : (f.key === 'mobile' || f.key === 'phone' ? fmtPhone(v) : v); };
