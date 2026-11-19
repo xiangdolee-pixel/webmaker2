@@ -92,8 +92,11 @@ export function openDialog(html, setup) {
   dlg.innerHTML = `<div class="dlg">${html}</div>`;
   document.body.append(dlg);
   dlg.addEventListener('close', () => dlg.remove());
+  // 바깥(어두운 곳)을 눌러 닫기: 누르기 시작한 곳도 바깥일 때만 — 입력칸에서 글자를 끌어 고르다 창 밖에서 손을 떼면 닫히던 것 막음 (2026-11-19)
+  let downOut = false;
+  dlg.addEventListener('pointerdown', (e) => { downOut = e.target === dlg; });
   dlg.addEventListener('click', (e) => {
-    if (e.target === dlg || e.target.closest('[data-close]')) dlg.close();
+    if ((e.target === dlg && downOut) || e.target.closest('[data-close]')) dlg.close();
   });
   setup?.(dlg);
   dlg.showModal();
