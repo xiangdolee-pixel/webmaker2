@@ -115,7 +115,7 @@ export async function contractsApi(request, env, path, method, readBody, audit) 
 }
 
 // ───────── 갑(고객) 화면 · API — 로그인 없음, 주소(5자)를 아는 사람만 ─────────
-export const isSignHost = (url) => url.hostname === SIGN_HOST;
+export const isSignHost = (url) => url.hostname.replace(/\.$/, '') === SIGN_HOST;   // 끝에 점을 붙인 이름도 같은 주소
 
 // 반환: Response, 또는 null(이 길이 아님)
 export async function contractsPublic(request, env, url, staticFile) {

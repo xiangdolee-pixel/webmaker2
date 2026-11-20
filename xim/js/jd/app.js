@@ -174,9 +174,9 @@ const TYPE_KEYS = Object.keys(TYPES);
 const listState = { q: '', type: '', year: '', trash: false, cat: '', page: 1 };
 const PER_PAGE = 12;
 // 고객에게 보내는 문서 주소: xim.plators.com/jd/wD5Jd4 (설정에서 앞부분을 바꿀 수 있다)
-// 고객에게 보내는 문서 주소: docs.plators.com/jd/<6자> (설정에서 앞부분을 바꿀 수 있다). 시험 주소(localhost 등)에서는 그 주소 그대로
+// 고객에게 보내는 문서 주소: docs.plators.com/jd/<8자> (설정에서 앞부분을 바꿀 수 있다). 시험 주소(localhost 등)에서는 그 주소 그대로
 const LINK_BASE = location.hostname === 'xim.plators.com' ? 'https://docs.plators.com/jd' : `${location.origin}/jd`;
-const linkBase = () => String(S.linkBase || LINK_BASE).trim().replace(/\/+$/, '');
+const linkBase = () => { const v = String(S.linkBase || '').trim().replace(/\/+$/, ''); return /^https?:\/\/[^\s"'<>]+$/.test(v) ? v : LINK_BASE; };   // http(s) 주소만 쓴다
 const docLink = (slug) => `${linkBase()}/${slug}`;
 async function copyText(t) {
   try { await navigator.clipboard.writeText(t); return true; } catch (e) {
@@ -1992,7 +1992,7 @@ async function viewSettings() {
     <section class="card">
       <h2 class="sec-title">문서 링크 주소</h2>
       ${F('linkBase', '고객에게 보내는 문서 주소 앞부분', 'https://docs.plators.com/jd')}
-      <p class="small">비워 두면 ${esc(LINK_BASE)} 를 씁니다. 문서마다 뒤에 고유한 6글자가 붙습니다. 예) docs.plators.com/jd/wD5Jd4 · 고객은 그 주소에서 문서를 보고 PDF로 받거나 인쇄만 할 수 있습니다.</p>
+      <p class="small">비워 두면 ${esc(LINK_BASE)} 를 씁니다. 문서마다 뒤에 고유한 8글자가 붙습니다. 예) docs.plators.com/jd/wD5Jd4Qk · 고객은 그 주소에서 문서를 보고 PDF로 받거나 인쇄만 할 수 있습니다.</p>
     </section>
     ${TYPE_KEYS.map((k) => {
       const t = s.types[k];

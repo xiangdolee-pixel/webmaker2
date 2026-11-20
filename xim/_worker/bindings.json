@@ -10,6 +10,10 @@
       "/",
       "/index.html",
       "/jd",
+      "/sign",
+      "/sign.html",
+      "/service",
+      "/service.html",
       "/js/*",
       "/css/*"
     ]

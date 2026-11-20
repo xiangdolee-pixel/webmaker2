@@ -29,6 +29,7 @@ export const num = (v) => {
 export function hangul(n) {
   n = Math.floor(Math.abs(Number(n) || 0));
   if (!n) return '영';
+  if (!(n < 1e20)) return '';   // 경 단위를 넘거나 셀 수 없는 수는 한글로 쓰지 않는다
   const D = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
   const U = ['', '십', '백', '천'];
   const B = ['', '만', '억', '조', '경'];
@@ -69,11 +70,13 @@ export function groupRate(doc, g) {
   return baseRate(doc);
 }
 
+// 한 줄 금액은 ±9천조 안에서만(1e308 같은 값이 합계를 무한대로 만들지 않게)
+const capAmount = (n) => (Number.isFinite(n) ? Math.max(-9e15, Math.min(9e15, n)) : 0);
 export function lineAmount(doc, g, l) {
-  if (l.kind === 'fixed') return Math.round(num(l.amount));
+  if (l.kind === 'fixed') return capAmount(Math.round(num(l.amount)));
   const qty = num(l.qty);
   const unit = l.kind === 'unit' ? Math.round(num(l.unit)) : groupRate(doc, g);
-  return Math.round(qty * unit);
+  return capAmount(Math.round(qty * unit));
 }
 export function lineUnit(doc, g, l) {
   if (l.kind === 'fixed') return null;
@@ -217,7 +220,7 @@ export function parseQuick(text) {
 // 입금계좌: 개인용 · 사업자용 중 문서마다 고른 것
 export const ACCOUNTS = { personal: '개인용', business: '사업자용' };
 export function accountKey(doc, settings) {
-  if (doc.account && ACCOUNTS[doc.account]) return doc.account;
+  if (typeof doc.account === 'string' && Object.hasOwn(ACCOUNTS, doc.account)) return doc.account;
   // 고른 적이 없으면 VAT 규칙대로: VAT포함은 사업자, VAT별도는 개인
   return doc.vat === 'incl' ? 'business' : 'personal';
 }

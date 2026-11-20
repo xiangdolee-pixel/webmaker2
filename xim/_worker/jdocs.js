@@ -8,15 +8,18 @@
 //     GET/POST templates · PUT/DELETE templates/:id      템플릿(불러와서 새 문서로)
 //     GET/POST clients · PUT/DELETE clients/:name        클라이언트 카테고리
 //     GET  stamp · seal                                  도장 그림 — 계약서 '을 정보 · 도장'(settings.contract_eul)의 그림을 같이 쓴다
-//   고객(로그인 없음, 주소 6자를 아는 사람만)  docs.plators.com/jd/<6자> (화면 — xim Worker 에 붙인 사용자 도메인. docs 주소에서는 문서 보기 말고 아무것도 안 열린다.
-//                                               xim 주소의 /jd/<6자> · 예전 /d/<6자> 도 같은 화면) · /api/jdp/<6자> (내용) · /api/jdp/<6자>/stamp|seal
+//   고객(로그인 없음, 주소(8자, 예전 6자)를 아는 사람만)  docs.plators.com/jd/<8자> (화면 — xim Worker 에 붙인 사용자 도메인. docs 주소에서는 문서 보기 말고 아무것도 안 열린다.
+//                                               xim 주소의 /jd/<8자> · 예전 /d/<8자> 도 같은 화면) · /api/jdp/<8자> (내용) · /api/jdp/<8자>/stamp|seal
 //
 //   회사 정보는 jd_settings 에만 있다(코드 · 리포에 두지 않는다). 사업장 주소는 받지도 내보내지도 않는다(사용자 지시: 공개하지 않음).
 
 export const DOCS_HOST = 'docs.plators.com';
+export const isDocsHost = (url) => url.hostname.replace(/\.$/, '') === DOCS_HOST;   // 끝에 점을 붙인 이름(docs.plators.com.)도 같은 주소
 const TYPE_NAME = { quote: '견적서', statement: '거래명세서', invoice: '청구서', letter: '공문' };
 const SLUG_CH = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';   // 헷갈리는 0 O 1 l I 는 뺀다
-const SLUG_RE = /^[A-Za-z0-9]{6}$/;
+const SLUG_LEN = 8;                 // 새 문서 주소 글자 수(예전 6자 주소도 그대로 열린다)
+const SLUG_RE = /^[A-Za-z0-9]{6,8}$/;
+const FAIL_HARD = 100;            //   100번 넘으면 맞는 주소도 잠깐 막는다(마구 찍어 맞히기 방지)
 const FAIL_WINDOW = 10 * 60000;   // 없는 문서 주소를 10분에
 const FAIL_MAX = 20;              //   20번 넘게 두드리면 잠깐 막는다(주소 찍어 보기 방지)
 const ROW = "id, no, type, title, client, doc_date, amount, vat, parent_id, deleted, version, created_at, updated_at, slug, json_extract(data, '$.category') AS category";
@@ -64,11 +67,15 @@ function clean(d, { needDate = true } = {}) {
     && (d.client === undefined || (isObj(d.client) && isText(d.client.name) && isText(d.client.ref)))
     && (d.extra === undefined || (Array.isArray(d.extra) && d.extra.every((e) => isObj(e) && isText(e.label) && isText(e.value))))
     && (d.groups === undefined || (Array.isArray(d.groups) && d.groups.every((g) => isObj(g) && isText(g.name) && (g.lines === undefined || (Array.isArray(g.lines) && g.lines.every((l) => isObj(l) && isText(l.text) && isText(l.note)))))))
-    && (d.rate === undefined || d.rate === null || isObj(d.rate));
+    && (d.rate === undefined || d.rate === null || isObj(d.rate))
+    && (d.account === undefined || d.account === null || d.account === 'personal' || d.account === 'business')
+    && (d.parentId === undefined || d.parentId === null || Number.isSafeInteger(d.parentId));
   if (!ok) throw bad('문서 내용을 읽을 수 없습니다.');
   if (JSON.stringify(d).length > 400000) throw bad('문서가 너무 큽니다.');
   return d;
 }
+// 목록에 보일 금액: 셀 수 있는 수만(너무 큰 값 · 무한대는 0)
+const amountOf = (v) => { const n = Math.round(+v || 0); return Number.isSafeInteger(n) ? n : 0; };
 function needCategory(d) {
   if (!String(d.category || '').trim()) throw bad('클라이언트 카테고리를 넣어 주세요(필수).');
 }
@@ -89,8 +96,8 @@ async function addClient(db, name, now) {
 
 function newSlug() {
   let s = '';
-  while (s.length < 6) {
-    for (const v of crypto.getRandomValues(new Uint8Array(12))) if (v < 228 && s.length < 6) s += SLUG_CH[v % 57];   // 228 = 57 × 4: 글자마다 고르게
+  while (s.length < SLUG_LEN) {
+    for (const v of crypto.getRandomValues(new Uint8Array(16))) if (v < 228 && s.length < SLUG_LEN) s += SLUG_CH[v % 57];   // 228 = 57 × 4: 글자마다 고르게
   }
   return s;
 }
@@ -274,7 +281,7 @@ export async function jdocsApi(request, env, url, path, audit) {
     delete d.id;
     const r = await db.prepare(`INSERT INTO jd_docs(no, type, title, client, doc_date, amount, vat, search, data, parent_id, created_at, updated_at)
       VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
-      .bind(no, d.type, d.title || '', d.client?.name || '', d.date || '', Math.round(+b.amount || 0), d.vat || '', searchText(d), JSON.stringify(d), d.parentId || null, now, now).first();
+      .bind(no, d.type, d.title || '', d.client?.name || '', d.date || '', amountOf(b.amount), d.vat || '', searchText(d), JSON.stringify(d), d.parentId || null, now, now).first();
     await addClient(db, d.category, now);
     const slug = await setSlug(db, r.id);
     await audit('JDOCS_NEW', `${TYPE_NAME[d.type]} ${no}`, d.client?.name || '');
@@ -308,7 +315,7 @@ export async function jdocsApi(request, env, url, path, audit) {
       d.no = row.no;
       const v = row.version + 1;
       const r = await db.prepare('UPDATE jd_docs SET type = ?, title = ?, client = ?, doc_date = ?, amount = ?, vat = ?, search = ?, data = ?, version = ?, updated_at = ? WHERE id = ? AND version = ?')
-        .bind(d.type, d.title || '', d.client?.name || '', d.date || '', Math.round(+b.amount || 0), d.vat || '', searchText(d), JSON.stringify(d), v, now, id, row.version).run();
+        .bind(d.type, d.title || '', d.client?.name || '', d.date || '', amountOf(b.amount), d.vat || '', searchText(d), JSON.stringify(d), v, now, id, row.version).run();
       if (!changes(r)) throw bad(stale, 409);
       await addClient(db, d.category, now);
       return json({ ok: true, id, no: row.no, version: v, updated_at: now });
@@ -341,7 +348,7 @@ export async function jdocsApi(request, env, url, path, audit) {
   return null;
 }
 
-// ───────── 고객 화면 · API — 로그인 없음, 주소(6자)를 아는 사람만 ─────────
+// ───────── 고객 화면 · API — 로그인 없음, 주소(8자, 예전 6자)를 아는 사람만 ─────────
 // 밖에 보여 줄 문서: 내부 메모 · 목표 금액 · 카테고리 · 단가 계산식(노임단가 × 적용률)은 빼고 일단가만 남긴다
 function publicDoc(row) {
   const d = JSON.parse(row.data);
@@ -356,13 +363,16 @@ function publicDoc(row) {
 }
 
 // 밖에 보여 줄 회사 정보: 그 문서 종류에 실제로 찍히는 칸만, 계좌는 그 문서가 쓰는 하나만
-const PUBLIC_CO = { letter: ['name', 'nameEn', 'ceo', 'tel', 'fax', 'email'], other: ['name', 'ceo', 'bizNo', 'bizType', 'bizItem', 'tel', 'fax'] };
+const PUBLIC_CO = { letter: ['name', 'nameEn', 'ceo', 'tel', 'fax', 'email'], invoice: ['name', 'ceo', 'tel'], other: ['name', 'ceo', 'bizNo', 'bizType', 'bizItem', 'tel', 'fax'] };
 function publicCompany(company, doc) {
   const c = isObj(company) ? company : {};
   const out = {};
-  for (const k of PUBLIC_CO[doc.type === 'letter' ? 'letter' : 'other']) if (typeof c[k] === 'string') out[k] = c[k];
+  for (const k of PUBLIC_CO[Object.hasOwn(PUBLIC_CO, doc.type) ? doc.type : 'other']) if (typeof c[k] === 'string') out[k] = c[k];
   const key = doc.account === 'personal' || doc.account === 'business' ? doc.account : (doc.vat === 'incl' ? 'business' : 'personal');
-  const acc = isObj(c.accounts) && typeof c.accounts[key] === 'string' ? c.accounts[key] : '';
+  // 계좌는 문서에 찍힐 때만: 글에 {계좌} 자리가 있거나, 청구서의 입금계좌 칸을 따로 적지 않았을 때
+  const pay = isObj(doc.pay) ? doc.pay : {};
+  const printed = [doc.notes, pay.bank, pay.account].some((t) => typeof t === 'string' && t.includes('{계좌}')) || (doc.type === 'invoice' && (!pay.bank || !pay.account));
+  const acc = printed && isObj(c.accounts) && typeof c.accounts[key] === 'string' ? c.accounts[key] : '';
   out.accounts = { [key]: acc };
   return out;
 }
@@ -405,13 +415,13 @@ const page = (opt, status = 200) => new Response(pageHtml(opt), { status, header
 // 반환: Response, 또는 null(이 길이 아님)
 export async function jdocsPublic(request, env, url, staticFile) {
   const p = url.pathname.replace(/\/+$/, '');
-  const onDocs = url.hostname === DOCS_HOST;
-  const pm = /^\/api\/jdp\/([A-Za-z0-9]{6})(?:\/(stamp|seal))?$/.exec(p);
-  const vm = pm ? null : /^\/(?:jd|d)\/([^/]+)$/.exec(p);   // 주소는 /jd/<6자>. 예전에 보낸 /d/<6자> 도 그대로 열린다
+  const onDocs = isDocsHost(url);
+  const pm = /^\/api\/jdp\/([A-Za-z0-9]{6,8})(?:\/(stamp|seal))?$/.exec(p);
+  const vm = pm ? null : /^\/(?:jd|d)\/([^/]+)$/.exec(p);   // 주소는 /jd/<8자>. 예전에 보낸 /d/<8자> 도 그대로 열린다
   if (!pm && !vm) {
     if (!onDocs) return null;
     // docs 주소: 문서 화면이 쓰는 파일만 내주고, 나머지(운영자 화면 · API)는 없는 주소
-    if (request.method === 'GET' && (p === '/css/jdocs.css' || /^\/js\/jd\/[\w-]+\.js$/.test(p))) return staticFile(request, env, url);
+    if ((request.method === 'GET' || request.method === 'HEAD') && (p === '/css/jdocs.css' || /^\/js\/jd\/(view|calc|layout|render)\.js$/.test(p))) return staticFile(request, env, url);
     return new Response('없는 주소입니다.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' } });
   }
   const db = env.DB;
@@ -419,18 +429,25 @@ export async function jdocsPublic(request, env, url, staticFile) {
   const slug = pm ? pm[1] : vm[1];
   const none = { title: '문서를 찾을 수 없습니다', desc: '주소가 바뀌었거나 지워진 문서입니다.', type: 'letter', origin: url.origin, path: p, ver, gone: true };
 
-  // 없는 주소를 여러 번 두드리면 잠깐 막는다 — 맞는 주소는 언제나 열린다(같은 공유기를 쓰는 다른 사람까지 막지 않게). IPv6 는 앞 64비트로 묶는다
-  const row = SLUG_RE.test(slug) ? await db.prepare('SELECT id, no, type, title, data, deleted FROM jd_docs WHERE slug = ?').bind(slug).first() : null;
+  // 없는 주소를 여러 번 두드리면 잠깐 막는다. 20번까지는 맞는 주소가 그대로 열리고(같은 공유기를 쓰는 다른 사람까지 막지 않게),
+  //   100번을 넘으면 맞는 주소도 막는다(마구 찍어 맞히는 것 방지). IPv6 는 앞 64비트로 묶는다
+  const ip = request.headers.get('CF-Connecting-IP') || 'local';
+  const key = `jdocs:${ip.includes(':') ? ip.split(':').slice(0, 4).join(':') : ip}`;
+  const t = Date.now();
+  const [rows, fails] = await db.batch([
+    db.prepare('SELECT id, no, type, title, data, deleted FROM jd_docs WHERE slug = ?').bind(SLUG_RE.test(slug) ? slug : ''),
+    db.prepare('SELECT COUNT(*) AS n FROM login_fails WHERE key = ? AND at > ?').bind(key, t - FAIL_WINDOW),
+  ]);
+  const row = rows.results[0] || null;
+  const missed = fails.results[0].n;
+  const wait = () => (pm ? json({ ok: false, error: '잠시 뒤에 다시 열어 주세요.' }, 429) : page({ ...none, title: '잠시 뒤에 다시 열어 주세요', desc: '없는 주소를 여러 번 열어 잠깐 막아 두었습니다.' }, 429));
+  if (missed >= FAIL_HARD) return wait();
   if (!row || row.deleted) {
-    const ip = request.headers.get('CF-Connecting-IP') || 'local';
-    const key = `jdocs:${ip.includes(':') ? ip.split(':').slice(0, 4).join(':') : ip}`;
-    const t = Date.now();
-    const [, fails] = await db.batch([
+    if (missed >= FAIL_MAX) return wait();
+    await db.batch([
       db.prepare("DELETE FROM login_fails WHERE key LIKE 'jdocs:%' AND at < ?").bind(t - FAIL_WINDOW),
-      db.prepare('SELECT COUNT(*) AS n FROM login_fails WHERE key = ? AND at > ?').bind(key, t - FAIL_WINDOW),
+      db.prepare('INSERT INTO login_fails (key, at) VALUES (?, ?)').bind(key, t),
     ]);
-    if (fails.results[0].n >= FAIL_MAX) return pm ? json({ ok: false, error: '잠시 뒤에 다시 열어 주세요.' }, 429) : page({ ...none, title: '잠시 뒤에 다시 열어 주세요', desc: '없는 주소를 여러 번 열어 잠깐 막아 두었습니다.' }, 429);
-    await db.prepare('INSERT INTO login_fails (key, at) VALUES (?, ?)').bind(key, t).run();
     return pm ? json({ ok: false, error: '문서를 찾을 수 없습니다.' }, 404) : page(none, 404);
   }
   if (request.method !== 'GET' && request.method !== 'HEAD') return json({ ok: false, error: '지원하지 않는 요청입니다.' }, 405);
