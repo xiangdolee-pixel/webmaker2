@@ -16,6 +16,8 @@ navBtn?.addEventListener('click', () => {
 
 // PDF 첨부 보기 (게시판 옵션): 글 안에 뷰어 자리가 있을 때만 뷰어를 불러온다
 if ($('.xv[data-xv], [data-xv-inline] iframe.ed-pdf')) import('./pdfview.js').then((m) => m.mountAll()).catch(() => {});
+// 글 안의 사진 크게 보기: 누르면 화면 가득 — 확대 · 축소 (사진이 있는 글에서만 불러온다)
+if ($('.post .prose img, .post .post-photos img')) import('./photoview.js').then((m) => m.mountPhotos()).catch(() => {});
 
 // 테스트모드로 둘러보기 (로그인 화면, xim 에서 켠 사이트만): 사본을 만들고 테스트 관리자로 들어간다
 $('[data-test-start]')?.addEventListener('click', async (e) => {

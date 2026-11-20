@@ -1484,6 +1484,31 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
   .inq-mailbtn b { max-width: 150px; }
 }
 
+/* 사진 크게 보기 (js/photoview.js) — 글 안의 사진을 누르면 화면 가득, 확대 · 축소 */
+.post.has-phv .prose img, .post.has-phv .post-photos img { cursor: zoom-in; }
+.post.has-phv .prose a img { cursor: pointer; }
+.phv { position: fixed; inset: 0; z-index: 2147482500; background: rgba(12, 14, 18, .96); color: #fff; outline: none; animation: phvIn .22s ease; }
+@keyframes phvIn { from { opacity: 0; } }
+.phv-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.phv-img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; border-radius: 0; transform-origin: center; will-change: transform; cursor: zoom-in; -webkit-user-drag: none; -webkit-touch-callout: none; }
+.phv.zoomed .phv-img { cursor: grab; }
+.phv-bar { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 12px 18px 18px; background: linear-gradient(rgba(0, 0, 0, .5), rgba(0, 0, 0, 0)); pointer-events: none; }
+.phv-n { font-size: 14.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.phv-tools { display: inline-flex; align-items: center; gap: 4px; pointer-events: auto; }
+.phv-z { min-width: 50px; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; }
+.phv-ic, .phv-nav { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .16); color: #fff; cursor: pointer; transition: background-color .25s, opacity .25s; }
+.phv-ic:hover, .phv-nav:hover { background: rgba(255, 255, 255, .3); }
+.phv-ic:disabled { opacity: .35; cursor: default; background: rgba(255, 255, 255, .16); }
+.phv-ic:focus-visible, .phv-nav:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.phv-x { margin-left: 8px; }
+.phv svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.phv-nav { position: absolute; top: 50%; width: 48px; height: 48px; margin-top: -24px; }
+.phv-nav[hidden] { display: none; }
+.phv-prev { left: 12px; }
+.phv-next { right: 12px; }
+@media (max-width: 599px) { .phv-nav { width: 40px; height: 40px; margin-top: -20px; background: rgba(0, 0, 0, .35); } .phv-prev { left: 6px; } .phv-next { right: 6px; } .phv-bar { padding-left: 14px; padding-right: 8px; } }
+@media (prefers-reduced-motion: reduce) { .phv { animation: none; } }
+
 /* PDF 첨부 보기 (js/pdfview.js) — 글 안에 놓이는 뷰어. pdf = 아래로 이어 보기, book = 전자책(책장 넘기기) */
 .xv { position: relative; display: flex; flex-direction: column; margin: 22px 0; border-radius: 14px; overflow: hidden; background: #1b2027; color: #fff; outline: none; }
 .xv:focus-visible { box-shadow: 0 0 0 2px var(--brand); }
