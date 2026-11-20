@@ -309,7 +309,7 @@ const engineErr = (r, names, j) => async () => {
   if (r.code === 2 || /LOGIN_REQUIRED/.test(r.out)) { for (const n of names) await j.step(n, 'failed', 'ChatGPT 로그인 필요'); throw new Error('LOGIN_REQUIRED'); }
   const tail = r.out.trim().split(/\r?\n/).filter((l) => !/dbg|Warning/.test(l)).slice(-3).join(' | ');
   for (const n of names) await j.step(n, 'failed', tail.slice(0, 200));
-  throw new Error('ENGINE_FAILED: ' + tail.slice(0, 300));
+  throw new Error('ENGINE_FAILED: ' + tail.slice(0, 300) + (/UI_CHANGED/.test(r.out) ? ' UI_CHANGED' : ''));
 };
 // 슬라이드 엔진(ChatGPT) — nums 만, 썸네일 없이. 실패 판정은 호출한 쪽에서(결과 r 반환)
 async function runSlidesEngine(j, work, nums, label = '슬라이드') {
@@ -576,10 +576,21 @@ async function processJob(payload) {
     }
     await j.status('done', '', { clear_redo: true });
     log(`✅ ${job.id} 완료`);
+    engineFails = 0;
   } catch (e) {
     if (e.message === 'STOPPED') { log('  사용자가 멈춤'); return; }
     if (e.message === 'LOGIN_REQUIRED') { notify('chatgpt', `ChatGPT(그림) 로그인이 필요해 "${job.title || job.id}" 그림 단계가 기다리고 있습니다 — PC 에서 node xim/runner/runner.mjs --login 으로 로그인해 주세요.`, 60); await j.status('images', 'slides', { error: 'ChatGPT 로그인이 풀려 그림 단계에서 멈췄습니다 — [해결하기] 를 누르면 PC 에 로그인 창이 뜹니다. 로그인하고 창을 닫으면 이어서 진행합니다.' }); loginNeeded = true; lastReport = Date.now() - 20 * 60000; return; }   // 10분 뒤 다시 점검
-    if (e.message.startsWith('ENGINE_FAILED')) { await j.status('images', 'slides', { error: `그림 엔진 실패 — 잠시 뒤 다시 시도합니다. ${e.message.slice(15, 200)}` }); engineFailAt = Date.now(); return; }
+    if (e.message.startsWith('ENGINE_FAILED')) {
+      // 연달아 실패하면 간격을 벌린다(2분 → 10분 → 30분). 2026-11-20: ChatGPT 화면이 바뀌어 그림을 못 읽는데 2분마다 다시 돌려
+      // 1시간 넘게 헛돌며 ChatGPT 에 그림 요청만 100번 넘게 보냈다 → 두 번째부터는 운영자에게 알리고 천천히.
+      engineFails += 1; engineFailAt = Date.now();
+      const ui = /UI_CHANGED/.test(e.message);
+      const waitMin = ENGINE_WAIT_MIN[Math.min(engineFails, ENGINE_WAIT_MIN.length) - 1];
+      const why = ui ? 'ChatGPT 는 그림을 만들었는데 엔진이 화면에서 읽지 못했습니다(ChatGPT 화면이 바뀐 듯) — Claude Code 에 "스튜디오 그림 엔진 점검해줘" 라고 하면 고칩니다. 화면 캡처: docs/tools/_work/stall_*.png' : e.message.slice(15, 200);
+      await j.status('images', 'slides', { error: `그림 엔진 실패 ${engineFails}번째 — ${waitMin}분 뒤 다시 시도합니다. ${why}` });
+      if (engineFails >= 2 || ui) notify('engine', `"${job.title || job.id}" 그림 단계가 ${engineFails}번 연달아 실패했습니다 — ${why}`, 120);
+      return;
+    }
     log('❌', e.message);
     notify(`fail-${job.id}`, `"${job.title || job.id}" 실패: ${String(e.message).slice(0, 200)} — 3분 뒤 자동으로 이어서 다시 합니다(최대 3번).`, 20);
     await j.status('failed', '', { error: e.message }).catch(() => {});
@@ -595,6 +606,8 @@ function notify(key, text, throttleMin = 180) {
   try { spawn(PYTHON, [path.join('tools', 'telegram_notify.py'), `[xim 스튜디오] ${text}`], { cwd: DOCS, windowsHide: true, stdio: 'ignore', env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }).on('error', () => {}); } catch { /* 무시 */ }
 }
 let engineFailAt = 0;   // 그림 엔진이 실패하면 2분 뒤에 다시 그림 일감을 집는다
+let engineFails = 0;    // 연달아 실패한 횟수 — 성공하면 0
+const ENGINE_WAIT_MIN = [2, 10, 30];
 
 // 제작 조건 보고 — 도우미가 시작할 때 · 30분마다 · 그림 작업 뒤에 xim 에 올린다 (스튜디오 첫 화면 '제작 조건' 표시)
 let lastReport = 0;
@@ -658,7 +671,7 @@ async function pcLoop() {
   for (;;) {
     try {
       const before = lastReport; await reportEnv(); if (lastReport !== before) closeProfileEdge();
-      const imagesOk = !loginNeeded && Date.now() - engineFailAt > 120000;
+      const imagesOk = !loginNeeded && Date.now() - engineFailAt > ENGINE_WAIT_MIN[Math.min(Math.max(engineFails, 1), ENGINE_WAIT_MIN.length) - 1] * 60000;
       const r = await api(`/api/studio/helper/next?want=${imagesOk ? 'text,images,youtube' : 'text,youtube'}`, { method: 'POST', body: {} });
       if (r.cmd === 'chatgpt-login') { await fixLogin(); continue; }
       if (r.job) { await processJob(r); closeProfileEdge(); cleanLocal(); continue; }
