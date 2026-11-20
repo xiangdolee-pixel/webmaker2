@@ -1,4 +1,4 @@
-// 고객에게 보낸 문서 주소(/d/wD5Jd4)에서 열리는 J-Docs 화면 — 로그인 없이 보기 · PDF 받기 · 인쇄
+// 고객에게 보낸 문서 주소(/jd/wD5Jd4)에서 열리는 J-Docs 화면 — 로그인 없이 보기 · PDF 받기 · 인쇄
 import { TYPES } from './calc.js';
 import { layout, clearMeasure } from './layout.js';
 import { pageSVGs, toPDF, printSVG, download, loadDocFont, stampPng } from './render.js';

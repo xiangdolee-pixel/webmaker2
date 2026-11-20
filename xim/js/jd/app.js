@@ -173,8 +173,8 @@ addEventListener('beforeunload', (e) => { if (leaveGuard && leaveGuard.dirty && 
 const TYPE_KEYS = Object.keys(TYPES);
 const listState = { q: '', type: '', year: '', trash: false, cat: '', page: 1 };
 const PER_PAGE = 12;
-// 고객에게 보내는 문서 주소: xim.plators.com/d/wD5Jd4 (설정에서 앞부분을 바꿀 수 있다)
-const linkBase = () => String(S.linkBase || `${location.origin}/d`).trim().replace(/\/+$/, '');
+// 고객에게 보내는 문서 주소: xim.plators.com/jd/wD5Jd4 (설정에서 앞부분을 바꿀 수 있다)
+const linkBase = () => String(S.linkBase || `${location.origin}/jd`).trim().replace(/\/+$/, '');
 const docLink = (slug) => `${linkBase()}/${slug}`;
 async function copyText(t) {
   try { await navigator.clipboard.writeText(t); return true; } catch (e) {
@@ -1976,8 +1976,8 @@ async function viewSettings() {
     </section>
     <section class="card">
       <h2 class="sec-title">문서 링크 주소</h2>
-      ${F('linkBase', '고객에게 보내는 문서 주소 앞부분', 'https://xim.plators.com/d')}
-      <p class="small">비워 두면 ${esc(location.origin)}/d 를 씁니다. 문서마다 뒤에 고유한 6글자가 붙습니다. 예) xim.plators.com/d/wD5Jd4 · 고객은 그 주소에서 문서를 보고 PDF로 받거나 인쇄만 할 수 있습니다.</p>
+      ${F('linkBase', '고객에게 보내는 문서 주소 앞부분', 'https://xim.plators.com/jd')}
+      <p class="small">비워 두면 ${esc(location.origin)}/jd 를 씁니다. 문서마다 뒤에 고유한 6글자가 붙습니다. 예) xim.plators.com/jd/wD5Jd4 · 고객은 그 주소에서 문서를 보고 PDF로 받거나 인쇄만 할 수 있습니다.</p>
     </section>
     ${TYPE_KEYS.map((k) => {
       const t = s.types[k];

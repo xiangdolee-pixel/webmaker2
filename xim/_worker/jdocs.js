@@ -8,7 +8,7 @@
 //     GET/POST templates · PUT/DELETE templates/:id      템플릿(불러와서 새 문서로)
 //     GET/POST clients · PUT/DELETE clients/:name        클라이언트 카테고리
 //     GET  stamp · seal                                  도장 그림 — 계약서 '을 정보 · 도장'(settings.contract_eul)의 그림을 같이 쓴다
-//   고객(로그인 없음, 주소 6자를 아는 사람만)  /d/<6자> (화면) · /api/jdp/<6자> (내용) · /api/jdp/<6자>/stamp|seal
+//   고객(로그인 없음, 주소 6자를 아는 사람만)  /jd/<6자> (화면, 예전 /d/<6자> 도 열림) · /api/jdp/<6자> (내용) · /api/jdp/<6자>/stamp|seal
 //
 //   회사 정보는 jd_settings 에만 있다(코드 · 리포에 두지 않는다). 사업장 주소는 받지도 내보내지도 않는다(사용자 지시: 공개하지 않음).
 
@@ -404,7 +404,7 @@ const page = (opt, status = 200) => new Response(pageHtml(opt), { status, header
 export async function jdocsPublic(request, env, url) {
   const p = url.pathname.replace(/\/+$/, '');
   const pm = /^\/api\/jdp\/([A-Za-z0-9]{6})(?:\/(stamp|seal))?$/.exec(p);
-  const vm = pm ? null : /^\/d\/([^/]+)$/.exec(p);
+  const vm = pm ? null : /^\/(?:jd|d)\/([^/]+)$/.exec(p);   // 주소는 /jd/<6자>. 예전에 보낸 /d/<6자> 도 그대로 열린다
   if (!pm && !vm) return null;
   const db = env.DB;
   const ver = String(env.VER?.id || 'dev').slice(0, 8);

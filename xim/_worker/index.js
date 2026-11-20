@@ -18,7 +18,7 @@ export { StudioMain };
 import { siteSettings, memberValues, uniqueProblem } from '../../xms/_worker/lib.js';
 // 홈페이지 제작 계약서 — /api/contracts* (운영자) · sign.plators.com/<5자> · /api/sign/<5자> (갑, 로그인 없음)
 import { contractsApi, contractsPublic } from './contracts.js';
-// J-Docs(견적서 · 거래명세서 · 청구서 · 공문) — /api/jdocs/* (운영자) · /d/<6자> · /api/jdp/<6자> (고객, 로그인 없음)
+// J-Docs(견적서 · 거래명세서 · 청구서 · 공문) — /api/jdocs/* (운영자) · /jd/<6자> · /api/jdp/<6자> (고객, 로그인 없음)
 import { jdocsApi, jdocsPublic } from './jdocs.js';
 
 const DAY = 86400000;
@@ -1203,7 +1203,7 @@ export default {
     const url = new URL(request.url);
     // 계약서 서명(sign.plators.com 전체 · /api/sign/* · /sign/*) — 운영자 화면 · API 보다 먼저. sign 주소에서는 이것 말고 아무것도 안 열린다
     try { const r = await contractsPublic(request, env, url, staticFile); if (r) return r; } catch (e) { return fail(e); }
-    // J-Docs 문서 보기(/d/<6자> · /api/jdp/<6자>) — 주소를 아는 사람만, 로그인 없음
+    // J-Docs 문서 보기(/jd/<6자> · /api/jdp/<6자>) — 주소를 아는 사람만, 로그인 없음
     try { const r = await jdocsPublic(request, env, url); if (r) return r; } catch (e) { return fail(e); }
     if (url.pathname.startsWith('/api/')) {
       try { return await ximApi(request, env, url, ctx); } catch (e) { return fail(e); }
