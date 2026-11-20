@@ -1501,6 +1501,8 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 /* 확대 · 축소 */
 .xv-zoom { display: inline-flex; align-items: center; gap: 2px; }
 .xv-zval { min-width: 46px; color: rgba(255, 255, 255, .86); font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; }
+.xv-pages, .xv-spread { will-change: transform; }
+.xv-body { touch-action: pan-x pan-y; }   /* 두 손가락 확대는 뷰어가 맡는다(브라우저의 화면 전체 확대 대신) */
 .xv.zoomed .xv-pages { width: max-content; min-width: 100%; }
 .xv.zoomed .xv-p { max-width: none; }
 .xv.zoomed .xv-body, .xv.zoomed .xv-stage { cursor: grab; }

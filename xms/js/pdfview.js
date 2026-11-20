@@ -1,7 +1,7 @@
 // PDF 를 글 안에서 바로 보기 (사용자 지시 2026-11-18) — 게시판 옵션 'PDF 첨부 보기'(pdf = 아래로 이어 보기 · book = 전자책, 책장 넘기기)
 //   글 보기 화면의 <div class="xv" data-xv="pdf|book" data-src data-dl data-name> 자리마다 뷰어를 하나씩 세운다.
 //   PDF.js 로 그린다(폰도 같게). 전자책: 1쪽은 표지(가운데 한 장), 그 뒤로 2–3, 4–5 … 좁은 화면은 한 장씩. 전체화면 · 내려받기.
-//   확대(사용자 지시 2026-11-20): − / + 단추, Ctrl + 휠, 두 손가락 벌리기. 확대하면 그 크기로 다시 그려 글자가 또렷하고, 끌어서(폰은 밀어서) 옮겨 본다.
+//   확대(사용자 지시 2026-11-20): − / + 단추, Ctrl + 휠, 두 손가락 벌리기. 커지는 과정이 그대로 보이고(지금 그림을 늘렸다가) 끝나면 그 크기로 다시 그려 글자가 또렷하다. 끌어서(폰은 밀어서) 옮겨 본다.
 //     전자책은 확대한 동안 책장 넘김 연출 없이 바로 넘어간다(화살표 단추 · 방향키), 쪽을 눌러 넘기는 것은 100% 일 때만.
 //   (bsf 다운로드 화면의 뷰어를 게시판용으로 옮긴 것 — 거기는 화면 위에 띄우고, 여기는 글 안에 놓인다)
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
@@ -148,23 +148,24 @@ export function mountPdf(host) {
     }, pre);
   };
   // 아래로 이어 보기: 쪽 자리를 먼저 잡아 두고, 화면에 다가오는 쪽만 그린다
-  const mountScroll = () => {
-    pages.innerHTML = '';
+  const mountScroll = (keep = false) => {
     io?.disconnect();
     const w = Math.min(body.clientWidth - 24, 860) * zoom;
+    keep = keep && pages.children.length === doc.numPages;
+    if (!keep) pages.innerHTML = '';
     io = new IntersectionObserver((ents) => {
       for (const en of ents) {
         const box = en.target;
-        if (!en.isIntersecting || box._done) continue;
-        box._done = true;
-        pageCanvas(+box.dataset.n, w).then((c) => { c.style.width = '100%'; c.style.height = 'auto'; box.appendChild(c); }).catch(() => {});
+        if (!en.isIntersecting || box._w === w) continue;
+        box._w = w;
+        pageCanvas(+box.dataset.n, w).then((c) => { if (box._w !== w) return; c.style.width = '100%'; c.style.height = 'auto'; box.replaceChildren(c); }).catch(() => {});
       }
     }, { root: body, rootMargin: '600px 0px' });
     for (let n = 1; n <= doc.numPages; n++) {
-      const box = document.createElement('div');
-      box.className = 'xv-p'; box.dataset.n = n;
+      const box = keep ? pages.children[n - 1] : document.createElement('div');
+      if (!keep) { box.className = 'xv-p'; box.dataset.n = n; pages.appendChild(box); }
       box.style.width = `${w}px`; box.style.aspectRatio = `1 / ${ratio}`;
-      pages.appendChild(box); io.observe(box);
+      io.observe(box);
     }
     onScroll();
   };
@@ -176,29 +177,53 @@ export function mountPdf(host) {
     cur = c; setPage();
   };
   const draw = () => { if (!doc) return; cache = {}; if (mode === 'pdf') mountScroll(); else { cur = spreadOf(cur)[0]; drawStage(); } };
-  // 확대 · 축소: 보던 자리(가운데, 또는 at = 화면 좌표)를 그대로 두고 그 크기로 다시 그린다
-  const zoomUi = () => {
-    host.classList.toggle('zoomed', zoom > 1);
-    $('.xv-zval').textContent = `${Math.round(zoom * 100)}%`;
-    $('.xv-zout').disabled = zoom <= ZOOMS[0]; $('.xv-zin').disabled = zoom >= ZOOMS[ZOOMS.length - 1];
+  // 확대 · 축소: 손가락 · 단추를 따라 지금 그림을 그대로 늘려 보여 주고(부드럽게), 끝나면 그 크기로 또렷하게 다시 그린다. 보던 자리는 그대로
+  const ZMIN = ZOOMS[0], ZMAX = ZOOMS[ZOOMS.length - 1];
+  const clampZ = (z) => Math.max(ZMIN, Math.min(ZMAX, z));
+  const content = () => (mode === 'pdf' ? pages : stage.querySelector('.xv-spread:not(.under)'));
+  const zoomUi = (z = zoom) => {
+    $('.xv-zval').textContent = `${Math.round(z * 100)}%`;
+    $('.xv-zout').disabled = z <= ZMIN + 0.001; $('.xv-zin').disabled = z >= ZMAX - 0.001;
   };
-  const setZoom = async (z, at) => {
-    z = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], z));
-    if (!doc || busy || z === zoom) return;
-    const r = scroller.getBoundingClientRect();
-    const ax = at ? at.x - r.left : r.width / 2, ay = at ? at.y - r.top : r.height / 2;
-    const fx = (scroller.scrollLeft + ax) / (scroller.scrollWidth || 1), fy = (scroller.scrollTop + ay) / (scroller.scrollHeight || 1);
-    zoom = z; zoomUi();
+  // at(화면 좌표)이 그림 안에서 어디쯤인지(0~1) — 다시 그린 뒤 같은 곳을 같은 자리에 둔다
+  const anchorOf = (at) => {
+    const r = scroller.getBoundingClientRect(), c = content()?.getBoundingClientRect() || r;
+    at ||= { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    return { at, fx: (at.x - c.left) / (c.width || 1), fy: (at.y - c.top) / (c.height || 1) };
+  };
+  const stretch = (k, an, ms) => {
+    const el = content(); if (!el) return;
+    const c = el.getBoundingClientRect(), cur = new DOMMatrixReadOnly(getComputedStyle(el).transform).a || 1;
+    if (!el.style.transform) el.style.transformOrigin = `${(an.at.x - c.left) / cur}px ${(an.at.y - c.top) / cur}px`;
+    el.style.transition = ms ? `transform ${ms}ms cubic-bezier(.22, .8, .24, 1)` : 'none';
+    el.style.transform = `scale(${k})`;
+  };
+  const unstretch = () => { const el = content(); if (el) { el.style.transition = 'none'; el.style.transform = ''; el.style.transformOrigin = ''; } };
+  // 새 크기로 다시 그리고 an 자리를 맞춘다
+  const applyZoom = async (z, an) => {
+    zoom = clampZ(Math.round(z * 100) / 100); zoomUi();
     cache = {};
-    if (mode === 'pdf') mountScroll(); else await drawStage();
-    scroller.scrollLeft = fx * scroller.scrollWidth - ax; scroller.scrollTop = fy * scroller.scrollHeight - ay;
+    const mark = () => host.classList.toggle('zoomed', zoom > 1);
+    if (mode === 'pdf') { mark(); mountScroll(true); unstretch(); } else { await drawStage(); mark(); }   // 전자책은 새 그림이 준비된 뒤 한 번에 바뀐다
+    const c = content()?.getBoundingClientRect();
+    if (c) { scroller.scrollLeft += c.left + an.fx * c.width - an.at.x; scroller.scrollTop += c.top + an.fy * c.height - an.at.y; }
     onScroll();
   };
-  const stepZoom = (dir, at) => {
-    const i = ZOOMS.findIndex((v) => v >= zoom - 0.001);
-    return setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (i < 0 ? ZOOMS.length - 1 : i) + dir))], at);
+  let zooming = false;
+  const setZoom = async (z, at) => {
+    z = clampZ(z);
+    if (!doc || busy || zooming || Math.abs(z - zoom) < 0.005) return;
+    zooming = true;
+    try {
+      const an = anchorOf(at);
+      if (!reduce) { stretch(z / zoom, an, 220); await new Promise((ok) => setTimeout(ok, 230)); }
+      await applyZoom(z, an);
+    } finally { zooming = false; }
   };
-  const nearZoom = (z) => ZOOMS.reduce((a, v) => (Math.abs(v - z) < Math.abs(a - z) ? v : a), ZOOMS[0]);
+  const stepZoom = (dir, at) => {
+    const next = dir > 0 ? ZOOMS.find((v) => v > zoom + 0.01) : [...ZOOMS].reverse().find((v) => v < zoom - 0.01);
+    return next === undefined ? Promise.resolve() : setZoom(next, at);
+  };
   zoomUi();
   $('.xv-zin').addEventListener('click', () => stepZoom(1));
   $('.xv-zout').addEventListener('click', () => stepZoom(-1));
@@ -210,16 +235,29 @@ export function mountPdf(host) {
     const now = Date.now(); if (now - wz < 160) return; wz = now;
     stepZoom(e.deltaY < 0 ? 1 : -1, { x: e.clientX, y: e.clientY });
   }, { passive: false });
-  // 두 손가락 벌리기 · 오므리기: 손을 뗄 때 가까운 단계로
+  // 두 손가락 벌리기 · 오므리기: 손가락을 따라 바로 커지고 작아진다. 손을 떼면 그 크기 그대로 또렷하게 다시 그린다
   let pinch = null;
   const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-  body.addEventListener('touchstart', (e) => { if (e.touches.length === 2) pinch = { d0: dist(e.touches), d: dist(e.touches), x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 }; }, { passive: true });
-  body.addEventListener('touchmove', (e) => { if (pinch && e.touches.length === 2) { e.preventDefault(); pinch.d = dist(e.touches); } }, { passive: false });
-  body.addEventListener('touchend', () => {
-    if (!pinch) return;
-    const k = pinch.d / (pinch.d0 || 1), at = { x: pinch.x, y: pinch.y }; pinch = null;
-    if (Math.abs(k - 1) > 0.12) setZoom(nearZoom(zoom * k) === zoom ? ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + (k > 1 ? 1 : -1)))] : nearZoom(zoom * k), at);
-  });
+  body.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 2 || !doc || busy || zooming) return;
+    const an = anchorOf({ x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 });
+    pinch = { d0: dist(e.touches) || 1, k: 1, an };
+  }, { passive: true });
+  body.addEventListener('touchmove', (e) => {
+    if (!pinch || e.touches.length !== 2) return;
+    e.preventDefault();
+    pinch.k = clampZ(zoom * (dist(e.touches) / pinch.d0)) / zoom;
+    stretch(pinch.k, pinch.an, 0); zoomUi(zoom * pinch.k);
+  }, { passive: false });
+  const pinchEnd = async (e) => {
+    if (!pinch || (e.touches && e.touches.length >= 2)) return;
+    const { k, an } = pinch; pinch = null;
+    if (Math.abs(k - 1) < 0.02) { unstretch(); zoomUi(); return; }
+    zooming = true;
+    try { await applyZoom(zoom * k, an); } finally { zooming = false; }
+  };
+  body.addEventListener('touchend', pinchEnd);
+  body.addEventListener('touchcancel', pinchEnd);
   // 확대했을 때 마우스로 끌어 옮기기
   let drag = null, dragged = false;
   scroller.addEventListener('mousedown', (e) => { if (zoom <= 1 || e.button !== 0) return; drag = { x: e.clientX, y: e.clientY, l: scroller.scrollLeft, t: scroller.scrollTop }; dragged = false; });
