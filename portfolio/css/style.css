@@ -98,8 +98,15 @@ a.card:hover .go::after { transform: translateX(3px); }
 .gate[hidden] { display: none; }
 .gate.off { opacity: 0; pointer-events: none; }
 html:has(.gate:not([hidden], .off)) { overflow: hidden; }
-.gate-btn { position: relative; isolation: isolate; display: grid; place-items: center; width: min(240px, 62vw); aspect-ratio: 1; padding: 0; border: 0; border-radius: 50%; background: var(--brand); color: var(--brand-fg); font: inherit; font-size: clamp(24px, 7vw, 30px); font-weight: 800; line-height: 1.3; letter-spacing: -.03em; text-align: center; cursor: pointer; box-shadow: 0 22px 54px -12px rgba(37, 99, 235, .75); animation: gate-pop .6s var(--ease) .25s both; transition: transform .25s var(--ease); }
-.gate-btn .ask-wave { animation-name: gate-wave; }
+.gate-btn { position: relative; isolation: isolate; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: min(268px, 68vw); aspect-ratio: 1; padding: 0; border: 0; border-radius: 50%; background: radial-gradient(circle at 30% 22%, color-mix(in srgb, var(--brand), #fff 30%), var(--brand) 62%); color: var(--brand-fg); font: inherit; font-size: clamp(25px, 7.4vw, 32px); font-weight: 800; line-height: 1.28; letter-spacing: -.03em; text-align: center; cursor: pointer; box-shadow: 0 0 0 6px rgba(255, 255, 255, .14), 0 24px 60px -10px rgba(37, 99, 235, .8); animation: gate-pop .6s var(--ease) .25s both, gate-breathe 2.4s ease-in-out 1s infinite; transition: transform .25s var(--ease), box-shadow .25s var(--ease); }
+.gate-btn .ask-wave { animation-name: gate-wave; animation-duration: 2.4s; }
+.gate-btn .gate-w2 { animation-delay: 1.2s; }
+/* 빛이 한 번씩 스치고, 손가락이 톡톡 누르는 시늉 */
+.gate-btn::after { content: ""; position: absolute; z-index: 0; inset: 0; border-radius: 50%; background: linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, .38) 50%, transparent 58%) 130% 0 / 260% 100% no-repeat; animation: gate-shine 3.6s ease-in-out 1.4s infinite; pointer-events: none; }
+.gate-btn b, .gate-tap { position: relative; z-index: 1; }
+.gate-tap { display: inline-flex; align-items: center; gap: 6px; padding: 5px 13px 5px 10px; border-radius: 999px; background: rgba(255, 255, 255, .2); font-size: 16px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+.gate-tap svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; animation: gate-tap 1.2s var(--ease) infinite; }
+.gate-btn:hover { box-shadow: 0 0 0 10px rgba(255, 255, 255, .22), 0 28px 70px -8px rgba(37, 99, 235, .95); }
 .gate-x { position: absolute; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px 0 16px; border: 1px solid rgba(255, 255, 255, .35); border-radius: 999px; background: rgba(255, 255, 255, .08); color: #fff; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; transition: background-color .25s var(--ease); }
 .gate-x span { font-size: 22px; line-height: 1; }
 .gate-x:hover { background: rgba(255, 255, 255, .2); }
@@ -108,8 +115,11 @@ html:has(.gate:not([hidden], .off)) { overflow: hidden; }
 .gate-btn:focus-visible, .gate-x:focus-visible { outline-color: #fff; }
 @keyframes gate-dim { from { background: rgba(8, 10, 14, 0); } }
 @keyframes gate-pop { from { opacity: 0; transform: scale(.86); } }
+@keyframes gate-breathe { 50% { scale: 1.06; } }
+@keyframes gate-shine { 0%, 55% { background-position: 130% 0; } 100% { background-position: -30% 0; } }
+@keyframes gate-tap { 0%, 100% { translate: 0 0; } 50% { translate: 0 3px; scale: .9; } }
 @keyframes gate-wave { 0% { transform: scale(1); opacity: .4; } 60%, 100% { transform: scale(1.45); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .gate, .gate-btn { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .gate, .gate-btn, .gate-btn::after, .gate-btn .ask-wave, .gate-tap svg { animation: none; } }
 
 .ask { width: min(520px, calc(100% - 32px)); max-height: calc(100% - 32px); padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--fg); box-shadow: var(--shadow-up); }
 .ask::backdrop { background: rgba(10, 12, 16, .5); }
