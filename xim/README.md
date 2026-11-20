@@ -11,6 +11,7 @@
 - **xms** 버튼: 운영자로 그 업체 관리 화면에 대신 들어간다 (1분짜리 입장권, 관리 로그에 "운영자" 으로 남음)
 - **관리 로그** 탭: 운영자가 xim 에서 한 일(로그인 · 고객 · 사이트 · 정지 · 관리자 계정 · xms 들어가기 · IP 차단 · 수정요청 답변 · GitHub 연결 등)을 1개월 보관, 20개씩 쪽 나눔 (xms 관리 로그와 같은 방식)
 - **계약서**: 홈페이지 제작 계약서(A4 한 장) — 갑 이름 · 연락처 · 이메일 · 제작비 · 호스팅 기간(년, 직접 입력) · 그 기간 관리비를 넣어 만들고(을 이메일은 master@plators.com 고정), 글자는 만든 뒤 고친다. 계약서마다 서명 주소 `https://sign.plators.com/<5자>` (xim Worker 에 붙인 사용자 도메인). 갑이 그 주소에서 직접 서명 → 완료(그 뒤로 고칠 수 없음, 내용 지문 sha256 남김) → PDF 내려받기. 을 정보 · 사인 그림은 '을 정보 · 사인'(settings.contract_eul). 코드: `_worker/contracts.js`, `js/contracts.js`, `js/contract-doc.js`(문서 · PDF), `sign.html` · `js/sign.js`(서명 화면)
+- **J-Docs**: 견적서 · 거래명세서 · 청구서 · 공문을 만들고 보관한다(메뉴 '계약서' 아래). 금액만 말하면 일단가를 거꾸로 맞추는 '바로 만들기', 템플릿, 클라이언트 카테고리, 견적 → 거래명세서 · 청구서로 바꾸기, 검사, PDF · 엑셀 · 워드 · 인쇄, 휴지통. 문서마다 고객에게 보내는 주소 `https://xim.plators.com/d/<6자>`(로그인 없이 보기 · PDF · 인쇄). 화면은 `/jd`(`jd.html` + `js/jd/*` + `css/jdocs.css`)를 메뉴 안 iframe 으로 끼우고(`js/jdocs.js`), 서버는 `_worker/jdocs.js`(`/api/jdocs/*` · `/d/*` · `/api/jdp/*`), 표는 xim DB `jd_*`. **회사 정보(상호 · 등록번호 · 계좌 등)는 코드 · 리포에 두지 않고 DB `jd_settings` 에만**, 사업장 주소는 칸 자체가 없다(공개하지 않음 — 서버도 저장 · 응답에서 뺀다). 도장은 계약서 '을 정보 · 도장' 그림을 같이 쓴다.
 - 업체가 xms 에서 남긴 **수정요청** 확인, 상태(접수 · 진행 중 · 완료) 바꾸기, 답변 달기 → 업체 화면에 보임
 
 아직 없는 것: 용량은 숫자만 저장(업로드 기능이 생기면 그때 집계·제한), 고객 도메인 자동 연결.
@@ -70,7 +71,8 @@ node deploy.mjs --wrangler secret put XIM_ADMIN_PASSWORD --name xim     # 운영
 ## 빠르게: 사진 · 첨부는 R2(서울)에서 (2026-11-13)
 
 국내 통신사는 Cloudflare 사이트 주소를 미국 서부(SEA/LAX)로 보내 사진 · 파일이 느리다(1MB 10초). R2 S3 주소(<계정>.r2.cloudflarestorage.com)는 서울(ICN)이라 0.2초.
-- **홈페이지 사진 · 글꼴 · 동영상**: `node deploy.mjs <폴더>` 가 R2 `xms-files/static/<사이트>/<hash 12자>/<경로>` 에 올리고(바뀐 것만, `r2-static.mjs`) xms D1 `site_static` 을 바꾼다. 사이트 Worker 가 html 의 img · srcset · poster · style url() 을 xms 가 서명한 주소로 바꾼다(그날 0시로 서명 고정 → 하루 동안 같은 주소). CSS · JS 는 그대로 사이트에서. 열쇠는 이 PC `%USERPROFILE%\.wrangler-xiangdolee2.json`(없으면 건너뜀 — GitHub Actions 배포 등).
+- **홈페이지 사진 · 글꼴 · 동영상**: `node deploy.mjs <폴더>` 가 R2 `xms-files/static/<사이트>/<hash 12자>/<경로>` 에 올리고(바뀐 것만, `r2-static.mjs`) xms D1 `site_static` 을 바꾼다. 사이트 Worker 가 html 의 img · srcset · poster · style url() 을 xms 가 서명한 주소로 바꾼다(그날 0시로 서명 고정 → 하루 동안 같은 주소). CSS · JS 는 그대로 사이트에서. 열쇠는 이 PC `%USERPROFILE%\.wrangler-xiangdolee
+2.json`(없으면 건너뜀 — GitHub Actions 배포 등).
 - **사진 · CSS · JS 는 사이트 Worker 를 거치지 않는다**(build.mjs run_worker_first 예외 + `_headers` 캐시) — html 만 Worker.
 - **게시판 첨부**: 올리기 = 브라우저 → R2 바로(xms `/xms-api/uploads/sign` · `/done`), 내려받기 · 보기 · 본문 그림 · 목록 썸네일 = 공개 글이면 R2 서명 주소, 아니면 `/xms/upload/<id>`(권한 확인 뒤 R2 로 넘김).
 - 열쇠: R2 계정 토큰 `xms-upload`(xms-files 읽기 · 쓰기) → xms 비밀값 `R2_KEY_ID` · `R2_SECRET`. 버킷 CORS: PUT · GET · HEAD 허용.

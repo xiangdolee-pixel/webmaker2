@@ -895,6 +895,12 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .iq-grow { flex: 1; }
 @media (max-width: 560px) { .iq-dl > div { grid-template-columns: 1fr; gap: 2px; } .iq-when { margin-left: 0; width: 100%; } }
 
+/* ── J-Docs 메뉴: 화면(/jd)을 본문 자리에 꽉 채워 끼운다 — 스크롤은 안쪽 화면이 맡는다 ── */
+.jd-on .wrap { max-width: none; padding: 0; }
+.jd-frame { display: block; width: 100%; height: 100vh; height: 100dvh; border: 0; background: var(--bg); }
+.jd-frame[hidden] { display: none; }
+@media (max-width: 899px) { .jd-frame { height: calc(100vh - 53px); height: calc(100dvh - 53px); } }
+
 /* ── 계약서 (xim '계약서' 메뉴 + 서명 화면 sign.html) ── */
 .ct-doc { width: 100%; max-width: 794px; margin: 0 auto; padding: 56px 64px 44px; background: #fff; color: #15171c; font-size: 16px; line-height: 1.75; letter-spacing: -.01em; border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow); word-break: keep-all; overflow-wrap: anywhere; overflow: hidden; }
 .ct-head { position: relative; margin-bottom: 26px; padding-bottom: 16px; border-bottom: 2px solid #15171c; text-align: center; }

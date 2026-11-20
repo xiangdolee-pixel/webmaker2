@@ -288,3 +288,29 @@ CREATE TABLE IF NOT EXISTS contracts (
 
 -- 2026-11-18 테스트모드 (xms test.js) — 한 번만 실행:
 --   ALTER TABLE sites ADD COLUMN test_mode INTEGER NOT NULL DEFAULT 0;  -- 1 이면 그 사이트 로그인 화면에 '테스트모드로 둘러보기' (xim 사이트 줄의 스위치)
+
+-- J-Docs (2026-11-20): xim 'J-Docs' 메뉴 — 견적서 · 거래명세서 · 청구서 · 공문. 코드 _worker/jdocs.js
+--   문서 내용은 data(JSON) 한 칸, 목록 · 검색용 값만 따로 둔다. slug = 고객에게 보내는 주소 6자(/d/<slug>)
+CREATE TABLE IF NOT EXISTS jd_docs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  no TEXT NOT NULL UNIQUE,                   -- 문서번호 YYYY-MMDD-NNN (날짜별 순번)
+  type TEXT NOT NULL,                        -- quote · statement · invoice · letter
+  title TEXT,
+  client TEXT,                               -- 수신
+  doc_date TEXT,
+  amount INTEGER DEFAULT 0,
+  vat TEXT,
+  search TEXT,                               -- 검색용 글자 모음(소문자)
+  data TEXT NOT NULL,
+  parent_id INTEGER,                         -- 견적서 → 거래명세서 · 청구서로 바꿔 만든 원본
+  deleted INTEGER DEFAULT 0,                 -- 1 = 휴지통
+  version INTEGER DEFAULT 1,                 -- 저장할 때마다 +1 (다른 창에서 먼저 고쳤는지 확인)
+  slug TEXT UNIQUE,
+  created_at INTEGER,
+  updated_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS jd_docs_date ON jd_docs(deleted, doc_date DESC);
+CREATE TABLE IF NOT EXISTS jd_counters (k TEXT PRIMARY KEY, n INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS jd_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL, updated_at INTEGER);   -- k = 'main': 회사 정보(주소 없음) · 기본값 · 항목 창고
+CREATE TABLE IF NOT EXISTS jd_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, type TEXT, data TEXT NOT NULL, sort INTEGER DEFAULT 0, updated_at INTEGER);
+CREATE TABLE IF NOT EXISTS jd_clients (name TEXT PRIMARY KEY, recipient TEXT, aliases TEXT, ref TEXT, tel TEXT, memo TEXT, created_at INTEGER, updated_at INTEGER);
