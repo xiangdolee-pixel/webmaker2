@@ -108,7 +108,7 @@ async function handle(request, env, ctx) {
       // 1시간 넘게 running 인 것은 PC 가 중간에 꺼진 것 → 다시 대기열로
       await db.prepare("UPDATE jobs SET status = 'queued', started_at = NULL WHERE status = 'running' AND started_at < ?").bind(now() - STALE_MS).run();
       const job = await db.prepare(`UPDATE jobs SET status = 'running', started_at = ?1, attempts = attempts + 1, error = NULL
-        WHERE id = (SELECT id FROM jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1) RETURNING id, text, speed, attempts, video, studio`).bind(now()).first();
+        WHERE id = (SELECT id FROM jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1) RETURNING id, text, speed, attempts, video, studio, voice`).bind(now()).first();
       if (job && job.studio) { try { job.studio = JSON.parse(job.studio); } catch { job.studio = null; } }
       return json({ job: job || null });
     }
@@ -166,7 +166,8 @@ async function handle(request, env, ctx) {
     return json({ jobs: results, agent: await agentStatus(db), sec_per_char: await pace(db), video_sec_per_sec: await videoPace(db) });
   }
   if (path === '/api/jobs' && method === 'POST') {
-    const { text, speed, video, studio } = await body(request);
+    const { text, speed, video, studio, voice } = await body(request);
+    const vo = /^[a-z0-9_-]{1,20}$/.test(String(voice || '')) ? String(voice) : null;   // 다른 목소리(2026-11-21 길성경 잠언 'novo') — 없으면 내 목소리. 처리기 agent.json 의 voices 에 있는 이름
     // 스튜디오 영상(2026-11-10): xim 스튜디오 카드 "영상 만들기" → {studio: {job_id, title, slides: [{idx, image, text}]}}. 슬라이드마다 원고를 읽고 1~2초 쉬며 넘어가는 1280x720 자막 영상
     let st = null, t;
     if (studio && Array.isArray(studio.slides) && studio.slides.length) {
@@ -184,7 +185,7 @@ async function handle(request, env, ctx) {
     const id = newId();
     const wantVideo = st || video === true || video === 1 || video === '1' || video === 'on' ? 1 : 0;   // 사자왕 영상도 함께(음성 뒤에 만들어짐)
     const title = st ? `[스튜디오 영상] ${st.title || titleOf(t)}` : titleOf(t);
-    await db.prepare('INSERT INTO jobs (id, created_at, status, title, text, chars, speed, video, video_status, studio) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, now(), 'queued', title, t, t.length, sp, wantVideo, wantVideo ? 'pending' : null, st ? JSON.stringify(st) : null).run();
+    await db.prepare('INSERT INTO jobs (id, created_at, status, title, text, chars, speed, video, video_status, studio, voice) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, now(), 'queued', title, t, t.length, sp, wantVideo, wantVideo ? 'pending' : null, st ? JSON.stringify(st) : null, vo).run();
     const job = await db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE id = ?`).bind(id).first();
     return json({ job, agent: await agentStatus(db) }, 201);
   }

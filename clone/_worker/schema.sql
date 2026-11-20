@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   video_status TEXT,
   video_at   INTEGER,
   video_error TEXT,
+  voice      TEXT,                  -- 다른 목소리 이름(없으면 내 목소리). 2026-11-21 추가: ALTER TABLE jobs ADD COLUMN voice TEXT
   studio     TEXT                   -- 스튜디오 영상 작업이면 JSON {job_id, title, slides:[{idx, image, text}]} (2026-11-10 추가: ALTER TABLE jobs ADD COLUMN studio TEXT)
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status, created_at);

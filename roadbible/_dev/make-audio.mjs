@@ -14,6 +14,8 @@ const API = SEC.worker_url.replace(/\/$/, '');
 const H = { 'X-Agent-Token': SEC.agent_token, 'Content-Type': 'application/json' };
 const OUT = path.join(ROOT, 'roadbible', 'assets', 'audio');
 const SLUG = { 창세기: 'genesis', 출애굽기: 'exodus', 레위기: 'leviticus', 민수기: 'numbers', 신명기: 'deuteronomy', 잠언: 'proverbs', 시편: 'psalms', 전도서: 'ecclesiastes', 아가: 'song', 로마서: 'romans' };
+// 책마다 목소리(2026-11-21 사용자: "잠언만 이 목소리로") — 없으면 내 목소리. 이름은 처리기 agent.json 의 voices
+const VOICE = { 잠언: 'novo' };
 const log = (...a) => console.log(new Date().toLocaleTimeString('ko-KR'), ...a);
 
 const src = fs.readFileSync(path.join(ROOT, 'roadbible', 'bible-data.js'), 'utf8');
@@ -49,7 +51,7 @@ for (const t of process.env.RESUME ? [] : targets) {
   if (!verses.length) { log('본문 없음', t.book, t.chap); continue; }
   const head = `${t.book} ${sino(t.chap)}${t.book === '시편' ? '편' : '장'}.`;
   const text = `${head}\n\n${verses.join('\n')}`;
-  const { job } = await call('POST', '/api/jobs', { text, speed: 1, video: false });
+  const { job } = await call('POST', '/api/jobs', { text, speed: 1, video: false, voice: VOICE[t.book] || undefined });
   jobs.push({ ...t, name, id: job.id, head });
   log('넣음', name, job.id, head, `${text.length}자`);
 }
