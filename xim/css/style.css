@@ -421,7 +421,8 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 /* 고객에게 받는 요금 — 업계 평균 | 내 요금 */
 .fee { margin-bottom: 26px; }
 .fee-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin: 14px 0 18px; }
-.fee-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; min-width: 0; }
+/* 제작비 · 매달 비용 두 묶음의 줄(이름 · 상자 · 원가)을 서로 맞춘다 — 한쪽 글이 두 줄이 돼도 높이가 같다 */
+.fee-pair { display: grid; grid-template-columns: 1fr 1fr; grid-row: span 3; grid-template-rows: subgrid; gap: 8px; min-width: 0; }
 .fee-label { grid-column: 1 / -1; font-size: 14px; font-weight: 700; color: var(--sub); }
 .fee-box { min-width: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; }
 .fee-box small { display: block; color: var(--mute); font-size: 13px; }
@@ -430,7 +431,7 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .fee-box.mine { border-color: var(--brand); background: var(--brand); }
 .fee-box.mine small, .fee-box.mine b, .fee-box.mine span { color: #fff; }
 .fee-box.mine small, .fee-box.mine span { opacity: .86; }
-.fee-cost { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 10px 16px; border-radius: 12px; background: var(--bg); font-size: 13px; color: var(--sub); }
+.fee-cost { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; align-content: center; gap: 2px 10px; padding: 10px 16px; border-radius: 12px; background: var(--bg); font-size: 13px; color: var(--sub); }
 .fee-cost small { color: var(--mute); font-size: 13px; }
 .fee-cost b { color: var(--ink); font-size: 15px; }
 .fee-tbl td { line-height: 1.55; vertical-align: top; }
