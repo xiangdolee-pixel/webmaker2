@@ -385,12 +385,25 @@ async function viewList() {
     if (!box) return;
     if (!j.templates.length) { box.innerHTML = '<p class="empty">아직 템플릿이 없습니다. 문서 편집 화면의 ⋯ 메뉴에서 "템플릿으로 저장"을 누르세요.</p>'; return; }
     box.innerHTML = j.templates.map((t) => `
-      <button type="button" class="tpl" data-tid="${t.id}">
+      <div class="tpl-wrap"><button type="button" class="tpl" data-tid="${t.id}">
         <span class="badge badge-${esc(t.type)}">${TYPES[t.type]?.name || ''}</span>
         <b>${esc(t.name)}</b>
         <small>${t.doc.type === 'letter' ? esc(t.doc.client?.name || '') : `${won(docAmount(t.doc))}원 ${vatWord(t.doc)}`}</small>
-      </button>`).join('');
-    box.onclick = (e) => {
+      </button><button type="button" class="tpl-name-btn" data-rename="${t.id}">이름 바꾸기</button></div>`).join('');
+    box.onclick = async (e) => {
+      // 이름 바꾸기: 카드 오른쪽 위 단추 — 다시 그리지 않고 그 카드의 이름만 바꾼다
+      const rn = e.target.closest('[data-rename]');
+      if (rn) {
+        const rt = j.templates.find((x) => x.id === +rn.dataset.rename);
+        const name = await modal({ title: '템플릿 이름', body: `<label class="field"><span>이름</span><input class="input" id="tplName" value="${esc(rt.name)}"></label>`,
+          buttons: [{ label: '취소', value: null }, { label: '바꾸기', kind: 'primary', value: (card) => $('#tplName', card).value.trim() }] });
+        if (!name || name === rt.name) return;
+        try { await api('PUT', `/api/templates/${rt.id}`, { name }); } catch (x) { toast(x.message, 'err'); return; }
+        rt.name = name;
+        rn.parentNode.querySelector('.tpl b').textContent = name;
+        toast('템플릿 이름을 바꿨습니다.');
+        return;
+      }
       const b = e.target.closest('[data-tid]');
       if (!b) return;
       const t = j.templates.find((x) => x.id === +b.dataset.tid);
