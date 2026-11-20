@@ -1,6 +1,8 @@
 // PDF 를 글 안에서 바로 보기 (사용자 지시 2026-11-18) — 게시판 옵션 'PDF 첨부 보기'(pdf = 아래로 이어 보기 · book = 전자책, 책장 넘기기)
 //   글 보기 화면의 <div class="xv" data-xv="pdf|book" data-src data-dl data-name> 자리마다 뷰어를 하나씩 세운다.
 //   PDF.js 로 그린다(폰도 같게). 전자책: 1쪽은 표지(가운데 한 장), 그 뒤로 2–3, 4–5 … 좁은 화면은 한 장씩. 전체화면 · 내려받기.
+//   확대(사용자 지시 2026-11-20): − / + 단추, Ctrl + 휠, 두 손가락 벌리기. 확대하면 그 크기로 다시 그려 글자가 또렷하고, 끌어서(폰은 밀어서) 옮겨 본다.
+//     전자책은 확대한 동안 책장 넘김 연출 없이 바로 넘어간다(화살표 단추 · 방향키), 쪽을 눌러 넘기는 것은 100% 일 때만.
 //   (bsf 다운로드 화면의 뷰어를 게시판용으로 옮긴 것 — 거기는 화면 위에 띄우고, 여기는 글 안에 놓인다)
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 let lib = null;
@@ -20,10 +22,14 @@ const ICO = {
   prev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
   next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
   dl: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>',
+  zin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  zout: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>',
 };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const dpr = Math.min(window.devicePixelRatio || 1, 2);
+const ZOOMS = [1, 1.25, 1.5, 2, 2.5, 3];   // 확대 단계
+const MAX_PX = 3600;                       // 한 쪽을 그리는 캔버스 폭 한도(px) — 크게 확대해도 메모리가 터지지 않게
 
 export function mountPdf(host) {
   if (host._xv) return;
@@ -33,18 +39,20 @@ export function mountPdf(host) {
   host.classList.add('xv');
   host.setAttribute('data-mode', mode);
   host.innerHTML = `<div class="xv-bar"><b class="xv-title">${esc(name)}</b><span class="xv-page"></span>
+    <span class="xv-zoom"><button type="button" class="xv-ic xv-zout" aria-label="축소" title="축소">${ICO.zout}</button><b class="xv-zval" aria-live="polite">100%</b><button type="button" class="xv-ic xv-zin" aria-label="확대" title="확대">${ICO.zin}</button></span>
     <button type="button" class="xv-ic xv-full"></button><a class="xv-dl" href="${esc(dl)}" download>${ICO.dl}<span>내려받기</span></a></div>
     <div class="xv-body"><div class="xv-pages"></div><div class="xv-stage"></div><p class="xv-msg">불러오는 중…</p>
     <button type="button" class="xv-nav xv-prev" aria-label="앞 쪽">${ICO.prev}</button><button type="button" class="xv-nav xv-next" aria-label="다음 쪽">${ICO.next}</button></div>`;
   const $ = (s) => host.querySelector(s);
   const body = $('.xv-body'), pages = $('.xv-pages'), stage = $('.xv-stage'), msg = $('.xv-msg');
-  let doc = null, cur = 1, busy = false, cache = {}, ratio = 1.414, io = null;
+  let doc = null, cur = 1, busy = false, cache = {}, ratio = 1.414, io = null, zoom = 1;
+  const scroller = mode === 'pdf' ? body : stage;   // 확대했을 때 밀어 보는 칸
 
   // n 쪽을 화면 폭 w(px)로 그린 캔버스 (같은 크기면 다시 쓰고, 쓸 때마다 새 캔버스로 복사해 준다)
   const pageCanvas = (n, w) => {
     const key = `${n}@${Math.round(w)}`;
     cache[key] ||= doc.getPage(n).then((pg) => {
-      const vp = pg.getViewport({ scale: (w / pg.getViewport({ scale: 1 }).width) * dpr }), c = document.createElement('canvas');
+      const vp = pg.getViewport({ scale: (Math.min(w * dpr, MAX_PX) / pg.getViewport({ scale: 1 }).width) }), c = document.createElement('canvas');
       c.width = vp.width; c.height = vp.height;
       return pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise.then(() => c);
     });
@@ -78,7 +86,7 @@ export function mountPdf(host) {
   const navState = () => { const last = spreadOf(cur); $('.xv-prev').disabled = cur <= 1; $('.xv-next').disabled = last[last.length - 1] >= doc.numPages; };
   const drawStage = async () => {
     sizeStage();
-    const sp = spreadOf(cur), w = fitW(narrow() ? 1 : 2);
+    const sp = spreadOf(cur), w = fitW(narrow() ? 1 : 2) * zoom;
     const cs = await Promise.all(sp.map((n) => pageCanvas(n, w)));
     const row = document.createElement('div');
     row.className = 'xv-spread';
@@ -97,7 +105,7 @@ export function mountPdf(host) {
     if (!doc || busy || mode !== 'book') return;
     const to = stepOf(dir);
     if (to === cur || (dir < 0 && cur <= 1)) return;
-    if (reduce) { cur = to; await drawStage(); return; }
+    if (reduce || zoom > 1) { cur = to; await drawStage(); if (zoom > 1) { stage.scrollTop = 0; stage.scrollLeft = dir > 0 ? 0 : stage.scrollWidth; } return; }   // 확대한 동안은 넘김 연출 없이 바로
     busy = true;
     const sp = spreadOf(cur), keep = cur;
     cur = to; const nsp = spreadOf(to); cur = keep;
@@ -143,7 +151,7 @@ export function mountPdf(host) {
   const mountScroll = () => {
     pages.innerHTML = '';
     io?.disconnect();
-    const w = Math.min(body.clientWidth - 24, 860);
+    const w = Math.min(body.clientWidth - 24, 860) * zoom;
     io = new IntersectionObserver((ents) => {
       for (const en of ents) {
         const box = en.target;
@@ -168,6 +176,60 @@ export function mountPdf(host) {
     cur = c; setPage();
   };
   const draw = () => { if (!doc) return; cache = {}; if (mode === 'pdf') mountScroll(); else { cur = spreadOf(cur)[0]; drawStage(); } };
+  // 확대 · 축소: 보던 자리(가운데, 또는 at = 화면 좌표)를 그대로 두고 그 크기로 다시 그린다
+  const zoomUi = () => {
+    host.classList.toggle('zoomed', zoom > 1);
+    $('.xv-zval').textContent = `${Math.round(zoom * 100)}%`;
+    $('.xv-zout').disabled = zoom <= ZOOMS[0]; $('.xv-zin').disabled = zoom >= ZOOMS[ZOOMS.length - 1];
+  };
+  const setZoom = async (z, at) => {
+    z = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], z));
+    if (!doc || busy || z === zoom) return;
+    const r = scroller.getBoundingClientRect();
+    const ax = at ? at.x - r.left : r.width / 2, ay = at ? at.y - r.top : r.height / 2;
+    const fx = (scroller.scrollLeft + ax) / (scroller.scrollWidth || 1), fy = (scroller.scrollTop + ay) / (scroller.scrollHeight || 1);
+    zoom = z; zoomUi();
+    cache = {};
+    if (mode === 'pdf') mountScroll(); else await drawStage();
+    scroller.scrollLeft = fx * scroller.scrollWidth - ax; scroller.scrollTop = fy * scroller.scrollHeight - ay;
+    onScroll();
+  };
+  const stepZoom = (dir, at) => {
+    const i = ZOOMS.findIndex((v) => v >= zoom - 0.001);
+    return setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (i < 0 ? ZOOMS.length - 1 : i) + dir))], at);
+  };
+  const nearZoom = (z) => ZOOMS.reduce((a, v) => (Math.abs(v - z) < Math.abs(a - z) ? v : a), ZOOMS[0]);
+  zoomUi();
+  $('.xv-zin').addEventListener('click', () => stepZoom(1));
+  $('.xv-zout').addEventListener('click', () => stepZoom(-1));
+  // Ctrl(⌘) + 휠
+  let wz = 0;
+  host.addEventListener('wheel', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || !doc) return;
+    e.preventDefault();
+    const now = Date.now(); if (now - wz < 160) return; wz = now;
+    stepZoom(e.deltaY < 0 ? 1 : -1, { x: e.clientX, y: e.clientY });
+  }, { passive: false });
+  // 두 손가락 벌리기 · 오므리기: 손을 뗄 때 가까운 단계로
+  let pinch = null;
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  body.addEventListener('touchstart', (e) => { if (e.touches.length === 2) pinch = { d0: dist(e.touches), d: dist(e.touches), x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 }; }, { passive: true });
+  body.addEventListener('touchmove', (e) => { if (pinch && e.touches.length === 2) { e.preventDefault(); pinch.d = dist(e.touches); } }, { passive: false });
+  body.addEventListener('touchend', () => {
+    if (!pinch) return;
+    const k = pinch.d / (pinch.d0 || 1), at = { x: pinch.x, y: pinch.y }; pinch = null;
+    if (Math.abs(k - 1) > 0.12) setZoom(nearZoom(zoom * k) === zoom ? ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + (k > 1 ? 1 : -1)))] : nearZoom(zoom * k), at);
+  });
+  // 확대했을 때 마우스로 끌어 옮기기
+  let drag = null, dragged = false;
+  scroller.addEventListener('mousedown', (e) => { if (zoom <= 1 || e.button !== 0) return; drag = { x: e.clientX, y: e.clientY, l: scroller.scrollLeft, t: scroller.scrollTop }; dragged = false; });
+  window.addEventListener('mousemove', (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 4) { dragged = true; host.classList.add('grabbing'); }
+    scroller.scrollLeft = drag.l - dx; scroller.scrollTop = drag.t - dy;
+  });
+  window.addEventListener('mouseup', () => { if (drag) { drag = null; host.classList.remove('grabbing'); } });
   const fullBtn = () => { const b = $('.xv-full'); b.innerHTML = isFull() ? ICO.unfull : ICO.full; b.title = isFull() ? '전체화면 끄기' : '전체화면'; b.setAttribute('aria-label', b.title); };
   fullBtn();
   if (!(host.requestFullscreen || host.webkitRequestFullscreen)) $('.xv-full').hidden = true;   // 아이폰 사파리 등은 전체화면이 없다
@@ -180,14 +242,17 @@ export function mountPdf(host) {
   $('.xv-prev').addEventListener('click', () => go(-1));
   $('.xv-next').addEventListener('click', () => go(1));
   body.addEventListener('scroll', onScroll, { passive: true });
-  stage.addEventListener('click', (e) => { const r = stage.getBoundingClientRect(); go(e.clientX - r.left > r.width / 2 ? 1 : -1); });   // 오른쪽 절반 = 다음, 왼쪽 절반 = 앞
+  stage.addEventListener('click', (e) => { if (zoom > 1 || dragged) return; const r = stage.getBoundingClientRect(); go(e.clientX - r.left > r.width / 2 ? 1 : -1); });   // 오른쪽 절반 = 다음, 왼쪽 절반 = 앞 (확대한 동안은 끌어서 옮겨 보는 칸)
   let tx = null;
-  stage.addEventListener('touchstart', (e) => { tx = e.touches[0].clientX; }, { passive: true });
+  stage.addEventListener('touchstart', (e) => { tx = e.touches.length === 1 && zoom <= 1 ? e.touches[0].clientX : null; }, { passive: true });   // 확대했거나 두 손가락이면 넘기지 않는다
   stage.addEventListener('touchend', (e) => { if (tx === null) return; const dx = e.changedTouches[0].clientX - tx; tx = null; if (Math.abs(dx) > 45) go(dx < 0 ? 1 : -1); });
   host.tabIndex = 0;
   host.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight' || e.key === 'PageDown') { if (mode === 'book') { e.preventDefault(); go(1); } }
     else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { if (mode === 'book') { e.preventDefault(); go(-1); } }
+    else if (e.key === '+' || e.key === '=') { e.preventDefault(); stepZoom(1); }
+    else if (e.key === '-') { e.preventDefault(); stepZoom(-1); }
+    else if (e.key === '0') { e.preventDefault(); setZoom(1); }
   });
   let rz = 0, lastW = host.clientWidth;
   window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (host.clientWidth !== lastW) { lastW = host.clientWidth; draw(); } }, 200); });

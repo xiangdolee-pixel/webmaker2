@@ -1497,6 +1497,16 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .xv-ic { width: 38px; background: rgba(255, 255, 255, .12); }
 .xv-dl:hover, .xv-ic:hover { background: rgba(255, 255, 255, .28); color: #fff; }
 .xv-ic[hidden] { display: none; }
+.xv-ic:disabled { opacity: .35; cursor: default; background: rgba(255, 255, 255, .12); }
+/* 확대 · 축소 */
+.xv-zoom { display: inline-flex; align-items: center; gap: 2px; }
+.xv-zval { min-width: 46px; color: rgba(255, 255, 255, .86); font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; }
+.xv.zoomed .xv-pages { width: max-content; min-width: 100%; }
+.xv.zoomed .xv-p { max-width: none; }
+.xv.zoomed .xv-body, .xv.zoomed .xv-stage { cursor: grab; }
+.xv.zoomed.grabbing .xv-body, .xv.zoomed.grabbing .xv-stage { cursor: grabbing; user-select: none; }
+.xv.zoomed .xv-stage { overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.xv.zoomed .xv-spread { position: relative; inset: auto; box-sizing: border-box; width: max-content; height: max-content; min-width: 100%; min-height: 100%; padding: 18px 60px; }
 .xv svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .xv-body { position: relative; flex: 1; min-height: 220px; }
 .xv[data-mode="pdf"] .xv-body { max-height: 86vh; overflow: auto; padding: 14px 12px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
@@ -1536,7 +1546,7 @@ html.ap-lock, html.ap-lock body { overflow: hidden; }
 .xv-face canvas { width: 100% !important; height: 100% !important; }
 .xv-face.backface { transform: rotateY(180deg); }
 .xv-leaf.one .xv-face.backface { display: none; }
-@media (max-width: 599px) { .xv-dl span { display: none; } .xv-dl { width: 38px; padding: 0; } .xv-nav { width: 38px; height: 38px; margin-top: -19px; } .xv-prev { left: 4px; } .xv-next { right: 4px; } }
+@media (max-width: 599px) { .xv-dl span { display: none; } .xv-dl { width: 38px; padding: 0; } .xv-bar { gap: 6px; padding: 8px 8px 8px 12px; } .xv-zval { display: none; } .xv-ic, .xv-dl { height: 36px; } .xv-ic { width: 36px; } .xv.zoomed .xv-spread { padding: 12px; } .xv-nav { width: 38px; height: 38px; margin-top: -19px; } .xv-prev { left: 4px; } .xv-next { right: 4px; } }
 @media (prefers-reduced-motion: reduce) { .xv-leaf { transition: none; } }
 
 /* 설교 게시판 (게시판 유형 sermon): 성경본문 · 설교자 */
