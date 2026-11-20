@@ -110,3 +110,17 @@
   window.addEventListener('scroll', function () { if (!t) t = requestAnimationFrame(function () { t = 0; f(); }); }, { passive: true });
   f();
 })();
+
+// 첫 화면 가림막 — 들어오면 어두워지고 가운데 '홈페이지 제작신청' 하나만 누를 수 있다. 누르면 걷히고 제작문의 창이 뜬다
+(function () {
+  var gate = document.getElementById('gate'), btn = document.getElementById('gate-btn'), main = document.querySelector('main');
+  if (!gate || !btn) return;
+  if (main) main.inert = true;   // 뒤 화면은 키보드로도 못 누르게
+  btn.addEventListener('click', function () {
+    if (main) main.inert = false;
+    gate.classList.add('off');
+    setTimeout(function () { gate.hidden = true; }, 400);
+    var fab = document.querySelector('[data-ask]');
+    if (fab) fab.click();
+  });
+})();

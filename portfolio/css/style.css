@@ -93,6 +93,20 @@ a.card:hover .go::after { transform: translateX(3px); }
 @media (prefers-reduced-motion: reduce) { .ask-wave { animation: none; } }
 
 /* 제작문의 창 */
+/* 첫 화면 가림막: 어두워지며 가운데 버튼 하나 */
+.gate { position: fixed; z-index: 60; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(8, 10, 14, .78); animation: gate-dim .7s var(--ease) both; transition: opacity .35s var(--ease); }
+.gate[hidden] { display: none; }
+.gate.off { opacity: 0; pointer-events: none; }
+html:has(.gate:not([hidden], .off)) { overflow: hidden; }
+.gate-btn { position: relative; isolation: isolate; display: inline-flex; align-items: center; justify-content: center; max-width: 100%; height: 68px; padding: 0 38px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-fg); font: inherit; font-size: 21px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; cursor: pointer; box-shadow: 0 18px 44px -12px rgba(37, 99, 235, .7); animation: gate-pop .6s var(--ease) .25s both; transition: transform .25s var(--ease); }
+.gate-btn:hover { transform: translateY(-2px) scale(1.03); }
+.gate-btn:active { transform: scale(.96); }
+.gate-btn:focus-visible { outline-color: #fff; }
+@keyframes gate-dim { from { background: rgba(8, 10, 14, 0); } }
+@keyframes gate-pop { from { opacity: 0; transform: scale(.86); } }
+@media (max-width: 560px) { .gate-btn { height: 62px; padding: 0 30px; font-size: 19px; } }
+@media (prefers-reduced-motion: reduce) { .gate, .gate-btn { animation: none; } }
+
 .ask { width: min(520px, calc(100% - 32px)); max-height: calc(100% - 32px); padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--fg); box-shadow: var(--shadow-up); }
 .ask::backdrop { background: rgba(10, 12, 16, .5); }
 .ask-form, .ask-done { padding: 22px 22px 20px; }
