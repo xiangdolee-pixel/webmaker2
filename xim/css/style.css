@@ -91,16 +91,25 @@ textarea.input { min-height: 120px; resize: vertical; }
 .side-link svg { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .side-link .ext { margin-left: auto; font-size: 13px; }
 .side-link:hover { color: var(--ink); background: var(--surface); }
+/* 폰 · 태블릿: 위쪽 줄의 메뉴 단추를 누르면 왼쪽에서 메뉴가 밀려 나온다 (사용자 지시 2026-11-20) */
+.mtop, .side-dim { display: none; }
 @media (max-width: 899px) {
-  .shell { grid-template-columns: minmax(0, 1fr); }
-  .side { position: sticky; z-index: 10; height: auto; flex-direction: row; align-items: center; gap: 8px; padding: 8px 10px; border-right: 0; border-bottom: 1px solid var(--line); backdrop-filter: blur(10px); }
-  .side .brand { padding: 0 4px; font-size: 22px; }
-  .tabs.side-nav { flex: 1; flex-direction: row; overflow-x: auto; }
-  .side-nav > button { padding: 0 10px; gap: 6px; }
-  .side-link { flex: none; margin: 0; padding: 0 10px; gap: 6px; white-space: nowrap; }
-  .side-link .ext { display: none; }
-  .side-out { margin: 0; align-self: center; }
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .mtop { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 6px; min-height: 52px; padding: 4px 14px 4px 6px; border-bottom: 1px solid var(--line); background: rgba(243, 244, 247, .9); backdrop-filter: blur(10px); }
+  .mtop-btn { position: relative; flex: none; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px; background: none; color: var(--ink); cursor: pointer; }
+  .mtop-btn:active { background: #e6e8ee; }
+  .mtop-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+  .mtop-btn.has-new::after { content: ""; position: absolute; right: 8px; top: 9px; width: 9px; height: 9px; border: 2px solid var(--bg); border-radius: 50%; background: var(--danger); }
+  .mtop-title { flex: 1; min-width: 0; font-size: 17px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mtop .logo { flex: none; font-size: 22px; }
+  .side { position: fixed; left: 0; top: 0; bottom: 0; z-index: 30; width: min(280px, 84vw); height: auto; padding: 16px 10px calc(16px + env(safe-area-inset-bottom)); border-right: 0; background: var(--bg); box-shadow: 0 0 40px rgba(20, 26, 40, .22); overflow-y: auto; overscroll-behavior: contain; transform: translateX(-105%); visibility: hidden; transition: transform .32s var(--ease), visibility 0s .32s; }
+  .side-nav > button, .side-nav > .side-link { min-height: 46px; }
+  .side-dim { display: block; position: fixed; inset: 0; z-index: 29; background: rgba(20, 26, 40, .4); opacity: 0; pointer-events: none; transition: opacity .32s; }
+  .nav-open .side { transform: none; visibility: visible; transition: transform .32s var(--ease), visibility 0s; }
+  .nav-open .side-dim { opacity: 1; pointer-events: auto; }
+  html.nav-lock { overflow: hidden; }
 }
+@media (max-width: 899px) and (prefers-reduced-motion: reduce) { .side, .nav-open .side, .side-dim { transition: none; } }
 .tabs {
   position: relative; display: flex; padding: 4px; border-radius: 99px; background: #e6e8ee; overflow-x: auto; scrollbar-width: none;
 }
@@ -645,13 +654,11 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 
 /* 왼쪽 메뉴 구분선 — 제작 도구(스튜디오 · 내 목소리) 묶음 앞 */
 .side-nav .nav-sep { display: block; height: 1px; margin: 8px 10px; background: var(--line); }
-@media (max-width: 899px) { .side-nav .nav-sep { width: 1px; height: 24px; margin: 0 4px; align-self: center; } }
 .st-cmd { display: flex; gap: 8px; align-items: center; }
 .st-cmd code { flex: 1; min-width: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--bg); font-size: 12px; word-break: break-all; }
 
 /* 포트폴리오 링크가 메뉴 안(포트폴리오2 위)에 들어갈 때 */
 .side-nav > .side-link { margin-top: 0; min-height: 42px; }
-@media (max-width: 899px) { .side-nav > .side-link { flex: none; white-space: nowrap; } }
 
 /* 스튜디오 — 슬라이드쇼 탭(축소 미리보기) */
 .st-show-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }

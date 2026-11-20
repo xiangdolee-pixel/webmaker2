@@ -87,8 +87,11 @@ function showApp() {
   $('#app').hidden = false;
   if (!navReady) {
     navReady = true;
-    pillTabs($('#nav'), [['sites', '사이트'], ['domains', '도메인 부스터'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['inquiries', '제작문의'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['naver', '네이버 지도'], ['contracts', '계약서'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC']], tab, (v) => {
+    const NAV = [['sites', '사이트'], ['domains', '도메인 부스터'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['inquiries', '제작문의'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['naver', '네이버 지도'], ['contracts', '계약서'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC']];
+    const navTitle = () => { $('#mtop-title').textContent = (NAV.find(([v]) => v === tab) || NAV[0])[1]; };
+    pillTabs($('#nav'), NAV, tab, (v) => {
       tab = v;
+      navTitle();
       try { localStorage.setItem(TAB_KEY, v); } catch { /* 무시 */ }
       setPath(v);
       if (reqOpen && !(v === 'requests' && /^#req-\d+$/.test(location.hash))) { reqOpen = 0; if (location.hash) history.replaceState(null, '', location.pathname); }
@@ -109,6 +112,19 @@ function showApp() {
     // 포트폴리오(바깥 링크)는 포트폴리오2 바로 위에 (사용자 지시 2026-11-09)
     const pfLink = $('.side > .side-link'); const pf2 = $('#nav > button[data-v="portfolio2"]');
     if (pfLink && pf2) pf2.before(pfLink);
+    navTitle();
+    // 폰: 메뉴 단추 → 왼쪽에서 메뉴가 밀려 나온다. 메뉴를 고르거나 바깥 · Esc 를 누르면 닫힌다 (사용자 지시 2026-11-20)
+    const navOpen = (on) => {
+      $('#app').classList.toggle('nav-open', on);
+      document.documentElement.classList.toggle('nav-lock', on);
+      $('#nav-open').setAttribute('aria-expanded', on);
+      if (on) slideTabs($('#nav'));
+    };
+    $('#nav-open').addEventListener('click', () => navOpen(!$('#app').classList.contains('nav-open')));
+    $('#nav-dim').addEventListener('click', () => navOpen(false));
+    $('#side').addEventListener('click', (e) => { if (e.target.closest('button, a')) navOpen(false); });
+    addEventListener('keydown', (e) => { if (e.key === 'Escape') navOpen(false); });
+    matchMedia('(min-width: 900px)').addEventListener('change', () => navOpen(false));
     requestAnimationFrame(() => slideTabs($('#nav')));
     setPath(tab);   // 첫 화면(/)도 지금 메뉴 주소로
   }
@@ -168,6 +184,7 @@ function navBadge(n, v = 'requests') {
   else { if (!i) { i = document.createElement('i'); i.className = 'nav-num'; b.append(i); } i.textContent = n; }
   // 숫자가 생기거나 없어지면 탭 폭이 바뀐다 → 고른 탭 배경을 다시 맞춘다
   if (before !== (n ? String(n) : '')) requestAnimationFrame(() => slideTabs($('#nav')));
+  $('#nav-open')?.classList.toggle('has-new', !!$('#nav .nav-num'));   // 폰: 메뉴 단추에 새 글 점
 }
 
 // 막대 하나: 이름 · 쓴 양 / 한도 · % — 아주 적어도 막대 끝이 보이게 최소 폭을 둔다
@@ -1145,11 +1162,11 @@ const PRICING = [
 const FEE_BASE = { name: '온길교회', url: 'https://ongil.plators.com/', what: '맞춤 디자인 · 게시판 3개 · 회원 로그인 · 관리 화면 · 모바일' };
 const FEE_TOP = [
   { label: '제작비', avg: '300~600만원', avgNote: '제작 업체 · 프리랜서는 120~250만원', mine: '90만원', mineNote: '첫 1년 호스팅 포함 · 간편형은 30만원', cost: '0원', costNote: '업체에 내는 돈 없음 — 내 작업 시간' },
-  { label: '매달 비용', avg: '월 3~10만원', avgNote: '호스팅 + 유지보수', mine: '월 3,000원', mineNote: '호스팅 1GB + SSL 포함 · 연 36,000원 · 도메인 별도', cost: '사이트당 0원', costNote: '계정 전체로 월 $30 고정(아래) · 파일 저장은 모든 사이트 합쳐 10GB 까지 무료, 넘는 만큼만 1GB당 월 약 20원' },
+  { label: '매달 비용', avg: '월 3~10만원', avgNote: '호스팅 + 유지보수', mine: '월 2,500원', mineNote: '호스팅 1GB + SSL 포함 · 연 30,000원 · 도메인 별도', cost: '사이트당 0원', costNote: '계정 전체로 월 $30 고정(아래) · 파일 저장은 모든 사이트 합쳐 10GB 까지 무료, 넘는 만큼만 1GB당 월 약 20원' },
 ];
 const FEE_ROWS = [
   ['제작비', '업체 300~600만원<br>프리랜서 120~250만원<br>재능마켓 10~30만원부터(한 쪽 · 틀 그대로, 쪽 · 게시판 · 수정은 추가 요금)', '간편형 <b>30만원</b> — 5쪽 안팎 · 게시판 1개<br>표준형 <b>90만원</b> — 온길교회 규모<br>맞춤형 <b>150만원부터</b> — 기능 · 쪽 수 많은 곳', '<b>0원</b> — 업체에 내는 돈 없음(내 작업 시간)'],
-  ['호스팅 (1GB)', '업체 월 1~3만원<br>직접 빌리면 월 500~2,200원(공간만)', '<b>월 3,000원</b> (연 36,000원) — SSL 인증서 포함<br>첫 1년은 제작비에 포함', '<b>사이트당 0원</b> — 계정 전체로 월 $30 고정<br>파일 저장은 모든 사이트 합쳐 10GB 까지 0원'],
+  ['호스팅 (1GB)', '업체 월 1~3만원<br>직접 빌리면 월 500~2,200원(공간만)', '<b>월 2,500원</b> (연 30,000원) — SSL 인증서 포함<br>첫 1년은 제작비에 포함', '<b>사이트당 0원</b> — 계정 전체로 월 $30 고정<br>파일 저장은 모든 사이트 합쳐 10GB 까지 0원'],
   ['용량 추가', '1GB당 월 1,000~3,000원', '<b>1GB당 월 1,000원</b> (연 12,000원)', '<b>10GB 까지 0원</b> (모든 사이트 합계)<br>넘는 만큼만 1GB당 월 약 20원 ($0.015)'],
   ['전송량', '하루 한도 · 넘으면 막히거나 추가 요금', '<b>무제한</b>', '<b>0원</b>'],
   ['유지보수 관리', '월 3~10만원', '선택 — <b>월 10,000원</b> (연 12만원)<br>안 맡기면 수정 건당 30,000원부터', '<b>0원</b> — 내 작업 시간'],

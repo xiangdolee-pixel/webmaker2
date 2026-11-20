@@ -30,7 +30,14 @@
   </main>
 
   <div id="app" class="shell" hidden>
-    <aside class="side">
+    <!-- 폰: 위쪽 줄(메뉴 단추 + 지금 메뉴 이름). 메뉴는 왼쪽에서 밀려 나온다 -->
+    <header class="mtop">
+      <button class="mtop-btn" type="button" id="nav-open" aria-label="메뉴 열기" aria-expanded="false" aria-controls="side"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <b class="mtop-title" id="mtop-title"></b>
+      <span class="logo">xim</span>
+    </header>
+    <div class="side-dim" id="nav-dim"></div>
+    <aside class="side" id="side">
       <span class="brand logo">xim</span>
       <nav class="tabs side-nav" id="nav" aria-label="메뉴"></nav>
       <!-- 밖으로 가는 바로가기 (탭이 아니라 새 창) -->
