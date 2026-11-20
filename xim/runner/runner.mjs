@@ -507,9 +507,17 @@ ${res.url || ''}`, 600);
 
 // 다 쓴 자동화 엣지(_edge_profile) 닫기 — 작업이 끝나면 창을 남기지 않는다(사용자 지시 2026-11-10 "다 쓰고 안 쓰는 건 꼭 닫아 줘")
 function closeProfileEdge() {
-  try {
-    spawnSync('powershell', ['-NoProfile', '-Command', `Get-WmiObject Win32_Process -Filter "name='msedge.exe'" | Where-Object { $_.CommandLine -like '*${path.basename(PROFILE)}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { encoding: 'utf8', timeout: 60000, windowsHide: true });
-  } catch { /* 없으면 그만 */ }
+  // 정상 종료가 먼저다(2026-11-21 "로그인 안 풀리게 해줘 벌써 몇번째야"): 예전엔 매번 강제 종료(Stop-Process -Force)라 방금 갱신된
+  // ChatGPT 세션 쿠키가 디스크에 저장되기 전에 날아가 로그인이 풀렸다. ① CDP Browser.close ② 창 닫기 ③ 그래도 남으면 강제.
+  const ps = (cmd) => { try { return spawnSync('powershell', ['-NoProfile', '-Command', cmd], { encoding: 'utf8', timeout: 60000, windowsHide: true }); } catch { return {}; } };
+  const mine = `Get-WmiObject Win32_Process -Filter "name='msedge.exe'" | Where-Object { $_.CommandLine -like '*${path.basename(PROFILE)}*' }`;
+  const open = () => +((ps(`(${mine} | Measure-Object).Count`).stdout || '').trim()) > 0;
+  const nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  if (!open()) return;
+  try { spawnSync(process.execPath, ['-e', `(async()=>{try{const v=await(await fetch('http://127.0.0.1:9333/json/version')).json();const w=new WebSocket(v.webSocketDebuggerUrl);w.onopen=()=>{w.send(JSON.stringify({id:1,method:'Browser.close'}));setTimeout(()=>process.exit(0),1500)};w.onerror=()=>process.exit(1)}catch{process.exit(1)}})()`], { timeout: 8000, windowsHide: true }); } catch { /* 포트 없음 */ }
+  for (let i = 0; i < 6 && open(); i++) nap(1000);
+  if (open()) { ps(`${mine} | ForEach-Object { try { (Get-Process -Id $_.ProcessId).CloseMainWindow() | Out-Null } catch {} }`); for (let i = 0; i < 6 && open(); i++) nap(1000); }
+  if (open()) { log('  (자동화 엣지가 정상 종료되지 않아 강제로 닫음)'); ps(`${mine} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`); }
 }
 
 // 검토가 끝났으면 공개로(2026-11-10): Worker 가 5분마다 'youtube-publish' 로 넘겨 준다 → 콘텐츠 목록의 '알림' 칸을 보고, '검토 중' 이 사라졌으면 편집 화면에서 공개 → 저장
