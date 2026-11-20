@@ -1204,7 +1204,7 @@ export default {
     // 계약서 서명(sign.plators.com 전체 · /api/sign/* · /sign/*) — 운영자 화면 · API 보다 먼저. sign 주소에서는 이것 말고 아무것도 안 열린다
     try { const r = await contractsPublic(request, env, url, staticFile); if (r) return r; } catch (e) { return fail(e); }
     // J-Docs 문서 보기(/jd/<6자> · /api/jdp/<6자>) — 주소를 아는 사람만, 로그인 없음
-    try { const r = await jdocsPublic(request, env, url); if (r) return r; } catch (e) { return fail(e); }
+    try { const r = await jdocsPublic(request, env, url, staticFile); if (r) return r; } catch (e) { return fail(e); }
     if (url.pathname.startsWith('/api/')) {
       try { return await ximApi(request, env, url, ctx); } catch (e) { return fail(e); }
     }

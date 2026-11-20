@@ -218,7 +218,7 @@ export function layout(doc, settings) {
   frame(lb);
 
   const RX = X0 + 90;
-  const cw = [7, 17, 27, 14, 25];
+  const cw = [7, 17, 24, 13, 29];
   const cx = cw.reduce((a, w, i) => (a.push(a[i] + w), a), [RX]);
   const rb = [];
   // 공급자 칸도 다섯 줄 — 왼쪽 다섯 줄과 줄마다 맞는다. 업태 · 종목은 한 줄씩 가로 전체를 쓴다(긴 글도 줄이 떨어지지 않게)
@@ -233,7 +233,7 @@ export function layout(doc, settings) {
   };
   lab(0, 1, '사업자\n등록번호'); val(0, 2, 3, co.bizNo || '');
   lab(1, 1, '상호'); val(1, 2, 1, co.name || ''); lab(1, 3, '대표자');
-  const ceoText = `${co.ceo || ''}  (인)`;
+  const ceoText = `${co.ceo || ''}      (인)`;   // 이름과 (인) 사이를 띄운다 — 도장이 이름을 가리지 않게
   const ceoBox = val(1, 4, 1, ceoText);
   lab(2, 1, '업태'); val(2, 2, 3, co.bizType || '', { size: 9, oneLine: true, minSize: 6 });
   lab(3, 1, '종목'); val(3, 2, 3, co.bizItem || '', { size: 9, oneLine: true, minSize: 6 });

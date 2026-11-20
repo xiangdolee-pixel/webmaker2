@@ -8,10 +8,12 @@
 //     GET/POST templates · PUT/DELETE templates/:id      템플릿(불러와서 새 문서로)
 //     GET/POST clients · PUT/DELETE clients/:name        클라이언트 카테고리
 //     GET  stamp · seal                                  도장 그림 — 계약서 '을 정보 · 도장'(settings.contract_eul)의 그림을 같이 쓴다
-//   고객(로그인 없음, 주소 6자를 아는 사람만)  /jd/<6자> (화면, 예전 /d/<6자> 도 열림) · /api/jdp/<6자> (내용) · /api/jdp/<6자>/stamp|seal
+//   고객(로그인 없음, 주소 6자를 아는 사람만)  docs.plators.com/jd/<6자> (화면 — xim Worker 에 붙인 사용자 도메인. docs 주소에서는 문서 보기 말고 아무것도 안 열린다.
+//                                               xim 주소의 /jd/<6자> · 예전 /d/<6자> 도 같은 화면) · /api/jdp/<6자> (내용) · /api/jdp/<6자>/stamp|seal
 //
 //   회사 정보는 jd_settings 에만 있다(코드 · 리포에 두지 않는다). 사업장 주소는 받지도 내보내지도 않는다(사용자 지시: 공개하지 않음).
 
+export const DOCS_HOST = 'docs.plators.com';
 const TYPE_NAME = { quote: '견적서', statement: '거래명세서', invoice: '청구서', letter: '공문' };
 const SLUG_CH = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';   // 헷갈리는 0 O 1 l I 는 뺀다
 const SLUG_RE = /^[A-Za-z0-9]{6}$/;
@@ -401,11 +403,17 @@ ${gone ? '' : `<script type="module" src="/js/jd/view.js?v=${ver}"></script>`}
 const page = (opt, status = 200) => new Response(pageHtml(opt), { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "frame-ancestors 'none'", 'X-Frame-Options': 'DENY' } });
 
 // 반환: Response, 또는 null(이 길이 아님)
-export async function jdocsPublic(request, env, url) {
+export async function jdocsPublic(request, env, url, staticFile) {
   const p = url.pathname.replace(/\/+$/, '');
+  const onDocs = url.hostname === DOCS_HOST;
   const pm = /^\/api\/jdp\/([A-Za-z0-9]{6})(?:\/(stamp|seal))?$/.exec(p);
   const vm = pm ? null : /^\/(?:jd|d)\/([^/]+)$/.exec(p);   // 주소는 /jd/<6자>. 예전에 보낸 /d/<6자> 도 그대로 열린다
-  if (!pm && !vm) return null;
+  if (!pm && !vm) {
+    if (!onDocs) return null;
+    // docs 주소: 문서 화면이 쓰는 파일만 내주고, 나머지(운영자 화면 · API)는 없는 주소
+    if (request.method === 'GET' && (p === '/css/jdocs.css' || /^\/js\/jd\/[\w-]+\.js$/.test(p))) return staticFile(request, env, url);
+    return new Response('없는 주소입니다.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' } });
+  }
   const db = env.DB;
   const ver = String(env.VER?.id || 'dev').slice(0, 8);
   const slug = pm ? pm[1] : vm[1];
