@@ -280,16 +280,38 @@ ${P.ARTICLE_FORMAT}
 }
 
 // ───────── 그림 단계 (PC · ChatGPT) ─────────
-function py(argsArr, { cwd, env = {}, timeoutMin = 30, label = 'python' } = {}) {
+function py(argsArr, { cwd, env = {}, timeoutMin = 30, label = 'python', onOut = null } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(PYTHON, ['-u', ...argsArr], { cwd, env: { ...process.env, PYTHONIOENCODING: 'utf-8', ...env }, windowsHide: true });
     let out = '';
-    child.stdout.on('data', (d) => { const s = d.toString(); out += s; process.stdout.write(s); });
+    child.stdout.on('data', (d) => { const s = d.toString(); out += s; process.stdout.write(s); if (onOut) { try { onOut(s); } catch { /* 표시용 */ } } });
     child.stderr.on('data', (d) => { const s = d.toString(); out += s; process.stderr.write(s); });
     const timer = setTimeout(() => { try { spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F']); } catch { /* */ } reject(new Error(`${label}: ${timeoutMin}분 초과`)); }, timeoutMin * 60000);
     child.on('error', (e) => { clearTimeout(timer); reject(e); });
     child.on('close', (code) => { clearTimeout(timer); resolve({ code, out }); });
   });
+}
+// 그림 엔진이 찍는 줄을 읽어 장마다 지금 상태를 xim 화면에 알린다 (사용자 지시 2026-11-21: "깜박거리지만 말고 몇 개 중 몇 개가 만들어졌고
+// 몇 개는 생성 중이고 로그인이 안 되고 있고… 를 표시"). 단계 설명(note)만 바꾼다 — 완료 처리는 그림을 올린 뒤 그대로.
+function engineProgress(j, names) {
+  const drawing = new Set(); let buf = '';
+  const note = (step, text) => { if (names.includes(step)) j.step(step, 'note', text); };
+  const all = (text) => { for (const n of names) note(n, text); };
+  return (chunk) => {
+    buf += chunk; const lines = buf.split(/\r?\n/); buf = lines.pop();
+    for (const l of lines) {
+      let m;
+      if ((m = l.match(/^\s*\[(\d+) dbg t=/))) { if (!drawing.has(m[1])) { drawing.add(m[1]); note(`slide-${m[1]}`, '그리는 중'); } }
+      else if ((m = l.match(/^\s*\[(\d+)\] -> shot2\/\d+\.png 저장/))) note(`slide-${m[1]}`, '완성');
+      else if ((m = l.match(/^\s*\[(\d+)\] -> .*재시도 \((\d)\//))) { drawing.delete(m[1]); note(`slide-${m[1]}`, `다시 그리는 중 (${+m[2] + 1}번째 시도)`); }
+      else if (/ChatGPT 로그인이 풀려 있음/.test(l)) all('ChatGPT 로그인이 풀려 다시 로그인하는 중');
+      else if (/자동 로그인 성공/.test(l)) all('차례 기다리는 중');
+      else if (/자동 로그인 (실패|불가)|LOGIN_REQUIRED/.test(l)) all('ChatGPT 로그인 안 됨');
+      else if (/인물 사진 첨부 중/.test(l)) note('thumb', '인물 사진 붙이는 중');
+      else if (/프롬프트 전송 중/.test(l) || /^\s*\[dbg t=/.test(l)) { if (!drawing.has('thumb')) { drawing.add('thumb'); note('thumb', '그리는 중'); } }
+      else if (/^\s*저장: .*06_thumbnail/.test(l)) note('thumb', '완성');
+    }
+  };
 }
 const engineEnv = () => ({ BROWSER_EXE: BROWSER, BRAVE_USER_DATA: PROFILE, KEEP_CF_COOKIES: '1', SLIDE_PARALLEL: process.env.SLIDE_PARALLEL || '4' });   // 4 = 슬라이드 3 + 썸네일 1 동시 (속도 최적화)
 
@@ -314,18 +336,18 @@ const engineErr = (r, names, j) => async () => {
 // 슬라이드 엔진(ChatGPT) — nums 만, 썸네일 없이. 실패 판정은 호출한 쪽에서(결과 r 반환)
 async function runSlidesEngine(j, work, nums, label = '슬라이드') {
   const names = nums.map((n) => `slide-${n}`);
-  for (const n of names) await j.step(n, 'running', 'ChatGPT');
-  const r = await py(['tools\\gpt_slide_text.py', '--result', work, ...nums.map(String)], { cwd: DOCS, env: engineEnv(), timeoutMin: 40, label });
+  for (const n of names) await j.step(n, 'running', '차례 기다리는 중');
+  const r = await py(['tools\\gpt_slide_text.py', '--result', work, ...nums.map(String)], { cwd: DOCS, env: engineEnv(), timeoutMin: 40, label, onOut: engineProgress(j, names) });
   if (!nums.some((n) => fs.existsSync(path.join(work, 'shot2', `${n}.png`))) && r.code !== 0) await engineErr(r, names, j)();
   return r;
 }
 // 슬라이드 몇 장 + 썸네일을 한 브라우저에서 동시에(gpt_slide_text.py --with-thumb). 엔진을 두 번 띄우면 뒤에 뜬 쪽이 앞의 브라우저를 정리해 버려 같이 못 돈다.
 async function runSlidesAndThumb(j, work, nums) {
   const names = [...nums.map((n) => `slide-${n}`), 'thumb'];
-  for (const n of names) await j.step(n, 'running', 'ChatGPT');
+  for (const n of names) await j.step(n, 'running', '차례 기다리는 중');
   const r = nums.length   // 번호 없이 --with-thumb 만 주면 엔진이 6장 전부를 다시 그린다 → 썸네일만이면 썸네일 엔진
-    ? await py(['tools\\gpt_slide_text.py', '--result', work, '--with-thumb', ...nums.map(String)], { cwd: DOCS, env: engineEnv(), timeoutMin: 40, label: `슬라이드 ${nums.length}장 + 썸네일` })
-    : await py(['tools\\gpt_thumbnail.py'], { cwd: DOCS, env: engineEnv(), timeoutMin: 15, label: '썸네일' });
+    ? await py(['tools\\gpt_slide_text.py', '--result', work, '--with-thumb', ...nums.map(String)], { cwd: DOCS, env: engineEnv(), timeoutMin: 40, label: `슬라이드 ${nums.length}장 + 썸네일`, onOut: engineProgress(j, names) })
+    : await py(['tools\\gpt_thumbnail.py'], { cwd: DOCS, env: engineEnv(), timeoutMin: 15, label: '썸네일', onOut: engineProgress(j, names) });
   const any = fs.existsSync(path.join(work, '06_thumbnail.png')) || nums.some((n) => fs.existsSync(path.join(work, 'shot2', `${n}.png`)));
   if (!any && r.code !== 0) await engineErr(r, names, j)();
   return r;
@@ -333,8 +355,8 @@ async function runSlidesAndThumb(j, work, nums) {
 // 썸네일 잡 파일 작성(패키지가 써 둔 프롬프트가 있고 내 사진이면 Claude 호출 없음) → 썸네일 엔진(ChatGPT, 교정 패스 없이)
 async function runThumb(j, job, work, pick, premade) {
   await thumbPrompt(j, job, work, pick, premade);
-  await j.step('thumb', 'running', 'ChatGPT');
-  const r = await py(['tools\\gpt_thumbnail.py'], { cwd: DOCS, env: engineEnv(), timeoutMin: 15, label: '썸네일' });
+  await j.step('thumb', 'running', '차례 기다리는 중');
+  const r = await py(['tools\\gpt_thumbnail.py'], { cwd: DOCS, env: engineEnv(), timeoutMin: 15, label: '썸네일', onOut: engineProgress(j, ['thumb']) });
   if (!fs.existsSync(path.join(work, '06_thumbnail.png'))) await engineErr(r, ['thumb'], j)();
   return r;
 }

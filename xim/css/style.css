@@ -644,6 +644,11 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .tl .tl-no { color: var(--mute); font-size: 12px; font-variant-numeric: tabular-nums; }
 .tl .tl-ic { font-weight: 800; color: var(--mute); }
 .tl .tl-note { grid-column: 3; color: var(--sub); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl .tl-chips { display: inline-flex; gap: 3px; margin-right: 8px; vertical-align: -3px; }
+.tl .tl-chip { min-width: 20px; padding: 0 4px; border: 1px solid var(--line); border-radius: 5px; color: var(--mute); font-size: 11px; font-style: normal; font-weight: 700; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+.tl .tl-chip.done { background: var(--ok); border-color: var(--ok); color: #fff; }
+.tl .tl-chip.draw { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); animation: new-blink 1.2s ease-in-out infinite; }
+.tl .tl-chip.fail, .tl .tl-chip.login { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
 .tl .tl-dur { grid-column: 4; grid-row: 1 / span 2; color: var(--mute); font-size: 13px; white-space: nowrap; align-self: start; }
 .tl li.tl-done .tl-ic { color: var(--ok); }
 .tl li.tl-running .tl-ic { color: var(--brand); animation: new-blink 1.2s ease-in-out infinite; }

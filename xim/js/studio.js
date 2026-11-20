@@ -77,6 +77,24 @@ function planFor(job) {
   p.push(['slides', `슬라이드 ${job.source === 'rss' ? 8 : '6'}장 → 썸네일 (ChatGPT)`], ['review', '슬라이드 검수 · 썸네일 검수']);
   return p;
 }
+// 그림 단계 한눈에 — 장마다 네모 하나(완성 · 그리는 중 · 대기 · 실패) + "8장 중 완성 3 · 그리는 중 4 · 대기 1" (사용자 지시 2026-11-21: "깜박거리지만 말고")
+//   도우미가 엔진 출력을 읽어 단계 설명(note)을 '차례 기다리는 중 → 그리는 중 → 완성' 으로 바꿔 준다. 같은 장을 다시 그리면 마지막 기록만 본다.
+function slidesDetail(ss) {
+  const last = {};
+  for (const x of ss) if (/^slide-\d+$|^thumb$/.test(x.step)) last[x.step] = x;
+  const kind = (x) => x.status === 'failed' ? 'fail' : x.status === 'done' || /^완성/.test(x.note || '') ? 'done' : /로그인/.test(x.note || '') ? 'login' : /그리는 중|붙이는 중/.test(x.note || '') ? 'draw' : 'wait';
+  const slides = Object.keys(last).filter((k) => k !== 'thumb').sort((a, b) => a.slice(6) - b.slice(6));
+  if (!slides.length && !last.thumb) return '';
+  const n = { done: 0, draw: 0, wait: 0, fail: 0, login: 0 };
+  for (const k of slides) n[kind(last[k])] += 1;
+  const tip = { done: '완성', draw: '그리는 중', wait: '차례 기다리는 중', fail: '실패', login: 'ChatGPT 로그인 중' };
+  const chip = (k, text) => `<i class="tl-chip ${kind(last[k])}" title="${esc(`${text === '썸' ? '썸네일' : `슬라이드 ${text}`} — ${last[k].note && kind(last[k]) !== 'done' ? last[k].note : tip[kind(last[k])]}`)}">${text}</i>`;
+  const parts = [];
+  if (slides.length) parts.push(`슬라이드 ${slides.length}장 중 완성 ${n.done}${n.draw ? ` · 그리는 중 ${n.draw}` : ''}${n.wait + n.login ? ` · 대기 ${n.wait + n.login}` : ''}${n.fail ? ` · 실패 ${n.fail}` : ''}`);
+  if (last.thumb) parts.push(`썸네일 ${tip[kind(last.thumb)]}`);
+  const login = [...slides, 'thumb'].some((k) => last[k] && kind(last[k]) === 'login');
+  return `<span class="tl-chips">${slides.map((k) => chip(k, k.slice(6))).join('')}${last.thumb ? chip('thumb', '썸') : ''}</span>${login ? '<b class="tl-stop">ChatGPT 로그인이 풀려 다시 로그인하는 중</b> · ' : ''}${esc(parts.join(' · '))}`;
+}
 const keyOf = (step) => step.replace(/^article-\d+$/, 'articles').replace(/^slide-\d+$/, 'slides').replace(/^review-\d+$/, 'review').replace(/^(thumb|thumb-prompt)$/, 'slides').replace(/^(factcheck|summary|thumb-pick)$/, 'package');
 // 계획 + 실제 기록 → 줄 목록과 요약
 function timeline(job, steps) {
@@ -95,7 +113,7 @@ function timeline(job, steps) {
     const start = ss.length ? Math.min(...ss.map((x) => x.started_at)) : 0;
     const end = ss.length && status !== 'running' ? Math.max(...ss.map((x) => x.finished_at || x.started_at)) : 0;
     const secs = start ? Math.round(((end || Date.now()) - start) / 1000) : 0;
-    return { key, label, status, start, end, secs, note: ss.filter((x) => x.note).map((x) => x.note).slice(-1)[0] || '' };
+    return { key, label, status, start, end, secs, note: ss.filter((x) => x.note).map((x) => x.note).slice(-1)[0] || '', html: key === 'slides' && status === 'running' ? slidesDetail(ss) : '' };
   });
   for (const r of rows) if ((r.key === 'pick' || r.key === 'thumb-wait') && r.status === 'pending') { const later = rows.slice(rows.indexOf(r) + 1).some((x) => x.status !== 'pending'); if (later) r.status = 'done'; }
   const total = rows.length, done = rows.filter((r) => ['done', 'skipped'].includes(r.status)).length;
@@ -177,7 +195,7 @@ function timelineHtml(job, steps, v = null) {
   return `<section class="card st-steps" id="st-tl">
     <div class="tl-head">${head}</div>
     <div class="tl-bar"><i style="width:${pct}%"></i></div>
-    <ol class="tl">${t.rows.map((r, i) => `<li class="tl-${r.status}"><span class="tl-no">${i + 1}</span><span class="tl-ic">${icon[r.status]}</span><b>${esc(r.label)}</b><span class="tl-note">${esc(r.note)}</span><span class="tl-dur">${r.status === 'running' ? `${mins(r.secs)} 진행 중` : r.status === 'wait' ? (r.since ? `${mins(r.secs)} 기다리는 중` : '기다리는 중') : r.status === 'pending' ? `예상 ${mins(EXPECT[r.key] || AFTER_EXPECT[r.key] || 60)}` : r.secs ? mins(r.secs) : ''}</span></li>`).join('')}</ol>
+    <ol class="tl">${t.rows.map((r, i) => `<li class="tl-${r.status}"><span class="tl-no">${i + 1}</span><span class="tl-ic">${icon[r.status]}</span><b>${esc(r.label)}</b><span class="tl-note">${r.html || esc(r.note)}</span><span class="tl-dur">${r.status === 'running' ? `${mins(r.secs)} 진행 중` : r.status === 'wait' ? (r.since ? `${mins(r.secs)} 기다리는 중` : '기다리는 중') : r.status === 'pending' ? `예상 ${mins(EXPECT[r.key] || AFTER_EXPECT[r.key] || 60)}` : r.secs ? mins(r.secs) : ''}</span></li>`).join('')}</ol>
   </section>`;
 }
 // 제작 조건 — 스튜디오 첫 화면에 늘 보인다 (사용자 지시 2026-11-09). 네 칸: PC 도우미 · Claude(글) · ChatGPT(그림) · 예약

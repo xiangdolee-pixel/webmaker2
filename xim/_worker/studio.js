@@ -615,6 +615,8 @@ export async function studioHelper(request, env, url, path, method) {
     if (sub === 'step' && method === 'POST') {
       const d = await readJson();
       const step = String(d.step || '').slice(0, 40);
+      // 'note' = 진행 중인 단계의 설명만 바꾼다(슬라이드 '차례 기다리는 중 → 그리는 중 → 완성' 처럼 화면에 지금 상태를 보여 주려고, 2026-11-21)
+      if (d.status === 'note') { await db.prepare("UPDATE studio_steps SET note = ? WHERE job_id = ? AND step = ? AND status = 'running'").bind(String(d.note || '').slice(0, 300), job.id, step).run(); return json({ ok: true }); }
       if (d.status === 'running') { const id = await stepStart(db, job.id, step, String(d.note || '').slice(0, 300)); return json({ id }); }
       const row = await db.prepare("SELECT id FROM studio_steps WHERE job_id = ? AND step = ? AND status = 'running' ORDER BY id DESC LIMIT 1").bind(job.id, step).first();
       if (row) await stepEnd(db, row.id, job.id, ['done', 'failed', 'skipped'].includes(d.status) ? d.status : 'done', d.note || '', d.usage || null);
