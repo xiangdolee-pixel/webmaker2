@@ -202,6 +202,20 @@ async function advance(env, cf, saas, zones, host, entryIps) {
     await env.KV.delete(kvKey);
     log.push(`확인용 TXT ${saved.length}개를 지웠습니다.`);
   }
+  // 그 도메인 영역의 기본 인증서(Universal SSL)를 끈다 — 켜 두면 대표 주소(www 없는 주소)가 부스터 인증서 대신 그 인증서로 잡혀 느린 길로 처리된다
+  //   (2026-11-21 늘해랑심리상담.kr 실측: 보안 연결 0.75초 · 첫 응답 1.5초 → 끄고 나서 0.27초 · 0.45초). 영역에 프록시(주황 구름) 레코드가 없을 때만, 한 번만.
+  const uniKey = `uni:${zid}`;
+  if (!(await env.KV.get(uniKey))) {
+    try {
+      const recs = await cf.all(`/zones/${zid}/dns_records`);
+      if (recs.some((r) => r.proxied)) await env.KV.put(uniKey, 'keep');   // 프록시로 쓰는 주소가 있으면 그대로 둔다
+      else {
+        const cur = (await cf.call('GET', `/zones/${zid}/ssl/universal/settings`)).result;
+        if (cur?.enabled) { await cf.call('PATCH', `/zones/${zid}/ssl/universal/settings`, { enabled: false }); log.push('도메인 기본 인증서를 껐습니다(대표 주소가 느려지지 않게).'); }
+        await env.KV.put(uniKey, 'off');
+      }
+    } catch (e) { log.push(`기본 인증서 끄기는 건너뜀: ${e.message}`); }
+  }
   return { ch: now, log };
 }
 
