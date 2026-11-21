@@ -173,6 +173,7 @@ CREATE TABLE IF NOT EXISTS portfolio_links (
 --   ALTER TABLE sites ADD COLUMN domain_start TEXT NOT NULL DEFAULT '';  -- 도메인 시작일 — 만료일은 넣지 않으면 1년 뒤
 --   ALTER TABLE sites ADD COLUMN domain_end TEXT NOT NULL DEFAULT '';
 --   ALTER TABLE sites ADD COLUMN domain_registrar TEXT NOT NULL DEFAULT '';  -- 도메인 구입처(가비아 · 후이즈 …)
+--   ALTER TABLE sites ADD COLUMN pay_account TEXT NOT NULL DEFAULT '';       -- 고객에게 안내한 입금계좌(목록은 settings.pay_accounts — JSON 배열, 첫 번째가 기본)
 --   ALTER TABLE sites ADD COLUMN domain_account TEXT NOT NULL DEFAULT '';    -- 누구 계정으로 샀는지(운영자 · 고객 · 아이디)
 --   ALTER TABLE sites ADD COLUMN portfolio_tag TEXT NOT NULL DEFAULT '';  -- 포트폴리오 분류(홈페이지 · 솔루션개발 · 웹앱 · 웹게임), 사이트 수정 창에서
 

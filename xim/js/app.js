@@ -263,7 +263,7 @@ async function renderSites() {
   if (cats.length > 1 && siteCat) requestAnimationFrame(showCat);
   refilter = liveSearch(view.querySelector('[data-q]'), (v) => { siteQ = v; }, (el) => !siteCat || el.dataset.cat === siteCat);
   view.querySelectorAll('[data-term-site]').forEach((b) => { b.onclick = () => { const st = sites.find((x) => x.id === +b.dataset.termSite); if (st) siteDialog(st); }; });   // 알림을 누르면 그 사이트 수정 창
-  view.querySelector('[data-term-more]')?.addEventListener('click', (e) => { e.currentTarget.closest('.term-alert').classList.add('all'); e.currentTarget.remove(); });
+  view.querySelector('[data-term-more]')?.addEventListener('click', (e) => { const b = e.currentTarget, on = b.closest('.term-alert').classList.toggle('all'); b.textContent = on ? b.dataset.open : b.dataset.shut; });
   view.querySelector('[data-act="new-site"]').onclick = () => siteDialog();
   view.querySelector('[data-act="connect"]').onclick = () => connectDialog();
   view.querySelectorAll('[data-site]').forEach((el) => {
@@ -590,7 +590,7 @@ function siteRow(s) {
     </div>
     <div class="sr-addr">${s.domain ? link(s.url, s.domain) : '<span class="dim">도메인 없음</span>'}${link(dev, 'workers.dev')}${tags}</div>
     <div class="sr-num"><span class="sr-visit" title="오늘 방문자 ${s.visits?.today.visitors || 0}명 · 페이지뷰 ${s.visits?.today.views || 0} / 어제 방문자 ${s.visits?.yesterday.visitors || 0}명 · 페이지뷰 ${s.visits?.yesterday.views || 0}">오늘 <b>${s.visits?.today.visitors || 0}</b>명<small>어제 ${s.visits?.yesterday.visitors || 0}</small></span><span class="sr-made" title="사이트를 만든 날 ${esc(fmtDate(s.created_at))}">제작 <b>${esc(fmtDate(s.created_at).slice(0, 10))}</b></span><span>관리자 <b>${s.admin_count}</b></span>${s.open_requests ? `<button type="button" class="link-btn" data-go-reqs="${esc(s.slug)}">요청 <b>${s.open_requests}</b></button>` : '<span>요청 0</span>'}</div>
-    ${s.host_end || s.domain_end || s.domain_registrar ? `<div class="sr-terms">${termChip('호스팅', s.host_end, s.host_start ? `시작 ${s.host_start}` : '')}${termChip('도메인', s.domain_end, [s.domain_start ? `시작 ${s.domain_start}` : '', s.domain_cost ? `${Number(s.domain_cost).toLocaleString('ko-KR')}원` : '', s.domain_registrar ? `구입처 ${s.domain_registrar}` : '', s.domain_account ? `계정 ${s.domain_account}` : ''].filter(Boolean).join(' · '), [s.domain_registrar, s.domain_account].filter(Boolean).join(' · '))}</div>` : ''}
+    ${s.host_end || s.domain_end || s.domain_registrar || s.pay_account ? `<div class="sr-terms">${termChip('호스팅', s.host_end, s.host_start ? `시작 ${s.host_start}` : '')}${s.pay_account ? `<span class="sr-term" title="고객에게 안내한 입금계좌">입금 <small>${esc(s.pay_account)}</small></span>` : ''}${termChip('도메인', s.domain_end, [s.domain_start ? `시작 ${s.domain_start}` : '', s.domain_cost ? `${Number(s.domain_cost).toLocaleString('ko-KR')}원` : '', s.domain_registrar ? `구입처 ${s.domain_registrar}` : '', s.domain_account ? `계정 ${s.domain_account}` : ''].filter(Boolean).join(' · '), [s.domain_registrar, s.domain_account].filter(Boolean).join(' · '))}</div>` : ''}
     <div class="sr-use${useCl}" title="${useCl === ' over' ? '저장 용량 초과 — 이 사이트는 지금 사진 · 파일을 올릴 수 없습니다 · ' : ''}DB ${mb(u.db)} · 파일 ${u.file_count}개(R2 ${mb(u.r2)} · DB ${mb(u.d1_files)}) · 홈페이지 ${s.static_mb || 0}MB">
       <span>DB ${mb(u.db)}</span><span class="use-f">파일 ${mb(u.files)} / ${s.quota_mb ? `${s.quota_mb}MB` : '제한 없음'}${useCl === ' over' ? ' <b>초과</b>' : ''}</span><span>홈 ${s.static_mb ? `${s.static_mb}MB` : '—'}</span>
       <div class="quota" aria-hidden="true"><i style="width:${pct}%"></i></div></div>
@@ -698,13 +698,15 @@ function termAlerts(sites) {
   const row = (i, k) => {
     const cl = i.left < 0 ? 'over' : i.left <= 31 ? 'soon' : i.left <= 60 ? 'near' : '';
     const when = i.left < 0 ? `${-i.left}일 지남` : i.left === 0 ? '오늘까지' : `D-${i.left}`;
-    return `<button type="button" class="ta-row ${cl}${k >= 5 ? ' more' : ''}" data-term-site="${i.s.id}" title="누르면 ${esc(i.s.name)} 수정 창이 열립니다">
+    return `<button type="button" class="ta-row ${cl}${i.left > 31 ? ' more' : ''}" data-term-site="${i.s.id}" title="누르면 ${esc(i.s.name)} 수정 창이 열립니다">
       <b class="ta-d">${when}</b><span class="ta-k">${i.kind}</span><span class="ta-n">${esc(i.s.name)}</span><span class="ta-e">~${esc(i.end)}</span>${i.note ? `<small>${esc(i.note)}</small>` : ''}</button>`;
   };
-  return `<section class="term-alert${urgent ? ' hot' : ''}" aria-label="호스팅 · 도메인 기간 알림">
-    <div class="ta-h"><b>기간 알림</b><span>${urgent ? `31일 안에 끝나거나 지난 것 <em>${urgent}건</em>` : '31일 안에 끝나는 것은 없습니다'} · 급한 순서</span></div>
+  // 31일 안에 끝나거나 지난 것만 바로 보이고, 나머지는 '전체 목록 보기' 를 눌러야 펼쳐진다(사용자 지시 2026-11-21)
+  const rest = items.length - urgent;
+  return `<section class="term-alert${urgent ? ' hot' : ' calm'}" aria-label="호스팅 · 도메인 기간 알림">
+    <div class="ta-h"><b>기간 알림</b><span>${urgent ? `31일 안에 끝나거나 지난 것 <em>${urgent}건</em> · 급한 순서` : '31일 안에 끝나는 것은 없습니다'}</span>
+      ${rest ? `<button type="button" class="btn sm ta-more" data-term-more data-open="접기" data-shut="전체 목록 보기 ${items.length}건">전체 목록 보기 ${items.length}건</button>` : ''}</div>
     <div class="ta-list">${items.map(row).join('')}</div>
-    ${items.length > 5 ? `<button type="button" class="link-btn ta-more" data-term-more>나머지 ${items.length - 5}건 더 보기</button>` : ''}
   </section>`;
 }
 function siteDialog(site) {
@@ -726,6 +728,9 @@ function siteDialog(site) {
         <label class="field"><span>저장 용량 (MB)</span><input class="input" name="quota_mb" type="number" min="0" value="${esc(s.quota_mb)}" required></label>
       </div>
       <label class="field"><span>메모</span><textarea class="input" name="memo" rows="2">${esc(s.memo)}</textarea></label>
+      <div class="field"><span>안내한 입금계좌</span>
+        <select class="input" name="pay_pick" data-pay-pick><option value="">불러오는 중…</option></select>
+        <input class="input" name="pay_custom" data-pay-custom placeholder="은행 · 계좌번호 · 예금주" maxlength="120" hidden></div>
       <div class="field"><span>포트폴리오 분류 <small>(여러 개 가능)</small></span><div class="pf-cats" data-pf-cats></div><input type="hidden" name="portfolio_tag" value="${esc(s.portfolio_tag)}"></div>
       </div>
       <div class="sf-col">
@@ -756,13 +761,24 @@ function siteDialog(site) {
     </form>`, (dlg) => {
     const form = dlg.querySelector('form');
     pfCatPicker(form.querySelector('[data-pf-cats]'), form.portfolio_tag);
+    // 안내한 입금계좌: 목록에서 고르거나 '직접입력'(사용자 지시 2026-11-21). 비어 있으면 목록의 첫 번째(기본 계좌)
+    const pick = form.querySelector('[data-pay-pick]'), custom = form.querySelector('[data-pay-custom]');
+    const showCustom = () => { custom.hidden = pick.value !== '__custom'; if (!custom.hidden && document.activeElement === pick) custom.focus(); };
+    payAccounts().then((list) => {
+      const cur = s.pay_account || '';
+      pick.innerHTML = list.map((a) => `<option value="${esc(a)}">${esc(a)}</option>`).join('') + '<option value="__custom">직접입력</option>';
+      if (cur && !list.includes(cur)) { pick.value = '__custom'; custom.value = cur; } else pick.value = cur || list[0] || '__custom';
+      showCustom();
+    });
+    pick.addEventListener('change', showCustom);
     // 시작일을 넣거나 바꾸면 끝나는 날을 1년 뒤로 채운다(끝나는 날을 손으로 고친 뒤에는 그대로 둔다 — 시작일을 다시 바꾸면 다시 채움)
     form.querySelectorAll('[data-term-start]').forEach((st) => st.addEventListener('change', () => { form[st.dataset.termStart].value = plusYear(st.value); }));
     form.querySelectorAll('[data-won]').forEach((w) => w.addEventListener('input', () => { const n = w.value.replace(/[^0-9]/g, ''); w.value = n ? Number(n).toLocaleString('ko-KR') : ''; }));
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       busy(form.querySelector('[type=submit]'), form.querySelector('.err'), async () => {
-        const { portfolio_tag: pfTag, ...rest } = formData(form);
+        const { portfolio_tag: pfTag, pay_pick: pp, pay_custom: pc, ...rest } = formData(form);
+        rest.pay_account = pp === '__custom' ? (pc || '').trim() : pp || '';
         const data = { ...rest, status: s.status };
         const r = site ? await api(`/sites/${site.id}`, { method: 'PUT', data }) : await api('/sites', { method: 'POST', data });
         const sid = site ? site.id : r?.id;

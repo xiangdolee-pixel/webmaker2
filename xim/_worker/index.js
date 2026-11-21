@@ -509,6 +509,11 @@ async function ximApi(request, env, url, ctx) {
     // 봇 확인 비밀 키(turnstile_secret)는 화면에 필요 없다 — 내려보내지 않는다
     return json(results.map(({ turnstile_secret, ...s }) => ({ ...s, visits: { today: visit[s.slug]?.today || { visitors: 0, views: 0 }, yesterday: visit[s.slug]?.yesterday || { visitors: 0, views: 0 } }, admin_count: count[s.slug] || 0, url: siteUrl(s), favicon: fav[s.slug] ? `${siteUrl(s)}/xms/file/favicon-32.png?v=${fav[s.slug]}` : s.site_favicon ? `${siteUrl(s)}${s.site_favicon}` : '', usage: use[s.slug] || { db: 0, files: 0, file_count: 0, r2: 0, d1_files: 0 } })));
   }
+  // 입금계좌 고르기 목록 — 계좌 번호는 코드에 두지 않고(리포가 공개) settings.pay_accounts(JSON 배열)에서 읽는다. 첫 번째가 기본
+  if (path === '/api/pay-accounts' && method === 'GET') {
+    let list = []; try { list = JSON.parse((await getSetting(db, 'pay_accounts')) || '[]'); } catch { /* 빈 목록 */ }
+    return json({ items: Array.isArray(list) ? list.map((x) => String(x)).filter(Boolean) : [] });
+  }
   if (path === '/api/sites' && method === 'POST') {
     const raw = await body(request);
     const slug = str(raw.slug, 40).toLowerCase();
@@ -517,8 +522,8 @@ async function ximApi(request, env, url, ctx) {
     const dup = await db.prepare('SELECT id FROM sites WHERE slug = ?').bind(slug).first();
     if (dup) throw bad('이미 있는 사이트 ID 입니다.');
     const r = await db.prepare(
-      'INSERT INTO sites (slug, name, customer_id, domain, status, quota_mb, memo, created_at, host_start, host_end, domain_cost, domain_start, domain_end, domain_registrar, domain_account) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    ).bind(slug, b.name, b.customer_id, b.domain, b.status, b.quota_mb, b.memo, now(), b.host_start, b.host_end, b.domain_cost, b.domain_start, b.domain_end, b.domain_registrar, b.domain_account).run();
+      'INSERT INTO sites (slug, name, customer_id, domain, status, quota_mb, memo, created_at, host_start, host_end, domain_cost, domain_start, domain_end, domain_registrar, domain_account, pay_account) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).bind(slug, b.name, b.customer_id, b.domain, b.status, b.quota_mb, b.memo, now(), b.host_start, b.host_end, b.domain_cost, b.domain_start, b.domain_end, b.domain_registrar, b.domain_account, b.pay_account).run();
     const mail = b.domain ? await mailRegister(env, r.meta.last_row_id, b.domain) : null;
     await audit(db, request, 'SITE_CREATE', `${b.name} (${slug})`, b.domain ? `도메인 ${b.domain}` : '');
     return json({ id: r.meta.last_row_id, mail });
@@ -527,11 +532,11 @@ async function ximApi(request, env, url, ctx) {
   if (m && method === 'PUT') {
     const b = siteFields(await body(request));
     const before = await db.prepare('SELECT * FROM sites WHERE id = ?').bind(+m[1]).first();
-    await db.prepare('UPDATE sites SET name = ?, customer_id = ?, domain = ?, status = ?, quota_mb = ?, memo = ?, host_start = ?, host_end = ?, domain_cost = ?, domain_start = ?, domain_end = ?, domain_registrar = ?, domain_account = ? WHERE id = ?')
-      .bind(b.name, b.customer_id, b.domain, b.status, b.quota_mb, b.memo, b.host_start, b.host_end, b.domain_cost, b.domain_start, b.domain_end, b.domain_registrar, b.domain_account, +m[1]).run();
+    await db.prepare('UPDATE sites SET name = ?, customer_id = ?, domain = ?, status = ?, quota_mb = ?, memo = ?, host_start = ?, host_end = ?, domain_cost = ?, domain_start = ?, domain_end = ?, domain_registrar = ?, domain_account = ?, pay_account = ? WHERE id = ?')
+      .bind(b.name, b.customer_id, b.domain, b.status, b.quota_mb, b.memo, b.host_start, b.host_end, b.domain_cost, b.domain_start, b.domain_end, b.domain_registrar, b.domain_account, b.pay_account, +m[1]).run();
     // 대표 도메인이 바뀌었거나 아직 메일 등록이 안 됐으면 Email Sending 에 등록
     const mail = b.domain && (b.domain !== before?.domain || !['ok', 'added'].includes(before?.mail_status)) ? await mailRegister(env, +m[1], b.domain) : null;
-    await audit(db, request, 'SITE_UPDATE', `${b.name} (${before?.slug || m[1]})`, changed(before, b, { name: '이름', customer_id: '고객', domain: '도메인', status: '상태', quota_mb: '용량(MB)', memo: '메모', host_start: '호스팅 시작', host_end: '호스팅 종료', domain_cost: '도메인 비용', domain_start: '도메인 시작', domain_end: '도메인 만료', domain_registrar: '도메인 구입처', domain_account: '도메인 계정' }));
+    await audit(db, request, 'SITE_UPDATE', `${b.name} (${before?.slug || m[1]})`, changed(before, b, { name: '이름', customer_id: '고객', domain: '도메인', status: '상태', quota_mb: '용량(MB)', memo: '메모', host_start: '호스팅 시작', host_end: '호스팅 종료', domain_cost: '도메인 비용', domain_start: '도메인 시작', domain_end: '도메인 만료', domain_registrar: '도메인 구입처', domain_account: '도메인 계정', pay_account: '입금계좌' }));
     return json({ ok: true, mail });
   }
   m = path.match(/^\/api\/sites\/(\d+)\/mail$/);
@@ -1046,7 +1051,8 @@ function siteFields(raw) {
     host_start: ymd(raw.host_start), host_end: ymd(raw.host_end) || plusYear(ymd(raw.host_start)),
     domain_cost: Math.max(0, Math.min(100000000, Math.round(Number(String(raw.domain_cost ?? '').replace(/[^0-9.]/g, '')) || 0))),
     domain_start: ymd(raw.domain_start), domain_end: ymd(raw.domain_end) || plusYear(ymd(raw.domain_start)),
-    domain_registrar: str(raw.domain_registrar, 60), domain_account: str(raw.domain_account, 100),   // 도메인 구입처 · 누구 계정인지
+    domain_registrar: str(raw.domain_registrar, 60), domain_account: str(raw.domain_account, 100),
+    pay_account: str(raw.pay_account, 120),   // 고객에게 안내한 입금계좌(고르거나 직접 적은 글 그대로)   // 도메인 구입처 · 누구 계정인지
   };
 }
 
