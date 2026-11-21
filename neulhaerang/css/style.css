@@ -114,7 +114,7 @@ a:hover > .more svg, a:hover .more svg, .more:hover svg { transform: translateX(
 .hero { --hu: min(1vw, 2.05vh); --hu: min(1vw, 2.05svh); position: relative; display: flex; align-items: center; min-height: max(380px, 100vh); min-height: max(380px, 100svh); background: var(--ivory-deep); overflow: hidden; }
 .hero-bg, .hero-bg picture, .hero-bg img { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-bg img { object-fit: cover; object-position: 78% 50%; }
-/* 배경 사진 두 장이 천천히 번갈아 나온다(겹치며 바뀜) + 아주 느린 확대 — 정적이지 않게 */
+/* 배경 사진은 한 장(두 번째 사진은 사용자가 '이상하다'고 해서 뺌 2026-11-21) — 아주 느린 확대만 남겨 정적이지 않게 */
 .hero-slide { opacity: 0; transition: opacity 2.4s ease; }
 .hero-slide.on { opacity: 1; }
 .hero-slide img { animation: heroDrift 20s ease-in-out infinite alternate; }   /* 늘 천천히 숨 쉬듯 — 바뀌는 순간에 튀지 않게 두 장 다 계속 움직인다 */

@@ -56,25 +56,6 @@
     window.addEventListener('pageshow', function (e) { if (e.persisted) { links.forEach(function (x) { x.classList.toggle('on', x === on); }); put(on); } });
   });
 
-  // 첫 장면 배경: 사진 두 장이 7초마다 겹치며 바뀐다. 두 번째 사진은 첫 화면이 뜬 뒤에 받는다(첫 화면 속도에 영향 없게).
-  var hs = doc.querySelector('[data-hero-slides]');
-  if (hs && !reduce) {
-    var slides = [].slice.call(hs.querySelectorAll('.hero-slide')), cur = 0, ready = false;
-    var loadRest = function () {
-      slides.slice(1).forEach(function (pic) {
-        [].forEach.call(pic.querySelectorAll('source[data-srcset]'), function (so) { so.srcset = so.getAttribute('data-srcset'); so.removeAttribute('data-srcset'); });
-        var im = pic.querySelector('img[data-src]'); if (!im) return;
-        im.addEventListener('load', function () { ready = true; }, { once: true });
-        im.src = im.getAttribute('data-src'); im.removeAttribute('data-src');
-      });
-    };
-    if (doc.readyState === 'complete') setTimeout(loadRest, 1500); else window.addEventListener('load', function () { setTimeout(loadRest, 1500); });
-    setInterval(function () {
-      if (!ready || doc.hidden || slides.length < 2) return;
-      slides[cur].classList.remove('on'); cur = (cur + 1) % slides.length; slides[cur].classList.add('on');
-    }, 7000);
-  }
-
   // 펼침 칸(자주 묻는 질문): 열릴 때도 닫힐 때도 높이가 부드럽게 움직인다 — 닫힐 때 뚝 끊기지 않게(사용자 지시 2026-11-21)
   [].forEach.call(doc.querySelectorAll('details.faq'), function (d) {
     var sum = d.querySelector('summary'), anim = null, closing = false;
