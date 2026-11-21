@@ -1,6 +1,6 @@
 // xim 관할 모든 서비스(고객 홈페이지) 공통 계정 버튼.
 //   사이트 Worker 가 처음부터 버튼을 그려서(로그인 링크 / 사람 동그라미) 보내고 스타일도 머리에 바로 넣는다 → 화면이 흔들리지 않는다.
-//   이 스크립트는 그 버튼에 메뉴(관리 · 유지보수 요청(레벨1만) / 내 정보 / 로그아웃)를 붙이기만 한다. 서버가 못 그린 경우에만 직접 묻고 그린다.
+//   이 스크립트는 그 버튼에 메뉴(관리(XMS) · 문의 · 수정모드 · 유지보수 요청(레벨1만) / 내 정보 / 로그아웃 — 이름 · 순서는 사용자 지시 2026-11-21)를 붙이기만 한다. 서버가 못 그린 경우에만 직접 묻고 그린다.
 //   놓을 자리: 사이트 헤더 안에 <span data-xms-account></span>  (없으면 화면 오른쪽 위에 떠 있는 버튼)
 //   서비스와 xms 는 같은 로그인(SSO). 색: 자리 요소에 --xa-bg(동그라미) · --xa-fg(사람) CSS 변수.
 (() => {
@@ -85,7 +85,7 @@
       me: ic('<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c.8-3.7 3.9-6 7.5-6s6.7 2.3 7.5 6"/>'),
       out: ic('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 16l-4-4 4-4M6 12h10"/>'),
     };
-    menu.innerHTML = `${me.name ? `<div class="xa-me"><b>${String(me.name).replace(/[&<>"]/g, (c) => '&#' + c.charCodeAt(0) + ';')}</b> 님</div>` : ''}${admin ? `<a role="menuitem" href="/xms/">${IC.admin}관리</a>${document.querySelector('[data-xe]') ? `<button type="button" role="menuitem" data-xa-edit>${IC.edit}수정 모드</button>` : ''}<a role="menuitem" href="/xms/#/inquiries">${IC.inq}${inqLabel}${me.inq ? `<i class="xa-num">${me.inq > 99 ? '99+' : me.inq}</i>` : ''}</a><a role="menuitem" href="/xms/#/requests">${IC.req}유지보수 요청</a>` : ''}
+    menu.innerHTML = `${me.name ? `<div class="xa-me"><b>${String(me.name).replace(/[&<>"]/g, (c) => '&#' + c.charCodeAt(0) + ';')}</b> 님</div>` : ''}${admin ? `<a role="menuitem" href="/xms/">${IC.admin}관리(XMS)</a><a role="menuitem" href="/xms/#/inquiries">${IC.inq}${inqLabel}${me.inq ? `<i class="xa-num">${me.inq > 99 ? '99+' : me.inq}</i>` : ''}</a>${document.querySelector('[data-xe]') ? `<button type="button" role="menuitem" data-xa-edit>${IC.edit}수정모드</button>` : ''}<a role="menuitem" href="/xms/#/requests">${IC.req}유지보수 요청</a>` : ''}
       ${me.staff ? '' : `<a role="menuitem" href="/member/mypage">${IC.me}내 정보</a>`}
       <button type="button" role="menuitem" data-xa-logout>${IC.out}로그아웃</button>`;
     document.body.append(menu);
