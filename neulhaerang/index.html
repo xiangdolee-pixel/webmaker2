@@ -23,8 +23,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=Nanum+Pen+Script&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20261121n">
-<script src="js/site.js?v=20261121n" defer></script>
+<link rel="stylesheet" href="css/style.css?v=20261121r">
+<script src="js/site.js?v=20261121r" defer></script>
 </head>
 <body class="home">
 <a class="sr" href="#main">본문 바로가기</a>
@@ -47,7 +47,10 @@
 
   <!-- 첫 장면: 꽉 찬 사진 위에 글자 -->
   <section class="hero" aria-label="늘해랑심리상담센터 소개">
-    <div class="hero-bg"><picture><source media="(max-width: 899px) and (orientation: portrait)" srcset="images/hero-p.webp" width="1024" height="1536"><img src="images/hero.webp" width="1672" height="941" alt="오후 햇살이 드는 늘해랑심리상담센터 상담실 — 의자 두 개와 작은 탁자" fetchpriority="high"></picture></div>
+    <div class="hero-bg" data-hero-slides>
+      <picture class="hero-slide on"><source media="(max-width: 899px) and (orientation: portrait)" srcset="images/hero-p.webp" width="1024" height="1536"><img src="images/hero.webp" width="1672" height="941" alt="오후 햇살이 드는 늘해랑심리상담센터 상담실 — 의자 두 개와 작은 탁자" fetchpriority="high"></picture>
+      <picture class="hero-slide"><source media="(max-width: 899px) and (orientation: portrait)" data-srcset="images/desk.webp" width="1086" height="1448"><img data-src="images/detail.webp" width="1672" height="941" alt="" aria-hidden="true"></picture>
+    </div>
     <div class="hero-in">
       <div class="hero-copy">
         <p class="hero-hand"><svg viewBox="0 0 56 44" aria-hidden="true"><g fill="none" stroke="#f0b445" stroke-width="3" stroke-linecap="round"><path d="M12 32a14 14 0 0 1 28 0"/><path d="M26 6v6M8.500 14.500l4 4M43.500 14.500l-4 4M3 30h4M45 30h4"/></g><path d="M30 37c2-8 9-11 17-10-1 8-7 12-17 10z" fill="#6f8f5f"/><path d="M8 38h40" stroke="#6f8f5f" stroke-width="2.500" stroke-linecap="round"/></svg>따뜻한 마음이 머무는 곳</p>
@@ -73,7 +76,7 @@
       </aside>
     </div>
     <p class="hero-strip"><span>상계역 5번 출구 3분</span><i></i><span>평일 저녁 · 토요일 상담</span></p>
-    <p class="hero-seal"><span>상계역<br>5번 출구<br>도보 <b>3분</b></span></p>
+    <a class="hero-seal" href="location.html" aria-label="오시는 길 — 상계역 5번 출구 도보 3분"><span>상계역<br>5번 출구<br>도보 <b>3분</b></span></a>
   </section>
 
   <!-- 네 가지 상담 -->

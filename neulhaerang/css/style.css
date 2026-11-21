@@ -113,7 +113,12 @@ a:hover > .more svg, a:hover .more svg, .more:hover svg { transform: translateX(
 /* ───── 첫 장면 ─────  꽉 찬 사진 위에 글자. 글자 크기는 화면 폭 · 높이 중 작은 쪽 기준(--hu) */
 .hero { --hu: min(1vw, 2.05vh); --hu: min(1vw, 2.05svh); position: relative; display: flex; align-items: center; min-height: max(380px, 100vh); min-height: max(380px, 100svh); background: var(--ivory-deep); overflow: hidden; }
 .hero-bg, .hero-bg picture, .hero-bg img { position: absolute; inset: 0; width: 100%; height: 100%; }
-.hero-bg img { object-fit: cover; object-position: 78% 50%; animation: heroIn 2.4s var(--ease) both; }
+.hero-bg img { object-fit: cover; object-position: 78% 50%; }
+/* 배경 사진 두 장이 천천히 번갈아 나온다(겹치며 바뀜) + 아주 느린 확대 — 정적이지 않게 */
+.hero-slide { opacity: 0; transition: opacity 2.4s ease; }
+.hero-slide.on { opacity: 1; }
+.hero-slide img { animation: heroDrift 20s ease-in-out infinite alternate; }   /* 늘 천천히 숨 쉬듯 — 바뀌는 순간에 튀지 않게 두 장 다 계속 움직인다 */
+@keyframes heroDrift { from { transform: scale(1.001); } to { transform: scale(1.07); } }
 .hero-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(251, 247, 240, .96) 0%, rgba(251, 247, 240, .88) 30%, rgba(251, 247, 240, .42) 52%, rgba(251, 247, 240, 0) 70%), linear-gradient(180deg, rgba(251, 247, 240, .7) 0%, rgba(251, 247, 240, 0) 22%, rgba(251, 247, 240, 0) 80%, rgba(72, 52, 34, .16) 100%); }
 @keyframes heroIn { from { transform: scale(1.06); } to { transform: none; } }
 .hero-in { position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: space-between; gap: clamp(20px, calc(3 * var(--hu)), 60px); width: min(100% - var(--gut) * 2, var(--wrap)); margin-inline: auto; padding: calc(var(--hd-h) + clamp(8px, calc(1.6 * var(--hu)), 30px)) 0 clamp(26px, calc(4.4 * var(--hu)), 84px); }
@@ -141,9 +146,16 @@ a:hover > .more svg, a:hover .more svg, .more:hover svg { transform: translateX(
 .hero-card .btn { width: 100%; margin-top: 14px; min-height: 50px; font-size: 18px; }
 .hero-card .note { margin-top: 10px; text-align: center; color: var(--ink-faint); font-size: 16px; }
 /* 동그란 초록 딱지(홍보물의 '상계역 5번 출구 도보 3분') */
-.hero-seal { position: absolute; z-index: 1; right: clamp(16px, 4vw, 60px); top: calc(var(--hd-h) + clamp(6px, calc(1.6 * var(--hu)), 28px)); display: grid; place-items: center; align-content: center; width: clamp(104px, calc(9.4 * var(--hu)), 150px); aspect-ratio: 1; border-radius: 50%; background: var(--green); color: #fff; text-align: center; font-weight: 700; font-size: clamp(16px, calc(1.06 * var(--hu)), 19.5px); line-height: 1.34; box-shadow: 0 12px 30px rgba(51, 73, 47, .32); transform: rotate(6deg); }
-.hero-seal::before { content: ""; position: absolute; inset: 6px; border-radius: 50%; border: 1.5px dashed rgba(255, 255, 255, .6); }
-.hero-seal b { color: #ffd77a; font-size: 1.24em; }
+.hero-seal { position: absolute; z-index: 1; right: clamp(16px, 4vw, 60px); top: calc(var(--hd-h) + clamp(6px, calc(1.6 * var(--hu)), 28px)); display: grid; place-items: center; align-content: center; width: clamp(104px, calc(9.4 * var(--hu)), 150px); aspect-ratio: 1; border-radius: 50%; background: var(--green); color: #fff; text-align: center; font-weight: 700; font-size: clamp(16px, calc(1.06 * var(--hu)), 18.5px); line-height: 1.34; box-shadow: 0 12px 30px rgba(51, 73, 47, .32); transform: rotate(6deg); animation: sealFloat 5s ease-in-out infinite; transition: transform .5s var(--ease), box-shadow .4s, background .3s; }
+/* 점선 테: 테두리(dashed)는 둥근 모양에서 길이 · 간격이 들쭉날쭉해서, 길이가 똑같은 점선 원을 그려 씌운다(40칸) */
+.hero-seal::before { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: rgba(255, 255, 255, .7); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48.6' fill='none' stroke='%23000' stroke-width='1.5' stroke-dasharray='4.24 3.394' /%3E%3C/svg%3E") center / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48.6' fill='none' stroke='%23000' stroke-width='1.5' stroke-dasharray='4.24 3.394' /%3E%3C/svg%3E") center / 100% 100% no-repeat; animation: sealSpin 26s linear infinite; transition: background .3s; }
+.hero-seal span { position: relative; transition: transform .5s var(--ease); }
+.hero-seal b { color: #ffd77a; font-size: 1.24em; display: inline-block; transition: transform .5s var(--ease); }
+.hero-seal:hover, .hero-seal:focus-visible { animation-play-state: paused; transform: rotate(0deg) scale(1.1); background: var(--green-deep); box-shadow: 0 20px 44px rgba(51, 73, 47, .42); }
+.hero-seal:hover::before, .hero-seal:focus-visible::before { animation-duration: 6s; background: #ffd77a; }
+.hero-seal:hover b, .hero-seal:focus-visible b { transform: scale(1.18) translateY(-1px); }
+@keyframes sealFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -7px; } }
+@keyframes sealSpin { to { transform: rotate(360deg); } }
 
 /* ───── 네 가지 상담(홍보물의 그림 아이콘) — 첫 장면 아래로 살짝 겹쳐 올라온다 ───── */
 .kinds-sec { position: relative; z-index: 2; padding-top: clamp(30px, 3.8vw, 56px); padding-bottom: clamp(36px, 4.4vw, 60px); background: var(--ivory); }
@@ -220,14 +232,15 @@ a:hover > .more svg, a:hover .more svg, .more:hover svg { transform: translateX(
 .strip figcaption { position: absolute; left: 14px; bottom: 14px; padding: 5px 14px; border-radius: 99px; background: rgba(255, 255, 255, .94); color: var(--ink); font-size: 16px; font-weight: 700; }
 
 /* ───── 과정 · 비용 ───── */
-.steps { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(14px, 1.8vw, 24px); padding-top: 34px; counter-reset: step; }
-.steps::before { content: ""; position: absolute; left: 6%; right: 6%; top: 34px; border-top: 2px dashed var(--green-line); }   /* 걸음을 잇는 점선 */
-.step { position: relative; padding: 58px clamp(22px, 2.3vw, 32px) clamp(26px, 2.6vw, 34px); border-radius: var(--r); background: #fff; box-shadow: var(--shadow); counter-increment: step; transition: transform .4s var(--ease), box-shadow .4s var(--ease); }
-.sec-warm .step, .step { border: 0; }
+.steps { --sg: clamp(14px, 1.8vw, 24px); --dot: 68px; --pad: clamp(22px, 2.3vw, 32px); position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sg); padding-top: 34px; counter-reset: step; }
+/* 걸음마다: 카드 위 모서리에 반쯤 걸친 번호 동그라미, 동그라미 뒤로 다음 동그라미까지 점선이 이어진다(사용자: "점선 위치만 동그라미 숫자 뒤쪽으로") */
+.step { position: relative; padding: 58px var(--pad) clamp(26px, 2.6vw, 34px); border-radius: var(--r); background: #fff; box-shadow: var(--shadow); counter-increment: step; transition: transform .4s var(--ease), box-shadow .4s var(--ease); }
 .step:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); }
-.step::before { content: "0" counter(step); position: absolute; left: clamp(22px, 2.3vw, 32px); top: -34px; display: grid; place-items: center; width: 68px; height: 68px; border-radius: 50%; background: var(--green); color: #fff; font-family: var(--serif); font-weight: 700; font-size: 23px; letter-spacing: .02em; box-shadow: 0 0 0 8px #fffdfa, 0 14px 26px rgba(75, 99, 64, .26); }
-.step::after { content: "STEP"; position: absolute; right: clamp(22px, 2.3vw, 32px); top: 20px; color: var(--gold); font-family: var(--serif); font-weight: 700; font-size: 16px; letter-spacing: .16em; }
+.step::before { content: "0" counter(step); position: absolute; z-index: 1; left: var(--pad); top: -34px; display: grid; place-items: center; width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--green); color: #fff; font-family: var(--serif); font-weight: 700; font-size: 23px; letter-spacing: .02em; box-shadow: 0 0 0 8px #fffdfa, 0 14px 26px rgba(75, 99, 64, .26); }
+.step::after { content: "STEP"; position: absolute; right: var(--pad); top: 20px; color: var(--gold); font-family: var(--serif); font-weight: 700; font-size: 16px; letter-spacing: .16em; }
 .step h3 { font-family: var(--serif); font-size: clamp(22px, 2vw, 25px); font-weight: 700; letter-spacing: -.02em; }
+.step h3::before { content: ""; position: absolute; left: calc(var(--pad) + var(--dot) / 2); top: -1px; width: calc(100% + var(--sg)); border-top: 2px dashed var(--green-line); }   /* 이 동그라미 가운데 → 다음 동그라미 가운데 (동그라미가 위에 덮는다) */
+.step:last-child h3::before { display: none; }
 .step h3::after { content: ""; display: block; width: 28px; height: 2px; margin: 14px 0 0; border-radius: 2px; background: var(--sun); }
 .step p { margin-top: 14px; color: var(--ink-soft); font-size: 17px; line-height: 1.8; }
 .fee { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: clamp(16px, 2.4vw, 28px); margin-top: clamp(18px, 2.4vw, 28px); }
@@ -423,8 +436,9 @@ a:hover > .more svg, a:hover .more svg, .more:hover svg { transform: translateX(
 .faq summary::after { content: ""; position: absolute; right: 26px; top: 50%; width: 11px; height: 11px; margin-top: -8px; border-right: 2px solid var(--green); border-bottom: 2px solid var(--green); transform: rotate(45deg); transition: transform .3s var(--ease); }
 .faq[open] summary::after { transform: translateY(5px) rotate(-135deg); }
 .faq > div { padding: 0 26px 24px; color: var(--ink-soft); line-height: 1.85; }
-.faq[open] > div { animation: faqIn .4s var(--ease); }
-@keyframes faqIn { from { opacity: 0; transform: translateY(-6px); } }
+.faq { overflow: hidden; }
+.faq summary { border-radius: var(--r-sm); }
+.faq.closing summary::after { transform: rotate(45deg); }   /* 닫히는 동안 화살표는 먼저 돌아간다 */
 
 /* ───── 꼬리 ───── */
 .ft { padding: clamp(44px, 6vw, 72px) 0 calc(28px + env(safe-area-inset-bottom)); background: #2f2a25; color: rgba(255, 255, 255, .72); font-size: 16.5px; }
@@ -455,7 +469,7 @@ a:hover > .more svg, a:hover .more svg, .more:hover svg { transform: translateX(
   .hero-card { display: none; }   /* 좁은 화면에서는 글자를 가리지 않게 — 시간은 아래 '오시는 길'과 예약 단추로 */
   .whys, .steps, .trust { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .steps { row-gap: 54px; }
-  .steps::before { display: none; }
+  .step:nth-child(2n) h3::before { display: none; }
   .kinds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kind:nth-child(3)::before { display: none; }
   .kind:nth-child(n+3) { border-top: 1px solid var(--line); }
@@ -535,6 +549,7 @@ a:hover > .more svg, a:hover .more svg, .more:hover svg { transform: translateX(
 }
 @media (max-width: 539px) {
   .whys, .steps, .trust { grid-template-columns: minmax(0, 1fr); }
+  .step h3::before { display: none; }
   .cards3, .loc-ph, .space-facts { grid-template-columns: minmax(0, 1fr); }
   .sup-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .loc-list > div { grid-template-columns: 76px minmax(0, 1fr); }
@@ -562,7 +577,7 @@ a:hover > .more svg, a:hover .more svg, .more:hover svg { transform: translateX(
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .js [data-reveal] { opacity: 1; transform: none; transition: none; }
-  .hero-bg img { animation: none; }
+  .hero-slide img, .hero-seal, .hero-seal::before { animation: none; }
   .btn, .btn svg, .path img, .post, .gnb, .gnb > a::after, .kind svg, .whyc, .tab-ind, .tabs a, .room-ph img, .gal img, .card-link { transition: none; }
-  .faq[open] > div { animation: none; }
+
 }

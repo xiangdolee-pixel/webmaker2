@@ -56,6 +56,48 @@
     window.addEventListener('pageshow', function (e) { if (e.persisted) { links.forEach(function (x) { x.classList.toggle('on', x === on); }); put(on); } });
   });
 
+  // 첫 장면 배경: 사진 두 장이 7초마다 겹치며 바뀐다. 두 번째 사진은 첫 화면이 뜬 뒤에 받는다(첫 화면 속도에 영향 없게).
+  var hs = doc.querySelector('[data-hero-slides]');
+  if (hs && !reduce) {
+    var slides = [].slice.call(hs.querySelectorAll('.hero-slide')), cur = 0, ready = false;
+    var loadRest = function () {
+      slides.slice(1).forEach(function (pic) {
+        [].forEach.call(pic.querySelectorAll('source[data-srcset]'), function (so) { so.srcset = so.getAttribute('data-srcset'); so.removeAttribute('data-srcset'); });
+        var im = pic.querySelector('img[data-src]'); if (!im) return;
+        im.addEventListener('load', function () { ready = true; }, { once: true });
+        im.src = im.getAttribute('data-src'); im.removeAttribute('data-src');
+      });
+    };
+    if (doc.readyState === 'complete') setTimeout(loadRest, 1500); else window.addEventListener('load', function () { setTimeout(loadRest, 1500); });
+    setInterval(function () {
+      if (!ready || doc.hidden || slides.length < 2) return;
+      slides[cur].classList.remove('on'); cur = (cur + 1) % slides.length; slides[cur].classList.add('on');
+    }, 7000);
+  }
+
+  // 펼침 칸(자주 묻는 질문): 열릴 때도 닫힐 때도 높이가 부드럽게 움직인다 — 닫힐 때 뚝 끊기지 않게(사용자 지시 2026-11-21)
+  [].forEach.call(doc.querySelectorAll('details.faq'), function (d) {
+    var sum = d.querySelector('summary'), anim = null, closing = false;
+    if (!sum || reduce || !d.animate) return;
+    function run(from, to, done) {
+      if (anim) anim.cancel();
+      anim = d.animate({ height: [from + 'px', to + 'px'] }, { duration: Math.min(520, 220 + Math.abs(to - from) * .9), easing: 'cubic-bezier(.22, .8, .24, 1)' });
+      anim.onfinish = function () { anim = null; done(); };
+      anim.oncancel = function () { anim = null; };
+    }
+    sum.addEventListener('click', function (e) {
+      e.preventDefault();
+      var from = d.offsetHeight;
+      if (d.open && !closing) {            // 닫기: 지금 높이 → 제목 높이, 다 줄어든 뒤에 닫는다
+        closing = true; d.classList.add('closing');
+        run(from, sum.offsetHeight, function () { d.open = false; closing = false; d.classList.remove('closing'); });
+      } else {                             // 열기(닫히던 중이면 되돌아 열린다)
+        closing = false; d.classList.remove('closing'); d.open = true;
+        run(from, sum.offsetHeight + (d.scrollHeight - sum.offsetHeight), function () {});
+      }
+    });
+  });
+
   // 공간 사진 띠: 저절로 천천히 흐른다(끝없이). 스크롤 위치(정수 픽셀)를 밀면 덜덜거려서, 안쪽 줄을 transform 으로 민다(소수점 픽셀 · GPU).
   //   마우스를 올리면 멈추고, 잡아 끌거나 손가락으로 밀면 따라 움직였다가 다시 흐른다.
   [].forEach.call(doc.querySelectorAll('[data-strip]'), function (el) {
