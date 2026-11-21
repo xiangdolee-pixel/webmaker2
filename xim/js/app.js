@@ -657,6 +657,8 @@ function pfCatPicker(box, hidden) {
   draw();
 }
 
+// 날짜 칸은 달력 아이콘이 아니라 칸 어디를 눌러도 달력이 뜬다(사용자 지시 2026-11-21) — xim 의 모든 날짜 칸
+document.addEventListener('click', (e) => { const el = e.target.closest?.('input[type="date"], input[type="month"], input[type="datetime-local"]'); if (el && !el.disabled && !el.readOnly && el.showPicker) { try { el.showPicker(); } catch { /* 이미 떠 있음 등 */ } } });
 // 'YYYY-MM-DD' 의 1년 뒤 같은 날(2월 29일 → 2월 28일)
 function plusYear(t) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(t || '')) return '';
