@@ -714,7 +714,7 @@ function siteDialog(site) {
       <div class="row2">
         <label class="field"><span>사이트 이름</span><input class="input" name="name" value="${esc(s.name)}" required></label>
         <label class="field"><span>사이트 ID</span>
-          <input class="input" name="slug" value="${esc(s.slug)}" ${site ? 'disabled' : 'required pattern="[a-z0-9][a-z0-9\-]{1,39}"'} placeholder="sjccc" title="WebMaker2 폴더 이름과 같게 (영문 소문자)"></label>
+          <input class="input" name="slug" value="${esc(s.slug)}" ${site ? 'disabled' : 'required pattern="[a-z0-9][a-z0-9\\-]{1,39}"'} placeholder="sjccc" title="WebMaker2 폴더 이름과 같게 (영문 소문자)"></label>
       </div>
       <label class="field"><span>고객</span><select class="input" name="customer_id">${customerOptions(s.customer_id)}</select></label>
       <div class="row2">
