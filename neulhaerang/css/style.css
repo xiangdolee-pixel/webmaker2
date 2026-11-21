@@ -211,9 +211,10 @@ a:hover > .more svg, a:hover .more svg, .more:hover svg { transform: translateX(
 .mate p { color: var(--ink-soft); font-size: 16px; line-height: 1.55; }
 
 /* ───── 공간: 저절로 흐르는 사진 띠(끝없이 — js 가 한 벌 더 붙여 천천히 민다. 잡아 끌거나 손가락으로 넘겨도 된다) ───── */
-.strip { display: flex; gap: clamp(12px, 1.6vw, 22px); padding: 6px 0 22px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; cursor: grab; }
-.strip::-webkit-scrollbar { display: none; }
+.strip { padding: 6px 0 22px; overflow: hidden; cursor: grab; touch-action: pan-y; }
 .strip.drag { cursor: grabbing; }
+.strip-track { display: flex; gap: clamp(12px, 1.6vw, 22px); width: max-content; will-change: transform; backface-visibility: hidden; }
+.strip:not(.auto) { display: flex; gap: clamp(12px, 1.6vw, 22px); overflow-x: auto; scrollbar-width: none; }   /* 스크립트가 안 돌 때는 손으로 넘기기 */
 .strip figure { position: relative; flex: none; height: clamp(300px, 32vw, 480px); border-radius: var(--r); overflow: hidden; background: var(--ivory-deep); box-shadow: var(--shadow); }
 .strip img { height: 100%; width: auto; max-width: none; pointer-events: none; user-select: none; }
 .strip figcaption { position: absolute; left: 14px; bottom: 14px; padding: 5px 14px; border-radius: 99px; background: rgba(255, 255, 255, .94); color: var(--ink); font-size: 16px; font-weight: 700; }

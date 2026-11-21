@@ -56,30 +56,39 @@
     window.addEventListener('pageshow', function (e) { if (e.persisted) { links.forEach(function (x) { x.classList.toggle('on', x === on); }); put(on); } });
   });
 
-  // 공간 사진 띠: 저절로 천천히 흐른다(끝없이). 마우스를 올리거나 잡아 끌거나 손가락으로 넘기는 동안은 멈췄다가 다시 흐른다.
+  // 공간 사진 띠: 저절로 천천히 흐른다(끝없이). 스크롤 위치(정수 픽셀)를 밀면 덜덜거려서, 안쪽 줄을 transform 으로 민다(소수점 픽셀 · GPU).
+  //   마우스를 올리면 멈추고, 잡아 끌거나 손가락으로 밀면 따라 움직였다가 다시 흐른다.
   [].forEach.call(doc.querySelectorAll('[data-strip]'), function (el) {
-    var kids = [].slice.call(el.children);
-    kids.forEach(function (k) { var c = k.cloneNode(true); c.setAttribute('aria-hidden', 'true'); el.appendChild(c); });   // 한 벌 더 → 끝과 처음이 이어진다
-    var hold = 0, down = false, sx = 0, pos = 0, last = 0, seen = false;
-    function half() { return (el.scrollWidth + parseFloat(getComputedStyle(el).columnGap || 0)) / 2; }
-    function wrap() { var h = half(); if (h > 0) { if (el.scrollLeft >= h) el.scrollLeft -= h; else if (el.scrollLeft <= 0) el.scrollLeft += h; } }
-    el.addEventListener('pointerdown', function (e) { hold = Date.now() + 3000; if (e.pointerType !== 'mouse') return; down = true; sx = e.clientX; el.classList.add('drag'); e.preventDefault(); });
-    window.addEventListener('pointermove', function (e) { if (!down) return; el.scrollLeft -= e.clientX - sx; sx = e.clientX; wrap(); hold = Date.now() + 3000; });
-    window.addEventListener('pointerup', function () { if (down) { down = false; el.classList.remove('drag'); } });
-    el.addEventListener('touchstart', function () { hold = Date.now() + 4000; }, { passive: true });
-    el.addEventListener('touchmove', function () { hold = Date.now() + 4000; }, { passive: true });
-    el.addEventListener('wheel', function () { hold = Date.now() + 2500; }, { passive: true });
-    el.addEventListener('mouseenter', function () { hold = Infinity; });
-    el.addEventListener('mouseleave', function () { hold = Date.now() + 600; });
+    var track = doc.createElement('div'); track.className = 'strip-track';
+    while (el.firstChild) track.appendChild(el.firstChild);
+    [].slice.call(track.children).forEach(function (k) { var c = k.cloneNode(true); c.setAttribute('aria-hidden', 'true'); track.appendChild(c); });   // 한 벌 더 → 끝과 처음이 이어진다
+    el.appendChild(track); el.classList.add('auto');
+    var pos = 0, half = 0, last = 0, seen = false, hover = false, down = false, sx = 0, sy = 0, dragging = false, vel = 0, hold = 0;
+    function measure() { var gap = parseFloat(getComputedStyle(track).columnGap) || 0; half = (track.scrollWidth + gap) / 2; }
+    function put() { if (half > 0) { pos = ((pos % half) + half) % half; } track.style.transform = 'translate3d(' + (-pos) + 'px,0,0)'; }
+    measure(); window.addEventListener('resize', measure); window.addEventListener('load', measure);
+    [].forEach.call(track.querySelectorAll('img'), function (im) { if (!im.complete) im.addEventListener('load', measure, { once: true }); });
+    el.addEventListener('mouseenter', function () { hover = true; });
+    el.addEventListener('mouseleave', function () { hover = false; });
+    el.addEventListener('pointerdown', function (e) { down = true; dragging = false; sx = e.clientX; sy = e.clientY; vel = 0; });
+    window.addEventListener('pointermove', function (e) {
+      if (!down) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (!dragging) { if (Math.abs(dx) < 6 || Math.abs(dx) < Math.abs(dy)) return; dragging = true; el.classList.add('drag'); }   // 옆으로 움직일 때만 잡는다(위아래 스크롤은 그대로)
+      pos -= dx; vel = -dx; sx = e.clientX; sy = e.clientY; put();
+    });
+    function up() { if (!down) return; down = false; if (dragging) { dragging = false; el.classList.remove('drag'); hold = Date.now() + 1200; } }
+    window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
     if ('IntersectionObserver' in window) new IntersectionObserver(function (es) { seen = es[0].isIntersecting; }, { rootMargin: '200px' }).observe(el); else seen = true;
-    if (reduce) return;
+    var speed = 0;   // 지금 빠르기(px/초) — 멈추고 다시 갈 때 부드럽게 오르내린다
     requestAnimationFrame(function tick(t) {
-      var dt = Math.min(50, t - (last || t)); last = t;
-      if (seen && !down && Date.now() > hold && !doc.hidden) {
-        if (Math.abs(el.scrollLeft - pos) > 2) pos = el.scrollLeft;   // 손으로 옮겼으면 그 자리에서 이어서
-        pos += dt * .045;                                             // 1초에 45px
-        var h = half(); if (h > 0 && pos >= h) pos -= h;
-        el.scrollLeft = pos;
+      var dt = Math.min(64, t - (last || t)); last = t;
+      if (seen && !doc.hidden && half > 0) {
+        var want = reduce || hover || dragging || Date.now() < hold ? 0 : 42;
+        speed += (want - speed) * Math.min(1, dt / 420);
+        if (!dragging && Math.abs(vel) > .2) { pos += vel; vel *= Math.pow(.92, dt / 16); }   // 놓은 뒤 살짝 미끄러짐
+        if (!dragging && speed > .05) pos += speed * dt / 1000;
+        put();
       }
       requestAnimationFrame(tick);
     });
