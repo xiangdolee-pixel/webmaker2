@@ -167,6 +167,11 @@ CREATE TABLE IF NOT EXISTS portfolio_links (
   sort        INTEGER NOT NULL DEFAULT 0,
   created_at  INTEGER NOT NULL
 );
+--   ALTER TABLE sites ADD COLUMN host_start TEXT NOT NULL DEFAULT '';    -- 호스팅 시작일 'YYYY-MM-DD' (2026-11-21) — 종료일은 넣지 않으면 1년 뒤
+--   ALTER TABLE sites ADD COLUMN host_end TEXT NOT NULL DEFAULT '';
+--   ALTER TABLE sites ADD COLUMN domain_cost INTEGER NOT NULL DEFAULT 0; -- 도메인 비용(원 · 1년)
+--   ALTER TABLE sites ADD COLUMN domain_start TEXT NOT NULL DEFAULT '';  -- 도메인 시작일 — 만료일은 넣지 않으면 1년 뒤
+--   ALTER TABLE sites ADD COLUMN domain_end TEXT NOT NULL DEFAULT '';
 --   ALTER TABLE sites ADD COLUMN portfolio_tag TEXT NOT NULL DEFAULT '';  -- 포트폴리오 분류(홈페이지 · 솔루션개발 · 웹앱 · 웹게임), 사이트 수정 창에서
 
 -- ───────── 스튜디오 (유튜브 발표자료 제작, 2026-11-09) ─────────

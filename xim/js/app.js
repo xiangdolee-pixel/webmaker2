@@ -581,7 +581,7 @@ function siteRow(s) {
       <label class="pf-sw" title="켜면 포트폴리오(portfolio.plators.com)에 나옵니다"><input type="checkbox" data-pf${s.portfolio ? ' checked' : ''}><i aria-hidden="true"></i>포트폴리오</label>
     </div>
     <div class="sr-addr">${s.domain ? link(s.url, s.domain) : '<span class="dim">도메인 없음</span>'}${link(dev, 'workers.dev')}${tags}</div>
-    <div class="sr-num"><span class="sr-visit" title="오늘 방문자 ${s.visits?.today.visitors || 0}명 · 페이지뷰 ${s.visits?.today.views || 0} / 어제 방문자 ${s.visits?.yesterday.visitors || 0}명 · 페이지뷰 ${s.visits?.yesterday.views || 0}">오늘 <b>${s.visits?.today.visitors || 0}</b>명<small>어제 ${s.visits?.yesterday.visitors || 0}</small></span><span class="sr-made" title="사이트를 만든 날 ${esc(fmtDate(s.created_at))}">제작 <b>${esc(fmtDate(s.created_at).slice(0, 10))}</b></span><span>관리자 <b>${s.admin_count}</b></span>${s.open_requests ? `<button type="button" class="link-btn" data-go-reqs="${esc(s.slug)}">요청 <b>${s.open_requests}</b></button>` : '<span>요청 0</span>'}</div>
+    <div class="sr-num"><span class="sr-visit" title="오늘 방문자 ${s.visits?.today.visitors || 0}명 · 페이지뷰 ${s.visits?.today.views || 0} / 어제 방문자 ${s.visits?.yesterday.visitors || 0}명 · 페이지뷰 ${s.visits?.yesterday.views || 0}">오늘 <b>${s.visits?.today.visitors || 0}</b>명<small>어제 ${s.visits?.yesterday.visitors || 0}</small></span><span class="sr-made" title="사이트를 만든 날 ${esc(fmtDate(s.created_at))}">제작 <b>${esc(fmtDate(s.created_at).slice(0, 10))}</b></span><span>관리자 <b>${s.admin_count}</b></span>${termChip('호스팅', s.host_end, s.host_start ? `시작 ${s.host_start}` : '')}${termChip('도메인', s.domain_end, [s.domain_start ? `시작 ${s.domain_start}` : '', s.domain_cost ? `${Number(s.domain_cost).toLocaleString('ko-KR')}원` : ''].filter(Boolean).join(' · '))}${s.open_requests ? `<button type="button" class="link-btn" data-go-reqs="${esc(s.slug)}">요청 <b>${s.open_requests}</b></button>` : '<span>요청 0</span>'}</div>
     <div class="sr-use${useCl}" title="${useCl === ' over' ? '저장 용량 초과 — 이 사이트는 지금 사진 · 파일을 올릴 수 없습니다 · ' : ''}DB ${mb(u.db)} · 파일 ${u.file_count}개(R2 ${mb(u.r2)} · DB ${mb(u.d1_files)}) · 홈페이지 ${s.static_mb || 0}MB">
       <span>DB ${mb(u.db)}</span><span class="use-f">파일 ${mb(u.files)} / ${s.quota_mb ? `${s.quota_mb}MB` : '제한 없음'}${useCl === ' over' ? ' <b>초과</b>' : ''}</span><span>홈 ${s.static_mb ? `${s.static_mb}MB` : '—'}</span>
       <div class="quota" aria-hidden="true"><i style="width:${pct}%"></i></div></div>
@@ -657,6 +657,21 @@ function pfCatPicker(box, hidden) {
   draw();
 }
 
+// 'YYYY-MM-DD' 의 1년 뒤 같은 날(2월 29일 → 2월 28일)
+function plusYear(t) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t || '')) return '';
+  const [y, m, d] = t.split('-').map(Number), last = new Date(Date.UTC(y + 1, m, 0)).getUTCDate();
+  return `${y + 1}-${String(m).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
+}
+// 끝나는 날까지 며칠 — 사이트 줄에 '호스팅 ~2027-11-21 · 364일' 꼴로. 30일 안이면 주의, 지났으면 경고
+function termChip(label, end, extra = '') {
+  if (!end) return '';
+  const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const left = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
+  const cl = left < 0 ? ' over' : left <= 30 ? ' soon' : '';
+  const when = left < 0 ? `${-left}일 지남` : left === 0 ? '오늘까지' : `${left}일 남음`;
+  return `<span class="sr-term${cl}" title="${esc(label)} ${left < 0 ? '만료' : '끝나는 날'} ${esc(end)}${extra ? ` · ${esc(extra)}` : ''}">${esc(label)} <b>~${esc(end)}</b><small>${when}</small></span>`;
+}
 function siteDialog(site) {
   const s = site || { quota_mb: 500, status: 'active' };
   openDialog(`
@@ -673,6 +688,21 @@ function siteDialog(site) {
         <label class="field"><span>대표 도메인</span><input class="input" name="domain" value="${esc(s.domain)}" placeholder="example.kr"><small>저장하면 회원가입 인증 메일(noreply@대표 도메인)도 자동으로 준비됩니다</small></label>
         <label class="field"><span>저장 용량 (MB)</span><input class="input" name="quota_mb" type="number" min="0" value="${esc(s.quota_mb)}" required></label>
       </div>
+      <fieldset class="term">
+        <legend>호스팅</legend>
+        <div class="row2">
+          <label class="field"><span>시작일</span><input class="input" name="host_start" type="date" value="${esc(s.host_start || '')}" data-term-start="host_end"></label>
+          <label class="field"><span>종료일</span><input class="input" name="host_end" type="date" value="${esc(s.host_end || '')}"><small>시작일을 넣으면 1년 뒤로 채워집니다(고칠 수 있음)</small></label>
+        </div>
+      </fieldset>
+      <fieldset class="term">
+        <legend>도메인</legend>
+        <div class="row3">
+          <label class="field"><span>비용 (원 · 1년)</span><input class="input" name="domain_cost" type="text" inputmode="numeric" value="${s.domain_cost ? Number(s.domain_cost).toLocaleString('ko-KR') : ''}" placeholder="22,000" data-won></label>
+          <label class="field"><span>시작일</span><input class="input" name="domain_start" type="date" value="${esc(s.domain_start || '')}" data-term-start="domain_end"></label>
+          <label class="field"><span>만료일</span><input class="input" name="domain_end" type="date" value="${esc(s.domain_end || '')}"><small>시작일을 넣으면 1년 뒤로</small></label>
+        </div>
+      </fieldset>
       <label class="field"><span>메모</span><textarea class="input" name="memo">${esc(s.memo)}</textarea></label>
       <div class="field"><span>포트폴리오 분류</span><div class="pf-cats" data-pf-cats></div><input type="hidden" name="portfolio_tag" value="${esc(s.portfolio_tag)}">
         <small>눌러서 고르세요(여러 개 가능). 포트폴리오에서 고른 분류 탭에 나옵니다.</small></div>
@@ -681,6 +711,9 @@ function siteDialog(site) {
     </form>`, (dlg) => {
     const form = dlg.querySelector('form');
     pfCatPicker(form.querySelector('[data-pf-cats]'), form.portfolio_tag);
+    // 시작일을 넣거나 바꾸면 끝나는 날을 1년 뒤로 채운다(끝나는 날을 손으로 고친 뒤에는 그대로 둔다 — 시작일을 다시 바꾸면 다시 채움)
+    form.querySelectorAll('[data-term-start]').forEach((st) => st.addEventListener('change', () => { form[st.dataset.termStart].value = plusYear(st.value); }));
+    form.querySelectorAll('[data-won]').forEach((w) => w.addEventListener('input', () => { const n = w.value.replace(/[^0-9]/g, ''); w.value = n ? Number(n).toLocaleString('ko-KR') : ''; }));
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       busy(form.querySelector('[type=submit]'), form.querySelector('.err'), async () => {

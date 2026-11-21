@@ -476,8 +476,8 @@ async function ximApi(request, env, url, ctx) {
     const dup = await db.prepare('SELECT id FROM sites WHERE slug = ?').bind(slug).first();
     if (dup) throw bad('이미 있는 사이트 ID 입니다.');
     const r = await db.prepare(
-      'INSERT INTO sites (slug, name, customer_id, domain, status, quota_mb, memo, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    ).bind(slug, b.name, b.customer_id, b.domain, b.status, b.quota_mb, b.memo, now()).run();
+      'INSERT INTO sites (slug, name, customer_id, domain, status, quota_mb, memo, created_at, host_start, host_end, domain_cost, domain_start, domain_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).bind(slug, b.name, b.customer_id, b.domain, b.status, b.quota_mb, b.memo, now(), b.host_start, b.host_end, b.domain_cost, b.domain_start, b.domain_end).run();
     const mail = b.domain ? await mailRegister(env, r.meta.last_row_id, b.domain) : null;
     await audit(db, request, 'SITE_CREATE', `${b.name} (${slug})`, b.domain ? `도메인 ${b.domain}` : '');
     return json({ id: r.meta.last_row_id, mail });
@@ -486,11 +486,11 @@ async function ximApi(request, env, url, ctx) {
   if (m && method === 'PUT') {
     const b = siteFields(await body(request));
     const before = await db.prepare('SELECT * FROM sites WHERE id = ?').bind(+m[1]).first();
-    await db.prepare('UPDATE sites SET name = ?, customer_id = ?, domain = ?, status = ?, quota_mb = ?, memo = ? WHERE id = ?')
-      .bind(b.name, b.customer_id, b.domain, b.status, b.quota_mb, b.memo, +m[1]).run();
+    await db.prepare('UPDATE sites SET name = ?, customer_id = ?, domain = ?, status = ?, quota_mb = ?, memo = ?, host_start = ?, host_end = ?, domain_cost = ?, domain_start = ?, domain_end = ? WHERE id = ?')
+      .bind(b.name, b.customer_id, b.domain, b.status, b.quota_mb, b.memo, b.host_start, b.host_end, b.domain_cost, b.domain_start, b.domain_end, +m[1]).run();
     // 대표 도메인이 바뀌었거나 아직 메일 등록이 안 됐으면 Email Sending 에 등록
     const mail = b.domain && (b.domain !== before?.domain || !['ok', 'added'].includes(before?.mail_status)) ? await mailRegister(env, +m[1], b.domain) : null;
-    await audit(db, request, 'SITE_UPDATE', `${b.name} (${before?.slug || m[1]})`, changed(before, b, { name: '이름', customer_id: '고객', domain: '도메인', status: '상태', quota_mb: '용량(MB)', memo: '메모' }));
+    await audit(db, request, 'SITE_UPDATE', `${b.name} (${before?.slug || m[1]})`, changed(before, b, { name: '이름', customer_id: '고객', domain: '도메인', status: '상태', quota_mb: '용량(MB)', memo: '메모', host_start: '호스팅 시작', host_end: '호스팅 종료', domain_cost: '도메인 비용', domain_start: '도메인 시작', domain_end: '도메인 만료' }));
     return json({ ok: true, mail });
   }
   m = path.match(/^\/api\/sites\/(\d+)\/mail$/);
@@ -979,6 +979,14 @@ async function mailRegister(env, id, domain) {
 }
 
 
+// 'YYYY-MM-DD' 만 받는다(아니면 빈칸). plusYear = 같은 날짜의 1년 뒤(2월 29일은 2월 28일)
+const ymd = (v) => { const t = String(v || '').trim(); if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return ''; const d = new Date(`${t}T00:00:00Z`); return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== t ? '' : t; };
+function plusYear(t, n = 1) {
+  if (!t) return '';
+  const [y, m, d] = t.split('-').map(Number);
+  const last = new Date(Date.UTC(y + n, m, 0)).getUTCDate();   // 그 달의 마지막 날
+  return `${y + n}-${String(m).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
+}
 function siteFields(raw) {
   const name = str(raw.name, 80);
   if (!name) throw bad('사이트 이름을 넣어 주세요.');
@@ -993,6 +1001,10 @@ function siteFields(raw) {
     status,
     quota_mb: quota,
     memo: str(raw.memo),
+    // 호스팅 · 도메인 기간(사용자 지시 2026-11-21): 시작일을 넣으면 끝나는 날은 1년 뒤로(화면에서 채워 주고, 비어 오면 여기서도 채운다)
+    host_start: ymd(raw.host_start), host_end: ymd(raw.host_end) || plusYear(ymd(raw.host_start)),
+    domain_cost: Math.max(0, Math.min(100000000, Math.round(Number(String(raw.domain_cost ?? '').replace(/[^0-9.]/g, '')) || 0))),
+    domain_start: ymd(raw.domain_start), domain_end: ymd(raw.domain_end) || plusYear(ymd(raw.domain_start)),
   };
 }
 
