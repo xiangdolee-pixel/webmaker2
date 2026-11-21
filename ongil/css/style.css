@@ -419,8 +419,8 @@ body .xms-top { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 66px); }
 .ft-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 24px; margin-top: clamp(32px, 4vw, 52px); padding-top: 22px; border-top: 1px solid rgba(255, 255, 255, .14); font-size: 14px; color: rgba(255, 255, 255, .56); }
 .ft-bottom span { margin-left: 14px; }
 /* 제작문의 단추 — 어두운 꼬리에서 눈에 띄게 흰 알약(사용자 지시 2026-11-21: 이메일 대신 단추, portfolio.plators.com 으로) */
-.ft-ask { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 16px; border-radius: 99px; background: #fff; color: var(--accent-deep); font-size: 14px; font-weight: 700; white-space: nowrap; transition: background .2s, transform .2s; }
-.ft-ask svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s; }
+.ft-ask { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 9px 0 12px; border-radius: 99px; background: #fff; color: var(--accent-deep); font-size: 14px; font-weight: 700; white-space: nowrap; transition: background .2s, transform .2s; }
+.ft-ask svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s; }
 .ft-ask:hover { background: var(--accent-soft); }
 .ft-ask:hover svg { transform: translateX(3px); }
 @media (prefers-reduced-motion: reduce) { .ft-ask, .ft-ask svg { transition: none; } }
