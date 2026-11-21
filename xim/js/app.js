@@ -676,9 +676,7 @@ function termChip(label, end, extra = '', tail = '') {   // tail = 줄에 함께
 }
 function siteDialog(site) {
   const s = site || { quota_mb: 500, status: 'active' };
-  // 도메인 구입처 · 계정 기본값(사용자 지시 2026-11-21): 호스팅케이알 · master@plators.com — 따로 산 도메인이 있는 사이트(또는 새 사이트)에서 비어 있을 때만 채워 보인다
-  const own = !site || (s.domain && !/(^|\.)plators\.com$/i.test(s.domain));
-  const dmDef = own ? { registrar: '호스팅케이알', account: 'master@plators.com' } : { registrar: '', account: '' };
+  // 도메인 구입처 · 계정은 비어 있으면 기본값(호스팅케이알 · master@plators.com)이 들어가고 고칠 수 있다 — 사용자 지시 2026-11-21
   openDialog(`
     <h2>${site ? '사이트 수정' : '사이트 만들기'}</h2>
     <form>
@@ -693,26 +691,26 @@ function siteDialog(site) {
         <label class="field"><span>대표 도메인</span><input class="input" name="domain" value="${esc(s.domain)}" placeholder="example.kr"><small>저장하면 회원가입 인증 메일(noreply@대표 도메인)도 자동으로 준비됩니다</small></label>
         <label class="field"><span>저장 용량 (MB)</span><input class="input" name="quota_mb" type="number" min="0" value="${esc(s.quota_mb)}" required></label>
       </div>
-      <fieldset class="term">
-        <legend>호스팅</legend>
+      <section class="term">
+        <div class="term-h"><b>호스팅</b><small>시작일을 넣으면 종료일이 1년 뒤로 채워집니다</small></div>
         <div class="row2">
           <label class="field"><span>시작일</span><input class="input" name="host_start" type="date" value="${esc(s.host_start || '')}" data-term-start="host_end"></label>
-          <label class="field"><span>종료일</span><input class="input" name="host_end" type="date" value="${esc(s.host_end || '')}"><small>시작일을 넣으면 1년 뒤로 채워집니다(고칠 수 있음)</small></label>
+          <label class="field"><span>종료일</span><input class="input" name="host_end" type="date" value="${esc(s.host_end || '')}"></label>
         </div>
-      </fieldset>
-      <fieldset class="term">
-        <legend>도메인</legend>
-        <div class="row3">
-          <label class="field"><span>비용 (원 · 1년)</span><input class="input" name="domain_cost" type="text" inputmode="numeric" value="${s.domain_cost ? Number(s.domain_cost).toLocaleString('ko-KR') : ''}" placeholder="22,000" data-won></label>
+      </section>
+      <section class="term">
+        <div class="term-h"><b>도메인</b><small>시작일을 넣으면 만료일이 1년 뒤로 채워집니다</small></div>
+        <div class="row2">
           <label class="field"><span>시작일</span><input class="input" name="domain_start" type="date" value="${esc(s.domain_start || '')}" data-term-start="domain_end"></label>
-          <label class="field"><span>만료일</span><input class="input" name="domain_end" type="date" value="${esc(s.domain_end || '')}"><small>시작일을 넣으면 1년 뒤로</small></label>
+          <label class="field"><span>만료일</span><input class="input" name="domain_end" type="date" value="${esc(s.domain_end || '')}"></label>
         </div>
         <div class="row2">
-          <label class="field"><span>구입처</span><input class="input" name="domain_registrar" value="${esc(s.domain_registrar || dmDef.registrar)}" placeholder="호스팅케이알" list="dm-registrars" maxlength="60"></label>
-          <label class="field"><span>누구 계정</span><input class="input" name="domain_account" value="${esc(s.domain_account || dmDef.account)}" placeholder="master@plators.com" maxlength="100"></label>
+          <label class="field"><span>비용 (원 · 1년)</span><input class="input" name="domain_cost" type="text" inputmode="numeric" value="${s.domain_cost ? Number(s.domain_cost).toLocaleString('ko-KR') : ''}" placeholder="22,000" data-won></label>
+          <label class="field"><span>구입처</span><input class="input" name="domain_registrar" value="${esc(s.domain_registrar || '호스팅케이알')}" placeholder="호스팅케이알" list="dm-registrars" maxlength="60"></label>
         </div>
+        <label class="field"><span>누구 계정</span><input class="input" name="domain_account" value="${esc(s.domain_account || 'master@plators.com')}" placeholder="master@plators.com" maxlength="100"></label>
         <datalist id="dm-registrars"><option value="호스팅케이알"><option value="가비아"><option value="후이즈"><option value="카페24"><option value="아이네임즈"><option value="Cloudflare"><option value="GoDaddy"><option value="Namecheap"></datalist>
-      </fieldset>
+      </section>
       <label class="field"><span>메모</span><textarea class="input" name="memo">${esc(s.memo)}</textarea></label>
       <div class="field"><span>포트폴리오 분류</span><div class="pf-cats" data-pf-cats></div><input type="hidden" name="portfolio_tag" value="${esc(s.portfolio_tag)}">
         <small>눌러서 고르세요(여러 개 가능). 포트폴리오에서 고른 분류 탭에 나옵니다.</small></div>
