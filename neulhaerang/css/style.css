@@ -321,10 +321,16 @@ a:hover > .more svg, a:hover .more svg, .more:hover svg { transform: translateX(
 .tabs { position: relative; display: inline-flex; padding: 5px; border-radius: 99px; background: var(--ivory-deep); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tabs a { position: relative; z-index: 1; padding: 10px clamp(16px, 2.2vw, 28px); border-radius: 99px; color: var(--ink-soft); font-weight: 700; font-size: 16.5px; white-space: nowrap; transition: color .35s var(--ease); }
-.tabs a.on { color: #fff; }
-.tabs:not(.ready) a.on { background: var(--green); }   /* 폭을 재기 전에는 칸 자체 배경 */
-.tab-ind { position: absolute; left: 0; top: 5px; bottom: 5px; width: 0; border-radius: 99px; background: var(--green); box-shadow: 0 6px 16px rgba(75, 99, 64, .3); transition: transform .38s var(--ease), width .38s var(--ease); }
-.tabs.no-anim .tab-ind { transition: none; }
+.tabs a.on { color: #fff; background: var(--green); box-shadow: 0 6px 16px rgba(75, 99, 64, .3); view-transition-name: tab-on; }
+/* 페이지를 옮기는 탭: 고른 칸이 앞 페이지의 자리에서 새 페이지의 자리로 한 번에 미끄러진다(브라우저의 페이지 전환 — 스크립트로 흉내 내면 누를 때 한 번 · 새 페이지에서 한 번 끊겨 보인다).
+   지원하지 않는 브라우저에서는 움직임 없이 바로 바뀐다. 페이지 나머지는 부드럽게 겹치며 바뀐다. */
+@view-transition { navigation: auto; }
+::view-transition-group(tab-on) { animation-duration: .5s; animation-timing-function: cubic-bezier(.22, .8, .24, 1); }
+::view-transition-old(tab-on), ::view-transition-new(tab-on) { height: 100%; animation-duration: .25s; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .32s; animation-timing-function: ease; }
+.hd { view-transition-name: site-hd; }
+.pg-tabs { view-transition-name: pg-tabs; }
+::view-transition-group(site-hd), ::view-transition-group(pg-tabs) { animation-duration: .01s; }
 .wrap.narrow { --wrap: 880px; }
 .more-row { margin-top: clamp(28px, 3.6vw, 44px); text-align: center; }
 .fine { margin-top: 26px; color: var(--ink-faint); font-size: 16px; line-height: 1.7; }
@@ -579,9 +585,10 @@ a:hover > .more svg, a:hover .more svg, .more:hover svg { transform: translateX(
   .hero .btns { justify-content: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
   html { scroll-behavior: auto; }
   .js [data-reveal] { opacity: 1; transform: none; transition: none; }
   .hero-slide img, .hero-seal, .hero-seal::before { animation: none; }
-  .btn, .btn svg, .path img, .post, .gnb, .gnb > a::after, .kind svg, .whyc, .tab-ind, .tabs a, .room-ph img, .gal img, .card-link { transition: none; }
+  .btn, .btn svg, .path img, .post, .gnb, .gnb > a::after, .kind svg, .whyc, .tabs a, .room-ph img, .gal img, .card-link { transition: none; }
 
 }

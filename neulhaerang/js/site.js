@@ -39,20 +39,7 @@
     a.parentNode.insertBefore(g, a); g.appendChild(a); g.appendChild(sub);
   });
 
-  // 알약 탭(센터소개): 누르는 순간 이 페이지에서 한 번만 미끄러지고, 새 페이지는 처음부터 제자리에 그린다.
-  //   (예전에는 새 페이지에서도 '앞 페이지 자리 → 지금 자리'로 한 번 더 미끄러져, 배경이 두 번 움직이고 글자 위에 겹쳐 잔상처럼 보였다 — 사용자 지적 2026-11-22)
-  [].forEach.call(doc.querySelectorAll('[data-tabs]'), function (box) {
-    var on = box.querySelector('a.on'); if (!on) return;
-    var ind = doc.createElement('span'); ind.className = 'tab-ind'; box.insertBefore(ind, box.firstChild);
-    function put(el) { ind.style.width = el.offsetWidth + 'px'; ind.style.transform = 'translateX(' + el.offsetLeft + 'px)'; }
-    function still() { box.classList.add('no-anim'); var cur = box.querySelector('a.on') || on; put(cur); void ind.offsetWidth; box.classList.remove('no-anim'); }
-    var links = [].slice.call(box.querySelectorAll('a'));
-    still(); box.classList.add('ready');
-    links.forEach(function (l) { l.addEventListener('click', function () { if (!reduce) { links.forEach(function (x) { x.classList.toggle('on', x === l); }); put(l); } }); });
-    window.addEventListener('resize', still);
-    if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(still);
-    window.addEventListener('pageshow', function (e) { if (e.persisted) { links.forEach(function (x) { x.classList.toggle('on', x === on); }); still(); } });
-  });
+  // 알약 탭(센터소개): 고른 칸이 미끄러지는 것은 CSS 의 페이지 전환(view-transition)이 한다 — 스크립트로 옮기지 않는다(2026-11-22: 두 번 끊겨 보이던 것)
 
   // 펼침 칸(자주 묻는 질문): 열릴 때도 닫힐 때도 높이가 부드럽게 움직인다 — 닫힐 때 뚝 끊기지 않게(사용자 지시 2026-11-21)
   [].forEach.call(doc.querySelectorAll('details.faq'), function (d) {
