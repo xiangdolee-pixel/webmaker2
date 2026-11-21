@@ -35,13 +35,17 @@ def tabs(cur):
     a = ''.join(f'<a href="{h}"{" class=\"on\" aria-current=\"page\"" if h == cur else ""}>{t}</a>' for h, t in ABOUT_TABS)
     return f'\n  <nav class="pg-tabs" aria-label="센터소개 메뉴"><div class="tabs" data-tabs>{a}</div></nav>'
 
-def cta(text='상담이 필요한 순간, 늘해랑이 함께합니다.'):
+def cta(text='상담이 필요한 순간,<br>늘해랑이 함께합니다.', hand='천천히, 편안한 마음으로 오세요'):
     return f'''
   <section class="outro" aria-label="예약 안내">
+    <img class="outro-bg" src="images/detail.webp" srcset="images/detail-m.webp 900w, images/detail.webp 1672w" sizes="100vw" width="1672" height="941" loading="lazy" alt="">
     <div class="wrap" data-reveal>
-      <img src="images/logo-mark.webp" width="677" height="605" loading="lazy" alt="">
-      <p>“{text}”</p>
-      <div class="btns"><a class="btn btn-main" href="{NAVER}" target="_blank" rel="noopener">네이버로 예약하기{GO}</a><a class="btn btn-line" href="sms:01067934899">문자로 문의하기</a></div>
+      <img class="outro-mark" src="images/logo-mark.webp?v=3" width="700" height="697" loading="lazy" alt="">
+      <p class="outro-hand">{hand}</p>
+      <h2 class="outro-say">{text}</h2>
+      <span class="outro-line" aria-hidden="true"></span>
+      <div class="btns"><a class="btn btn-white" href="{NAVER}" target="_blank" rel="noopener">네이버로 예약하기{GO}</a><a class="btn btn-ghost" href="sms:01067934899">문자로 문의하기</a></div>
+      <p class="outro-info">상계역 5번 출구 도보 3분 · 평일 저녁 · 토요일 상담 · 100% 예약제</p>
     </div>
   </section>'''
 
@@ -145,10 +149,10 @@ prof('mate-lee.webp', '자문위원', '이선욱', '', [
     ('늘해랑에서', ['정기 자문 및 사례 슈퍼비전 진행'])]) + '''
       </div>
     </div>
-  </section>''' + cta('한 사람, 한 사람의 마음에 온전히 집중합니다.'))
+  </section>''' + cta('한 사람, 한 사람의 마음에<br>온전히 집중합니다.', '늘해랑의 선생님들이 함께합니다'))
 
 # ───────────────────────── 센터소개 › 오시는 길
-MAP = 'https://xim.plators.com/map?addr=%EC%84%9C%EC%9A%B8%20%EB%85%B8%EC%9B%90%EA%B5%AC%20%ED%95%9C%EA%B8%80%EB%B9%84%EC%84%9D%EB%A1%9C%20396&amp;name=%EB%8A%98%ED%95%B4%EB%9E%91%EC%8B%AC%EB%A6%AC%EC%83%81%EB%8B%B4%EC%84%BC%ED%84%B0&amp;c=4e6b4c'
+MAP = 'https://xim.plators.com/map?addr=%EC%84%9C%EC%9A%B8%20%EB%85%B8%EC%9B%90%EA%B5%AC%20%ED%95%9C%EA%B8%80%EB%B9%84%EC%84%9D%EB%A1%9C%20396&amp;name=%EB%8A%98%ED%95%B4%EB%9E%91%EC%8B%AC%EB%A6%AC%EC%83%81%EB%8B%B4%EC%84%BC%ED%84%B0&amp;c=4b6340'
 page('location.html', '오시는 길', '늘해랑심리상담센터 오시는 길 — 서울 노원구 한글비석로 396 벽산종합상가 108동 2층 7호, 4호선 상계역 5번 출구 도보 3분, 지하 주차장 무료.',
 banner('hall.webp', '센터소개', '오시는 길', '상계역 5번 출구에서 횡단보도만 건너면 됩니다', ' up') + tabs('location.html') + f'''
 
@@ -173,7 +177,7 @@ banner('hall.webp', '센터소개', '오시는 길', '상계역 5번 출구에�
         <figure><img src="images/hall.webp" width="1086" height="1448" loading="lazy" alt="대기 공간"><figcaption>문을 열면 보이는 대기 공간</figcaption></figure>
       </div>
     </div>
-  </section>''' + cta('천천히, 편안한 마음으로 오세요.'))
+  </section>''' + cta('상계역 5번 출구에서<br>3분이면 닿습니다.'))
 
 # ───────────────────────── 상담프로그램
 def prog(pid, img, w, h, hand, title, lead, who, how, flip=False):
@@ -289,7 +293,7 @@ banner('hero.webp', '공간안내', '마음이 편안해지는 공간', '상담�
         <li><b>상계역 도보 3분</b>4호선 5번 출구 앞</li>
       </ul>
     </div>
-  </section>''' + cta('조용하고 편안한 공간에서, 천천히 마음을 들여다보세요.'))
+  </section>''' + cta('조용하고 편안한 공간에서,<br>천천히 마음을 들여다보세요.', '직접 오셔서 느껴 보세요'))
 
 # ───────────────────────── 이용안내
 def faq(q, a): return f'<details class="faq" data-reveal><summary>{q}</summary><div><p>{a}</p></div></details>'
