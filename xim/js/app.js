@@ -679,7 +679,7 @@ function termChip(label, end, extra = '', tail = '') {   // tail = 줄에 함께
   if (!end) return tail ? `<span class="sr-term" title="${esc(label)} ${esc(extra)}">${esc(label)} <small>${esc(tail)}</small></span>` : '';
   const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
   const left = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
-  const cl = left < 0 ? ' over' : left <= 30 ? ' soon' : '';
+  const cl = left < 0 ? ' over' : left <= 31 ? ' soon' : '';   // 31일 전부터 빨갛게 깜박인다(사용자 지시 2026-11-21)
   const when = left < 0 ? `${-left}일 지남` : left === 0 ? '오늘까지' : `${left}일 남음`;
   return `<span class="sr-term${cl}" title="${esc(label)} ${left < 0 ? '만료' : '끝나는 날'} ${esc(end)}${extra ? ` · ${esc(extra)}` : ''}">${esc(label)} <b>~${esc(end)}</b><small>${when}${tail ? ` · ${esc(tail)}` : ''}</small></span>`;
 }
@@ -694,15 +694,15 @@ function termAlerts(sites) {
   }
   if (!items.length) return '';
   items.sort((a, b) => a.left - b.left);
-  const urgent = items.filter((i) => i.left <= 30).length;
+  const urgent = items.filter((i) => i.left <= 31).length;
   const row = (i, k) => {
-    const cl = i.left < 0 ? 'over' : i.left <= 30 ? 'soon' : i.left <= 60 ? 'near' : '';
+    const cl = i.left < 0 ? 'over' : i.left <= 31 ? 'soon' : i.left <= 60 ? 'near' : '';
     const when = i.left < 0 ? `${-i.left}일 지남` : i.left === 0 ? '오늘까지' : `D-${i.left}`;
     return `<button type="button" class="ta-row ${cl}${k >= 5 ? ' more' : ''}" data-term-site="${i.s.id}" title="누르면 ${esc(i.s.name)} 수정 창이 열립니다">
       <b class="ta-d">${when}</b><span class="ta-k">${i.kind}</span><span class="ta-n">${esc(i.s.name)}</span><span class="ta-e">~${esc(i.end)}</span>${i.note ? `<small>${esc(i.note)}</small>` : ''}</button>`;
   };
   return `<section class="term-alert${urgent ? ' hot' : ''}" aria-label="호스팅 · 도메인 기간 알림">
-    <div class="ta-h"><b>기간 알림</b><span>${urgent ? `30일 안에 끝나거나 지난 것 <em>${urgent}건</em>` : '30일 안에 끝나는 것은 없습니다'} · 급한 순서</span></div>
+    <div class="ta-h"><b>기간 알림</b><span>${urgent ? `31일 안에 끝나거나 지난 것 <em>${urgent}건</em>` : '31일 안에 끝나는 것은 없습니다'} · 급한 순서</span></div>
     <div class="ta-list">${items.map(row).join('')}</div>
     ${items.length > 5 ? `<button type="button" class="link-btn ta-more" data-term-more>나머지 ${items.length - 5}건 더 보기</button>` : ''}
   </section>`;

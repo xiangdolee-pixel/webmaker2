@@ -278,7 +278,7 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 /* 새 글 숫자: 깜박여서 눈에 띄게 (움직임 줄이기 설정이면 멈춤) */
 @keyframes new-blink { 0%, 55% { opacity: 1; transform: scale(1); } 70% { opacity: .25; transform: scale(.92); } 85% { opacity: 1; transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
 .new-num, .nav-num { animation: new-blink 1.4s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .new-num, .nav-num { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .new-num, .nav-num, .ta-row .ta-d, .sr-term { animation: none !important; } }
 /* 감시 */
 .live-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--sub); }
 .live-dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #22a861; animation: new-blink 1.4s ease-in-out infinite; }
@@ -323,11 +323,11 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .sr-num b { color: var(--ink); }
 .sr-terms { grid-area: term; display: flex; flex-wrap: wrap; gap: 6px 8px; min-width: 0; }   /* 호스팅 · 도메인 기간은 따로 한 줄(다른 칸과 겹치지 않게) */
 .sr-term { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 3px 12px; border-radius: 99px; background: #f3f5fb; border: 1px solid #e3e7f3; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sr-term.soon { background: #fff3e0; border-color: #f3d9ae; }
-.sr-term.over { background: #fdeeee; border-color: #f3c2c2; }
+.sr-term.soon { background: #fdeeee; border-color: #f3c2c2; animation: new-blink 1.4s ease-in-out infinite; }
+.sr-term.over { background: #fdeeee; border-color: #f3c2c2; animation: new-blink 1.4s ease-in-out infinite; }
 .sr-term b { font-weight: 600; }
 .sr-term small { color: var(--mute, #8a8f98); }
-.sr-term.soon b, .sr-term.soon small { color: #c77700; }
+.sr-term.soon b, .sr-term.soon small { color: var(--danger, #d33); font-weight: 700; }
 .sr-term.over b, .sr-term.over small { color: var(--danger, #d33); font-weight: 700; }
 .term { margin: 4px 0 14px; padding: 14px 16px 2px; border-radius: 14px; background: #f3f5fb; border: 1px solid #e3e7f3; }
 .term-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #e3e7f3; }
@@ -339,11 +339,11 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .term .field > span { font-weight: 600; }
 @media (max-width: 380px) { .term .row2 { grid-template-columns: minmax(0, 1fr); } }
 .term-alert { margin: 0 0 14px; padding: 12px 14px; border-radius: 14px; background: #f6f7fb; border: 1px solid #e3e7f3; }
-.term-alert.hot { background: #fff7ec; border-color: #f3d9ae; }
+.term-alert.hot { background: #fff4f4; border-color: #f1b5b5; }
 .ta-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin-bottom: 8px; }
 .ta-h b { font-size: 15px; font-weight: 800; }
 .ta-h span { color: var(--ink-3, #8a8f98); font-size: 13px; }
-.ta-h em { font-style: normal; font-weight: 800; color: #c77700; }
+.ta-h em { font-style: normal; font-weight: 800; color: var(--danger, #d33); }
 .ta-list { display: grid; gap: 6px; }
 .ta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; width: 100%; padding: 8px 12px; border-radius: 10px; background: #fff; border: 1px solid #e8eaf2; text-align: left; font-size: 14px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
 .ta-row:hover { border-color: var(--brand, #3b4cca); box-shadow: 0 2px 10px rgba(59, 76, 202, .1); }
@@ -351,8 +351,10 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .term-alert.all .ta-row.more { display: flex; }
 .ta-d { min-width: 74px; padding: 2px 9px; border-radius: 99px; background: #eef0f6; color: #555b66; font-size: 13px; font-weight: 800; text-align: center; white-space: nowrap; }
 .ta-row.near .ta-d { background: #fff3c9; color: #8a6500; }
-.ta-row.soon .ta-d { background: #ffe1b8; color: #a55400; }
-.ta-row.over .ta-d { background: var(--danger, #d33); color: #fff; }   /* 빨간 바탕 → 흰 글자 */
+.ta-row.soon { border-color: #f1b5b5; background: #fff5f5; }
+.ta-row.soon .ta-d, .ta-row.over .ta-d { background: var(--danger, #d33); color: #fff; animation: new-blink 1.4s ease-in-out infinite; }   /* 31일 전부터 빨갛게 깜박 — 빨간 바탕 위 흰 글자 */
+.ta-row.soon .ta-n, .ta-row.soon .ta-e, .ta-row.over .ta-n, .ta-row.over .ta-e { color: #b42323; }
+.ta-row.over { border-color: #f1b5b5; background: #fff5f5; }
 .ta-k { color: var(--ink-3, #8a8f98); font-weight: 700; font-size: 13px; }
 .ta-n { font-weight: 700; }
 .ta-e { color: #555b66; font-variant-numeric: tabular-nums; }
