@@ -1,12 +1,12 @@
 // xim 부기(처음 이름 J-Est. → BookKeeping → 부기) — 달마다 매입(왼쪽) · 매출(오른쪽)을 날짜 · 항목 · 금액으로 적어 정리한다 (사용자 지시 2026-11-21)
 //   한 달씩 본다. 줄을 누르면 그 자리에서 고치고, 맨 아래 줄에 적고 Enter 를 치면 더해진다. 아래에 달 합계와 차액, 그 해의 달별 합계.
-//   매입은 어느 계좌에서 나갔는지도 적는다: 개인(카카오뱅크) · 기업(케이뱅크) · 기타(직접 적기).
+//   매출(왼쪽)은 입금자명과 어느 계좌로 들어왔는지도 적는다: 개인(카카오뱅크) · 기업(케이뱅크) · 기타(직접 적기). 매입은 오른쪽.
 import { esc, toast } from './common.js';
 
 let deps = null;            // { view, api }
 let month = '';             // 'YYYY-MM'
 let data = { items: [], year: [] };
-const SIDES = [['buy', '매입'], ['sell', '매출']];
+const SIDES = [['sell', '매출'], ['buy', '매입']];   // 왼쪽 매출 · 오른쪽 매입
 const ACCTS = [['개인', '개인 · 카카오뱅크'], ['기업', '기업 · 케이뱅크']];   // 값은 '개인' · '기업' 또는 직접 적은 글
 const CUSTOM = '__custom';
 const won = (n) => Number(n || 0).toLocaleString('ko-KR');
@@ -41,27 +41,27 @@ function draw(view) {
   const buy = sumOf('buy'), sell = sumOf('sell'), diff = sell - buy;
   const today = kst(), defDay = today.startsWith(month) ? today : `${month}-01`;
   const col = ([side, name]) => {
-    const rows = data.items.filter((i) => i.side === side), isBuy = side === 'buy';
-    // 매입은 계좌마다 얼마인지도 보여 준다
+    const rows = data.items.filter((i) => i.side === side), isBuy = side === 'buy', isSell = !isBuy;
+    // 매출은 계좌마다 얼마인지도 보여 준다
     let by = '';
-    if (isBuy && rows.length) {
+    if (isSell && rows.length) {
       const m = new Map(); rows.forEach((i) => { const k = ACCTS.some(([v]) => v === i.account) ? i.account : '기타'; m.set(k, (m.get(k) || 0) + i.amount); });
       by = `<p class="je-by">${['개인', '기업', '기타'].filter((k) => m.has(k)).map((k) => `<span>${k} <b>${won(m.get(k))}원</b></span>`).join('')}</p>`;
     }
     return `<section class="je-col je-${side}" data-side="${side}">
       <header class="je-h"><b>${name}</b><span>${rows.length}건</span><em>${won(isBuy ? buy : sell)}원</em></header>${by}
       <div class="je-table" role="table" aria-label="${name}">
-        <div class="je-row je-head" role="row"><span>날짜</span><span>항목</span>${isBuy ? '<span>계좌</span>' : ''}<span class="r">금액</span><span></span></div>
+        <div class="je-row je-head" role="row"><span>날짜</span><span>항목</span>${isSell ? '<span>입금자명</span><span>계좌</span>' : ''}<span class="r">금액</span><span></span></div>
         ${rows.map((i) => `<div class="je-row" role="row" data-id="${i.id}">
           <input class="je-in" type="date" value="${esc(i.day)}" data-f="day" aria-label="날짜">
           <input class="je-in" type="text" value="${esc(i.item)}" data-f="item" maxlength="120" aria-label="항목">
-          ${isBuy ? acctSelect(i.account || '개인', 'data-f="account"') : ''}
+          ${isSell ? `<input class="je-in" type="text" value="${esc(i.payer || '')}" data-f="payer" maxlength="40" placeholder="입금자" aria-label="입금자명">${acctSelect(i.account || '개인', 'data-f="account"')}` : ''}
           <input class="je-in r" type="text" inputmode="numeric" value="${won(i.amount)}" data-f="amount" aria-label="금액">
           <button type="button" class="je-x" data-del title="지우기" aria-label="${esc(i.item)} 지우기">×</button></div>`).join('')}
         <form class="je-row je-new" data-new>
           <input class="je-in" type="date" name="day" value="${defDay}" min="${month}-01" max="${month}-31" aria-label="날짜" required>
           <input class="je-in" type="text" name="item" placeholder="항목을 적고 Enter" maxlength="120" aria-label="항목" required>
-          ${isBuy ? acctSelect(lastAcct, 'name="account"') : ''}
+          ${isSell ? `<input class="je-in" type="text" name="payer" placeholder="입금자명" maxlength="40" aria-label="입금자명">${acctSelect(lastAcct, 'name="account"')}` : ''}
           <input class="je-in r" type="text" name="amount" inputmode="numeric" placeholder="금액" aria-label="금액" required>
           <button type="submit" class="je-add" title="더하기" aria-label="${name} 더하기">+</button>
         </form>
@@ -77,17 +77,17 @@ function draw(view) {
         <button type="button" class="btn sm" data-mv="1" aria-label="다음 달">›</button>
         <button type="button" class="btn sm" data-today>이번 달</button></div></div>
     <div class="je-sum">
-      <div><span>매입</span><b>${won(buy)}원</b></div><i>−</i>
-      <div><span>매출</span><b>${won(sell)}원</b></div><i>=</i>
+      <div><span>매출</span><b>${won(sell)}원</b></div><i>−</i>
+      <div><span>매입</span><b>${won(buy)}원</b></div><i>=</i>
       <div class="je-diff ${diff < 0 ? 'minus' : 'plus'}"><span>차액 (매출 − 매입)</span><b>${diff < 0 ? '−' : ''}${won(Math.abs(diff))}원</b></div>
     </div>
     <div class="je-cols">${SIDES.map(col).join('')}</div>
     <section class="je-year">
       <h3>${yr}년 달별 합계</h3>
       <div class="je-ytable">
-        <div class="je-yrow je-head"><span>달</span><span class="r">매입</span><span class="r">매출</span><span class="r">차액</span></div>
-        ${data.year.map((y) => `<button type="button" class="je-yrow${y.month === month ? ' on' : ''}" data-go="${y.month}"><span>${Number(y.month.slice(5))}월</span><span class="r">${won(y.buy)}</span><span class="r">${won(y.sell)}</span><span class="r ${y.sell - y.buy < 0 ? 'minus' : ''}">${y.sell - y.buy < 0 ? '−' : ''}${won(Math.abs(y.sell - y.buy))}</span></button>`).join('') || '<p class="je-none">아직 적은 내용이 없습니다.</p>'}
-        ${data.year.length ? `<div class="je-yrow je-total"><span>합계</span><span class="r">${won(ysum.buy)}</span><span class="r">${won(ysum.sell)}</span><span class="r ${ysum.sell - ysum.buy < 0 ? 'minus' : ''}">${ysum.sell - ysum.buy < 0 ? '−' : ''}${won(Math.abs(ysum.sell - ysum.buy))}</span></div>` : ''}
+        <div class="je-yrow je-head"><span>달</span><span class="r">매출</span><span class="r">매입</span><span class="r">차액</span></div>
+        ${data.year.map((y) => `<button type="button" class="je-yrow${y.month === month ? ' on' : ''}" data-go="${y.month}"><span>${Number(y.month.slice(5))}월</span><span class="r">${won(y.sell)}</span><span class="r">${won(y.buy)}</span><span class="r ${y.sell - y.buy < 0 ? 'minus' : ''}">${y.sell - y.buy < 0 ? '−' : ''}${won(Math.abs(y.sell - y.buy))}</span></button>`).join('') || '<p class="je-none">아직 적은 내용이 없습니다.</p>'}
+        ${data.year.length ? `<div class="je-yrow je-total"><span>합계</span><span class="r">${won(ysum.sell)}</span><span class="r">${won(ysum.buy)}</span><span class="r ${ysum.sell - ysum.buy < 0 ? 'minus' : ''}">${ysum.sell - ysum.buy < 0 ? '−' : ''}${won(Math.abs(ysum.sell - ysum.buy))}</span></div>` : ''}
       </div>
     </section>`;
   bind(view);
@@ -132,7 +132,7 @@ function bind(view) {
       if (!f.item.value.trim() || !Number.isFinite(amount) || !amount) { toast('항목과 금액을 넣어 주세요.'); return; }
       const account = acct && acct.value !== CUSTOM ? acct.value : '';
       try {
-        await api('/jest', { method: 'POST', data: { side, day: f.day.value, item: f.item.value, amount, account } });
+        await api('/jest', { method: 'POST', data: { side, day: f.day.value, item: f.item.value, amount, account, payer: f.payer ? f.payer.value : '' } });
         const day = f.day.value; if (day.slice(0, 7) !== month) month = day.slice(0, 7);
         await load();
         const again = deps.view.querySelector(`[data-side="${side}"] [data-new]`); if (again) { again.day.value = day; again.item.focus(); }   // 이어서 적기 쉽게
@@ -153,7 +153,7 @@ function bind(view) {
       }
       const save = async () => {
         const v = f === 'amount' ? Number(onlyNum(el.value)) : el.value.trim();
-        if (v === it[f]) return;
+        if (v === (it[f] ?? '')) return;
         if ((f === 'item' && !v) || (f === 'amount' && (!Number.isFinite(v) || !v)) || (f === 'day' && !v)) { el.value = f === 'amount' ? won(it.amount) : it[f]; return; }
         await put(f, v, el);
       };

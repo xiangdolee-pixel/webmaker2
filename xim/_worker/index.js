@@ -345,7 +345,7 @@ async function ximApi(request, env, url, ctx) {
   if (path === '/api/jest' && method === 'GET') {
     const mo = /^\d{4}-\d{2}$/.test(url.searchParams.get('month') || '') ? url.searchParams.get('month') : new Date(now() + 9 * 3600000).toISOString().slice(0, 7);
     const [{ results: items }, { results: year }] = await Promise.all([
-      db.prepare('SELECT id, side, day, item, amount, account FROM jest_entries WHERE month = ? ORDER BY day, id').bind(mo).all(),
+      db.prepare('SELECT id, side, day, item, amount, account, payer FROM jest_entries WHERE month = ? ORDER BY day, id').bind(mo).all(),
       db.prepare("SELECT month, SUM(CASE WHEN side = 'buy' THEN amount ELSE 0 END) AS buy, SUM(CASE WHEN side = 'sell' THEN amount ELSE 0 END) AS sell FROM jest_entries WHERE month LIKE ? GROUP BY month ORDER BY month").bind(`${mo.slice(0, 4)}-%`).all(),
     ]);
     return json({ month: mo, items, year });
@@ -361,14 +361,15 @@ async function ximApi(request, env, url, ctx) {
       if (!day) throw bad('날짜를 넣어 주세요.');
       if (!item) throw bad('항목을 넣어 주세요.');
       if (!Number.isFinite(amount) || !amount || Math.abs(amount) > 100000000000) throw bad('금액을 숫자로 넣어 주세요.');
-      const account = side === 'buy' ? (str(raw.account, 40) || '개인') : '';   // 매입만 계좌(개인 · 기업 · 직접 적은 글)
-      const what = `${side === 'buy' ? `매입(${account})` : '매출'} ${day} ${item}`;
+      // 매출만: 들어온 계좌(개인 · 기업 · 직접 적은 글)와 입금자명
+      const account = side === 'sell' ? (str(raw.account, 40) || '개인') : '', payer = side === 'sell' ? str(raw.payer, 40) : '';
+      const what = `${side === 'sell' ? `매출(${account}${payer ? ` · ${payer}` : ''})` : '매입'} ${day} ${item}`;
       if (method === 'POST') {
-        const r = await db.prepare('INSERT INTO jest_entries (month, side, day, item, amount, account, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(day.slice(0, 7), side, day, item, amount, account, now()).run();
+        const r = await db.prepare('INSERT INTO jest_entries (month, side, day, item, amount, account, payer, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(day.slice(0, 7), side, day, item, amount, account, payer, now()).run();
         await audit(db, request, 'JBOOK_ADD', what, `${amount.toLocaleString('ko-KR')}원`);
         return json({ id: r.meta.last_row_id });
       }
-      await db.prepare('UPDATE jest_entries SET month = ?, side = ?, day = ?, item = ?, amount = ?, account = ? WHERE id = ?').bind(day.slice(0, 7), side, day, item, amount, account, +jm[1]).run();
+      await db.prepare('UPDATE jest_entries SET month = ?, side = ?, day = ?, item = ?, amount = ?, account = ?, payer = ? WHERE id = ?').bind(day.slice(0, 7), side, day, item, amount, account, payer, +jm[1]).run();
       await audit(db, request, 'JBOOK_EDIT', what, `${amount.toLocaleString('ko-KR')}원`);
       return json({ ok: true });
     }
