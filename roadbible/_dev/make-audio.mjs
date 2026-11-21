@@ -15,7 +15,7 @@ const H = { 'X-Agent-Token': SEC.agent_token, 'Content-Type': 'application/json'
 const OUT = path.join(ROOT, 'roadbible', 'assets', 'audio');
 const SLUG = { 창세기: 'genesis', 출애굽기: 'exodus', 레위기: 'leviticus', 민수기: 'numbers', 신명기: 'deuteronomy', 잠언: 'proverbs', 시편: 'psalms', 전도서: 'ecclesiastes', 아가: 'song', 로마서: 'romans' };
 // 책마다 목소리(2026-11-21 사용자: "잠언만 이 목소리로") — 없으면 내 목소리. 이름은 처리기 agent.json 의 voices
-const VOICE = { 잠언: 'novo' };
+const VOICE = { 잠언: 'novo', 전도서: 'novo', 아가: 'novo', 창세기: 'novo', 출애굽기: 'novo', 레위기: 'novo', 민수기: 'novo', 신명기: 'novo' };   // 로마서는 내 목소리 그대로
 const log = (...a) => console.log(new Date().toLocaleTimeString('ko-KR'), ...a);
 
 const src = fs.readFileSync(path.join(ROOT, 'roadbible', 'bible-data.js'), 'utf8');
@@ -40,6 +40,38 @@ async function call(method, p, body) {
   const r = await fetch(API + p, { method, headers: H, body: body && JSON.stringify(body), signal: AbortSignal.timeout(p.startsWith('/audio/') ? 900000 : 120000) });   // 음성 원본(10MB 안팎)은 넉넉히   // 걸려서 멈추지 않게
   if (!r.ok) throw new Error(`${method} ${p} → ${r.status} ${(await r.text()).slice(0, 200)}`);
   return r.headers.get('content-type')?.includes('json') ? r.json() : r;
+}
+
+// 읽는 자리 표시용 <이름>.json = { id: 작업 번호(음성 주소 ?v= 로도 씀), v: [절마다 시작 초] } — 2026-11-21 사용자 "읽는 지점을 표시"
+//   처리기가 남긴 구간 시각(80자 안팎 · 절과 무관하게 끊김)에서, 절이 시작하는 글자 위치를 구간 안에서 글자 수 비례로 잡는다.
+const nws = (s) => s.replace(/\s+/g, '').length;
+function verseTimes(key, text, timings) {
+  const all = BIBLE[key] || [], idx = []; all.forEach((v, i) => { if (v) idx.push(i); });
+  const lines = String(text || '').split('\n').filter((l) => l.trim());
+  if (!Array.isArray(timings) || !timings.length || lines.length !== idx.length + 1) return null;
+  let a = 0; const segs = timings.map((x) => { const n = nws(x.t); const o = { a, b: a + n, s: x.s, e: x.e }; a += n; return o; });
+  const k = a / lines.reduce((n, l) => n + nws(l), 0);   // 구간 글자 수 ÷ 본문 글자 수(거의 1)
+  const out = new Array(all.length).fill(null); let c = nws(lines[0]);
+  lines.slice(1).forEach((l, j) => {
+    const p = c * k, g = segs.find((x) => p < x.b - 1e-6) || segs.at(-1);
+    out[idx[j]] = +(g.s + Math.max(0, Math.min(1, (p - g.a) / (g.b - g.a || 1))) * (g.e - g.s)).toFixed(2); c += nws(l);
+  });
+  return { out, drift: Math.abs(1 - k) };
+}
+async function saveTimes(j) {
+  const { text, timings } = await call('GET', `/api/jobs/${j.id}/text`);
+  const r = verseTimes(`${j.book}/${j.chap}`, text, timings);
+  if (!r) log('읽는 자리 시각 없음(주소 번호만 적음)', j.name); else if (r.drift > 0.02) log('경고: 구간과 본문 글자 수 차이', j.name, r.drift.toFixed(3));
+  fs.writeFileSync(path.join(OUT, `${j.name}.json`), JSON.stringify({ id: j.id, v: r ? r.out : null }));
+  return !!r;
+}
+// TIMES=1 → 이미 만든 음성의 json 만 만든다(새로 만들지 않음): _dev/audio-jobs-<번호>.json 에 적힌 작업 중 장마다 가장 최근 것(작업이 지워졌으면 건너뜀)
+if (process.env.TIMES) {
+  const dev = path.join(ROOT, 'roadbible', '_dev'), last = {};
+  for (const f of fs.readdirSync(dev).filter((x) => /^audio-jobs-\d+\.json$/.test(x)).sort()) for (const j of JSON.parse(fs.readFileSync(path.join(dev, f), 'utf8'))) last[j.name] = j;   // 뒤에 만든 목록이 이긴다
+  const list = Object.values(last).filter((j) => fs.existsSync(path.join(OUT, `${j.name}.webm`))); let ok = 0, i = 0;
+  await Promise.all(Array.from({ length: 6 }, async () => { while (i < list.length) { const j = list[i++]; try { if (await saveTimes(j)) ok++; } catch (e) { log('실패', j.name, e.message); } } }));
+  log(`읽는 자리 json ${ok} / ${list.length}`); process.exit(0);
 }
 
 // 1) 작업 넣기 (이미 만든 파일이 있으면 건너뜀). RESUME=<audio-jobs-….json> 이면 새로 넣지 않고 그 작업들을 이어서 받는다
@@ -83,6 +115,7 @@ while (left.size) {
     execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', wav, '-af', af, '-ar', '48000', '-ac', '1', '-c:a', 'libopus', '-b:a', '20k', '-application', 'audio', '-f', 'webm', path.join(OUT, `${j.name}.webm.part`)]);
     fs.renameSync(path.join(OUT, `${j.name}.webm.part`), path.join(OUT, `${j.name}.webm`));   // 다 만든 뒤에만 이름을 바꿔 반쯤 된 파일이 남지 않게
     fs.unlinkSync(wav);
+    try { await saveTimes(j); } catch (e) { log('읽는 자리 json 실패', j.name, e.message); }
     left.delete(j.id);
     log('완료', j.name, `${Math.round(fs.statSync(path.join(OUT, `${j.name}.webm`)).size / 1024)}KB`, `남은 ${left.size}`);
     } catch (e) { log('받기 · 압축 실패(다음에 다시)', j.name, e.message); }   // 한 장이 실패해도 전체가 멈추지 않게

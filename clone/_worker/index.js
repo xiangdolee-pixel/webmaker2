@@ -108,7 +108,7 @@ async function handle(request, env, ctx) {
       // 1시간 넘게 running 인 것은 PC 가 중간에 꺼진 것 → 다시 대기열로
       await db.prepare("UPDATE jobs SET status = 'queued', started_at = NULL WHERE status = 'running' AND started_at < ?").bind(now() - STALE_MS).run();
       const job = await db.prepare(`UPDATE jobs SET status = 'running', started_at = ?1, attempts = attempts + 1, error = NULL
-        WHERE id = (SELECT id FROM jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1) RETURNING id, text, speed, attempts, video, studio, voice`).bind(now()).first();
+        WHERE id = (SELECT id FROM jobs WHERE status = 'queued' ORDER BY (title LIKE '[길성경]%'), created_at LIMIT 1) RETURNING id, text, speed, attempts, video, studio, voice`).bind(now()).first();
       if (job && job.studio) { try { job.studio = JSON.parse(job.studio); } catch { job.studio = null; } }
       return json({ job: job || null });
     }
