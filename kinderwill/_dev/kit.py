@@ -4,7 +4,7 @@ import html as _h, json, re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-V = "20261122d"                      # css · js · 그림 주소 버전 — 파일을 바꾸면 올린다
+V = "20261122e"                      # css · js · 그림 주소 버전 — 파일을 바꾸면 올린다
 SITE = "킨더윌 사회성언어전문센터"
 KAKAO = "https://pf.kakao.com/_ZxoxfUb"
 NBOOK = "https://booking.naver.com/booking/5/bizes/472902"
@@ -132,7 +132,7 @@ def _mega():
     return "".join(out)
 def _drawer():
     b1 = "".join(f'<button type="button"{" class=\"on\"" if i == 0 else ""}{" data-centers" if m["key"] == "about" else ""}>{m["title"]}</button>' for i, m in enumerate(MENU))
-    ps = "".join(f'<div class="dr-p{" on" if i == 0 else ""}"><b>{m["title"]}</b>' + "".join(f'<a href="{href(f)}">{t}</a>' for f, t, _ in m["items"]) + "</div>" for i, m in enumerate(MENU))
+    ps = "".join(f'<div class="dr-p{" on" if i == 0 else ""}"><b>{m["title"]}</b>' + "".join(f'<a href="{href(f)}"><span>{t}</span></a>' for f, t, _ in m["items"]) + "</div>" for i, m in enumerate(MENU))
     cta = (f'<div class="dr-cta">{btn("상담 문의하기", href("contact"))}<a class="btn btn-line dr-login" href="/member/login">로그인</a></div>')
     return f'<div class="drawer" id="drawer" aria-label="전체 메뉴"><div class="dr-1">{b1}</div><div class="dr-2">{ps}{cta}</div></div>'
 def _find():
@@ -145,7 +145,7 @@ def header():
     return f'''<a class="sr" href="#main">본문 바로가기</a>
 <header class="hd">
   <div class="wrap hd-in">
-    <a class="logo" href="./" aria-label="{SITE} 첫 화면">{img("logo-mark.png", "", lazy=False)}<span class="logo-t"><b>킨더윌 사회성언어전문센터</b><small>KINDER WILL</small></span></a>
+    <a class="logo" href="./" aria-label="{SITE} 첫 화면">{img("logo-mark.webp", "", lazy=False)}<span class="logo-t"><b>킨더윌 사회성언어전문센터</b><small>KINDER WILL</small></span></a>
     <nav class="gnb" id="gnb" aria-label="주 메뉴">{nav}</nav>
     <div class="hd-side">
       <button type="button" class="hd-find" aria-expanded="false" aria-controls="find" aria-label="센터 찾기">{ic("pin")}<span>센터 찾기</span></button>
@@ -201,9 +201,9 @@ def doc(file, title, desc, body, body_cls="", preload="", noindex=False):
 <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-192.png?v={V}">
 <link rel="apple-touch-icon" href="images/apple-touch-icon.png?v={V}">
 <script>document.documentElement.className="js"</script>
-{preload}<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="css/style.css?v={V}">
+<link rel="preload" as="font" type="font/woff2" href="fonts/kw-pretendard.woff2?v=1" crossorigin>
+{preload}<link rel="stylesheet" href="css/style.css?v={V}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'">
 <script src="js/site.js?v={V}" defer></script>
 </head>
 <body{f' class="{body_cls}"' if body_cls else ''}>
@@ -218,7 +218,7 @@ def subpage(file, h1, lead, inner, bg="c3wait", title=None, desc=None, body_cls=
     if m and tabs and len(m["items"]) > 1:
         sub = ('<div class="subnav"><div class="wrap"><div class="seg coral" role="navigation" aria-label="' + m["title"] + ' 메뉴">'
                + "".join(f'<a href="{href(f)}"{" class=\"on\" aria-current=\"page\"" if f == file else ""}>{t}</a>' for f, t, _ in m["items"]) + "</div></div></div>\n")
-    ph = (f'<section class="ph{" " + ph_cls if ph_cls else ""}"><div class="ph-bg">{img(bg, "", lazy=False)}</div><div class="wrap">{crumb}<h1>{h1}</h1>{f"<p>{lead}</p>" if lead else ""}</div></section>\n')
+    ph = (f'<section class="ph{" " + ph_cls if ph_cls else ""}"><div class="ph-bg">{img(bg, "", lazy=False, extra=' fetchpriority="high"')}</div><div class="wrap">{crumb}<h1>{h1}</h1>{f"<p>{lead}</p>" if lead else ""}</div></section>\n')
     body = ph + sub + f'<main id="main">\n{inner}</main>\n' + (cta_band() if cta else "")
     return doc(file, title or h1, desc or re.sub(r"<[^>]+>", "", lead), body, body_cls=("sub " + body_cls).strip())
 def write(file, html):

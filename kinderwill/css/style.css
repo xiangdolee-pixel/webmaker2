@@ -1,11 +1,13 @@
 /* 킨더윌 사회성언어전문센터 — 사이트 전체 CSS 한 파일
    색: 흰 바탕 + 로고의 코랄(강조) · 청록(보조). 키즈스텝 구역만 짙은 남색.  컨테이너 한 벌(.wrap)로 헤더 · 본문 · 푸터 끝선을 맞춘다. */
+/* Pretendard: 사이트에 쓰인 글자만 담은 한 파일(_dev/build-fonts.py)을 미리 받는다. 빠진 글자는 뒤늦게 오는 바깥 Pretendard 가 채운다 */
+@font-face { font-family: "KW Pretendard"; src: url("../fonts/kw-pretendard.woff2?v=1") format("woff2"); font-weight: 400 800; font-style: normal; font-display: swap; }
 :root {
   --brand: #cf4a24; --brand-deep: #b33d19; --brand-soft: #fff1ea; --brand-line: #f8d2c1;
   --teal: #1a7f79; --teal-deep: #14655f; --teal-soft: #e8f6f5; --teal-line: #bfe5e2;
   --ink: #1b2531; --ink-2: #44505f; --ink-3: #5d6978; --line: #e2e7ee; --line-2: #eef1f5; --soft: #f5f7fa;
   --navy: #101d33; --navy-2: #182a47; --lime: #c9f26b;
-  --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font: "KW Pretendard", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   --r: 18px; --r-sm: 12px; --r-lg: 28px;
   --wrap: 1280px; --gut: clamp(20px, 3.4vw, 40px);
   --hd-h: 84px;
@@ -127,7 +129,7 @@ a:hover > .more svg, .more:hover svg { transform: translateX(5px); }
 .find-all:hover { background: var(--ink); color: #fff; }
 
 /* ───── 첫 화면(히어로): 꽉 찬 사진 + 왼쪽 글. 큰 글자는 폭 · 높이 중 작은 쪽(--hu) 기준 */
-.hero { --hu: min(1vw, 1.72vh); --hu: min(1vw, 1.72svh); position: relative; display: grid; align-items: center; min-height: max(360px, calc(100vh - var(--hd-h) - 40px)); min-height: max(360px, calc(100svh - var(--hd-h) - 40px)); padding-block: clamp(34px, calc(5 * var(--hu)), 96px) clamp(84px, calc(8.4 * var(--hu)), 150px); color: #fff; overflow: hidden; isolation: isolate; }
+.hero { --hu: min(1vw, 1.72vh); --hu: min(1vw, 1.72svh); position: relative; display: grid; align-items: center; min-height: max(360px, calc(100vh - var(--hd-h) - 84px)); min-height: max(360px, calc(100svh - var(--hd-h) - 84px)); padding-block: clamp(34px, calc(5 * var(--hu)), 96px) clamp(84px, calc(8.4 * var(--hu)), 150px); color: #fff; overflow: hidden; isolation: isolate; }
 .hero-bg { position: absolute; inset: 0; z-index: -2; }
 .hero-bg img { width: 100%; height: 100%; object-fit: cover; object-position: 70% 50%; animation: heroDrift 16s ease-out both; }
 @keyframes heroDrift { from { transform: scale(1.06); } to { transform: scale(1.001); } }
@@ -1006,3 +1008,14 @@ body .xms-top { bottom: 24px; }
 .tbl-w.scrolls.end { box-shadow: none; }
 .tbl-tip.show { display: flex; }
 @media (max-width: 639px) { .rvw .rv { opacity: 1; transform: none; } }
+
+/* ───── 레드팀 3차(실제 주소) */
+@media (min-width: 900px) and (max-height: 700px) { .hero-facts { display: none; } }
+@media (max-width: 639px) {
+  .hero { min-height: max(360px, min(calc(100svh - var(--hd-h) - 60px), 780px)); }   /* 폰: 사진이 아래 막대 바로 위에서 끝나고 */
+  .quick { margin-top: 16px; }                                                        /* 빠른 메뉴는 그 아래에서 온전히 시작 */
+}
+@media (min-width: 600px) and (max-width: 899px) and (orientation: portrait) { .hero-p2 { display: none; } .hero h1 { font-size: clamp(34px, 6vw, 46px); } }
+@media (max-width: 639px) and (max-height: 660px) and (orientation: portrait) { .hero-p { display: none; } }
+/* 스크롤해서 탭 띠가 위에 붙은 채로 페이지를 옮길 때는 화면 전체만 겹쳐 바꾼다(띠가 내용 위를 가로질러 내려가지 않게) */
+.vt-plain .subnav, .vt-plain .subnav .seg .on { view-transition-name: none; }

@@ -272,6 +272,12 @@
     });
   }
 
+  /* 페이지 전환: 탭 띠가 위에 붙어 있을 때(스크롤한 상태) 떠나면 탭은 따로 움직이지 않게 */
+  win.addEventListener('pageswap', function () {
+    var sn = $('.subnav'); if (sn && win.pageYOffset > 4 && sn.getBoundingClientRect().top <= hd.offsetHeight + 2) doc.documentElement.classList.add('vt-plain');
+  });
+  win.addEventListener('pageshow', function () { doc.documentElement.classList.remove('vt-plain'); });
+
   /* 서랍 · 머리의 '로그인' 은 로그인 전에만 */
   var acc = $('.hd-account'), gl = $('.dr-login');
   if (acc && gl && win.MutationObserver) {
