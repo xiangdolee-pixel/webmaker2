@@ -54,7 +54,7 @@ function draw(view) {
   const yr = month.slice(0, 4), ysum = { buy: 0, sell: 0 };
   data.year.forEach((y) => { ysum.buy += y.buy; ysum.sell += y.sell; });
   view.innerHTML = `
-    <div class="bar je-bar"><h2>BookKeeping</h2>
+    <div class="bar je-bar"><h2>부기</h2>
       <div class="je-nav"><button type="button" class="btn sm" data-mv="-1" aria-label="앞 달">‹</button>
         <label class="je-month"><b>${label(month)}</b><input type="month" value="${month}" aria-label="달 고르기"></label>
         <button type="button" class="btn sm" data-mv="1" aria-label="다음 달">›</button>

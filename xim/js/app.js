@@ -91,7 +91,7 @@ function showApp() {
   $('#app').hidden = false;
   if (!navReady) {
     navReady = true;
-    const NAV = [['sites', '사이트'], ['domains', '도메인 부스터'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['inquiries', '제작문의'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['naver', '네이버 지도'], ['contracts', '계약서'], ['jdocs', 'DMS'], ['bookkeeping', 'BookKeeping'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC']];
+    const NAV = [['sites', '사이트'], ['domains', '도메인 부스터'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['inquiries', '제작문의'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['naver', '네이버 지도'], ['contracts', '계약서'], ['jdocs', '문서관리'], ['bookkeeping', '부기'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC']];
     const navTitle = () => { $('#mtop-title').textContent = (NAV.find(([v]) => v === tab) || NAV[0])[1]; };
     pillTabs($('#nav'), NAV, tab, (v) => {
       tab = v;

@@ -4,7 +4,7 @@ const escH = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
 // ui: { fresh, api, toast, modal, $, TYPES, won }
 export async function viewTrash(ui) {
   const { fresh, api, toast, modal, $, TYPES, won } = ui;
-  document.title = '휴지통 · DMS';
+  document.title = '휴지통 · 문서관리';
   fresh(`
   <div class="wrap">
     <section class="card">
