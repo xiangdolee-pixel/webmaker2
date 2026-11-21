@@ -355,18 +355,25 @@ async function ximApi(request, env, url, ctx) {
     try { for (const t of JSON.parse((await getSetting(db, 'pay_accounts')) || '[]')) { const m = String(t).match(/^\((개인|사업자|기업)\)\s*(.+?)(?:\s*예금주.*)?$/); if (m) acct[m[1] === '개인' ? '개인' : '기업'] = m[2].trim(); } } catch { /* 없으면 이름만 */ }
     return json({ month: mo, items, year, lists, customers: custs, acct });
   }
-  // 엑셀로 내려받기(쉼표 파일 · 한글이 깨지지 않게 BOM): ?month=YYYY-MM 그 달 · ?year=YYYY 그 해 전체
+  // 엑셀로 내려받기(쉼표 파일 · 한글이 깨지지 않게 BOM): ?from=YYYY-MM-DD&to=YYYY-MM-DD (둘 다 비우면 전체) · &side=sell|buy (없으면 둘 다). 해가 쌓여도 원하는 기간만
   if (path === '/api/jest/export' && method === 'GET') {
-    const mo = url.searchParams.get('month') || '', yr = url.searchParams.get('year') || '';
-    const key = /^\d{4}-\d{2}$/.test(mo) ? mo : /^\d{4}$/.test(yr) ? `${yr}-%` : null;
-    if (!key) throw bad('달(month) 또는 해(year)를 알려 주세요.');
-    const { results } = await db.prepare("SELECT e.side, e.day, e.item, e.payer, e.account, e.amount, c.name AS customer FROM jest_entries e LEFT JOIN customers c ON c.id = e.customer_id WHERE e.month LIKE ? ORDER BY e.day, CASE e.side WHEN 'sell' THEN 0 ELSE 1 END, e.id").bind(key).all();
+    const from = ymd(url.searchParams.get('from')), to = ymd(url.searchParams.get('to'));
+    if (from && to && from > to) throw bad('시작일이 끝나는 날보다 뒤입니다.');
+    const side = ['sell', 'buy'].includes(url.searchParams.get('side')) ? url.searchParams.get('side') : '';
+    const where = [], args = [];
+    if (from) { where.push('e.day >= ?'); args.push(from); }
+    if (to) { where.push('e.day <= ?'); args.push(to); }
+    if (side) { where.push('e.side = ?'); args.push(side); }
+    const { results } = await db.prepare(`SELECT e.side, e.day, e.item, e.payer, e.account, e.amount, c.name AS customer FROM jest_entries e LEFT JOIN customers c ON c.id = e.customer_id ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY e.day, CASE e.side WHEN 'sell' THEN 0 ELSE 1 END, e.id`).bind(...args).all();
     const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const lines = [['구분', '날짜', '항목', '고객', '입금자명', '계좌 · 결제 수단', '금액'].map(cell).join(',')];
     let sell = 0, buy = 0;
     for (const r of results) { if (r.side === 'sell') sell += r.amount; else buy += r.amount; lines.push([r.side === 'sell' ? '매출' : '매입', r.day, r.item, r.customer, r.payer, r.account, r.amount].map((v, i) => (i === 6 ? v : cell(v))).join(',')); }
-    lines.push('', [cell('매출 합계'), '', '', '', '', '', sell].join(','), [cell('매입 합계'), '', '', '', '', '', buy].join(','), [cell('차액(매출 − 매입)'), '', '', '', '', '', sell - buy].join(','));
-    const name = `부기_${key.replace('-%', '년').replace(/^(\d{4})-(\d{2})$/, '$1년$2월')}.csv`;
+    lines.push('');
+    if (side !== 'buy') lines.push([cell('매출 합계'), '', '', '', '', '', sell].join(','));
+    if (side !== 'sell') lines.push([cell('매입 합계'), '', '', '', '', '', buy].join(','));
+    if (!side) lines.push([cell('차액(매출 − 매입)'), '', '', '', '', '', sell - buy].join(','));
+    const name = `부기_${from || '처음'}~${to || '끝'}${side ? `_${side === 'sell' ? '매출' : '매입'}` : ''}.csv`;
     await audit(db, request, 'JBOOK_EXPORT', name, `${results.length}줄`);
     return new Response('\ufeff' + lines.join('\r\n'), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="bookkeeping.csv"; filename*=UTF-8''${encodeURIComponent(name)}`, 'Cache-Control': 'no-store' } });
   }

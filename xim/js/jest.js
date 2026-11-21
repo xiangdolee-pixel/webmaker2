@@ -179,8 +179,7 @@ function draw(view) {
         <button type="button" class="je-tb" data-today>이번 달</button></div>
       <div class="je-tools">
         <button type="button" class="je-tb" data-items>목록 관리</button>
-        <a class="je-tb" href="/api/jest/export?month=${month}" download title="${label(month)} 내역을 엑셀 파일로">이 달 엑셀</a>
-        <a class="je-tb" href="/api/jest/export?year=${month.slice(0, 4)}" download title="${month.slice(0, 4)}년 전체 내역을 엑셀 파일로">${month.slice(0, 4)}년 엑셀</a>
+        <button type="button" class="je-tb" data-export>엑셀 내려받기</button>
       </div>
     </header>
     <div class="je-body">
@@ -261,12 +260,46 @@ function itemsDialog() {
   });
 }
 
+// 엑셀 내려받기: 기간(시작 ~ 끝)과 구분을 정해서 받는다 — 해가 쌓여도 원하는 부분만(사용자 지시 2026-11-21)
+function exportDialog() {
+  const y = month.slice(0, 4), mo = month;
+  const lastDay = (m) => { const [yy, mm] = m.split('-').map(Number); return `${m}-${String(new Date(Date.UTC(yy, mm, 0)).getUTCDate()).padStart(2, '0')}`; };
+  const quarter = () => { const q = Math.floor((Number(mo.slice(5)) - 1) / 3), a = `${y}-${String(q * 3 + 1).padStart(2, '0')}`, b = `${y}-${String(q * 3 + 3).padStart(2, '0')}`; return [`${a}-01`, lastDay(b)]; };
+  const PRE = [['보는 달', `${mo}-01`, lastDay(mo)], ['지난달', `${shift(mo, -1)}-01`, lastDay(shift(mo, -1))], ['이 분기', ...quarter()], [`${y}년`, `${y}-01-01`, `${y}-12-31`], [`${y - 1}년`, `${y - 1}-01-01`, `${y - 1}-12-31`], ['전체', '', '']];
+  openDialog(`
+    <h2>엑셀 내려받기</h2>
+    <form class="je-exp">
+      <div class="je-pre">${PRE.map((p, i) => `<button type="button" class="btn sm" data-pre="${i}">${p[0]}</button>`).join('')}</div>
+      <div class="row2">
+        <label class="field"><span>시작일</span><input class="input" type="date" name="from" value="${mo}-01"></label>
+        <label class="field"><span>끝나는 날</span><input class="input" type="date" name="to" value="${lastDay(mo)}"></label>
+      </div>
+      <label class="field"><span>구분</span><select class="input" name="side"><option value="">매출 · 매입 모두</option><option value="sell">매출만</option><option value="buy">매입만</option></select></label>
+      <p class="je-dlg-note">날짜를 비우면 그쪽은 끝까지입니다(둘 다 비우면 전체). 엑셀에서 바로 열리는 파일로 받습니다.</p>
+      <p class="err" role="alert"></p>
+      <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">내려받기</button></div>
+    </form>`, (dlg) => {
+    const f = dlg.querySelector('form');
+    f.querySelectorAll('[data-pre]').forEach((b) => { b.onclick = () => { const p = PRE[+b.dataset.pre]; f.from.value = p[1]; f.to.value = p[2]; f.querySelectorAll('[data-pre]').forEach((x) => x.classList.toggle('primary', x === b)); }; });
+    f.querySelector('[data-pre="0"]').classList.add('primary');
+    [f.from, f.to].forEach((el) => el.addEventListener('input', () => f.querySelectorAll('[data-pre]').forEach((x) => x.classList.remove('primary'))));
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (f.from.value && f.to.value && f.from.value > f.to.value) { f.querySelector('.err').textContent = '시작일이 끝나는 날보다 뒤입니다.'; return; }
+      const q = new URLSearchParams(); if (f.from.value) q.set('from', f.from.value); if (f.to.value) q.set('to', f.to.value); if (f.side.value) q.set('side', f.side.value);
+      const a = document.createElement('a'); a.href = `/api/jest/export?${q}`; a.download = ''; document.body.append(a); a.click(); a.remove();
+      dlg.close();
+    });
+  });
+}
+
 function bind(view) {
   const { api } = deps;
   const go = (m) => { month = m; load().catch((e) => toast(e.message)); };
   view.querySelectorAll('[data-mv]').forEach((b) => { b.onclick = () => go(shift(month, +b.dataset.mv)); });
   view.querySelector('[data-today]').onclick = () => go(kst().slice(0, 7));
   view.querySelector('[data-items]').onclick = itemsDialog;
+  view.querySelector('[data-export]').onclick = exportDialog;
   view.querySelector('.je-month input').onchange = (e) => { if (/^\d{4}-\d{2}$/.test(e.target.value)) go(e.target.value); };
   view.querySelectorAll('[data-go]').forEach((b) => { b.onclick = () => go(b.dataset.go); });
   // 금액 칸: 치는 대로 쉼표

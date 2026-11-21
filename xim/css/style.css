@@ -453,6 +453,8 @@ button.je-yrow:hover { background: #f5f6fa; }
 .je-yrow.je-total { border-bottom: 0; font-weight: 800; }
 .je-yrow .minus { color: var(--danger, #d33); }
 .je-none { margin: 6px 0; color: var(--mute, #8a8f98); }
+.je-pre { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.je-exp .je-dlg-note { margin: 0 0 4px; }
 .je-dlg-note { margin: -6px 0 12px; color: var(--mute, #8a8f98); font-size: 13.5px; line-height: 1.6; }
 .je-items { display: grid; gap: 6px; margin: 0 0 14px; padding: 0; list-style: none; max-height: min(52vh, 420px); overflow-y: auto; }
 .je-items li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 6px 6px 14px; border-radius: 10px; background: #f6f7fb; border: 1px solid #e8eaf2; font-weight: 600; }
