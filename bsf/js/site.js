@@ -472,12 +472,12 @@
   // Vimeo 와는 postMessage 로 직접 주고받는다(재생 · 끝남 · 처음으로) — 따로 받는 player.js 를 기다리지 않는다.
   var fr = hv && hv.querySelector('iframe'), vPlaying = false, waiting = 0, VIMEO = 'https://player.vimeo.com';
   function tell(method, value) { if (fr && fr.contentWindow) try { fr.contentWindow.postMessage(JSON.stringify(value === undefined ? { method: method } : { method: method, value: value }), VIMEO); } catch (e) {} }
-  function listen() { ['playing', 'timeupdate', 'ended'].forEach(function (ev) { tell('addEventListener', ev); }); }
+  function listen() { ['playing', 'play', 'timeupdate', 'ended'].forEach(function (ev) { tell('addEventListener', ev); }); }
   function photos() { hero.classList.add('slides-on'); hero.classList.remove('has-video'); }
   function videoOn() { if (vPlaying || !fr) return; vPlaying = true; clearTimeout(waiting); clearTimeout(timer); hero.classList.remove('slides-on'); hero.classList.add('has-video'); fr.classList.add('loaded'); }
   function videoEnded() {
     if (!vPlaying) return;
-    vPlaying = false;
+    vPlaying = false; again = true;   // 멈춘 뒤 따라오는 끝자리 시간 알림에 영상이 다시 켜지지 않게
     tell('pause');
     show(0); photos();
     var k = 0;
@@ -500,9 +500,9 @@
       if (!d) return;
       var t = d.data || {};
       if (d.event === 'ready') { listen(); tell('play'); }
-      else if (d.event === 'ended') videoEnded();
-      else if (d.event === 'playing') { if (!again) videoOn(); }
-      else if (d.event === 'timeupdate') {
+      else if (d.event === 'ended' || d.event === 'finish') videoEnded();   // Vimeo 가 옛 이름(finish · playProgress)으로 알려 오기도 한다 — 2026-11-21 끝 장면에서 멈춰 있던 원인
+      else if (d.event === 'playing' || d.event === 'play') { if (!again) videoOn(); }
+      else if (d.event === 'timeupdate' || d.event === 'playProgress') {
         if (vPlaying) { if (t.duration && t.seconds >= t.duration - .35) videoEnded(); }   // 'ended' 가 안 올 때 대비
         else if (t.seconds > 0 && (!again || t.seconds < 3)) { again = false; videoOn(); }   // 'playing' 을 놓쳤을 때 · 다시 틀 때
       }
