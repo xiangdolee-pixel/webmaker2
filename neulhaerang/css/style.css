@@ -233,13 +233,13 @@ a:hover > .more svg, a:hover .more svg, .more:hover svg { transform: translateX(
 
 /* ───── 과정 · 비용 ───── */
 .steps { --sg: clamp(14px, 1.8vw, 24px); --dot: 68px; --pad: clamp(22px, 2.3vw, 32px); position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sg); padding-top: 34px; counter-reset: step; }
-/* 걸음마다: 카드 위 모서리에 반쯤 걸친 번호 동그라미, 동그라미 뒤로 다음 동그라미까지 점선이 이어진다(사용자: "점선 위치만 동그라미 숫자 뒤쪽으로") */
+/* 걸음마다: 카드 위 모서리에 반쯤 걸친 번호 동그라미, 카드 사이는 가운데 높이의 점선으로 잇는다 */
 .step { position: relative; padding: 58px var(--pad) clamp(26px, 2.6vw, 34px); border-radius: var(--r); background: #fff; box-shadow: var(--shadow); counter-increment: step; transition: transform .4s var(--ease), box-shadow .4s var(--ease); }
 .step:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); }
 .step::before { content: "0" counter(step); position: absolute; z-index: 1; left: var(--pad); top: -34px; display: grid; place-items: center; width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--green); color: #fff; font-family: var(--serif); font-weight: 700; font-size: 23px; letter-spacing: .02em; box-shadow: 0 0 0 8px #fffdfa, 0 14px 26px rgba(75, 99, 64, .26); }
 .step::after { content: "STEP"; position: absolute; right: var(--pad); top: 20px; color: var(--gold); font-family: var(--serif); font-weight: 700; font-size: 16px; letter-spacing: .16em; }
 .step h3 { font-family: var(--serif); font-size: clamp(22px, 2vw, 25px); font-weight: 700; letter-spacing: -.02em; }
-.step h3::before { content: ""; position: absolute; left: calc(var(--pad) + var(--dot) / 2); top: -1px; width: calc(100% + var(--sg)); border-top: 2px dashed var(--green-line); }   /* 이 동그라미 가운데 → 다음 동그라미 가운데 (동그라미가 위에 덮는다) */
+.step h3::before { content: ""; position: absolute; left: 100%; top: 50%; width: var(--sg); margin-top: -1px; border-top: 2px dashed var(--green-line); }   /* 카드와 카드 사이, 흰 상자 가운데 높이에서 다음 걸음으로 잇는 점선(사용자 지시) */
 .step:last-child h3::before { display: none; }
 .step h3::after { content: ""; display: block; width: 28px; height: 2px; margin: 14px 0 0; border-radius: 2px; background: var(--sun); }
 .step p { margin-top: 14px; color: var(--ink-soft); font-size: 17px; line-height: 1.8; }
