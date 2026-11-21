@@ -62,7 +62,7 @@ for slug in books:
             old = json.loads(jf.read_text(encoding='utf-8'))['v']; d = [abs(a - b) for a, b in zip(old, out) if a is not None and b is not None]
             print(f"{f.stem} 맞은 글자 {got:.0%} · 차이 평균 {sum(d) / len(d):.2f}초 최대 {max(d):.2f}초 · {time.time() - t0:.0f}초", flush=True); continue
         if jf.exists() or f.stat().st_mtime != mt: print("그 사이 새 음성이 옴, 건너뜀", f.name, flush=True); continue
-        if got < 0.7: print(f"맞은 글자 {got:.0%} — 못 믿어서 안 씀", f.name, flush=True); continue
+        if got < 0.4: print(f"맞은 글자 {got:.0%} — 못 믿어서 안 씀", f.name, flush=True); continue
         jf.write_text(json.dumps({"id": "2", "v": out}), encoding="utf-8")
         print(f"{f.stem} 맞은 글자 {got:.0%} · {time.time() - t0:.0f}초", flush=True)
 print("끝", flush=True)
