@@ -377,11 +377,18 @@ dialog:has(.site-form) { width: min(1000px, calc(100vw - 24px)); max-width: none
   .sf-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 22px; align-items: start; }
 }
 /* ───── BookKeeping: 왼쪽 매입 · 오른쪽 매출 ───── */
-.je-bar { gap: 12px 18px; }
-.je-nav { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.je-month { position: relative; display: inline-flex; align-items: center; min-width: 132px; justify-content: center; padding: 6px 14px; border-radius: 10px; background: var(--brand-soft, #eceefd); cursor: pointer; }
+.je-on .wrap { max-width: none; padding: 0; }   /* 부기: 화면을 넓게 쓰고 위쪽 띠를 끝까지(문서관리처럼) */
+.je-top { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; min-height: 60px; padding: 8px 20px; background: #2f3da6; color: #fff; }
+.je-brand { display: flex; align-items: center; gap: 10px; font-size: 17px; white-space: nowrap; }
+.je-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: #fff; color: #2f3da6; font-weight: 800; font-size: 16px; }
+.je-nav { display: flex; align-items: center; gap: 6px; margin-inline: auto; }
+.je-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.je-tb { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 13px; border: 0; border-radius: 99px; background: rgba(255, 255, 255, .14); color: #fff; font: inherit; font-size: 14px; font-weight: 700; text-decoration: none; white-space: nowrap; cursor: pointer; transition: background .15s; }
+.je-tb:hover { background: rgba(255, 255, 255, .26); }
+.je-month { position: relative; display: inline-flex; align-items: center; min-width: 136px; justify-content: center; padding: 5px 16px; border-radius: 99px; background: #fff; color: #2f3da6; cursor: pointer; }
 .je-month b { font-size: 17px; font-weight: 800; }
 .je-month input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.je-body { padding: 16px clamp(12px, 1.6vw, 24px) 28px; }
 .je-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-bottom: 14px; padding: 14px 18px; border-radius: 14px; background: var(--surface, #fff); border: 1px solid var(--line, #e5e7eb); }
 .je-sum > div { display: grid; gap: 2px; }
 .je-sum span { color: var(--mute, #8a8f98); font-size: 13px; font-weight: 600; }
@@ -392,7 +399,7 @@ dialog:has(.site-form) { width: min(1000px, calc(100vw - 24px)); max-width: none
 .je-diff.minus { background: #fdeeee; }
 .je-diff.minus b { color: var(--danger, #d33); }
 .je-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
-@media (min-width: 900px) { .je-cols { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); } }   /* 왼쪽 매출이 칸이 많아 더 넓다 */
+@media (min-width: 1100px) { .je-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }   /* 매출 · 매입 같은 폭(사용자 지시) */
 .je-col { border-radius: 14px; background: var(--surface, #fff); border: 1px solid var(--line, #e5e7eb); overflow: hidden; }
 .je-h { display: flex; align-items: baseline; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line, #e5e7eb); }
 .je-h b { font-size: 17px; font-weight: 800; }
@@ -401,9 +408,29 @@ dialog:has(.site-form) { width: min(1000px, calc(100vw - 24px)); max-width: none
 .je-buy .je-h { background: #fff6ee; } .je-buy .je-h b { color: #b45a09; }
 .je-sell .je-h { background: #eef4ff; } .je-sell .je-h b { color: #2b4fc7; }
 .je-row { display: grid; grid-template-columns: 138px minmax(0, 1fr) 128px 34px; align-items: center; gap: 4px; padding: 3px 8px; border-bottom: 1px solid #f0f1f5; }
-.je-sell .je-row { grid-template-columns: 142px minmax(70px, 1fr) 92px 130px 104px 30px; }   /* 매출: 입금자명 · 계좌 칸이 더 있다 */
-.je-acct, .je-item { padding-right: 2px; }
-.je-new select.je-item:has(option[value=""]:checked) { color: var(--mute, #8a8f98); }
+.je-sell .je-row { grid-template-columns: 126px minmax(70px, 1.2fr) minmax(70px, 1.3fr) 76px minmax(110px, 1.3fr) 96px 28px; }   /* 날짜 · 항목 · 고객 · 입금자명 · 계좌 · 금액 */
+.je-cust { padding-right: 2px; }
+.je-buy .je-row { grid-template-columns: 138px minmax(70px, 1fr) 122px 100px 30px; }   /* 매입: 결제 수단 칸 */
+.je-mgs { display: grid; gap: 14px; }
+@media (min-width: 760px) { .je-mgs { grid-template-columns: repeat(3, minmax(0, 1fr)); } dialog:has(.je-mgs) { width: min(1000px, calc(100vw - 24px)); } }
+.je-mg h3 { margin: 0 0 8px; font-size: 15.5px; }
+.je-mg-add { display: flex; gap: 6px; margin-bottom: 8px; }
+.je-mg-add .input { flex: 1; min-width: 0; width: auto; }
+.je-nm { flex: 1; min-width: 0; padding: 4px 0; border: 0; background: none; font: inherit; font-weight: 600; text-align: left; cursor: text; overflow: hidden; text-overflow: ellipsis; }
+.je-items li .input { flex: 1; min-width: 0; width: auto; }   /* 매출: 입금자명 · 계좌 칸이 더 있다 */
+.je-acct { padding-right: 2px; }
+/* 찾아 고르는 목록(항목 · 결제 수단) */
+.je-dd { position: fixed; z-index: 1000; overflow-y: auto; padding: 6px; border-radius: 12px; background: #fff; border: 1px solid #dfe3ee; box-shadow: 0 18px 44px rgba(20, 28, 60, .18); }
+.je-opt { display: flex; align-items: center; gap: 2px; padding: 2px 4px 2px 12px; border-radius: 8px; cursor: pointer; }
+.je-opt span { flex: 1; min-width: 0; padding: 7px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.je-opt:hover, .je-opt.on { background: var(--brand-soft, #eceefd); }
+.je-opt button { width: 28px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: var(--mute, #8a8f98); font-size: 15px; line-height: 1; cursor: pointer; opacity: .55; }
+.je-opt:hover button, .je-opt.on button { opacity: 1; }
+.je-opt button:hover { background: #fff; color: var(--brand, #3b4cca); }
+.je-opt button[data-rm]:hover { color: var(--danger, #d33); }
+.je-opt .je-in { height: 34px; border-color: var(--brand, #3b4cca); background: #fff; }
+.je-fresh span { color: var(--brand, #3b4cca); font-weight: 700; }
+.je-dd-none { margin: 0; padding: 10px 12px; color: var(--mute, #8a8f98); font-size: 14px; }
 .je-by { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 8px 16px; border-bottom: 1px solid #f0f1f5; color: var(--mute, #8a8f98); font-size: 13.5px; }
 .je-by b { color: var(--ink, #222); font-variant-numeric: tabular-nums; }
 .je-row.je-head { padding: 7px 14px; color: var(--mute, #8a8f98); font-size: 13px; font-weight: 700; background: #fafbfd; }
@@ -411,7 +438,7 @@ dialog:has(.site-form) { width: min(1000px, calc(100vw - 24px)); max-width: none
 .je-in { width: 100%; min-width: 0; height: 38px; padding: 0 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; font: inherit; color: inherit; }
 .je-in:hover { background: #f5f6fa; }
 .je-in:focus { outline: none; border-color: var(--brand, #3b4cca); background: #fff; }
-.je-new { background: #fafbfd; border-bottom: 0; padding-block: 6px; }
+.je-new { background: #f3f5fb; border-bottom: 1px solid #e3e7f3; padding-block: 8px; }
 .je-new .je-in { background: #fff; border-color: var(--line, #e5e7eb); }
 .je-x, .je-add { width: 30px; height: 30px; border-radius: 8px; border: 0; background: transparent; color: var(--mute, #8a8f98); font-size: 18px; line-height: 1; cursor: pointer; }
 .je-x:hover { background: #fdeeee; color: var(--danger, #d33); }
@@ -431,8 +458,9 @@ button.je-yrow:hover { background: #f5f6fa; }
 .je-items li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 6px 6px 14px; border-radius: 10px; background: #f6f7fb; border: 1px solid #e8eaf2; font-weight: 600; }
 .je-items li.je-none { background: none; border: 0; font-weight: 400; }
 @media (max-width: 520px) { .je-row { grid-template-columns: 118px minmax(0, 1fr) 96px 30px; } .je-diff { margin-left: 0; }
-  .je-sell .je-row { grid-template-columns: 118px minmax(0, 1fr) 96px 30px; } .je-sell .je-row [data-f="payer"], .je-sell .je-row [name="payer"] { grid-column: 1; grid-row: 2; } .je-sell .je-row .je-acct { grid-column: 2 / 4; grid-row: 2; } .je-sell .je-row.je-head span:nth-child(3), .je-sell .je-row.je-head span:nth-child(4) { display: none; } }
-@media (min-width: 900px) and (max-width: 1280px) { .je-cols { grid-template-columns: minmax(0, 1fr); } }   /* 어중간한 폭에서는 위아래로 */
+  .je-buy .je-row { grid-template-columns: 118px minmax(0, 1fr) 96px 30px; } .je-buy .je-row [data-kind="method"] { grid-column: 1 / 3; grid-row: 2; } .je-buy .je-row.je-head span:nth-child(3) { display: none; }
+  .je-sell .je-row { grid-template-columns: 118px minmax(0, 1fr) 96px 30px; } .je-sell .je-row .je-cust { grid-column: 1 / 3; grid-row: 2; } .je-sell .je-row [data-f="payer"], .je-sell .je-row [name="payer"] { grid-column: 1; grid-row: 3; } .je-sell .je-row .je-acct { grid-column: 2 / 4; grid-row: 3; } .je-sell .je-row.je-head span:nth-child(3), .je-sell .je-row.je-head span:nth-child(4), .je-sell .je-row.je-head span:nth-child(5) { display: none; } }
+
 .sr-made { white-space: nowrap; }
 .sr-made b { font-weight: 600; }
 .sr-use { display: grid !important; grid-template-columns: repeat(3, auto); justify-content: start; gap: 2px 10px !important; font-size: 13px !important; }

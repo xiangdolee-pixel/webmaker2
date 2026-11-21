@@ -344,23 +344,50 @@ async function ximApi(request, env, url, ctx) {
   // BookKeeping: 달마다 매입(buy) · 매출(sell)을 날짜 · 항목 · 금액으로 (사용자 지시 2026-11-21)
   if (path === '/api/jest' && method === 'GET') {
     const mo = /^\d{4}-\d{2}$/.test(url.searchParams.get('month') || '') ? url.searchParams.get('month') : new Date(now() + 9 * 3600000).toISOString().slice(0, 7);
-    const [{ results: items }, { results: year }, { results: nameRows }] = await Promise.all([
-      db.prepare('SELECT id, side, day, item, amount, account, payer FROM jest_entries WHERE month = ? ORDER BY day, id').bind(mo).all(),
+    const [{ results: items }, { results: year }, lists, { results: custs }] = await Promise.all([
+      db.prepare('SELECT id, side, day, item, amount, account, payer, customer_id FROM jest_entries WHERE month = ? ORDER BY day, id').bind(mo).all(),
       db.prepare("SELECT month, SUM(CASE WHEN side = 'buy' THEN amount ELSE 0 END) AS buy, SUM(CASE WHEN side = 'sell' THEN amount ELSE 0 END) AS sell FROM jest_entries WHERE month LIKE ? GROUP BY month ORDER BY month").bind(`${mo.slice(0, 4)}-%`).all(),
-      db.prepare('SELECT item, COUNT(*) AS n, MAX(id) AS last FROM jest_entries GROUP BY item ORDER BY n DESC, last DESC LIMIT 60').all(),   // 전에 적은 항목 — 다음부터 골라 넣게
+      jestLists(db),
+      db.prepare('SELECT id, name FROM customers ORDER BY name').all(),   // 매출 줄에서 고를 고객(고객 메뉴에 등록된 것)
     ]);
-    // 목록에서 뺀 항목(settings.jest_hidden) — 장부에 적힌 줄은 그대로 두고 고르는 목록에서만 뺀다
-    let hidden = []; try { hidden = JSON.parse((await getSetting(db, 'jest_hidden')) || '[]'); } catch { /* 빈 목록 */ }
-    return json({ month: mo, items, year, names: nameRows.map((r) => r.item).filter((n) => !hidden.includes(n)), hidden });
+    // 계좌 이름 옆에 보일 은행 · 계좌번호 — 번호는 코드에 두지 않고(리포가 공개) settings.pay_accounts 에서 읽는다: "(개인) 카카오뱅크 3333… 예금주: …"
+    const acct = {};
+    try { for (const t of JSON.parse((await getSetting(db, 'pay_accounts')) || '[]')) { const m = String(t).match(/^\((개인|사업자|기업)\)\s*(.+?)(?:\s*예금주.*)?$/); if (m) acct[m[1] === '개인' ? '개인' : '기업'] = m[2].trim(); } } catch { /* 없으면 이름만 */ }
+    return json({ month: mo, items, year, lists, customers: custs, acct });
   }
-  if (path === '/api/jest-items' && method === 'POST') {   // { hide: '항목' } 목록에서 빼기 · { show: '항목' } 되살리기
+  // 엑셀로 내려받기(쉼표 파일 · 한글이 깨지지 않게 BOM): ?month=YYYY-MM 그 달 · ?year=YYYY 그 해 전체
+  if (path === '/api/jest/export' && method === 'GET') {
+    const mo = url.searchParams.get('month') || '', yr = url.searchParams.get('year') || '';
+    const key = /^\d{4}-\d{2}$/.test(mo) ? mo : /^\d{4}$/.test(yr) ? `${yr}-%` : null;
+    if (!key) throw bad('달(month) 또는 해(year)를 알려 주세요.');
+    const { results } = await db.prepare("SELECT e.side, e.day, e.item, e.payer, e.account, e.amount, c.name AS customer FROM jest_entries e LEFT JOIN customers c ON c.id = e.customer_id WHERE e.month LIKE ? ORDER BY e.day, CASE e.side WHEN 'sell' THEN 0 ELSE 1 END, e.id").bind(key).all();
+    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [['구분', '날짜', '항목', '고객', '입금자명', '계좌 · 결제 수단', '금액'].map(cell).join(',')];
+    let sell = 0, buy = 0;
+    for (const r of results) { if (r.side === 'sell') sell += r.amount; else buy += r.amount; lines.push([r.side === 'sell' ? '매출' : '매입', r.day, r.item, r.customer, r.payer, r.account, r.amount].map((v, i) => (i === 6 ? v : cell(v))).join(',')); }
+    lines.push('', [cell('매출 합계'), '', '', '', '', '', sell].join(','), [cell('매입 합계'), '', '', '', '', '', buy].join(','), [cell('차액(매출 − 매입)'), '', '', '', '', '', sell - buy].join(','));
+    const name = `부기_${key.replace('-%', '년').replace(/^(\d{4})-(\d{2})$/, '$1년$2월')}.csv`;
+    await audit(db, request, 'JBOOK_EXPORT', name, `${results.length}줄`);
+    return new Response('\ufeff' + lines.join('\r\n'), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="bookkeeping.csv"; filename*=UTF-8''${encodeURIComponent(name)}`, 'Cache-Control': 'no-store' } });
+  }
+  // 고르는 목록 손보기 — kind: item(항목) | method(매입 결제 수단).  { add } 더하기 · { hide } 목록에서 빼기(적힌 줄은 그대로) · { rename: { from, to } } 이름 바꾸기(적힌 줄도 함께)
+  if (path === '/api/jest-items' && method === 'POST') {
     const raw = await body(request);
-    let hidden = []; try { hidden = JSON.parse((await getSetting(db, 'jest_hidden')) || '[]'); } catch { /* 빈 목록 */ }
-    const hide = str(raw.hide, 120), show = str(raw.show, 120);
-    if (hide && !hidden.includes(hide)) hidden.push(hide);
-    if (show) hidden = hidden.filter((n) => n !== show);
-    await db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind('jest_hidden', JSON.stringify(hidden.slice(-300))).run();
-    return json({ ok: true, hidden });
+    const kind = ['item_sell', 'item_buy', 'method'].includes(raw.kind) ? raw.kind : 'item_sell', max = kind === 'method' ? 40 : 120;   // 매출 항목 · 매입 항목은 따로
+    const cfg = await jestCfg(db), c = cfg[kind];
+    const add = str(raw.add, max), hide = str(raw.hide, max), from = str(raw.rename?.from, max), to = str(raw.rename?.to, max);
+    if (add) { if (!c.extra.includes(add)) c.extra.push(add); c.hidden = c.hidden.filter((n) => n !== add); }
+    if (hide) { if (!c.hidden.includes(hide)) c.hidden.push(hide); c.extra = c.extra.filter((n) => n !== hide); }
+    if (from && to && from !== to) {
+      if (kind !== 'method') await db.prepare('UPDATE jest_entries SET item = ? WHERE side = ? AND item = ?').bind(to, kind === 'item_sell' ? 'sell' : 'buy', from).run();
+      else await db.prepare("UPDATE jest_entries SET account = ? WHERE side = 'buy' AND account = ?").bind(to, from).run();
+      c.extra = c.extra.map((n) => (n === from ? to : n)); if (!c.extra.includes(to)) c.extra.push(to);
+      c.hidden = c.hidden.filter((n) => n !== to); if (!c.hidden.includes(from)) c.hidden.push(from);   // 옛 이름은 (기본 항목이어도) 목록에서 빠진다
+      await audit(db, request, 'JBOOK_RENAME', `${kind === 'item_sell' ? '매출 항목' : kind === 'item_buy' ? '매입 항목' : '결제 수단'} ${from}`, `→ ${to}`);
+    }
+    c.extra = [...new Set(c.extra)].slice(-200); c.hidden = [...new Set(c.hidden)].slice(-300);
+    await db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind('jest_lists', JSON.stringify(cfg)).run();
+    return json({ ok: true, lists: await jestLists(db, cfg) });
   }
   {
     const jm = path.match(/^\/api\/jest(?:\/(\d+))?$/);
@@ -373,17 +400,24 @@ async function ximApi(request, env, url, ctx) {
       if (!day) throw bad('날짜를 넣어 주세요.');
       if (!item) throw bad('항목을 넣어 주세요.');
       if (!Number.isFinite(amount) || !amount || Math.abs(amount) > 100000000000) throw bad('금액을 숫자로 넣어 주세요.');
-      // 매출만: 들어온 계좌(개인 · 기업 · 직접 적은 글)와 입금자명
-      const account = side === 'sell' ? (str(raw.account, 40) || '개인') : '', payer = side === 'sell' ? str(raw.payer, 40) : '';
-      const what = `${side === 'sell' ? `매출(${account}${payer ? ` · ${payer}` : ''})` : '매입'} ${day} ${item}`;
-      // 목록에서 뺐던 항목을 다시 적으면 목록에 되살린다
-      try { const hid = JSON.parse((await getSetting(db, 'jest_hidden')) || '[]'); if (hid.includes(item)) await db.prepare("UPDATE settings SET value = ? WHERE key = 'jest_hidden'").bind(JSON.stringify(hid.filter((n) => n !== item))).run(); } catch { /* 무시 */ }
+      // account = 매출: 들어온 계좌(개인 · 기업 · 직접 적은 글) / 매입: 무엇으로 샀는지(결제 수단, 비워도 됨).  payer = 매출의 입금자명
+      const account = side === 'sell' ? (str(raw.account, 40) || '개인') : str(raw.account, 40), payer = side === 'sell' ? str(raw.payer, 40) : '';
+      const cid = side === 'sell' && Number.isInteger(Number(raw.customer_id)) && Number(raw.customer_id) > 0 ? Number(raw.customer_id) : null;   // 매출의 고객
+      const what = `${side === 'sell' ? `매출(${account}${payer ? ` · ${payer}` : ''})` : `매입${account ? `(${account})` : ''}`} ${day} ${item}`;
+      // 목록에서 뺐던 이름을 다시 적으면 목록에 되살린다
+      try {
+        const cfg = await jestCfg(db); let touched = false;
+        const ik = side === 'sell' ? 'item_sell' : 'item_buy';
+        if (cfg[ik].hidden.includes(item)) { cfg[ik].hidden = cfg[ik].hidden.filter((n) => n !== item); touched = true; }
+        if (side === 'buy' && account && cfg.method.hidden.includes(account)) { cfg.method.hidden = cfg.method.hidden.filter((n) => n !== account); touched = true; }
+        if (touched) await db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind('jest_lists', JSON.stringify(cfg)).run();
+      } catch { /* 무시 */ }
       if (method === 'POST') {
-        const r = await db.prepare('INSERT INTO jest_entries (month, side, day, item, amount, account, payer, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(day.slice(0, 7), side, day, item, amount, account, payer, now()).run();
+        const r = await db.prepare('INSERT INTO jest_entries (month, side, day, item, amount, account, payer, customer_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(day.slice(0, 7), side, day, item, amount, account, payer, cid, now()).run();
         await audit(db, request, 'JBOOK_ADD', what, `${amount.toLocaleString('ko-KR')}원`);
         return json({ id: r.meta.last_row_id });
       }
-      await db.prepare('UPDATE jest_entries SET month = ?, side = ?, day = ?, item = ?, amount = ?, account = ?, payer = ? WHERE id = ?').bind(day.slice(0, 7), side, day, item, amount, account, payer, +jm[1]).run();
+      await db.prepare('UPDATE jest_entries SET month = ?, side = ?, day = ?, item = ?, amount = ?, account = ?, payer = ?, customer_id = ? WHERE id = ?').bind(day.slice(0, 7), side, day, item, amount, account, payer, cid, +jm[1]).run();
       await audit(db, request, 'JBOOK_EDIT', what, `${amount.toLocaleString('ko-KR')}원`);
       return json({ ok: true });
     }
@@ -1048,6 +1082,25 @@ function plusYear(t, n = 1) {
   const [y, m, d] = t.split('-').map(Number);
   const last = new Date(Date.UTC(y + n, m, 0)).getUTCDate();   // 그 달의 마지막 날
   return `${y + n}-${String(m).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
+}
+// 부기의 고르는 목록 설정(settings.jest_lists): { item_sell, item_buy, method } 마다 { extra, hidden } — extra = 손으로 더한 이름, hidden = 목록에서 뺀 이름
+//   매출 항목과 매입 항목은 서로 따로 관리한다(사용자 지시 2026-11-21). method = 매입의 결제 수단
+const JEST_ITEMS = ['호스팅 1년', '도메인 1년'];   // 매출 항목 기본값
+async function jestCfg(db) {
+  let c = {}; try { c = JSON.parse((await getSetting(db, 'jest_lists')) || '{}') || {}; } catch { /* 빈 설정 */ }
+  const arr = (v) => (Array.isArray(v) ? v.map(String).filter(Boolean) : []);
+  const one = (k) => ({ extra: arr(k?.extra), hidden: arr(k?.hidden) });
+  return { item_sell: one(c.item_sell || c.item), item_buy: one(c.item_buy), method: one(c.method) };
+}
+// 고를 수 있는 이름들: 기본 + 손으로 더한 것 + 장부에 적힌 것(많이 쓴 순) − 뺀 것
+async function jestLists(db, cfg) {
+  const c = cfg || await jestCfg(db);
+  const [{ results: a }, { results: b }] = await Promise.all([
+    db.prepare('SELECT side, item AS v, COUNT(*) AS n, MAX(id) AS last FROM jest_entries GROUP BY side, item ORDER BY n DESC, last DESC LIMIT 160').all(),
+    db.prepare("SELECT account AS v, COUNT(*) AS n, MAX(id) AS last FROM jest_entries WHERE side = 'buy' AND account != '' GROUP BY account ORDER BY n DESC, last DESC LIMIT 60").all(),
+  ]);
+  const mk = (base, used, k) => [...new Set([...base, ...k.extra, ...used.map((r) => r.v)])].filter((n) => !k.hidden.includes(n));
+  return { item_sell: mk(JEST_ITEMS, a.filter((r) => r.side === 'sell'), c.item_sell), item_buy: mk([], a.filter((r) => r.side === 'buy'), c.item_buy), method: mk([], b, c.method) };
 }
 function siteFields(raw) {
   const name = str(raw.name, 80);

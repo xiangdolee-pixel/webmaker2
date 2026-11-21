@@ -254,7 +254,8 @@ CREATE TABLE IF NOT EXISTS jest_entries (
   day        TEXT NOT NULL,               -- 'YYYY-MM-DD'
   item       TEXT NOT NULL,
   amount     INTEGER NOT NULL,            -- 원
-  account    TEXT NOT NULL DEFAULT '',    -- 매출만: 들어온 계좌 — 개인(카카오뱅크) · 기업(케이뱅크) · 직접 적은 글
+  account    TEXT NOT NULL DEFAULT '',    -- 매출: 들어온 계좌(개인 · 기업 · 직접 적은 글) / 매입: 결제 수단
+  customer_id INTEGER,                    -- 매출만: 고객(customers.id)
   payer      TEXT NOT NULL DEFAULT '',    -- 매출만: 입금자명
   created_at INTEGER NOT NULL
 );

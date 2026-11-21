@@ -8,7 +8,7 @@ import { renderDomains, stopDomains } from './domains.js';
 import { renderInquiries } from './inquiries.js';
 import { renderContracts } from './contracts.js';
 import { renderJdocs, stopJdocs } from './jdocs.js';
-import { renderJest } from './jest.js';
+import { renderJest, stopJest } from './jest.js';
 import { renderNaverMap } from './naver-map.js';
 
 const api = makeApi('/api');
@@ -222,7 +222,7 @@ function render() {
     if (tab === 'naver') tasks.push(renderNaverMap({ view, api }));
     if (tab === 'contracts') tasks.push(renderContracts({ view, api }));
     if (tab === 'jdocs') renderJdocs({ view }); else stopJdocs(view);
-    if (tab === 'bookkeeping') tasks.push(renderJest({ view, api }));
+    if (tab === 'bookkeeping') tasks.push(renderJest({ view, api })); else stopJest();
     if (tab === 'pricing') renderPricing();
     if (tab === 'studio') tasks.push(renderStudio({ view, api, shrinkImage })); else stopStudio();
     if (tab === 'voice') tasks.push(renderVoice({ view, api })); else stopVoice();
