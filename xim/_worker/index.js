@@ -349,7 +349,18 @@ async function ximApi(request, env, url, ctx) {
       db.prepare("SELECT month, SUM(CASE WHEN side = 'buy' THEN amount ELSE 0 END) AS buy, SUM(CASE WHEN side = 'sell' THEN amount ELSE 0 END) AS sell FROM jest_entries WHERE month LIKE ? GROUP BY month ORDER BY month").bind(`${mo.slice(0, 4)}-%`).all(),
       db.prepare('SELECT item, COUNT(*) AS n, MAX(id) AS last FROM jest_entries GROUP BY item ORDER BY n DESC, last DESC LIMIT 60').all(),   // 전에 적은 항목 — 다음부터 골라 넣게
     ]);
-    return json({ month: mo, items, year, names: nameRows.map((r) => r.item) });
+    // 목록에서 뺀 항목(settings.jest_hidden) — 장부에 적힌 줄은 그대로 두고 고르는 목록에서만 뺀다
+    let hidden = []; try { hidden = JSON.parse((await getSetting(db, 'jest_hidden')) || '[]'); } catch { /* 빈 목록 */ }
+    return json({ month: mo, items, year, names: nameRows.map((r) => r.item).filter((n) => !hidden.includes(n)), hidden });
+  }
+  if (path === '/api/jest-items' && method === 'POST') {   // { hide: '항목' } 목록에서 빼기 · { show: '항목' } 되살리기
+    const raw = await body(request);
+    let hidden = []; try { hidden = JSON.parse((await getSetting(db, 'jest_hidden')) || '[]'); } catch { /* 빈 목록 */ }
+    const hide = str(raw.hide, 120), show = str(raw.show, 120);
+    if (hide && !hidden.includes(hide)) hidden.push(hide);
+    if (show) hidden = hidden.filter((n) => n !== show);
+    await db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind('jest_hidden', JSON.stringify(hidden.slice(-300))).run();
+    return json({ ok: true, hidden });
   }
   {
     const jm = path.match(/^\/api\/jest(?:\/(\d+))?$/);
@@ -365,6 +376,8 @@ async function ximApi(request, env, url, ctx) {
       // 매출만: 들어온 계좌(개인 · 기업 · 직접 적은 글)와 입금자명
       const account = side === 'sell' ? (str(raw.account, 40) || '개인') : '', payer = side === 'sell' ? str(raw.payer, 40) : '';
       const what = `${side === 'sell' ? `매출(${account}${payer ? ` · ${payer}` : ''})` : '매입'} ${day} ${item}`;
+      // 목록에서 뺐던 항목을 다시 적으면 목록에 되살린다
+      try { const hid = JSON.parse((await getSetting(db, 'jest_hidden')) || '[]'); if (hid.includes(item)) await db.prepare("UPDATE settings SET value = ? WHERE key = 'jest_hidden'").bind(JSON.stringify(hid.filter((n) => n !== item))).run(); } catch { /* 무시 */ }
       if (method === 'POST') {
         const r = await db.prepare('INSERT INTO jest_entries (month, side, day, item, amount, account, payer, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(day.slice(0, 7), side, day, item, amount, account, payer, now()).run();
         await audit(db, request, 'JBOOK_ADD', what, `${amount.toLocaleString('ko-KR')}원`);

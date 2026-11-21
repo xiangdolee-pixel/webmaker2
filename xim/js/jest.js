@@ -1,7 +1,7 @@
 // xim 부기(처음 이름 J-Est. → BookKeeping → 부기) — 달마다 매입(왼쪽) · 매출(오른쪽)을 날짜 · 항목 · 금액으로 적어 정리한다 (사용자 지시 2026-11-21)
 //   한 달씩 본다. 줄을 누르면 그 자리에서 고치고, 맨 아래 줄에 적고 Enter 를 치면 더해진다. 아래에 달 합계와 차액, 그 해의 달별 합계.
 //   매출(왼쪽)은 입금자명과 어느 계좌로 들어왔는지도 적는다: 개인(카카오뱅크) · 기업(케이뱅크) · 기타(직접 적기). 매입은 오른쪽.
-import { esc, toast } from './common.js';
+import { esc, toast, openDialog } from './common.js';
 
 let deps = null;            // { view, api }
 let month = '';             // 'YYYY-MM'
@@ -38,9 +38,11 @@ function acctSelect(cur, attrs) {
   return `<select class="je-in je-acct" ${attrs} aria-label="계좌">${ACCTS.map(([v, t]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${t}</option>`).join('')}${cur && !known ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>` : ''}<option value="${CUSTOM}">기타 (직접 적기)</option></select>`;
 }
 
+// 고를 수 있는 항목 = 기본 항목 + 전에 적은 항목 − 목록에서 뺀 항목
+const itemNames = () => [...new Set([...ITEMS, ...(data.names || [])])].filter((n) => !(data.hidden || []).includes(n));
 // 항목 고르기: 기본 항목 · 전에 직접 적은 항목 · 직접 기입
 function itemSelect(cur, attrs) {
-  const names = [...new Set([...ITEMS, ...(data.names || [])])];
+  const names = itemNames();
   return `<select class="je-in je-item" ${attrs} aria-label="항목">${cur ? '' : '<option value="" selected>항목 고르기</option>'}${names.map((v) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(v)}</option>`).join('')}${cur && !names.includes(cur) ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>` : ''}<option value="${CUSTOM}">직접 기입…</option></select>`;
 }
 
@@ -82,7 +84,8 @@ function draw(view) {
       <div class="je-nav"><button type="button" class="btn sm" data-mv="-1" aria-label="앞 달">‹</button>
         <label class="je-month"><b>${label(month)}</b><input type="month" value="${month}" aria-label="달 고르기"></label>
         <button type="button" class="btn sm" data-mv="1" aria-label="다음 달">›</button>
-        <button type="button" class="btn sm" data-today>이번 달</button></div></div>
+        <button type="button" class="btn sm" data-today>이번 달</button>
+        <button type="button" class="btn sm" data-items>항목 관리</button></div></div>
     <div class="je-sum">
       <div><span>매출</span><b>${won(sell)}원</b></div><i>−</i>
       <div><span>매입</span><b>${won(buy)}원</b></div><i>=</i>
@@ -118,11 +121,32 @@ function askCustom(sel, done, hint = '계좌 이름 (예: 현금 · 신한 1234)
   inp.addEventListener('blur', () => end(true));
 }
 
+// 항목 관리: 고르는 목록에서 항목을 뺀다(이미 장부에 적은 줄은 그대로 남는다). 사용자 지시 2026-11-21
+function itemsDialog() {
+  const { api } = deps;
+  let changed = false;
+  openDialog(`
+    <h2>항목 관리</h2>
+    <p class="je-dlg-note">× 를 누르면 고르는 목록에서 빠집니다. 이미 장부에 적은 줄은 그대로 남고, 같은 이름을 다시 적으면 목록에 되살아납니다.</p>
+    <ul class="je-items" data-list></ul>
+    <div class="dlg-foot"><button class="btn primary" type="button" data-close>닫기</button></div>`, (dlg) => {
+    const list = dlg.querySelector('[data-list]');
+    const paint = () => { const names = itemNames(); list.innerHTML = names.map((n) => `<li><span>${esc(n)}</span><button type="button" class="je-x" data-hide="${esc(n)}" title="목록에서 빼기" aria-label="${esc(n)} 목록에서 빼기">×</button></li>`).join('') || '<li class="je-none">목록이 비어 있습니다. 새 줄에서 "직접 기입…" 으로 적으면 여기에 생깁니다.</li>'; };
+    paint();
+    list.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-hide]'); if (!b) return;
+      try { const r = await api('/jest-items', { method: 'POST', data: { hide: b.dataset.hide } }); data.hidden = r.hidden || []; changed = true; paint(); } catch (err) { toast(err.message); }
+    });
+    dlg.addEventListener('close', () => { if (changed) draw(deps.view); });
+  });
+}
+
 function bind(view) {
   const { api } = deps;
   const go = (m) => { month = m; load().catch((e) => toast(e.message)); };
   view.querySelectorAll('[data-mv]').forEach((b) => { b.onclick = () => go(shift(month, +b.dataset.mv)); });
   view.querySelector('[data-today]').onclick = () => go(kst().slice(0, 7));
+  view.querySelector('[data-items]').onclick = itemsDialog;
   view.querySelector('.je-month input').onchange = (e) => { if (/^\d{4}-\d{2}$/.test(e.target.value)) go(e.target.value); };
   view.querySelectorAll('[data-go]').forEach((b) => { b.onclick = () => go(b.dataset.go); });
   // 금액 칸: 치는 대로 쉼표
