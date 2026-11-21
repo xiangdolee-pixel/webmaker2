@@ -245,6 +245,18 @@ CREATE TABLE IF NOT EXISTS studio_settings (
 );
 
 -- 제작문의 (2026-11-12): 포트폴리오 사이트의 '제작문의' 폼 → xim '제작문의' 메뉴. read_at = 운영자가 열어 본 때(0 이면 새 문의)
+-- BookKeeping(2026-11-21): 달마다 매입(buy) · 매출(sell) 한 줄씩. month = day 의 앞 7자('YYYY-MM')
+CREATE TABLE IF NOT EXISTS jest_entries (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  month      TEXT NOT NULL,
+  side       TEXT NOT NULL,               -- buy | sell
+  day        TEXT NOT NULL,               -- 'YYYY-MM-DD'
+  item       TEXT NOT NULL,
+  amount     INTEGER NOT NULL,            -- 원
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_jest_month ON jest_entries(month, day);
+
 CREATE TABLE IF NOT EXISTS inquiries (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   site TEXT NOT NULL DEFAULT '',

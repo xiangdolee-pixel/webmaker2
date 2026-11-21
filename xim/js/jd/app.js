@@ -188,7 +188,7 @@ async function copyText(t) {
 }
 
 async function viewList() {
-  document.title = 'J-Docs';
+  document.title = 'DMS';
   fresh(`
   <div class="wrap">
     <section class="quick card">
@@ -774,7 +774,7 @@ async function viewEditor({ id, type, draft }) {
       sh.innerHTML = `<div class="share-row"><span class="share-label">문서 링크</span><a class="share-url" href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\//, ''))}</a><button type="button" class="btn btn-sm btn-primary" data-sh="copy">링크 복사</button></div>
         <p class="small">이 주소를 카톡 · 문자로 보내면 고객이 로그인 없이 보고 PDF로 받을 수 있습니다. 저장한 내용이 보입니다.</p>`;
     }
-    document.title = `${d.no || '새 문서'} ${TYPES[d.type].name} · J-Docs`;
+    document.title = `${d.no || '새 문서'} ${TYPES[d.type].name} · DMS`;
   }
 
   // 금액 옵션
@@ -1959,7 +1959,7 @@ function enableDrag(root, done) {
 
 // ── 설정 ───────────────────────────────────────────────────────────
 async function viewSettings() {
-  document.title = '설정 · J-Docs';
+  document.title = '설정 · DMS';
   await loadSettings();
   const s = clone(S);
   const F = (k, label, ph = '') => `<label class="field"><span>${label}</span><input class="input" data-s="${k}" value="${esc(k.split('.').reduce((o, p) => o?.[p], s) ?? '')}" placeholder="${esc(ph)}"></label>`;

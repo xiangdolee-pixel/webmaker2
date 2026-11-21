@@ -321,9 +321,12 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .sr-cust b { color: var(--ink); font-weight: 600; }
 .srow a, .crow a { color: var(--brand); text-decoration: none; overflow-wrap: anywhere; }
 .sr-num b { color: var(--ink); }
-.sr-term { white-space: nowrap; }
+.sr-terms { grid-area: term; display: flex; flex-wrap: wrap; gap: 6px 8px; min-width: 0; }   /* 호스팅 · 도메인 기간은 따로 한 줄(다른 칸과 겹치지 않게) */
+.sr-term { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 3px 12px; border-radius: 99px; background: #f3f5fb; border: 1px solid #e3e7f3; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-term.soon { background: #fff3e0; border-color: #f3d9ae; }
+.sr-term.over { background: #fdeeee; border-color: #f3c2c2; }
 .sr-term b { font-weight: 600; }
-.sr-term small { margin-left: 5px; color: var(--ink-3, #8a8f98); }
+.sr-term small { color: var(--mute, #8a8f98); }
 .sr-term.soon b, .sr-term.soon small { color: #c77700; }
 .sr-term.over b, .sr-term.over small { color: var(--danger, #d33); font-weight: 700; }
 .term { margin: 4px 0 14px; padding: 14px 16px 2px; border-radius: 14px; background: #f3f5fb; border: 1px solid #e3e7f3; }
@@ -366,6 +369,52 @@ dialog:has(.site-form) { width: min(1000px, calc(100vw - 24px)); max-width: none
 @media (min-width: 860px) {
   .sf-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 22px; align-items: start; }
 }
+/* ───── BookKeeping: 왼쪽 매입 · 오른쪽 매출 ───── */
+.je-bar { gap: 12px 18px; }
+.je-nav { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.je-month { position: relative; display: inline-flex; align-items: center; min-width: 132px; justify-content: center; padding: 6px 14px; border-radius: 10px; background: var(--brand-soft, #eceefd); cursor: pointer; }
+.je-month b { font-size: 17px; font-weight: 800; }
+.je-month input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.je-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-bottom: 14px; padding: 14px 18px; border-radius: 14px; background: var(--surface, #fff); border: 1px solid var(--line, #e5e7eb); }
+.je-sum > div { display: grid; gap: 2px; }
+.je-sum span { color: var(--mute, #8a8f98); font-size: 13px; font-weight: 600; }
+.je-sum b { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.je-sum i { color: var(--mute, #8a8f98); font-style: normal; font-size: 20px; }
+.je-diff { margin-left: auto; padding: 8px 16px; border-radius: 12px; background: #eef7f0; }
+.je-diff.plus b { color: #1f7a3d; }
+.je-diff.minus { background: #fdeeee; }
+.je-diff.minus b { color: var(--danger, #d33); }
+.je-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+@media (min-width: 900px) { .je-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.je-col { border-radius: 14px; background: var(--surface, #fff); border: 1px solid var(--line, #e5e7eb); overflow: hidden; }
+.je-h { display: flex; align-items: baseline; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line, #e5e7eb); }
+.je-h b { font-size: 17px; font-weight: 800; }
+.je-h span { color: var(--mute, #8a8f98); font-size: 13px; }
+.je-h em { margin-left: auto; font-style: normal; font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
+.je-buy .je-h { background: #fff6ee; } .je-buy .je-h b { color: #b45a09; }
+.je-sell .je-h { background: #eef4ff; } .je-sell .je-h b { color: #2b4fc7; }
+.je-row { display: grid; grid-template-columns: 138px minmax(0, 1fr) 128px 34px; align-items: center; gap: 4px; padding: 3px 8px; border-bottom: 1px solid #f0f1f5; }
+.je-row.je-head { padding: 7px 14px; color: var(--mute, #8a8f98); font-size: 13px; font-weight: 700; background: #fafbfd; }
+.je-row .r, .je-yrow .r { text-align: right; font-variant-numeric: tabular-nums; }
+.je-in { width: 100%; min-width: 0; height: 38px; padding: 0 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; font: inherit; color: inherit; }
+.je-in:hover { background: #f5f6fa; }
+.je-in:focus { outline: none; border-color: var(--brand, #3b4cca); background: #fff; }
+.je-new { background: #fafbfd; border-bottom: 0; padding-block: 6px; }
+.je-new .je-in { background: #fff; border-color: var(--line, #e5e7eb); }
+.je-x, .je-add { width: 30px; height: 30px; border-radius: 8px; border: 0; background: transparent; color: var(--mute, #8a8f98); font-size: 18px; line-height: 1; cursor: pointer; }
+.je-x:hover { background: #fdeeee; color: var(--danger, #d33); }
+.je-add { background: var(--brand, #3b4cca); color: #fff; font-weight: 700; }
+.je-year { margin-top: 16px; padding: 14px 16px; border-radius: 14px; background: var(--surface, #fff); border: 1px solid var(--line, #e5e7eb); }
+.je-year h3 { margin: 0 0 10px; font-size: 16px; }
+.je-yrow { display: grid; grid-template-columns: 70px repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-bottom: 1px solid #f0f1f5; background: transparent; font: inherit; color: inherit; text-align: left; }
+button.je-yrow { cursor: pointer; border-radius: 8px; }
+button.je-yrow:hover { background: #f5f6fa; }
+.je-yrow.on { background: var(--brand-soft, #eceefd); font-weight: 700; }
+.je-yrow.je-head { color: var(--mute, #8a8f98); font-size: 13px; font-weight: 700; }
+.je-yrow.je-total { border-bottom: 0; font-weight: 800; }
+.je-yrow .minus { color: var(--danger, #d33); }
+.je-none { margin: 6px 0; color: var(--mute, #8a8f98); }
+@media (max-width: 520px) { .je-row { grid-template-columns: 118px minmax(0, 1fr) 96px 30px; } .je-diff { margin-left: 0; } }
 .sr-made { white-space: nowrap; }
 .sr-made b { font-weight: 600; }
 .sr-use { display: grid !important; grid-template-columns: repeat(3, auto); justify-content: start; gap: 2px 10px !important; font-size: 13px !important; }
@@ -1093,7 +1142,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .pf2-priv input { width: 16px; height: 16px; margin: 0; accent-color: var(--brand); }
 
 /* 사이트 목록 한 줄 다시 정리 (2026-11-18): 윗줄 = 이름 · 상태 · 고객 | 스위치,  아랫줄 = 주소 · 숫자 · 사용량 | 버튼 (칸마다 자리가 정해져 줄이 흐트러지지 않게) */
-.srow.srow2 { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "sw" "addr" "num" "use" "act"; gap: 8px 20px; padding: 12px 16px; align-items: center; }
+.srow.srow2 { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "sw" "addr" "num" "term" "use" "act"; gap: 8px 20px; padding: 12px 16px; align-items: center; }
 .srow2 > .sr-top { grid-area: top; gap: 6px 14px; }
 .srow2 > .sr-sw { grid-area: sw; gap: 4px 16px; }
 .srow2 > .sr-addr { grid-area: addr; }
@@ -1107,7 +1156,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .sr-top .sr-cust { flex-wrap: wrap; }
 .srow2 .pf-sw { flex-basis: auto; margin: 0; }
 @media (min-width: 900px) {
-  .srow.srow2 { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "top sw" "addr use" "num act"; }
+  .srow.srow2 { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "top sw" "addr use" "num act" "term term"; }
   .srow2 > .sr-sw, .srow2 > .sr-act { justify-content: flex-end; }
   .srow2 > .sr-use { justify-self: end; }
   .srow2 > .sr-act { flex-wrap: nowrap !important; }
@@ -1116,7 +1165,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 }
 @media (min-width: 1500px) {
   /* 넓은 화면: 아랫줄을 한 줄로 — 주소 | 숫자 | 사용량 | 버튼. 윗줄과 아랫줄 사이에 가는 선 */
-  .srow.srow2 { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto auto; grid-template-areas: "top top top sw" "addr num use act"; row-gap: 10px; }
+  .srow.srow2 { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto auto; grid-template-areas: "top top top sw" "addr num use act" "term term term term"; row-gap: 10px; }
   .srow2 > .sr-addr, .srow2 > .sr-num, .srow2 > .sr-use, .srow2 > .sr-act { padding-top: 10px; align-self: stretch; align-content: center; position: relative; }
   .srow2 > .sr-addr::before { content: ""; position: absolute; left: 0; top: 0; height: 1px; width: 100vw; max-width: none; background: var(--line, #e6e8ee); pointer-events: none; }
   .srow.srow2 { overflow: hidden; }

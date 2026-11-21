@@ -341,6 +341,43 @@ async function ximApi(request, env, url, ctx) {
   }
 
   // 제작문의 (포트폴리오 '제작문의' 폼 → Engine.inquiry 가 저장). 열어 보면 읽음
+  // BookKeeping: 달마다 매입(buy) · 매출(sell)을 날짜 · 항목 · 금액으로 (사용자 지시 2026-11-21)
+  if (path === '/api/jest' && method === 'GET') {
+    const mo = /^\d{4}-\d{2}$/.test(url.searchParams.get('month') || '') ? url.searchParams.get('month') : new Date(now() + 9 * 3600000).toISOString().slice(0, 7);
+    const [{ results: items }, { results: year }] = await Promise.all([
+      db.prepare('SELECT id, side, day, item, amount FROM jest_entries WHERE month = ? ORDER BY day, id').bind(mo).all(),
+      db.prepare("SELECT month, SUM(CASE WHEN side = 'buy' THEN amount ELSE 0 END) AS buy, SUM(CASE WHEN side = 'sell' THEN amount ELSE 0 END) AS sell FROM jest_entries WHERE month LIKE ? GROUP BY month ORDER BY month").bind(`${mo.slice(0, 4)}-%`).all(),
+    ]);
+    return json({ month: mo, items, year });
+  }
+  {
+    const jm = path.match(/^\/api\/jest(?:\/(\d+))?$/);
+    if (jm && (method === 'POST' || method === 'PUT')) {
+      if ((method === 'POST') === !!jm[1]) throw bad('잘못된 요청입니다.');
+      const raw = await body(request);
+      const side = raw.side === 'sell' ? 'sell' : raw.side === 'buy' ? 'buy' : '';
+      const day = ymd(raw.day), item = str(raw.item, 120), amount = Math.round(Number(raw.amount));
+      if (!side) throw bad('매입 · 매출 중 어느 쪽인지 알 수 없습니다.');
+      if (!day) throw bad('날짜를 넣어 주세요.');
+      if (!item) throw bad('항목을 넣어 주세요.');
+      if (!Number.isFinite(amount) || !amount || Math.abs(amount) > 100000000000) throw bad('금액을 숫자로 넣어 주세요.');
+      const what = `${side === 'buy' ? '매입' : '매출'} ${day} ${item}`;
+      if (method === 'POST') {
+        const r = await db.prepare('INSERT INTO jest_entries (month, side, day, item, amount, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(day.slice(0, 7), side, day, item, amount, now()).run();
+        await audit(db, request, 'JBOOK_ADD', what, `${amount.toLocaleString('ko-KR')}원`);
+        return json({ id: r.meta.last_row_id });
+      }
+      await db.prepare('UPDATE jest_entries SET month = ?, side = ?, day = ?, item = ?, amount = ? WHERE id = ?').bind(day.slice(0, 7), side, day, item, amount, +jm[1]).run();
+      await audit(db, request, 'JBOOK_EDIT', what, `${amount.toLocaleString('ko-KR')}원`);
+      return json({ ok: true });
+    }
+    if (jm && jm[1] && method === 'DELETE') {
+      const old = await db.prepare('SELECT side, day, item, amount FROM jest_entries WHERE id = ?').bind(+jm[1]).first();
+      await db.prepare('DELETE FROM jest_entries WHERE id = ?').bind(+jm[1]).run();
+      if (old) await audit(db, request, 'JBOOK_DEL', `${old.side === 'buy' ? '매입' : '매출'} ${old.day} ${old.item}`, `${Number(old.amount).toLocaleString('ko-KR')}원`);
+      return json({ ok: true });
+    }
+  }
   if (path === '/api/inquiries' && method === 'GET') {
     const { results } = await db.prepare("SELECT i.id, i.site, s.name AS site_name, i.name, i.contact, i.org, i.kind, substr(i.message, 1, 120) AS preview, i.created_at, i.read_at, i.done FROM inquiries i LEFT JOIN sites s ON s.slug = i.site WHERE i.site = 'portfolio' ORDER BY i.id DESC LIMIT 300").all();
     return json({ items: results, unread: results.filter((r) => !r.read_at).length });
@@ -1268,7 +1305,7 @@ export default {
 // 화면 파일: 배포 번호(?v=)를 붙여 한 번 받으면 브라우저가 다시 묻지 않게 (배포하면 번호가 바뀌어 새로 받음)
 //   index.html → css · js 주소에 ?v=번호,  js 안의 import './x.js' 에도 같은 번호.  번호 붙은 파일 = 1년, 첫 화면 = 매번 확인
 // 메뉴마다 주소(사용자 지시 2026-11-11: xim.plators.com/studio 처럼) — 이 주소들은 첫 화면(index.html)을 내주고, 화면(app.js)이 주소를 보고 그 메뉴를 연다
-const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'monitor', 'security', 'audit', 'naver', 'contracts', 'jdocs', 'pricing', 'studio', 'voice', 'pc', 'domains']);
+const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'monitor', 'security', 'audit', 'naver', 'contracts', 'jdocs', 'bookkeeping', 'pricing', 'studio', 'voice', 'pc', 'domains']);
 async function staticFile(request, env, url) {
   const v = String(env.VER?.id || 'dev').slice(0, 8);
   const isNav = NAV_PATHS.has(url.pathname.slice(1));

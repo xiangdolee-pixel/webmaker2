@@ -13,7 +13,7 @@ export function renderJdocs({ view }) {
   if (!frame) {
     frame = document.createElement('iframe');
     frame.className = 'jd-frame';
-    frame.title = 'J-Docs';
+    frame.title = 'DMS';
     frame.src = `/jd${inner(location.hash)}`;
     view.after(frame);
   } else if (frame.hidden) {

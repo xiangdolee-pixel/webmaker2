@@ -191,7 +191,7 @@ export async function editClient(ui, c = {}, { isNew = !c.name } = {}) {
 // 클라이언트 메뉴
 export async function viewClients(ui) {
   const { fresh, api, toast, modal, $ } = ui;
-  document.title = '클라이언트 · J-Docs';
+  document.title = '클라이언트 · DMS';
   fresh(`
   <div class="wrap">
     <section class="card">
