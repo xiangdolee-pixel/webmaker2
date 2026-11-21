@@ -711,7 +711,7 @@ function termAlerts(sites) {
 }
 // 입금계좌 목록(xim 설정에서 한 번만 읽는다)
 let payList = null;
-async function payAccounts() { if (!payList) { try { payList = (await api('/pay-accounts')).items || []; } catch { payList = []; } } return payList; }
+async function payAccounts() { if (!payList) { try { payList = (await api('/pay-accounts')).items || []; } catch { return []; } } return payList; }
 function siteDialog(site) {
   const s = site || { quota_mb: 500, status: 'active' };
   // 도메인 구입처 · 계정은 비어 있으면 기본값(호스팅케이알 · master@plators.com)이 들어가고 고칠 수 있다 — 사용자 지시 2026-11-21
@@ -767,7 +767,9 @@ function siteDialog(site) {
     // 안내한 입금계좌: 목록에서 고르거나 '직접입력'(사용자 지시 2026-11-21). 비어 있으면 목록의 첫 번째(기본 계좌)
     const pick = form.querySelector('[data-pay-pick]'), custom = form.querySelector('[data-pay-custom]');
     const showCustom = () => { custom.hidden = pick.value !== '__custom'; if (!custom.hidden && document.activeElement === pick) custom.focus(); };
+    let payReady = false;   // 목록이 오기 전에 저장하면 적혀 있던 계좌를 그대로 둔다(지워지지 않게)
     payAccounts().then((list) => {
+      payReady = true;
       const cur = s.pay_account || '';
       pick.innerHTML = list.map((a) => `<option value="${esc(a)}">${esc(a)}</option>`).join('') + '<option value="__custom">직접입력</option>';
       if (cur && !list.includes(cur)) { pick.value = '__custom'; custom.value = cur; } else pick.value = cur || list[0] || '__custom';
@@ -781,7 +783,7 @@ function siteDialog(site) {
       e.preventDefault();
       busy(form.querySelector('[type=submit]'), form.querySelector('.err'), async () => {
         const { portfolio_tag: pfTag, pay_pick: pp, pay_custom: pc, ...rest } = formData(form);
-        rest.pay_account = pp === '__custom' ? (pc || '').trim() : pp || '';
+        rest.pay_account = !payReady ? (s.pay_account || '') : pp === '__custom' ? (pc || '').trim() : pp || '';
         const data = { ...rest, status: s.status };
         const r = site ? await api(`/sites/${site.id}`, { method: 'PUT', data }) : await api('/sites', { method: 'POST', data });
         const sid = site ? site.id : r?.id;

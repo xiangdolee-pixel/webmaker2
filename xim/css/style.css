@@ -378,6 +378,7 @@ dialog:has(.site-form) { width: min(1000px, calc(100vw - 24px)); max-width: none
 }
 /* ───── BookKeeping: 왼쪽 매입 · 오른쪽 매출 ───── */
 .je-on .wrap { max-width: none; padding: 0; }   /* 부기: 화면을 넓게 쓰고 위쪽 띠를 끝까지(문서관리처럼) */
+@media (max-width: 899px) { #app .je-top { position: static; } }   /* 폰: 위쪽 메뉴 띠를 덮지 않게 */
 .je-top { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; min-height: 60px; padding: 8px 20px; background: #2f3da6; color: #fff; }
 .je-brand { display: flex; align-items: center; gap: 10px; font-size: 17px; white-space: nowrap; }
 .je-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: #fff; color: #2f3da6; font-weight: 800; font-size: 16px; }
@@ -399,7 +400,7 @@ dialog:has(.site-form) { width: min(1000px, calc(100vw - 24px)); max-width: none
 .je-diff.minus { background: #fdeeee !important; }
 .je-diff.minus b { color: var(--danger, #d33); }
 .je-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
-@media (min-width: 1100px) { .je-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }   /* 매출 · 매입 같은 폭(사용자 지시) */
+@media (min-width: 1500px) { .je-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }   /* 매출 · 매입 같은 폭(사용자 지시) */
 .je-col { border-radius: 14px; background: var(--surface, #fff); border: 1px solid var(--line, #e5e7eb); overflow: hidden; }
 .je-h { display: flex; align-items: baseline; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line, #e5e7eb); }
 .je-h b { font-size: 17px; font-weight: 800; }

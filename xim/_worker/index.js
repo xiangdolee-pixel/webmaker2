@@ -411,12 +411,14 @@ async function ximApi(request, env, url, ctx) {
       const account = side === 'sell' ? (str(raw.account, 40) || '개인') : str(raw.account, 40), payer = side === 'sell' ? str(raw.payer, 40) : '';
       const cid = side === 'sell' && Number.isInteger(Number(raw.customer_id)) && Number(raw.customer_id) > 0 ? Number(raw.customer_id) : null;   // 매출의 고객
       const what = `${side === 'sell' ? `매출(${account}${payer ? ` · ${payer}` : ''})` : `매입${account ? `(${account})` : ''}`} ${day} ${item}`;
-      // 목록에서 뺐던 이름을 다시 적으면 목록에 되살린다
+      const old = method === 'PUT' ? await db.prepare('SELECT item, account FROM jest_entries WHERE id = ?').bind(+jm[1]).first() : null;
+      if (method === 'PUT' && !old) throw new HttpError(404, '없는 내역입니다. 화면을 새로 열어 주세요.');
+      // 목록에서 뺐던 이름을 다시 적으면 목록에 되살린다 — 새로 적을 때, 또는 고치면서 그 이름으로 바꿨을 때만(금액만 고쳐도 되살아나지 않게)
       try {
         const cfg = await jestCfg(db); let touched = false;
         const ik = side === 'sell' ? 'item_sell' : 'item_buy';
-        if (cfg[ik].hidden.includes(item)) { cfg[ik].hidden = cfg[ik].hidden.filter((n) => n !== item); touched = true; }
-        if (side === 'buy' && account && cfg.method.hidden.includes(account)) { cfg.method.hidden = cfg.method.hidden.filter((n) => n !== account); touched = true; }
+        if ((!old || old.item !== item) && cfg[ik].hidden.includes(item)) { cfg[ik].hidden = cfg[ik].hidden.filter((n) => n !== item); touched = true; }
+        if (side === 'buy' && account && (!old || old.account !== account) && cfg.method.hidden.includes(account)) { cfg.method.hidden = cfg.method.hidden.filter((n) => n !== account); touched = true; }
         if (touched) await db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind('jest_lists', JSON.stringify(cfg)).run();
       } catch { /* 무시 */ }
       if (method === 'POST') {

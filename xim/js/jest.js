@@ -27,17 +27,21 @@ let lastAcct = '개인', lastMethod = '';      // 새 줄은 바로 앞에 고�
 
 export async function renderJest(d) {
   deps = d;
+  alive = true;
   document.getElementById('app')?.classList.add('je-on');   // 화면을 넓게(좌우 여백 줄임) · 위쪽 띠 — 문서관리처럼
   if (!month) { try { month = localStorage.getItem('xim-jest-month') || ''; } catch { /* 무시 */ } }
   if (!/^\d{4}-\d{2}$/.test(month)) month = kst().slice(0, 7);
   await load();
 }
 
-export function stopJest() { document.getElementById('app')?.classList.remove('je-on'); }
+let alive = false;   // 부기 화면이 떠 있는 동안만 그린다(불러오는 중에 다른 메뉴로 가면 그 화면을 덮어쓰지 않게)
+export function stopJest() { alive = false; closeDD(); document.getElementById('app')?.classList.remove('je-on'); }
 
 async function load() {
   const { view, api } = deps;
-  data = await api(`/jest?month=${month}`);
+  const got = await api(`/jest?month=${month}`);
+  if (!alive) return;
+  data = got;
   try { localStorage.setItem('xim-jest-month', month); } catch { /* 무시 */ }
   draw(view);
 }
@@ -49,7 +53,7 @@ const listOf = (kind) => (kind === 'cust' ? (data.customers || []).map((c) => c.
 function pick(kind, cur, attrs, hint) {
   return `<input class="je-in je-combo" type="text" data-kind="${kind}" value="${esc(cur || '')}" ${attrs} placeholder="${hint || KINDS[kind].name}" maxlength="${KINDS[kind].max}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-label="${KINDS[kind].name}">`;
 }
-let dd = null, ddFor = null, ddAct = -1, ddAll = false;
+let dd = null, ddFor = null, ddAct = -1, ddAll = false, escAt = 0;
 function closeDD() { if (dd) { dd.remove(); dd = null; } ddFor = null; ddAct = -1; }
 function openDD(inp, all) {
   const kind = inp.dataset.kind, q = all ? '' : inp.value.trim().toLowerCase();
@@ -66,6 +70,7 @@ function openDD(inp, all) {
     ${fresh ? `<div class="je-opt je-fresh" data-new><span>＋ ‘${esc(inp.value.trim())}’ 새로 넣기</span></div>` : ''}
     ${!hits.length && !fresh ? `<p class="je-dd-none">${names.length ? '찾는 이름이 없습니다.' : isCust ? '등록된 고객이 없습니다. \'고객\' 메뉴에서 먼저 등록해 주세요.' : `아직 없습니다. 적으면 다음부터 여기에 나옵니다.`}</p>` : ''}`;
   dd.onclick = async (e) => {
+    if (e.target.closest('input')) return;   // 이름을 바꾸는 글 칸 안을 누른 것
     const opt = e.target.closest('.je-opt'); if (!opt) return;
     const v = opt.dataset.v, { api } = deps;
     if (e.target.closest('[data-rm]')) {
@@ -108,7 +113,7 @@ function bindCombo(inp) {
     if (!dd || ddFor !== inp) { if (e.key === 'ArrowDown') { e.preventDefault(); openDD(inp, true); } return; }
     const opts = [...dd.querySelectorAll('.je-opt')];
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); ddAct = Math.max(0, Math.min(opts.length - 1, ddAct + (e.key === 'ArrowDown' ? 1 : -1))); opts.forEach((o, i) => o.classList.toggle('on', i === ddAct)); opts[ddAct]?.scrollIntoView({ block: 'nearest' }); }
-    else if (e.key === 'Enter' && ddAct < 0 && inp.dataset.kind === 'cust' && inp.value.trim() && opts[0] && opts[0].dataset.v) { e.preventDefault(); e.stopPropagation(); choose(inp, opts[0].dataset.v); }   // 고객: 치다가 Enter = 맨 위 것
+    else if (e.key === 'Enter' && ddAct < 0 && !ddAll && inp.dataset.kind === 'cust' && inp.value.trim() && opts[0] && opts[0].dataset.v) { e.preventDefault(); e.stopPropagation(); choose(inp, opts[0].dataset.v); }   // 고객: 치다가 Enter = 맨 위 것
     else if (e.key === 'Enter' && ddAct >= 0 && opts[ddAct]) { e.preventDefault(); e.stopPropagation(); const o = opts[ddAct]; choose(inp, o.hasAttribute('data-new') ? inp.value.trim() : o.dataset.v); }
     else if (e.key === 'Escape') { e.stopPropagation(); closeDD(); }
     else if (e.key === 'Tab') closeDD();
@@ -153,7 +158,7 @@ function draw(view) {
       <div class="je-table" role="table" aria-label="${name}">
         <div class="je-row je-head" role="row"><span>날짜</span><span>항목</span>${isSell ? '<span>고객</span><span>입금자명</span><span>계좌</span>' : '<span>결제 수단</span>'}<span class="r">금액</span><span></span></div>
         <form class="je-row je-new" data-new>
-          <input class="je-in" type="date" name="day" value="${defDay}" min="${month}-01" max="${month}-31" aria-label="날짜" required>
+          <input class="je-in" type="date" name="day" value="${defDay}" min="${month}-01" max="${month}-${String(new Date(Date.UTC(+month.slice(0, 4), +month.slice(5), 0)).getUTCDate()).padStart(2, '0')}" aria-label="날짜" required>
           ${pick(`item_${side}`, '', 'name="item" required', '항목 고르기 · 검색')}
           ${isSell ? `${custSelect(lastCust, 'name="customer_name"')}<input class="je-in" type="text" name="payer" placeholder="입금자명" maxlength="40" aria-label="입금자명">${acctSelect(lastAcct, 'name="account"')}` : pick('method', lastMethod, 'name="account"', '결제 수단')}
           <input class="je-in r" type="text" name="amount" inputmode="numeric" placeholder="금액" aria-label="금액" required>
@@ -250,12 +255,13 @@ function itemsDialog() {
             inp.className = 'input sm'; inp.value = from; inp.maxLength = KINDS[kind].max; r.replaceWith(inp); inp.focus(); inp.select();
             let ended = false;
             const end = async (ok) => { if (ended) return; ended = true; const to = inp.value.trim(); if (ok && to && to !== from) { try { await send({ kind, rename: { from, to } }); } catch (err) { toast(err.message); paint(); } } else paint(); };
-            inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); end(true); } if (ev.key === 'Escape') { ev.stopPropagation(); end(false); } });
+            inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); end(true); } if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); escAt = Date.now(); end(false); } });
             inp.addEventListener('blur', () => end(true));
           }
         } catch (err) { toast(err.message); }
       });
     });
+    dlg.addEventListener('cancel', (e) => { if (Date.now() - escAt < 150) e.preventDefault(); });   // 이름 고치기를 그만둔 Esc 는 창을 닫지 않는다
     dlg.addEventListener('close', () => { if (changed) load().catch((e) => toast(e.message)); });
   });
 }
@@ -339,7 +345,7 @@ function bind(view) {
     row.querySelectorAll('[data-f]').forEach((el) => {
       const f = el.dataset.f;
       if (f === 'customer_id') {   // 고객: 고른 번호(data-cid)가 바뀌었을 때만 저장
-        el.addEventListener('change', () => { const id = el.dataset.cid || ''; if (String(id) !== String(it.customer_id ?? '')) put('customer_id', id, null); });
+        el.addEventListener('change', () => { const id = el.dataset.cid || ''; if (String(id) !== String(it.customer_id ?? '') && el.dataset.sent !== `c${id}`) { el.dataset.sent = `c${id}`; put('customer_id', id, null); } });   // 같은 값을 두 번 보내지 않게(우리가 낸 change + 브라우저가 낸 change)
         el.addEventListener('keydown', (e) => { if (e.key === 'Escape') { el.dataset.cid = it.customer_id ?? ''; settleCust(el); } });
         return;
       }
