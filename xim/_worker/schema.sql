@@ -254,6 +254,7 @@ CREATE TABLE IF NOT EXISTS jest_entries (
   day        TEXT NOT NULL,               -- 'YYYY-MM-DD'
   item       TEXT NOT NULL,
   amount     INTEGER NOT NULL,            -- 원
+  account    TEXT NOT NULL DEFAULT '',    -- 매입만: 개인(카카오뱅크) · 기업(케이뱅크) · 직접 적은 글
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_jest_month ON jest_entries(month, day);

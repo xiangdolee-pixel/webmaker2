@@ -401,6 +401,10 @@ dialog:has(.site-form) { width: min(1000px, calc(100vw - 24px)); max-width: none
 .je-buy .je-h { background: #fff6ee; } .je-buy .je-h b { color: #b45a09; }
 .je-sell .je-h { background: #eef4ff; } .je-sell .je-h b { color: #2b4fc7; }
 .je-row { display: grid; grid-template-columns: 138px minmax(0, 1fr) 128px 34px; align-items: center; gap: 4px; padding: 3px 8px; border-bottom: 1px solid #f0f1f5; }
+.je-buy .je-row { grid-template-columns: 132px minmax(0, 1fr) 138px 116px 34px; }   /* 매입: 계좌 칸이 하나 더 */
+.je-acct { padding-right: 2px; }
+.je-by { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 8px 16px; border-bottom: 1px solid #f0f1f5; color: var(--mute, #8a8f98); font-size: 13.5px; }
+.je-by b { color: var(--ink, #222); font-variant-numeric: tabular-nums; }
 .je-row.je-head { padding: 7px 14px; color: var(--mute, #8a8f98); font-size: 13px; font-weight: 700; background: #fafbfd; }
 .je-row .r, .je-yrow .r { text-align: right; font-variant-numeric: tabular-nums; }
 .je-in { width: 100%; min-width: 0; height: 38px; padding: 0 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; font: inherit; color: inherit; }
@@ -421,7 +425,8 @@ button.je-yrow:hover { background: #f5f6fa; }
 .je-yrow.je-total { border-bottom: 0; font-weight: 800; }
 .je-yrow .minus { color: var(--danger, #d33); }
 .je-none { margin: 6px 0; color: var(--mute, #8a8f98); }
-@media (max-width: 520px) { .je-row { grid-template-columns: 118px minmax(0, 1fr) 96px 30px; } .je-diff { margin-left: 0; } }
+@media (max-width: 520px) { .je-row { grid-template-columns: 118px minmax(0, 1fr) 96px 30px; } .je-diff { margin-left: 0; }
+  .je-buy .je-row { grid-template-columns: 118px minmax(0, 1fr) 96px 30px; } .je-buy .je-row .je-acct { grid-column: 1 / 3; grid-row: 2; } .je-buy .je-row.je-head span:nth-child(3) { display: none; } }
 .sr-made { white-space: nowrap; }
 .sr-made b { font-weight: 600; }
 .sr-use { display: grid !important; grid-template-columns: repeat(3, auto); justify-content: start; gap: 2px 10px !important; font-size: 13px !important; }
