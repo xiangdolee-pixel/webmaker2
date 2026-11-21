@@ -581,7 +581,7 @@ function siteRow(s) {
       <label class="pf-sw" title="켜면 포트폴리오(portfolio.plators.com)에 나옵니다"><input type="checkbox" data-pf${s.portfolio ? ' checked' : ''}><i aria-hidden="true"></i>포트폴리오</label>
     </div>
     <div class="sr-addr">${s.domain ? link(s.url, s.domain) : '<span class="dim">도메인 없음</span>'}${link(dev, 'workers.dev')}${tags}</div>
-    <div class="sr-num"><span class="sr-visit" title="오늘 방문자 ${s.visits?.today.visitors || 0}명 · 페이지뷰 ${s.visits?.today.views || 0} / 어제 방문자 ${s.visits?.yesterday.visitors || 0}명 · 페이지뷰 ${s.visits?.yesterday.views || 0}">오늘 <b>${s.visits?.today.visitors || 0}</b>명<small>어제 ${s.visits?.yesterday.visitors || 0}</small></span><span class="sr-made" title="사이트를 만든 날 ${esc(fmtDate(s.created_at))}">제작 <b>${esc(fmtDate(s.created_at).slice(0, 10))}</b></span><span>관리자 <b>${s.admin_count}</b></span>${termChip('호스팅', s.host_end, s.host_start ? `시작 ${s.host_start}` : '')}${termChip('도메인', s.domain_end, [s.domain_start ? `시작 ${s.domain_start}` : '', s.domain_cost ? `${Number(s.domain_cost).toLocaleString('ko-KR')}원` : ''].filter(Boolean).join(' · '))}${s.open_requests ? `<button type="button" class="link-btn" data-go-reqs="${esc(s.slug)}">요청 <b>${s.open_requests}</b></button>` : '<span>요청 0</span>'}</div>
+    <div class="sr-num"><span class="sr-visit" title="오늘 방문자 ${s.visits?.today.visitors || 0}명 · 페이지뷰 ${s.visits?.today.views || 0} / 어제 방문자 ${s.visits?.yesterday.visitors || 0}명 · 페이지뷰 ${s.visits?.yesterday.views || 0}">오늘 <b>${s.visits?.today.visitors || 0}</b>명<small>어제 ${s.visits?.yesterday.visitors || 0}</small></span><span class="sr-made" title="사이트를 만든 날 ${esc(fmtDate(s.created_at))}">제작 <b>${esc(fmtDate(s.created_at).slice(0, 10))}</b></span><span>관리자 <b>${s.admin_count}</b></span>${termChip('호스팅', s.host_end, s.host_start ? `시작 ${s.host_start}` : '')}${termChip('도메인', s.domain_end, [s.domain_start ? `시작 ${s.domain_start}` : '', s.domain_cost ? `${Number(s.domain_cost).toLocaleString('ko-KR')}원` : '', s.domain_registrar ? `구입처 ${s.domain_registrar}` : '', s.domain_account ? `계정 ${s.domain_account}` : ''].filter(Boolean).join(' · '), [s.domain_registrar, s.domain_account].filter(Boolean).join(' · '))}${s.open_requests ? `<button type="button" class="link-btn" data-go-reqs="${esc(s.slug)}">요청 <b>${s.open_requests}</b></button>` : '<span>요청 0</span>'}</div>
     <div class="sr-use${useCl}" title="${useCl === ' over' ? '저장 용량 초과 — 이 사이트는 지금 사진 · 파일을 올릴 수 없습니다 · ' : ''}DB ${mb(u.db)} · 파일 ${u.file_count}개(R2 ${mb(u.r2)} · DB ${mb(u.d1_files)}) · 홈페이지 ${s.static_mb || 0}MB">
       <span>DB ${mb(u.db)}</span><span class="use-f">파일 ${mb(u.files)} / ${s.quota_mb ? `${s.quota_mb}MB` : '제한 없음'}${useCl === ' over' ? ' <b>초과</b>' : ''}</span><span>홈 ${s.static_mb ? `${s.static_mb}MB` : '—'}</span>
       <div class="quota" aria-hidden="true"><i style="width:${pct}%"></i></div></div>
@@ -666,13 +666,13 @@ function plusYear(t) {
   return `${y + 1}-${String(m).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
 }
 // 끝나는 날까지 며칠 — 사이트 줄에 '호스팅 ~2027-11-21 · 364일' 꼴로. 30일 안이면 주의, 지났으면 경고
-function termChip(label, end, extra = '') {
-  if (!end) return '';
+function termChip(label, end, extra = '', tail = '') {   // tail = 줄에 함께 보일 짧은 말(도메인 구입처 · 계정)
+  if (!end) return tail ? `<span class="sr-term" title="${esc(label)} ${esc(extra)}">${esc(label)} <small>${esc(tail)}</small></span>` : '';
   const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
   const left = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
   const cl = left < 0 ? ' over' : left <= 30 ? ' soon' : '';
   const when = left < 0 ? `${-left}일 지남` : left === 0 ? '오늘까지' : `${left}일 남음`;
-  return `<span class="sr-term${cl}" title="${esc(label)} ${left < 0 ? '만료' : '끝나는 날'} ${esc(end)}${extra ? ` · ${esc(extra)}` : ''}">${esc(label)} <b>~${esc(end)}</b><small>${when}</small></span>`;
+  return `<span class="sr-term${cl}" title="${esc(label)} ${left < 0 ? '만료' : '끝나는 날'} ${esc(end)}${extra ? ` · ${esc(extra)}` : ''}">${esc(label)} <b>~${esc(end)}</b><small>${when}${tail ? ` · ${esc(tail)}` : ''}</small></span>`;
 }
 function siteDialog(site) {
   const s = site || { quota_mb: 500, status: 'active' };
@@ -704,6 +704,11 @@ function siteDialog(site) {
           <label class="field"><span>시작일</span><input class="input" name="domain_start" type="date" value="${esc(s.domain_start || '')}" data-term-start="domain_end"></label>
           <label class="field"><span>만료일</span><input class="input" name="domain_end" type="date" value="${esc(s.domain_end || '')}"><small>시작일을 넣으면 1년 뒤로</small></label>
         </div>
+        <div class="row2">
+          <label class="field"><span>구입처</span><input class="input" name="domain_registrar" value="${esc(s.domain_registrar || '')}" placeholder="가비아" list="dm-registrars" maxlength="60"></label>
+          <label class="field"><span>누구 계정</span><input class="input" name="domain_account" value="${esc(s.domain_account || '')}" placeholder="운영자 계정 · 고객 계정(아이디)" maxlength="100"></label>
+        </div>
+        <datalist id="dm-registrars"><option value="가비아"><option value="후이즈"><option value="카페24"><option value="호스팅케이알"><option value="아이네임즈"><option value="Cloudflare"><option value="GoDaddy"><option value="Namecheap"></datalist>
       </fieldset>
       <label class="field"><span>메모</span><textarea class="input" name="memo">${esc(s.memo)}</textarea></label>
       <div class="field"><span>포트폴리오 분류</span><div class="pf-cats" data-pf-cats></div><input type="hidden" name="portfolio_tag" value="${esc(s.portfolio_tag)}">

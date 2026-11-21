@@ -476,8 +476,8 @@ async function ximApi(request, env, url, ctx) {
     const dup = await db.prepare('SELECT id FROM sites WHERE slug = ?').bind(slug).first();
     if (dup) throw bad('이미 있는 사이트 ID 입니다.');
     const r = await db.prepare(
-      'INSERT INTO sites (slug, name, customer_id, domain, status, quota_mb, memo, created_at, host_start, host_end, domain_cost, domain_start, domain_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    ).bind(slug, b.name, b.customer_id, b.domain, b.status, b.quota_mb, b.memo, now(), b.host_start, b.host_end, b.domain_cost, b.domain_start, b.domain_end).run();
+      'INSERT INTO sites (slug, name, customer_id, domain, status, quota_mb, memo, created_at, host_start, host_end, domain_cost, domain_start, domain_end, domain_registrar, domain_account) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).bind(slug, b.name, b.customer_id, b.domain, b.status, b.quota_mb, b.memo, now(), b.host_start, b.host_end, b.domain_cost, b.domain_start, b.domain_end, b.domain_registrar, b.domain_account).run();
     const mail = b.domain ? await mailRegister(env, r.meta.last_row_id, b.domain) : null;
     await audit(db, request, 'SITE_CREATE', `${b.name} (${slug})`, b.domain ? `도메인 ${b.domain}` : '');
     return json({ id: r.meta.last_row_id, mail });
@@ -486,11 +486,11 @@ async function ximApi(request, env, url, ctx) {
   if (m && method === 'PUT') {
     const b = siteFields(await body(request));
     const before = await db.prepare('SELECT * FROM sites WHERE id = ?').bind(+m[1]).first();
-    await db.prepare('UPDATE sites SET name = ?, customer_id = ?, domain = ?, status = ?, quota_mb = ?, memo = ?, host_start = ?, host_end = ?, domain_cost = ?, domain_start = ?, domain_end = ? WHERE id = ?')
-      .bind(b.name, b.customer_id, b.domain, b.status, b.quota_mb, b.memo, b.host_start, b.host_end, b.domain_cost, b.domain_start, b.domain_end, +m[1]).run();
+    await db.prepare('UPDATE sites SET name = ?, customer_id = ?, domain = ?, status = ?, quota_mb = ?, memo = ?, host_start = ?, host_end = ?, domain_cost = ?, domain_start = ?, domain_end = ?, domain_registrar = ?, domain_account = ? WHERE id = ?')
+      .bind(b.name, b.customer_id, b.domain, b.status, b.quota_mb, b.memo, b.host_start, b.host_end, b.domain_cost, b.domain_start, b.domain_end, b.domain_registrar, b.domain_account, +m[1]).run();
     // 대표 도메인이 바뀌었거나 아직 메일 등록이 안 됐으면 Email Sending 에 등록
     const mail = b.domain && (b.domain !== before?.domain || !['ok', 'added'].includes(before?.mail_status)) ? await mailRegister(env, +m[1], b.domain) : null;
-    await audit(db, request, 'SITE_UPDATE', `${b.name} (${before?.slug || m[1]})`, changed(before, b, { name: '이름', customer_id: '고객', domain: '도메인', status: '상태', quota_mb: '용량(MB)', memo: '메모', host_start: '호스팅 시작', host_end: '호스팅 종료', domain_cost: '도메인 비용', domain_start: '도메인 시작', domain_end: '도메인 만료' }));
+    await audit(db, request, 'SITE_UPDATE', `${b.name} (${before?.slug || m[1]})`, changed(before, b, { name: '이름', customer_id: '고객', domain: '도메인', status: '상태', quota_mb: '용량(MB)', memo: '메모', host_start: '호스팅 시작', host_end: '호스팅 종료', domain_cost: '도메인 비용', domain_start: '도메인 시작', domain_end: '도메인 만료', domain_registrar: '도메인 구입처', domain_account: '도메인 계정' }));
     return json({ ok: true, mail });
   }
   m = path.match(/^\/api\/sites\/(\d+)\/mail$/);
@@ -1005,6 +1005,7 @@ function siteFields(raw) {
     host_start: ymd(raw.host_start), host_end: ymd(raw.host_end) || plusYear(ymd(raw.host_start)),
     domain_cost: Math.max(0, Math.min(100000000, Math.round(Number(String(raw.domain_cost ?? '').replace(/[^0-9.]/g, '')) || 0))),
     domain_start: ymd(raw.domain_start), domain_end: ymd(raw.domain_end) || plusYear(ymd(raw.domain_start)),
+    domain_registrar: str(raw.domain_registrar, 60), domain_account: str(raw.domain_account, 100),   // 도메인 구입처 · 누구 계정인지
   };
 }
 
