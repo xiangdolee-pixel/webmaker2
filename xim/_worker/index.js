@@ -344,11 +344,12 @@ async function ximApi(request, env, url, ctx) {
   // BookKeeping: 달마다 매입(buy) · 매출(sell)을 날짜 · 항목 · 금액으로 (사용자 지시 2026-11-21)
   if (path === '/api/jest' && method === 'GET') {
     const mo = /^\d{4}-\d{2}$/.test(url.searchParams.get('month') || '') ? url.searchParams.get('month') : new Date(now() + 9 * 3600000).toISOString().slice(0, 7);
-    const [{ results: items }, { results: year }] = await Promise.all([
+    const [{ results: items }, { results: year }, { results: nameRows }] = await Promise.all([
       db.prepare('SELECT id, side, day, item, amount, account, payer FROM jest_entries WHERE month = ? ORDER BY day, id').bind(mo).all(),
       db.prepare("SELECT month, SUM(CASE WHEN side = 'buy' THEN amount ELSE 0 END) AS buy, SUM(CASE WHEN side = 'sell' THEN amount ELSE 0 END) AS sell FROM jest_entries WHERE month LIKE ? GROUP BY month ORDER BY month").bind(`${mo.slice(0, 4)}-%`).all(),
+      db.prepare('SELECT item, COUNT(*) AS n, MAX(id) AS last FROM jest_entries GROUP BY item ORDER BY n DESC, last DESC LIMIT 60').all(),   // 전에 적은 항목 — 다음부터 골라 넣게
     ]);
-    return json({ month: mo, items, year });
+    return json({ month: mo, items, year, names: nameRows.map((r) => r.item) });
   }
   {
     const jm = path.match(/^\/api\/jest(?:\/(\d+))?$/);

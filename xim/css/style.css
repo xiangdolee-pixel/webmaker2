@@ -402,7 +402,8 @@ dialog:has(.site-form) { width: min(1000px, calc(100vw - 24px)); max-width: none
 .je-sell .je-h { background: #eef4ff; } .je-sell .je-h b { color: #2b4fc7; }
 .je-row { display: grid; grid-template-columns: 138px minmax(0, 1fr) 128px 34px; align-items: center; gap: 4px; padding: 3px 8px; border-bottom: 1px solid #f0f1f5; }
 .je-sell .je-row { grid-template-columns: 142px minmax(70px, 1fr) 92px 130px 104px 30px; }   /* 매출: 입금자명 · 계좌 칸이 더 있다 */
-.je-acct { padding-right: 2px; }
+.je-acct, .je-item { padding-right: 2px; }
+.je-new select.je-item:has(option[value=""]:checked) { color: var(--mute, #8a8f98); }
 .je-by { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 8px 16px; border-bottom: 1px solid #f0f1f5; color: var(--mute, #8a8f98); font-size: 13.5px; }
 .je-by b { color: var(--ink, #222); font-variant-numeric: tabular-nums; }
 .je-row.je-head { padding: 7px 14px; color: var(--mute, #8a8f98); font-size: 13px; font-weight: 700; background: #fafbfd; }

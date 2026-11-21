@@ -5,7 +5,8 @@ import { esc, toast } from './common.js';
 
 let deps = null;            // { view, api }
 let month = '';             // 'YYYY-MM'
-let data = { items: [], year: [] };
+let data = { items: [], year: [], names: [] };
+const ITEMS = ['호스팅 1년', '도메인 1년'];   // 항목 기본 목록 — 직접 적은 항목은 다음부터 목록에 함께 나온다(사용자 지시 2026-11-21)
 const SIDES = [['sell', '매출'], ['buy', '매입']];   // 왼쪽 매출 · 오른쪽 매입
 const ACCTS = [['개인', '개인 · 카카오뱅크'], ['기업', '기업 · 케이뱅크']];   // 값은 '개인' · '기업' 또는 직접 적은 글
 const CUSTOM = '__custom';
@@ -37,6 +38,12 @@ function acctSelect(cur, attrs) {
   return `<select class="je-in je-acct" ${attrs} aria-label="계좌">${ACCTS.map(([v, t]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${t}</option>`).join('')}${cur && !known ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>` : ''}<option value="${CUSTOM}">기타 (직접 적기)</option></select>`;
 }
 
+// 항목 고르기: 기본 항목 · 전에 직접 적은 항목 · 직접 기입
+function itemSelect(cur, attrs) {
+  const names = [...new Set([...ITEMS, ...(data.names || [])])];
+  return `<select class="je-in je-item" ${attrs} aria-label="항목">${cur ? '' : '<option value="" selected>항목 고르기</option>'}${names.map((v) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(v)}</option>`).join('')}${cur && !names.includes(cur) ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>` : ''}<option value="${CUSTOM}">직접 기입…</option></select>`;
+}
+
 function draw(view) {
   const buy = sumOf('buy'), sell = sumOf('sell'), diff = sell - buy;
   const today = kst(), defDay = today.startsWith(month) ? today : `${month}-01`;
@@ -54,13 +61,13 @@ function draw(view) {
         <div class="je-row je-head" role="row"><span>날짜</span><span>항목</span>${isSell ? '<span>입금자명</span><span>계좌</span>' : ''}<span class="r">금액</span><span></span></div>
         ${rows.map((i) => `<div class="je-row" role="row" data-id="${i.id}">
           <input class="je-in" type="date" value="${esc(i.day)}" data-f="day" aria-label="날짜">
-          <input class="je-in" type="text" value="${esc(i.item)}" data-f="item" maxlength="120" aria-label="항목">
+          ${itemSelect(i.item, 'data-f="item"')}
           ${isSell ? `<input class="je-in" type="text" value="${esc(i.payer || '')}" data-f="payer" maxlength="40" placeholder="입금자" aria-label="입금자명">${acctSelect(i.account || '개인', 'data-f="account"')}` : ''}
           <input class="je-in r" type="text" inputmode="numeric" value="${won(i.amount)}" data-f="amount" aria-label="금액">
           <button type="button" class="je-x" data-del title="지우기" aria-label="${esc(i.item)} 지우기">×</button></div>`).join('')}
         <form class="je-row je-new" data-new>
           <input class="je-in" type="date" name="day" value="${defDay}" min="${month}-01" max="${month}-31" aria-label="날짜" required>
-          <input class="je-in" type="text" name="item" placeholder="항목을 적고 Enter" maxlength="120" aria-label="항목" required>
+          ${itemSelect('', 'name="item"')}
           ${isSell ? `<input class="je-in" type="text" name="payer" placeholder="입금자명" maxlength="40" aria-label="입금자명">${acctSelect(lastAcct, 'name="account"')}` : ''}
           <input class="je-in r" type="text" name="amount" inputmode="numeric" placeholder="금액" aria-label="금액" required>
           <button type="submit" class="je-add" title="더하기" aria-label="${name} 더하기">+</button>
@@ -94,10 +101,10 @@ function draw(view) {
 }
 
 // '기타 (직접 적기)' 를 고르면 그 자리가 글 칸으로 바뀐다. done(값) — 빈 값이면 취소
-function askCustom(sel, done) {
-  const before = sel.dataset.prev || ACCTS[0][0];
+function askCustom(sel, done, hint = '계좌 이름 (예: 현금 · 신한 1234)', max = 40) {
+  const before = sel.dataset.prev ?? ACCTS[0][0];
   const inp = document.createElement('input');
-  inp.className = 'je-in je-acct'; inp.type = 'text'; inp.maxLength = 40; inp.placeholder = '계좌 이름 (예: 현금 · 신한 1234)'; inp.setAttribute('aria-label', '계좌 직접 적기');
+  inp.className = 'je-in'; inp.type = 'text'; inp.maxLength = max; inp.placeholder = hint; inp.setAttribute('aria-label', '직접 적기');
   sel.hidden = true; sel.after(inp); inp.focus();
   let ended = false;
   const end = (ok) => {
@@ -120,16 +127,18 @@ function bind(view) {
   view.querySelectorAll('[data-go]').forEach((b) => { b.onclick = () => go(b.dataset.go); });
   // 금액 칸: 치는 대로 쉼표
   view.querySelectorAll('[data-f="amount"], [name="amount"]').forEach((el) => el.addEventListener('input', () => { const n = onlyNum(el.value); el.value = n && n !== '-' ? won(n) : n; }));
-  view.querySelectorAll('select.je-acct').forEach((sel) => { sel.dataset.prev = sel.value; });
+  view.querySelectorAll('select.je-acct, select.je-item').forEach((sel) => { sel.dataset.prev = sel.value; });
   // 더하기
   view.querySelectorAll('[data-new]').forEach((f) => {
     const acct = f.querySelector('select.je-acct');
     if (acct) acct.addEventListener('change', () => { if (acct.value === CUSTOM) askCustom(acct, (v) => { if (v) lastAcct = v; f.amount.focus(); }); else { acct.dataset.prev = acct.value; lastAcct = acct.value; } });
+    const itemSel = f.querySelector('select.je-item');
+    itemSel.addEventListener('change', () => { if (itemSel.value === CUSTOM) askCustom(itemSel, () => { (f.payer || f.amount).focus(); }, '항목 이름을 적고 Enter', 120); else { itemSel.dataset.prev = itemSel.value; (f.payer || f.amount).focus(); } });
     f.addEventListener('submit', async (e) => {
       e.preventDefault();
       const side = f.closest('[data-side]').dataset.side;
       const amount = Number(onlyNum(f.amount.value));
-      if (!f.item.value.trim() || !Number.isFinite(amount) || !amount) { toast('항목과 금액을 넣어 주세요.'); return; }
+      if (!f.item.value.trim() || f.item.value === CUSTOM || !Number.isFinite(amount) || !amount) { toast('항목과 금액을 넣어 주세요.'); return; }
       const account = acct && acct.value !== CUSTOM ? acct.value : '';
       try {
         await api('/jest', { method: 'POST', data: { side, day: f.day.value, item: f.item.value, amount, account, payer: f.payer ? f.payer.value : '' } });
@@ -147,8 +156,8 @@ function bind(view) {
     };
     row.querySelectorAll('[data-f]').forEach((el) => {
       const f = el.dataset.f;
-      if (f === 'account') {
-        el.addEventListener('change', () => { if (el.value === CUSTOM) askCustom(el, (v) => { if (v && v !== it.account) put('account', v, el); }); else if (el.value !== it.account) put('account', el.value, el); });
+      if (f === 'account' || f === 'item') {   // 고르는 칸: '직접 …' 을 고르면 글 칸으로
+        el.addEventListener('change', () => { if (el.value === CUSTOM) askCustom(el, (v) => { if (v && v !== it[f]) put(f, v, el); }, f === 'item' ? '항목 이름을 적고 Enter' : undefined, f === 'item' ? 120 : 40); else if (el.value && el.value !== it[f]) put(f, el.value, el); });
         return;
       }
       const save = async () => {
