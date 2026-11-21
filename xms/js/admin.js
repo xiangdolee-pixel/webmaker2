@@ -273,7 +273,7 @@ async function membersPage(qs) {
   const lede = filtered ? `조건에 맞는 회원 ${d.total}명입니다.` : `${d.all}명이 가입해 있습니다. 등급을 바꾸거나 로그인을 막을 수 있습니다.`;
   const exportQs = new URLSearchParams(qs); exportQs.delete('page');
   const reqFields = d.fields.filter((f) => f.mode === 'REQUIRED');
-  const lvOpts = (sel) => Array.from({ length: 10 }, (_, i) => i + 1).map((n) => `<option value="${n}"${n === sel ? ' selected' : ''}>${esc(LV(n))}</option>`).join('');
+  const lvOpts = (sel, cnt) => Array.from({ length: 10 }, (_, i) => i + 1).map((n) => `<option value="${n}"${n === sel ? ' selected' : ''}>${esc(LV(n))}${cnt ? ` (${cnt[n] || 0}명)` : ''}</option>`).join('');   // cnt = 등급마다 몇 명(찾기 칸에서만)
   // 가입회원 한 줄 (2026-11-19 다시 정리 "정렬 안 되어 보인다"): 이름 · 아이디 | 연락처 | 최근 로그인 | 등급 | 관리 — 칸 폭을 고정해 줄마다 같은 자리에
   const rowHtml = (m) => {
     const social = String(m.social || '').split(',').filter(Boolean).map((p) => (p === 'kakao' ? '<span class="tag yellow">카카오</span>' : p === 'naver' ? '<span class="tag green">네이버</span>' : p === 'google' ? '<span class="tag blue">Google</span>' : '')).join('');
@@ -294,7 +294,7 @@ async function membersPage(qs) {
     <form class="search" id="msearch">
       <input class="input" name="q" value="${esc(qs.get('q') || '')}" placeholder="이름, 아이디, 이메일, 휴대전화${extraFields.map((f) => `, ${esc(f.label)}`).join('')}로 찾기">
       <select class="input" name="missing"><option value="">필수 항목 채움 여부</option>${reqFields.map((f) => `<option value="${f.key}"${qs.get('missing') === f.key ? ' selected' : ''}>${esc(f.label)} 비어 있음</option>`).join('')}</select>
-      <select class="input" name="level"><option value="">모든 등급</option>${lvOpts(Number(qs.get('level')))}</select>
+      <select class="input" name="level"><option value="">모든 등급 (${d.all}명)</option>${lvOpts(Number(qs.get('level')), d.levelCounts || {})}</select>
       <button class="btn primary" type="submit">찾기</button>
       ${filtered ? '<a class="btn" href="#/members">조건 지우기</a>' : ''}
       <a class="btn green right" href="/xms-api/admin/members/export?${exportQs}">엑셀로 내려받기</a>

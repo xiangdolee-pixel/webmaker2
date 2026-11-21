@@ -627,7 +627,10 @@ async function listMembers(db, site, q, withdrawn, all = false) {
   const sql = `SELECT *, (SELECT group_concat(s.provider) FROM member_social s WHERE s.site = members.site AND s.member_id = members.id) AS social FROM members WHERE ${w} ORDER BY ${withdrawn ? 'withdrawn_at DESC' : 'id DESC'}${all ? '' : ` LIMIT ${size} OFFSET ${(page - 1) * size}`}`;
   const { results } = await db.prepare(sql).bind(...args).all();
   const rows = results.map(({ pw_hash, pw_salt, ...r }) => ({ ...r, extra: JSON.parse(r.extra || '{}') }));
-  return { total, all: all_, page, size, rows, fields, levelNames };
+  // 등급마다 몇 명인지(가입회원 화면의 등급 고르기에 적는다 — 사용자 지시 2026-11-21). 찾는 조건과 상관없이 그 사이트 전체
+  const levelCounts = {};
+  if (!withdrawn && !all) for (const r of (await db.prepare("SELECT level, COUNT(*) AS n FROM members WHERE site = ? AND status != 'WITHDRAWN' GROUP BY level").bind(site).all()).results) levelCounts[r.level] = r.n;
+  return { total, all: all_, page, size, rows, fields, levelNames, levelCounts };
 }
 
 async function fieldUsage(db, site, fields) {
