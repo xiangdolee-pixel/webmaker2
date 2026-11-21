@@ -709,6 +709,9 @@ function termAlerts(sites) {
     <div class="ta-list">${items.map(row).join('')}</div>
   </section>`;
 }
+// 입금계좌 목록(xim 설정에서 한 번만 읽는다)
+let payList = null;
+async function payAccounts() { if (!payList) { try { payList = (await api('/pay-accounts')).items || []; } catch { payList = []; } } return payList; }
 function siteDialog(site) {
   const s = site || { quota_mb: 500, status: 'active' };
   // 도메인 구입처 · 계정은 비어 있으면 기본값(호스팅케이알 · master@plators.com)이 들어가고 고칠 수 있다 — 사용자 지시 2026-11-21
