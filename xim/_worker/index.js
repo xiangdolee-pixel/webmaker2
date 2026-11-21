@@ -384,7 +384,11 @@ async function ximApi(request, env, url, ctx) {
       db.prepare('SELECT 1').run(), env.XMS_DB.prepare('SELECT 1').run(),
       env.XMS_DB.prepare('SELECT COALESCE(SUM(size), 0) AS n FROM (SELECT MAX(size) AS size FROM uploads WHERE r2_key IS NOT NULL GROUP BY r2_key)').first(),   // 여러 글이 함께 쓰는 파일은 한 번만
     ]);
+    // 호스팅 · 도메인이 30일 안에 끝나거나 이미 지난 건수(사이트 메뉴 옆 숫자) — 날짜는 한국 시간
+    const soonDay = new Date(now() + 9 * 3600000 + 30 * 86400000).toISOString().slice(0, 10);
+    const term = await db.prepare("SELECT (SELECT COUNT(*) FROM sites WHERE host_end != '' AND host_end <= ?1) + (SELECT COUNT(*) FROM sites WHERE domain_end != '' AND domain_end <= ?1) AS n").bind(soonDay).first();
     return json({
+      termSoon: term?.n || 0,
       customers: r[0].results[0].n,
       sites: r[1].results[0].n,
       suspended: r[1].results[0].off || 0,

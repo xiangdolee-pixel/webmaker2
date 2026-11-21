@@ -335,6 +335,37 @@ dialog::backdrop { background: rgba(16, 20, 32, .45); backdrop-filter: blur(2px)
 .term .row2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .term .field > span { font-weight: 600; }
 @media (max-width: 380px) { .term .row2 { grid-template-columns: minmax(0, 1fr); } }
+.term-alert { margin: 0 0 14px; padding: 12px 14px; border-radius: 14px; background: #f6f7fb; border: 1px solid #e3e7f3; }
+.term-alert.hot { background: #fff7ec; border-color: #f3d9ae; }
+.ta-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin-bottom: 8px; }
+.ta-h b { font-size: 15px; font-weight: 800; }
+.ta-h span { color: var(--ink-3, #8a8f98); font-size: 13px; }
+.ta-h em { font-style: normal; font-weight: 800; color: #c77700; }
+.ta-list { display: grid; gap: 6px; }
+.ta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; width: 100%; padding: 8px 12px; border-radius: 10px; background: #fff; border: 1px solid #e8eaf2; text-align: left; font-size: 14px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.ta-row:hover { border-color: var(--brand, #3b4cca); box-shadow: 0 2px 10px rgba(59, 76, 202, .1); }
+.ta-row.more { display: none; }
+.term-alert.all .ta-row.more { display: flex; }
+.ta-d { min-width: 74px; padding: 2px 9px; border-radius: 99px; background: #eef0f6; color: #555b66; font-size: 13px; font-weight: 800; text-align: center; white-space: nowrap; }
+.ta-row.near .ta-d { background: #fff3c9; color: #8a6500; }
+.ta-row.soon .ta-d { background: #ffe1b8; color: #a55400; }
+.ta-row.over .ta-d { background: var(--danger, #d33); color: #fff; }   /* 빨간 바탕 → 흰 글자 */
+.ta-k { color: var(--ink-3, #8a8f98); font-weight: 700; font-size: 13px; }
+.ta-n { font-weight: 700; }
+.ta-e { color: #555b66; font-variant-numeric: tabular-nums; }
+.ta-row small { margin-left: auto; color: var(--ink-3, #8a8f98); font-size: 12.5px; }
+.ta-more { margin-top: 8px; }
+/* 사이트 수정 창: 넓은 화면에서는 두 칸(왼쪽 기본 정보 · 오른쪽 호스팅/도메인)으로 펴서 세로 스크롤이 안 생기게 (사용자 지시 2026-11-21) */
+dialog:has(.site-form) { width: min(1000px, calc(100vw - 24px)); max-width: none; }
+.site-form .field { margin-bottom: 10px; gap: 4px; }
+.site-form .input { min-height: 40px; padding-block: 7px; }
+.site-form textarea.input { min-height: 64px; }
+.site-form .term { margin: 0 0 10px; padding: 12px 14px 2px; }
+.site-form .term-h { margin-bottom: 10px; padding-bottom: 8px; }
+.site-form .field > span small { font-weight: 400; }
+@media (min-width: 860px) {
+  .sf-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 22px; align-items: start; }
+}
 .sr-made { white-space: nowrap; }
 .sr-made b { font-weight: 600; }
 .sr-use { display: grid !important; grid-template-columns: repeat(3, auto); justify-content: start; gap: 2px 10px !important; font-size: 13px !important; }

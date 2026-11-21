@@ -145,6 +145,8 @@ async function renderTiles() {
   const s = await api('/summary');
   navBadge(s.unreadRequests);
   navBadge(s.unreadInquiries, 'inquiries');
+  navBadge(s.termSoon, 'sites');   // 호스팅 · 도메인이 30일 안에 끝나거나 지난 건수
+  if (s.termSoon && !sessionStorage.getItem('xim-term-told')) { sessionStorage.setItem('xim-term-told', '1'); toast(`호스팅 · 도메인 기간 알림 ${s.termSoon}건 — 사이트 메뉴 맨 위에서 확인하세요.`); }   // 들어왔을 때 한 번
   $('#tiles').innerHTML = [
     ['고객', s.customers],
     ['사이트', s.sites],
@@ -239,6 +241,7 @@ async function renderSites() {
     <div class="bar"><h2>사이트 ${sites.length}</h2>
       <input class="input search-q" type="search" placeholder="사이트 · 고객 · 도메인 · 연락처 찾기" value="${esc(siteQ)}" data-q>
       <button class="btn primary" type="button" data-act="connect">GitHub에서 연결</button><button class="btn" type="button" data-act="new-site">+ 직접 만들기</button></div>
+    ${termAlerts(sites)}
     <div class="tabs site-cats" id="site-cats"></div>
     <div class="rows">${sites.map(siteRow).join('') || '<div class="card empty">아직 등록된 사이트가 없습니다.</div>'}</div>
     <div class="card empty" data-none hidden>찾는 사이트가 없습니다.</div>`;
@@ -256,6 +259,8 @@ async function renderSites() {
   function showCat() { const on = catBox.querySelector('button.on'); if (on && catBox.scrollWidth > catBox.clientWidth) catBox.scrollTo({ left: on.offsetLeft - (catBox.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' }); }
   if (cats.length > 1 && siteCat) requestAnimationFrame(showCat);
   refilter = liveSearch(view.querySelector('[data-q]'), (v) => { siteQ = v; }, (el) => !siteCat || el.dataset.cat === siteCat);
+  view.querySelectorAll('[data-term-site]').forEach((b) => { b.onclick = () => { const st = sites.find((x) => x.id === +b.dataset.termSite); if (st) siteDialog(st); }; });   // 알림을 누르면 그 사이트 수정 창
+  view.querySelector('[data-term-more]')?.addEventListener('click', (e) => { e.currentTarget.closest('.term-alert').classList.add('all'); e.currentTarget.remove(); });
   view.querySelector('[data-act="new-site"]').onclick = () => siteDialog();
   view.querySelector('[data-act="connect"]').onclick = () => connectDialog();
   view.querySelectorAll('[data-site]').forEach((el) => {
@@ -674,32 +679,61 @@ function termChip(label, end, extra = '', tail = '') {   // tail = 줄에 함께
   const when = left < 0 ? `${-left}일 지남` : left === 0 ? '오늘까지' : `${left}일 남음`;
   return `<span class="sr-term${cl}" title="${esc(label)} ${left < 0 ? '만료' : '끝나는 날'} ${esc(end)}${extra ? ` · ${esc(extra)}` : ''}">${esc(label)} <b>~${esc(end)}</b><small>${when}${tail ? ` · ${esc(tail)}` : ''}</small></span>`;
 }
+// 사이트 메뉴 맨 위 기간 알림: 호스팅 · 도메인 끝나는 날을 급한 순서로(지난 것 → 곧 끝나는 것). 사용자 지시 2026-11-21
+function termAlerts(sites) {
+  const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const left = (end) => Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
+  const items = [];
+  for (const s of sites) {
+    if (s.host_end) items.push({ s, kind: '호스팅', end: s.host_end, left: left(s.host_end), note: '' });
+    if (s.domain_end) items.push({ s, kind: '도메인', end: s.domain_end, left: left(s.domain_end), note: [s.domain, s.domain_cost ? `${Number(s.domain_cost).toLocaleString('ko-KR')}원` : '', s.domain_registrar, s.domain_account].filter(Boolean).join(' · ') });
+  }
+  if (!items.length) return '';
+  items.sort((a, b) => a.left - b.left);
+  const urgent = items.filter((i) => i.left <= 30).length;
+  const row = (i, k) => {
+    const cl = i.left < 0 ? 'over' : i.left <= 30 ? 'soon' : i.left <= 60 ? 'near' : '';
+    const when = i.left < 0 ? `${-i.left}일 지남` : i.left === 0 ? '오늘까지' : `D-${i.left}`;
+    return `<button type="button" class="ta-row ${cl}${k >= 5 ? ' more' : ''}" data-term-site="${i.s.id}" title="누르면 ${esc(i.s.name)} 수정 창이 열립니다">
+      <b class="ta-d">${when}</b><span class="ta-k">${i.kind}</span><span class="ta-n">${esc(i.s.name)}</span><span class="ta-e">~${esc(i.end)}</span>${i.note ? `<small>${esc(i.note)}</small>` : ''}</button>`;
+  };
+  return `<section class="term-alert${urgent ? ' hot' : ''}" aria-label="호스팅 · 도메인 기간 알림">
+    <div class="ta-h"><b>기간 알림</b><span>${urgent ? `30일 안에 끝나거나 지난 것 <em>${urgent}건</em>` : '30일 안에 끝나는 것은 없습니다'} · 급한 순서</span></div>
+    <div class="ta-list">${items.map(row).join('')}</div>
+    ${items.length > 5 ? `<button type="button" class="link-btn ta-more" data-term-more>나머지 ${items.length - 5}건 더 보기</button>` : ''}
+  </section>`;
+}
 function siteDialog(site) {
   const s = site || { quota_mb: 500, status: 'active' };
   // 도메인 구입처 · 계정은 비어 있으면 기본값(호스팅케이알 · master@plators.com)이 들어가고 고칠 수 있다 — 사용자 지시 2026-11-21
   openDialog(`
     <h2>${site ? '사이트 수정' : '사이트 만들기'}</h2>
-    <form>
+    <form class="site-form">
+      <div class="sf-cols">
+      <div class="sf-col">
       <div class="row2">
         <label class="field"><span>사이트 이름</span><input class="input" name="name" value="${esc(s.name)}" required></label>
         <label class="field"><span>사이트 ID</span>
-          <input class="input" name="slug" value="${esc(s.slug)}" ${site ? 'disabled' : 'required pattern="[a-z0-9][a-z0-9\\-]{1,39}"'} placeholder="sjccc">
-          <small>WebMaker2 폴더 이름과 같게 (영문 소문자)</small></label>
+          <input class="input" name="slug" value="${esc(s.slug)}" ${site ? 'disabled' : 'required pattern="[a-z0-9][a-z0-9\-]{1,39}"'} placeholder="sjccc" title="WebMaker2 폴더 이름과 같게 (영문 소문자)"></label>
       </div>
       <label class="field"><span>고객</span><select class="input" name="customer_id">${customerOptions(s.customer_id)}</select></label>
       <div class="row2">
-        <label class="field"><span>대표 도메인</span><input class="input" name="domain" value="${esc(s.domain)}" placeholder="example.kr"><small>저장하면 회원가입 인증 메일(noreply@대표 도메인)도 자동으로 준비됩니다</small></label>
+        <label class="field"><span>대표 도메인</span><input class="input" name="domain" value="${esc(s.domain)}" placeholder="example.kr" title="저장하면 회원가입 인증 메일(noreply@대표 도메인)도 자동으로 준비됩니다"></label>
         <label class="field"><span>저장 용량 (MB)</span><input class="input" name="quota_mb" type="number" min="0" value="${esc(s.quota_mb)}" required></label>
       </div>
+      <label class="field"><span>메모</span><textarea class="input" name="memo" rows="2">${esc(s.memo)}</textarea></label>
+      <div class="field"><span>포트폴리오 분류 <small>(여러 개 가능)</small></span><div class="pf-cats" data-pf-cats></div><input type="hidden" name="portfolio_tag" value="${esc(s.portfolio_tag)}"></div>
+      </div>
+      <div class="sf-col">
       <section class="term">
-        <div class="term-h"><b>호스팅</b><small>시작일을 넣으면 종료일이 1년 뒤로 채워집니다</small></div>
+        <div class="term-h"><b>호스팅</b><small>시작일을 넣으면 종료일이 1년 뒤로</small></div>
         <div class="row2">
           <label class="field"><span>시작일</span><input class="input" name="host_start" type="date" value="${esc(s.host_start || '')}" data-term-start="host_end"></label>
           <label class="field"><span>종료일</span><input class="input" name="host_end" type="date" value="${esc(s.host_end || '')}"></label>
         </div>
       </section>
       <section class="term">
-        <div class="term-h"><b>도메인</b><small>시작일을 넣으면 만료일이 1년 뒤로 채워집니다</small></div>
+        <div class="term-h"><b>도메인</b><small>시작일을 넣으면 만료일이 1년 뒤로</small></div>
         <div class="row2">
           <label class="field"><span>시작일</span><input class="input" name="domain_start" type="date" value="${esc(s.domain_start || '')}" data-term-start="domain_end"></label>
           <label class="field"><span>만료일</span><input class="input" name="domain_end" type="date" value="${esc(s.domain_end || '')}"></label>
@@ -711,9 +745,8 @@ function siteDialog(site) {
         <label class="field"><span>누구 계정</span><input class="input" name="domain_account" value="${esc(s.domain_account || 'master@plators.com')}" placeholder="master@plators.com" maxlength="100"></label>
         <datalist id="dm-registrars"><option value="호스팅케이알"><option value="가비아"><option value="후이즈"><option value="카페24"><option value="아이네임즈"><option value="Cloudflare"><option value="GoDaddy"><option value="Namecheap"></datalist>
       </section>
-      <label class="field"><span>메모</span><textarea class="input" name="memo">${esc(s.memo)}</textarea></label>
-      <div class="field"><span>포트폴리오 분류</span><div class="pf-cats" data-pf-cats></div><input type="hidden" name="portfolio_tag" value="${esc(s.portfolio_tag)}">
-        <small>눌러서 고르세요(여러 개 가능). 포트폴리오에서 고른 분류 탭에 나옵니다.</small></div>
+      </div>
+      </div>
       <p class="err" role="alert"></p>
       <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">저장</button></div>
     </form>`, (dlg) => {
