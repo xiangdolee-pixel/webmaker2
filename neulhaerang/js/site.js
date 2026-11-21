@@ -26,6 +26,15 @@
     if (p === here) a.setAttribute('aria-current', 'page');
   });
 
+  // 공간 사진 띠: 마우스로 잡아 끌어 넘기기(손가락은 그냥 넘어감)
+  [].forEach.call(doc.querySelectorAll('[data-strip]'), function (el) {
+    var down = false, sx = 0, sl = 0, moved = false;
+    el.addEventListener('pointerdown', function (e) { if (e.pointerType !== 'mouse') return; down = true; moved = false; sx = e.clientX; sl = el.scrollLeft; });
+    window.addEventListener('pointermove', function (e) { if (!down) return; var dx = e.clientX - sx; if (Math.abs(dx) > 4) { moved = true; el.classList.add('drag'); } el.scrollLeft = sl - dx; });
+    window.addEventListener('pointerup', function () { if (!down) return; down = false; el.classList.remove('drag'); });
+    el.addEventListener('wheel', function (e) { if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) return; }, { passive: true });
+  });
+
   // 스크롤하면 떠오르기
   var items = [].slice.call(doc.querySelectorAll('[data-reveal]'));
   if (reduce || !('IntersectionObserver' in window)) { items.forEach(function (el) { el.classList.add('in'); }); return; }
