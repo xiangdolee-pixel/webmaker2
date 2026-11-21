@@ -409,7 +409,7 @@ dialog:has(.site-form) { width: min(1000px, calc(100vw - 24px)); max-width: none
 .je-sell .je-h { background: #eef4ff; } .je-sell .je-h b { color: #2b4fc7; }
 .je-row { display: grid; grid-template-columns: 138px minmax(0, 1fr) 128px 34px; align-items: center; gap: 4px; padding: 3px 8px; border-bottom: 1px solid #f0f1f5; }
 .je-sell .je-row { grid-template-columns: 126px minmax(70px, 1.2fr) minmax(70px, 1.3fr) 76px minmax(110px, 1.3fr) 96px 28px; }   /* 날짜 · 항목 · 고객 · 입금자명 · 계좌 · 금액 */
-.je-cust { padding-right: 2px; }
+.je-nocust span { color: var(--mute, #8a8f98); }
 .je-buy .je-row { grid-template-columns: 138px minmax(70px, 1fr) 122px 100px 30px; }   /* 매입: 결제 수단 칸 */
 .je-mgs { display: grid; gap: 14px; }
 @media (min-width: 760px) { .je-mgs { grid-template-columns: repeat(3, minmax(0, 1fr)); } dialog:has(.je-mgs) { width: min(1000px, calc(100vw - 24px)); } }

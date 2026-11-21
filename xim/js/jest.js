@@ -43,7 +43,7 @@ async function load() {
 }
 
 function sumOf(side) { return data.items.filter((i) => i.side === side).reduce((n, i) => n + i.amount, 0); }
-const listOf = (kind) => (data.lists || {})[kind] || [];
+const listOf = (kind) => (kind === 'cust' ? (data.customers || []).map((c) => c.name) : (data.lists || {})[kind] || []);
 // 찾아 고르는 칸(항목 · 결제 수단): 누르면 목록이 펼쳐지고, 치는 대로 걸러진다. 목록에 없는 말은 그대로 새 이름이 된다.
 //   목록의 ✎ 로 이름을 바꾸고(적힌 줄도 함께), × 로 목록에서 뺀다. 사용자 지시 2026-11-21 "검색 · 이름 수정 · 삭제"
 function pick(kind, cur, attrs, hint) {
@@ -54,15 +54,17 @@ function closeDD() { if (dd) { dd.remove(); dd = null; } ddFor = null; ddAct = -
 function openDD(inp, all) {
   const kind = inp.dataset.kind, q = all ? '' : inp.value.trim().toLowerCase();
   ddAll = !!all;
+  const isCust = kind === 'cust';   // 고객은 고르기만(이름 바꾸기 · 빼기 · 새로 넣기는 '고객' 메뉴에서)
   const names = listOf(kind), hits = names.filter((n) => !q || n.toLowerCase().includes(q));
-  const fresh = inp.value.trim() && !names.includes(inp.value.trim());
+  const fresh = !isCust && inp.value.trim() && !names.includes(inp.value.trim());
   if (!dd) { dd = document.createElement('div'); dd.className = 'je-dd'; dd.setAttribute('role', 'listbox'); document.body.append(dd); dd.addEventListener('mousedown', (e) => { if (!e.target.closest('input')) e.preventDefault(); }); }   // 글 칸의 포커스를 뺏지 않게
   ddFor = inp; ddAct = Math.min(ddAct, hits.length - 1);
   const r = inp.getBoundingClientRect();
   dd.style.cssText = `left:${Math.round(Math.min(r.left, innerWidth - 268))}px;top:${Math.round(r.bottom + 4)}px;min-width:${Math.max(260, Math.round(r.width))}px;max-height:${Math.max(160, Math.round(innerHeight - r.bottom - 16))}px`;
-  dd.innerHTML = `${hits.map((n, i) => `<div class="je-opt${i === ddAct ? ' on' : ''}" role="option" data-v="${esc(n)}"><span>${esc(n)}</span><button type="button" data-ed title="이름 바꾸기" aria-label="${esc(n)} 이름 바꾸기">✎</button><button type="button" data-rm title="목록에서 빼기" aria-label="${esc(n)} 목록에서 빼기">×</button></div>`).join('')}
+  dd.innerHTML = `${hits.map((n, i) => `<div class="je-opt${i === ddAct ? ' on' : ''}" role="option" data-v="${esc(n)}"><span>${esc(n)}</span>${isCust ? '' : `<button type="button" data-ed title="이름 바꾸기" aria-label="${esc(n)} 이름 바꾸기">✎</button><button type="button" data-rm title="목록에서 빼기" aria-label="${esc(n)} 목록에서 빼기">×</button>`}</div>`).join('')}
+    ${isCust && !q ? '<div class="je-opt je-nocust" role="option" data-v=""><span>고객 없음</span></div>' : ''}
     ${fresh ? `<div class="je-opt je-fresh" data-new><span>＋ ‘${esc(inp.value.trim())}’ 새로 넣기</span></div>` : ''}
-    ${!hits.length && !fresh ? `<p class="je-dd-none">${names.length ? '찾는 이름이 없습니다.' : `아직 없습니다. 적으면 다음부터 여기에 나옵니다.`}</p>` : ''}`;
+    ${!hits.length && !fresh ? `<p class="je-dd-none">${names.length ? '찾는 이름이 없습니다.' : isCust ? '등록된 고객이 없습니다. \'고객\' 메뉴에서 먼저 등록해 주세요.' : `아직 없습니다. 적으면 다음부터 여기에 나옵니다.`}</p>` : ''}`;
   dd.onclick = async (e) => {
     const opt = e.target.closest('.je-opt'); if (!opt) return;
     const v = opt.dataset.v, { api } = deps;
@@ -90,6 +92,7 @@ function openDD(inp, all) {
 function choose(inp, v) {
   closeDD();
   const was = inp.value; inp.value = v;
+  if (inp.dataset.kind === 'cust') { const before = inp.dataset.cid || ''; settleCust(inp); if (!inp.name) { if (before !== (inp.dataset.cid || '')) inp.dispatchEvent(new Event('change', { bubbles: true })); return; } }
   if (inp.name) { const f = inp.form, all = [...f.querySelectorAll('input:not([type=date]), select')]; (all[all.indexOf(inp) + 1] || f.amount).focus(); }   // 새 줄: 다음 칸으로
   else if (was !== v || v !== inp.defaultValue) inp.dispatchEvent(new Event('change', { bubbles: true }));                                             // 적힌 줄: 바로 저장
 }
@@ -97,11 +100,15 @@ function bindCombo(inp) {
   inp.addEventListener('focus', () => { ddAct = -1; openDD(inp, true); });
   inp.addEventListener('click', () => { if (!dd || ddFor !== inp) openDD(inp, true); });
   inp.addEventListener('input', () => { ddAct = -1; openDD(inp, false); });
-  inp.addEventListener('blur', () => setTimeout(() => { if (ddFor === inp && !(dd && dd.contains(document.activeElement))) closeDD(); }, 120));
+  inp.addEventListener('blur', () => setTimeout(() => {
+    if (ddFor === inp && !(dd && dd.contains(document.activeElement))) closeDD();
+    if (inp.dataset.kind === 'cust' && document.activeElement !== inp) { const before = inp.dataset.cid || ''; settleCust(inp); if (!inp.name && before !== (inp.dataset.cid || '')) inp.dispatchEvent(new Event('change', { bubbles: true })); }
+  }, 120));
   inp.addEventListener('keydown', (e) => {
     if (!dd || ddFor !== inp) { if (e.key === 'ArrowDown') { e.preventDefault(); openDD(inp, true); } return; }
     const opts = [...dd.querySelectorAll('.je-opt')];
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); ddAct = Math.max(0, Math.min(opts.length - 1, ddAct + (e.key === 'ArrowDown' ? 1 : -1))); opts.forEach((o, i) => o.classList.toggle('on', i === ddAct)); opts[ddAct]?.scrollIntoView({ block: 'nearest' }); }
+    else if (e.key === 'Enter' && ddAct < 0 && inp.dataset.kind === 'cust' && inp.value.trim() && opts[0] && opts[0].dataset.v) { e.preventDefault(); e.stopPropagation(); choose(inp, opts[0].dataset.v); }   // 고객: 치다가 Enter = 맨 위 것
     else if (e.key === 'Enter' && ddAct >= 0 && opts[ddAct]) { e.preventDefault(); e.stopPropagation(); const o = opts[ddAct]; choose(inp, o.hasAttribute('data-new') ? inp.value.trim() : o.dataset.v); }
     else if (e.key === 'Escape') { e.stopPropagation(); closeDD(); }
     else if (e.key === 'Tab') closeDD();
@@ -112,7 +119,16 @@ window.addEventListener('resize', closeDD);
 
 // 매출의 고객 고르기 — '고객' 메뉴에 등록된 고객(사용자 지시 2026-11-21)
 function custSelect(cur, attrs) {
-  return `<select class="je-in je-cust" ${attrs} aria-label="고객"><option value="">고객 없음</option>${(data.customers || []).map((c) => `<option value="${c.id}"${String(c.id) === String(cur || '') ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select>`;
+  const c = (data.customers || []).find((x) => String(x.id) === String(cur || ''));
+  return `<input class="je-in je-combo je-cust" type="text" data-kind="cust" data-cid="${c ? c.id : ''}" value="${esc(c ? c.name : '')}" ${attrs} placeholder="고객 검색" maxlength="60" autocomplete="off" role="combobox" aria-autocomplete="list" aria-label="고객">`;
+}
+const custByName = (name) => (data.customers || []).find((x) => x.name === name) || null;
+// 고객 칸에 적힌 글을 고객 번호로 맞춘다: 이름이 정확히 맞으면 그 고객, 비우면 없음, 그 밖에는 앞의 고객으로 되돌린다
+function settleCust(inp) {
+  const t = inp.value.trim(), hit = custByName(t);
+  if (hit) inp.dataset.cid = hit.id; else if (!t) inp.dataset.cid = '';
+  const c = (data.customers || []).find((x) => String(x.id) === String(inp.dataset.cid || ''));
+  inp.value = c ? c.name : '';
 }
 // 매출 계좌 고르기: 개인 · 기업 · (직접 적은 글) · 기타(직접 적기)
 function acctSelect(cur, attrs) {
@@ -139,7 +155,7 @@ function draw(view) {
         <form class="je-row je-new" data-new>
           <input class="je-in" type="date" name="day" value="${defDay}" min="${month}-01" max="${month}-31" aria-label="날짜" required>
           ${pick(`item_${side}`, '', 'name="item" required', '항목 고르기 · 검색')}
-          ${isSell ? `${custSelect(lastCust, 'name="customer_id"')}<input class="je-in" type="text" name="payer" placeholder="입금자명" maxlength="40" aria-label="입금자명">${acctSelect(lastAcct, 'name="account"')}` : pick('method', lastMethod, 'name="account"', '결제 수단')}
+          ${isSell ? `${custSelect(lastCust, 'name="customer_name"')}<input class="je-in" type="text" name="payer" placeholder="입금자명" maxlength="40" aria-label="입금자명">${acctSelect(lastAcct, 'name="account"')}` : pick('method', lastMethod, 'name="account"', '결제 수단')}
           <input class="je-in r" type="text" name="amount" inputmode="numeric" placeholder="금액" aria-label="금액" required>
           <button type="submit" class="je-add" title="더하기" aria-label="${name} 더하기">+</button>
         </form>
@@ -263,7 +279,7 @@ function bind(view) {
     const side = f.closest('[data-side]').dataset.side;
     const next = (el) => { const all = [...f.querySelectorAll('input:not([type=date]), select')].filter((x) => !x.hidden); const i = all.indexOf(el); (all[i + 1] || f.amount).focus(); };
     f.querySelectorAll('select').forEach((sel) => sel.addEventListener('change', () => {
-      const keep = () => { if (sel.name === 'account') { if (side === 'sell') lastAcct = sel.value; else lastMethod = sel.value; } if (sel.name === 'customer_id') lastCust = sel.value; };
+      const keep = () => { if (sel.name === 'account') { if (side === 'sell') lastAcct = sel.value; else lastMethod = sel.value; } };
       if (sel.value === CUSTOM) askCustom(sel, () => { keep(); next(sel); }, ...hintOf(sel)); else { sel.dataset.prev = sel.value; keep(); next(sel); }
     }));
     f.addEventListener('submit', async (e) => {
@@ -274,7 +290,7 @@ function bind(view) {
       const account = f.account && f.account.value !== CUSTOM ? f.account.value.trim() : '';
       try {
         closeDD();
-        await api('/jest', { method: 'POST', data: { side, day: f.day.value, item: f.item.value.trim(), amount, account, payer: f.payer ? f.payer.value : '', customer_id: f.customer_id ? f.customer_id.value : '' } });
+        await api('/jest', { method: 'POST', data: { side, day: f.day.value, item: f.item.value.trim(), amount, account, payer: f.payer ? f.payer.value : '', customer_id: f.customer_name ? (settleCust(f.customer_name), lastCust = f.customer_name.dataset.cid || '') : '' } });
         const day = f.day.value; if (day.slice(0, 7) !== month) month = day.slice(0, 7);
         await load();
         const again = deps.view.querySelector(`[data-side="${side}"] [data-new]`); if (again) { again.day.value = day; again.item.focus(); }   // 이어서 적기 쉽게
@@ -289,6 +305,11 @@ function bind(view) {
     };
     row.querySelectorAll('[data-f]').forEach((el) => {
       const f = el.dataset.f;
+      if (f === 'customer_id') {   // 고객: 고른 번호(data-cid)가 바뀌었을 때만 저장
+        el.addEventListener('change', () => { const id = el.dataset.cid || ''; if (String(id) !== String(it.customer_id ?? '')) put('customer_id', id, null); });
+        el.addEventListener('keydown', (e) => { if (e.key === 'Escape') { el.dataset.cid = it.customer_id ?? ''; settleCust(el); } });
+        return;
+      }
       if (el.tagName === 'SELECT') {   // 고르는 칸: '직접 …' 을 고르면 글 칸으로
         el.addEventListener('change', () => {
           if (el.value === CUSTOM) askCustom(el, (v) => { if (v && v !== it[f]) put(f, v, el); }, ...hintOf(el));
