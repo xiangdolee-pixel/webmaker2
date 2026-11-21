@@ -676,6 +676,9 @@ function termChip(label, end, extra = '', tail = '') {   // tail = 줄에 함께
 }
 function siteDialog(site) {
   const s = site || { quota_mb: 500, status: 'active' };
+  // 도메인 구입처 · 계정 기본값(사용자 지시 2026-11-21): 호스팅케이알 · master@plators.com — 따로 산 도메인이 있는 사이트(또는 새 사이트)에서 비어 있을 때만 채워 보인다
+  const own = !site || (s.domain && !/(^|\.)plators\.com$/i.test(s.domain));
+  const dmDef = own ? { registrar: '호스팅케이알', account: 'master@plators.com' } : { registrar: '', account: '' };
   openDialog(`
     <h2>${site ? '사이트 수정' : '사이트 만들기'}</h2>
     <form>
@@ -705,10 +708,10 @@ function siteDialog(site) {
           <label class="field"><span>만료일</span><input class="input" name="domain_end" type="date" value="${esc(s.domain_end || '')}"><small>시작일을 넣으면 1년 뒤로</small></label>
         </div>
         <div class="row2">
-          <label class="field"><span>구입처</span><input class="input" name="domain_registrar" value="${esc(s.domain_registrar || '')}" placeholder="가비아" list="dm-registrars" maxlength="60"></label>
-          <label class="field"><span>누구 계정</span><input class="input" name="domain_account" value="${esc(s.domain_account || '')}" placeholder="운영자 계정 · 고객 계정(아이디)" maxlength="100"></label>
+          <label class="field"><span>구입처</span><input class="input" name="domain_registrar" value="${esc(s.domain_registrar || dmDef.registrar)}" placeholder="호스팅케이알" list="dm-registrars" maxlength="60"></label>
+          <label class="field"><span>누구 계정</span><input class="input" name="domain_account" value="${esc(s.domain_account || dmDef.account)}" placeholder="master@plators.com" maxlength="100"></label>
         </div>
-        <datalist id="dm-registrars"><option value="가비아"><option value="후이즈"><option value="카페24"><option value="호스팅케이알"><option value="아이네임즈"><option value="Cloudflare"><option value="GoDaddy"><option value="Namecheap"></datalist>
+        <datalist id="dm-registrars"><option value="호스팅케이알"><option value="가비아"><option value="후이즈"><option value="카페24"><option value="아이네임즈"><option value="Cloudflare"><option value="GoDaddy"><option value="Namecheap"></datalist>
       </fieldset>
       <label class="field"><span>메모</span><textarea class="input" name="memo">${esc(s.memo)}</textarea></label>
       <div class="field"><span>포트폴리오 분류</span><div class="pf-cats" data-pf-cats></div><input type="hidden" name="portfolio_tag" value="${esc(s.portfolio_tag)}">
