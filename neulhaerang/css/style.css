@@ -1,5 +1,9 @@
 /* 늘해랑심리상담센터 — 사이트 전체 CSS 한 파일
    분위기: 센터 홍보물 그대로 — 볕이 드는 아이보리 · 잎사귀 초록 · 해의 노랑 · 로고의 살구색 · 손글씨 한 줄 (사용자 2026-11-21 "따뜻한 느낌 · 여기의 느낌을 살려서") */
+/* 제목(고운바탕) · 손글씨(나눔손글씨 펜)는 쓰는 글자만 담은 파일을 사이트에 두고 처음부터 그 글꼴로 그린다 — 새로고침 때 다른 글꼴로 보였다 바뀌던 것 막기(_dev/build-fonts.py).
+   빠진 글자는 뒤따르는 구글 글꼴(같은 글꼴 전체)에서 받아 온다. */
+@font-face { font-family: "NH Batang"; src: url("../fonts/nh-batang.woff2?v=1") format("woff2"); font-weight: 700; font-style: normal; font-display: block; }
+@font-face { font-family: "NH Hand"; src: url("../fonts/nh-hand.woff2?v=1") format("woff2"); font-weight: 400; font-style: normal; font-display: block; }
 :root {
   --green: #4b6340;
   --green-deep: #34472c;
@@ -25,8 +29,8 @@
   --hd-h: 84px;
   --ease: cubic-bezier(.22, .8, .24, 1);
   --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
-  --serif: "Gowun Batang", "Noto Serif KR", "Pretendard Variable", serif;   /* 제목: 따뜻하고 차분한 명조(OFL) */
-  --hand: "Nanum Pen Script", "Pretendard Variable", Pretendard, cursive;
+  --serif: "NH Batang", "Gowun Batang", "Noto Serif KR", "Pretendard Variable", serif;   /* 제목: 따뜻하고 차분한 명조(OFL) */
+  --hand: "NH Hand", "Nanum Pen Script", "Pretendard Variable", Pretendard, cursive;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
