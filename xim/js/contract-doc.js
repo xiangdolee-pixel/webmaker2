@@ -88,23 +88,27 @@ function bodyHtml(c, eul, lines = false, edit = false) {
 //   서명 · 도장은 이름 오른쪽 (인) 동그라미 한가운데에 찍힌다 (사용자 지시 2026-11-12)
 export function contractHtml(c, eul, opt = {}) {
   const signed = c.status === 'signed';
+  // 연락처 · 이메일은 갑 · 을 둘 다 적혀 있을 때만 보인다 — 한쪽이라도 비면 그 줄을 양쪽 다 뺀다 (사용자 지시 2026-11-22)
+  const phone = !!(String(c.client_phone || '').trim() && String(eul.phone || '').trim());
+  const mail = !!(String(c.client_email || '').trim() && String(eul.email || '').trim());
   return `<article class="ct-doc${opt.a4 ? ' ct-a4' : ''}">
     <header class="ct-head"><h1>홈페이지 제작 계약서</h1>${c.code ? `<span class="ct-no">No. ${esc(c.code)}</span>` : ''}</header>
     <div class="ct-body">${bodyHtml(c, eul, opt.lines, opt.edit)}</div>
     <p class="ct-date">${esc(dateKo(c.contract_date) || '　　년　　월　　일')}</p>
     <div class="ct-parties">
-      ${party('갑', c.client_company, c.client_name, c.client_phone, c.client_sign || opt.preview || '', 'gap', eul.email ? c.client_email || '' : null)}
-      ${party('을', eul.company, eul.name, eul.phone, eul.sign, 'eul', eul.email || null)}
+      ${party('갑', c.client_company, c.client_name, phone ? c.client_phone : null, c.client_sign || opt.preview || '', 'gap', mail ? c.client_email : null)}
+      ${party('을', eul.company, eul.name, phone ? eul.phone : null, eul.sign, 'eul', mail ? eul.email : null)}
     </div>
     ${signed ? `<footer class="ct-foot">전자 서명 완료 ${esc(stamp(c.signed_at))} · 문서 확인 ${esc(c.host || 'sign.plators.com')}/${esc(c.code)}${c.doc_hash ? ` · 지문 ${esc(c.doc_hash.slice(0, 16))}` : ''}</footer>` : ''}
   </article>`;
 }
-// email 이 null 이면 이메일 줄을 그리지 않는다(이메일 칸이 생기기 전에 서명한 계약서는 서명 때 모습 그대로)
+// phone · email 이 null 이면 그 줄을 그리지 않는다
 //   업체명이 없으면 업체명 줄 없이 '이름' 한 줄(업체명 칸이 생기기 전 계약서 모습 그대로)
 const party = (role, company, name, phone, mark, who, email = null) => `<section class="ct-party${company ? ' ct-party-co' : ''}">
   <h2>${role}</h2>
   <dl>${company ? `<div><dt>업체명</dt><dd>${esc(company)}</dd></div>` : ''}<div><dt>${company ? '대표자' : '이름'}</dt><dd class="ct-name"><span>${esc(name || '')}</span><span class="ct-in ct-in-${who}" data-in="${who}"><i>인</i>${mark ? `<img src="${esc(mark)}" alt="${esc(name || company || '')} 서명 · 도장">` : ''}</span></dd></div>
-  <div><dt>연락처</dt><dd>${esc(phone || '')}</dd></div>${email === null ? '' : `
+${phone === null ? '' : `
+  <div><dt>연락처</dt><dd>${esc(phone || '')}</dd></div>`}${email === null ? '' : `
   <div><dt>이메일</dt><dd class="ct-mail">${esc(email)}</dd></div>`}</dl>
 </section>`;
 
