@@ -1,9 +1,9 @@
-const CACHE = 'olivebasket-v42';
+const CACHE = 'olivebasket-v43';
 const SHELL = [
   '/app',
   '/basket',
-  'style.css?v=33',
-  'app.js?v=37',
+  'style.css?v=34',
+  'app.js?v=38',
   'admin.js?v=26',
   'manifest.webmanifest',
   'assets/img/logo.webp',

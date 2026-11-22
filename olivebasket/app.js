@@ -1,6 +1,7 @@
 const $quote = document.getElementById('quote');
 const $source = document.getElementById('source');
 const $stars = document.getElementById('stars');
+const $pos = document.getElementById('pos');
 const $meta = document.getElementById('meta');
 const $stage = document.getElementById('stage');
 
@@ -67,11 +68,13 @@ function render(item) {
   changeScene();
   $quote.textContent = item.text;
   $source.textContent = item.source || '';
+  $pos.textContent = item.pos ? item.pos + ' / ' + item.of : ''; // 별표 위 '2 / 36' — 36구절 중 2번째 (전체 · 출처별 모두, 사용자 지시 2026-11-22)
   $stars.textContent = item.id ? '★'.repeat(item.stars || 1) : '';
   $stars.setAttribute('aria-label', item.id ? `중요도 ${item.stars || 1}` : '');
   lastId = item.id || 0;
   fitQuote();
   try { localStorage.setItem('ob_last', JSON.stringify(item)); } catch {}
+  if (listening) say(item); // 듣는 중이면 새로 뜬 구절을 바로 읽는다 (손으로 넘겨도)
 }
 
 // 긴 문구가 오른쪽 아래 '담기' 버튼과 겹치지 않게: 화면에 들어올 때까지 글자를 1px씩 줄임
@@ -93,7 +96,7 @@ async function transition(getItem, dir) {
   if (busy) return;
   busy = true;
   // 바구니도 글자와 함께 사라졌다 새 자리에서 같이 나타남 (따로 움직이면 바구니만 눈에 띔)
-  const els = [$branch, $quote, $meta];
+  const els = [$pos, $branch, $quote, $meta];
   const outCls = dir > 0 ? 'shift-l' : 'shift-r';
   const inCls = dir > 0 ? 'shift-r' : 'shift-l';
   els.forEach(el => el.classList.add(outCls));
@@ -140,9 +143,11 @@ function pick() {
   }
   const it = weighted(pool);
   seen.push(it.id);
-  if (mode !== 'random' && seen.length > 30) seen = seen.slice(-30); // 가중 모드는 최근 본 것만 피하면 된다
+  if (mode !== 'random' && !listening && seen.length > 30) seen = seen.slice(-30); // 가중 모드는 최근 본 것만 피하면 된다 (듣는 중에는 한 바퀴를 겹치지 않게 다 돈다)
   try { localStorage.setItem('ob_seen', JSON.stringify(seen)); } catch {}
-  return it;
+  // 몇 번째인지 함께: 이번 바퀴에 본 수 / 구절 수 (출처를 골랐으면 그 출처 안에서). 가중 모드는 바퀴가 없어 듣는 중에만
+  if (mode !== 'random' && !listening) return it;
+  return { ...it, pos: Math.min(base.length, seen.filter(id => mine.has(id)).length), of: base.length };
 }
 
 // ---------- 출처별로 보기 (사용자 지시 2026-11-19): 기본은 전체, 위 단추로 출처를 고르면 그 출처의 구절만
@@ -173,6 +178,7 @@ function showSrc() {
   $srcBtn.hidden = !token || !gs.length;
   $srcName.textContent = cur ? cur.name : '전체';
   $srcBtn.classList.toggle('on', !!cur);
+  $listen.hidden = !synth || !token || !items.length;
 }
 function openSrc() {
   const gs = srcGroups();
@@ -195,6 +201,56 @@ function closeSrc() {
   $srcSheet.classList.remove('open');
   setTimeout(() => { if (!$srcSheet.classList.contains('open')) $srcSheet.hidden = true; }, 280);
 }
+// ---------- 듣기 (사용자 지시 2026-11-22): 기기의 읽어 주기(Web Speech)로 지금 구절부터 읽고, 끝나면 다음 구절로 넘겨 계속 읽는다.
+//   출처를 골랐으면 그 출처 안에서만. 구절 수만큼(한 바퀴) 읽으면 멈춘다. 음성 파일을 만들지 않는다
+const $listen = document.getElementById('listenBtn');
+const synth = window.speechSynthesis;
+let listening = false, heard = 0, sayNo = 0, curU = null, wake = null;
+function say(item) {
+  const no = ++sayNo;
+  if (!item.id) { stopListen(); return; }
+  const u = curU = new SpeechSynthesisUtterance(item.text.replace(/\s*\n\s*/g, ' '));
+  u.lang = 'ko-KR';
+  const v = synth.getVoices().find(x => /^ko/i.test(x.lang));
+  if (v) u.voice = v;
+  u.onend = () => {
+    if (no !== sayNo || !listening) return;
+    const n = src ? items.filter(r => String(r.source_id) === src).length : items.length;
+    if (++heard >= n) { stopListen(); return; }
+    setTimeout(() => { if (no === sayNo && listening) next(); }, 700); // 구절 사이 잠깐 쉼
+  };
+  u.onerror = e => { if (no === sayNo && listening && e.error !== 'interrupted' && e.error !== 'canceled') stopListen(); };
+  // 읽던 것이 있으면 끊고 조금 뒤에 (끊자마자 말하면 크롬이 새 말을 버린다). 처음은 누른 그 순간에 바로(아이폰은 누를 때만 시작된다)
+  if (synth.speaking || synth.pending) { synth.cancel(); setTimeout(() => { if (no === sayNo && listening) synth.speak(u); }, 80); }
+  else synth.speak(u);
+}
+function showListen() {
+  $listen.classList.toggle('on', listening);
+  $listen.setAttribute('aria-pressed', listening);
+  $listen.querySelector('.t').textContent = listening ? '멈춤' : '듣기';
+}
+function startListen() {
+  listening = true; heard = 0;
+  showListen();
+  if (navigator.wakeLock) navigator.wakeLock.request('screen').then(w => { wake = w; if (!listening) w.release(); }).catch(() => {}); // 듣는 동안 화면이 꺼지지 않게
+  const cur = hist[idx];
+  if (cur && cur.id) say(cur); else next();
+}
+function stopListen() {
+  listening = false; sayNo++;
+  if (synth) synth.cancel();
+  if (wake) { wake.release().catch(() => {}); wake = null; }
+  showListen();
+}
+if (synth) {
+  synth.getVoices(); // 목소리 목록을 미리 불러 둔다
+  $listen.addEventListener('click', () => { if (listening) stopListen(); else startListen(); });
+  window.addEventListener('pagehide', () => synth.cancel());
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && listening && navigator.wakeLock) navigator.wakeLock.request('screen').then(w => { wake = w; }).catch(() => {});
+  });
+}
+
 $srcBtn.addEventListener('click', openSrc);
 $srcSheet.addEventListener('click', e => {
   const b = e.target.closest('.src-it');
@@ -207,6 +263,7 @@ $srcSheet.addEventListener('click', e => {
     lastId = 0;
   }
   hist.length = 0; idx = -1; // 고른 출처의 구절부터 새로
+  heard = 0;
   next();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$srcSheet.hidden) closeSrc(); });

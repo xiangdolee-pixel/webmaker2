@@ -111,9 +111,9 @@ body.lock {
   word-break: keep-all;
   white-space: pre-line;
 }
-.branch, .top-stars, .quote, .meta { transition: opacity .22s ease, transform .22s ease, color 1.6s ease; }
-.branch.shift-l, .top-stars.shift-l, .quote.shift-l, .meta.shift-l { opacity: 0; transform: translateX(-28px); }
-.branch.shift-r, .top-stars.shift-r, .quote.shift-r, .meta.shift-r { opacity: 0; transform: translateX(28px); }
+.branch, .pos, .top-stars, .quote, .meta { transition: opacity .22s ease, transform .22s ease, color 1.6s ease; }
+.branch.shift-l, .pos.shift-l, .top-stars.shift-l, .quote.shift-l, .meta.shift-l { opacity: 0; transform: translateX(-28px); }
+.branch.shift-r, .pos.shift-r, .top-stars.shift-r, .quote.shift-r, .meta.shift-r { opacity: 0; transform: translateX(28px); }
 .source {
   color: var(--ink-soft);
   font-size: 15px;
@@ -338,6 +338,21 @@ a, button { -webkit-touch-callout: none; }
 
 /* 글 위 별표 (예전 바구니 그림 자리) */
 .top-stars { flex: none; min-height: 24px; margin: 0 0 18px; font-size: 18px; letter-spacing: .4em; text-indent: .4em; }
+/* 별표 위 '2 / 36' (36구절 중 2번째 — 전체면 모든 구절, 출처를 골랐으면 그 출처 안에서) */
+.pos { flex: none; min-height: 20px; margin: 0 0 8px; color: var(--ink-soft); font-size: 14px; line-height: 20px; letter-spacing: .12em; font-variant-numeric: tabular-nums; opacity: .8; }
+/* 듣기 단추: 왼쪽 아래, 담기와 같은 크기. 쉬는 동안은 옅게, 읽는 중(.on)에는 채운 색 + 글자 · 그림은 반대 색 */
+.ob-listen {
+  left: calc(18px + env(safe-area-inset-left)); right: auto; padding: 0; gap: 2px; font-family: inherit;
+  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  background: color-mix(in srgb, var(--b0, var(--card)) 70%, transparent); color: var(--ink-soft);
+  box-shadow: 0 4px 12px rgba(40, 48, 25, .12);
+  transition: transform .18s ease, box-shadow .18s ease, background-color .3s ease, color .3s ease, border-color .3s ease;
+}
+.ob-listen[hidden] { display: none; }
+.ob-listen .i-stop, .ob-listen.on .i-play { display: none; }
+.ob-listen.on .i-stop { display: block; }
+.ob-listen.on { background: var(--olive); color: var(--b0, #fff); border-color: transparent; box-shadow: 0 6px 18px rgba(40, 48, 25, .28); }
+.ob-listen:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
 
 /* 첫 화면 말고 다른 화면(담기 · 로그인 · 내 정보): 같은 위 메뉴를 바탕색 위에 고정, 그 아래로 내용 */
 body.page { padding-top: calc(56px + env(safe-area-inset-top)); }

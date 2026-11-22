@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/noto-serif-kr@5.2.5/index.css" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="style.css?v=33">
+<link rel="stylesheet" href="style.css?v=34">
 <!-- 시작 화면(로고 · 이름): 설치한 앱으로 열면 휴대폰이 이미 로고 · 이름 화면을 보여 주므로 한 번 더 띄우지 않는다 (사용자 지시 2026-11-04).
      브라우저로 열 때만, 그것도 처음 한 번만 (당겨서 새로고침 때는 생략) -->
 <script>try { if (sessionStorage.getItem('ob_splash') || matchMedia('(display-mode: standalone)').matches || navigator.standalone) document.documentElement.classList.add('nosplash'); } catch {}</script>
@@ -33,6 +33,7 @@
   <span class="ob-acc" data-xms-account></span>
 </header>
 <main class="stage" id="stage" aria-live="polite">
+  <div class="pos" id="pos"></div>
   <div class="stars top-stars" id="stars" aria-label="중요도"></div>
 
   <div class="quote-card">
@@ -51,8 +52,15 @@
   </div>
 </div>
 
+<!-- 듣기: 지금 구절부터 소리 내어 읽고 다음 구절로 이어 간다 (출처를 골랐으면 그 출처만) -->
+<button type="button" class="ob-fab ob-listen" id="listenBtn" aria-pressed="false" hidden>
+  <svg class="i-play" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 9.5v5h3.5l4.5 4v-13l-4.5 4H4z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+  <svg class="i-stop" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor"/></svg>
+  <span class="t">듣기</span>
+</button>
+
 <a class="ob-fab" id="addLink" href="/basket" aria-label="올리브바스켓에 담기"><span class="ob-fab-plus" aria-hidden="true">+</span>담기</a>
 
-<script src="app.js?v=37"></script>
+<script src="app.js?v=38"></script>
 </body>
 </html>
