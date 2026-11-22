@@ -284,7 +284,8 @@ CREATE INDEX IF NOT EXISTS inquiries_site ON inquiries (site, created_at);
 CREATE TABLE IF NOT EXISTS contracts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   code TEXT NOT NULL UNIQUE,                 -- 주소 5자 (대소문자 · 숫자)
-  client_name TEXT NOT NULL,
+  client_name TEXT NOT NULL,                 -- 갑 대표자명 (업체명 칸이 생기기 전에는 '업체 또는 대표자 이름')
+  client_company TEXT NOT NULL DEFAULT '',   -- 갑 업체명 (2026-11-22 ALTER TABLE contracts ADD COLUMN client_company TEXT NOT NULL DEFAULT ''). 을 업체명은 settings.contract_eul.company
   client_phone TEXT NOT NULL DEFAULT '',
   client_email TEXT NOT NULL DEFAULT '',     -- 갑 이메일 (2026-11-19 ALTER TABLE contracts ADD COLUMN client_email TEXT NOT NULL DEFAULT ''). 을 이메일은 코드에 고정
   build_fee INTEGER NOT NULL DEFAULT 0,      -- 제작비(원)

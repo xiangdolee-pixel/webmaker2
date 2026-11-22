@@ -1066,6 +1066,8 @@ button.je-yrow:hover { background: #f5f6fa; }
 .ct-party h2 { margin: 0 0 6px; font-size: 1.08em; font-weight: 800; }
 .ct-party dl { margin: 0; display: grid; gap: 4px; }
 .ct-party dl > div { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; min-height: 38px; }
+.ct-party-co dl > div { min-height: 30px; }
+.ct-party-co dl > div:nth-child(2) { min-height: 38px; }
 .ct-party dt { color: #6a717e; font-size: .88em; }
 .ct-party dd { margin: 0; font-weight: 600; }
 .ct-party .ct-mail { overflow-wrap: anywhere; }

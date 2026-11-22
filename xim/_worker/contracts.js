@@ -11,7 +11,7 @@ export const SIGN_HOST = 'sign.plators.com';
 const CODE_RE = /^[A-Za-z0-9]{5}$/;
 const B62 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 const EUL_KEY = 'contract_eul';
-const EUL_DEFAULT = { name: '박민진', phone: '0507-1402-5303', sign: '' };
+const EUL_DEFAULT = { company: '자두랩스 JADOO Labs.', name: '박민진', phone: '0507-1402-5303', sign: '' };
 const EUL_EMAIL = 'master@plators.com';   // 을 이메일 — 고정 (사용자 지시 2026-11-19), 화면에서 바꾸지 않는다
 const MAX_SIGN = 400 * 1024;          // 서명 그림(data URL) 최대 크기
 const FAIL_WINDOW = 10 * 60000;       // 없는 계약서 주소를 10분에
@@ -47,13 +47,16 @@ const docHash = (c, eul) => sha256(JSON.stringify([c.code, c.client_name, c.clie
   // 이메일 · 기간도 같다: 이메일 줄이 보이는 계약서(을 이메일 있음) · {기간} 자리가 있는 계약서만 넣는다
   ...(eul.email ? [c.client_email || '', eul.email] : []), ...(String(c.body).includes('{기간}') ? [yearsNum(c.hosting_years)] : []),
   // VAT 표시도 같다: 고른 계약서만 넣는다
-  ...(vatNum(c.build_vat) || vatNum(c.hosting_vat) ? [vatNum(c.build_vat), vatNum(c.hosting_vat)] : [])]));
+  ...(vatNum(c.build_vat) || vatNum(c.hosting_vat) ? [vatNum(c.build_vat), vatNum(c.hosting_vat)] : []),
+  // 업체명도 같다: 업체명 칸(2026-11-22)이 쓰인 계약서만 넣는다
+  ...(c.client_company || eul.company ? [c.client_company || '', eul.company || ''] : [])]));
 const vatNum = (v) => { const n = Number(v) || 0; return n === 1 || n === 2 ? n : 0; };   // VAT 표시: 0 없음 · 1 포함 · 2 별도
 const yearsNum = (v) => Math.min(99, Math.max(1, Math.floor(Number(String(v ?? '').replace(/[^\d]/g, '')) || 1)));   // 호스팅 · 유지보수 기간(년)
 const emailStr = (v) => { const s = str(v, 120); if (s && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) throw bad('갑 이메일을 확인해 주세요.'); return s; };
 const hostingStr = (v) => String(v ?? '').trim().slice(0, 20) || '1GB';   // 호스팅 저장 용량 (예: 1GB, 500MB)
 
-const LIST_COLS = 'id, code, client_name, client_phone, client_email, build_fee, yearly_fee, build_vat, hosting_vat, hosting_years, hosting, contract_date, status, viewed_at, signed_at, created_at, updated_at';
+const label = (c) => c.client_company || c.client_name;   // 화면 · 메일에 부르는 이름: 업체명, 없으면 대표자명
+const LIST_COLS = 'id, code, client_company, client_name, client_phone, client_email, build_fee, yearly_fee, build_vat, hosting_vat, hosting_years, hosting, contract_date, status, viewed_at, signed_at, created_at, updated_at';
 
 // ───────── 운영자 API (로그인 확인은 index.js 가 먼저 한다) ─────────
 export async function contractsApi(request, env, path, method, readBody, audit) {
@@ -61,27 +64,27 @@ export async function contractsApi(request, env, path, method, readBody, audit) 
   if (path === '/api/contracts' && method === 'GET') {
     const { results } = await db.prepare(`SELECT ${LIST_COLS} FROM contracts ORDER BY id DESC LIMIT 500`).all();
     const eul = await getEul(db);
-    return json({ items: results, eul: { name: eul.name, phone: eul.phone, email: eul.email, sign: eul.sign }, host: SIGN_HOST });
+    return json({ items: results, eul: { company: eul.company, name: eul.name, phone: eul.phone, email: eul.email, sign: eul.sign }, host: SIGN_HOST });
   }
   if (path === '/api/contracts' && method === 'POST') {
     const b = await readBody(request);
-    const name = str(b.client_name, 60);
-    if (!name) throw bad('갑(고객) 이름을 넣어 주세요.');
+    const name = str(b.client_name, 60); const company = str(b.client_company, 60);
+    if (!name && !company) throw bad('갑(고객) 업체명이나 대표자명을 넣어 주세요.');
     const body = str(b.body, 20000);
     if (!body) throw bad('계약서 내용이 비어 있습니다.');
     let code;
     for (let i = 0; i < 8; i++) { code = newCode(); if (!(await db.prepare('SELECT 1 FROM contracts WHERE code = ?').bind(code).first())) break; }
     const t = now();
-    const r = await db.prepare(`INSERT INTO contracts (code, client_name, client_phone, client_email, build_fee, yearly_fee, build_vat, hosting_vat, hosting_years, hosting, contract_date, body, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'wait', ?, ?)`)
-      .bind(code, name, str(b.client_phone, 40), emailStr(b.client_email), money(b.build_fee), money(b.yearly_fee), vatNum(b.build_vat), vatNum(b.hosting_vat), yearsNum(b.hosting_years), hostingStr(b.hosting), dateStr(b.contract_date), body, t, t).run();
-    await audit('CONTRACT_NEW', name, `sign/${code}`);
+    const r = await db.prepare(`INSERT INTO contracts (code, client_company, client_name, client_phone, client_email, build_fee, yearly_fee, build_vat, hosting_vat, hosting_years, hosting, contract_date, body, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'wait', ?, ?)`)
+      .bind(code, company, name, str(b.client_phone, 40), emailStr(b.client_email), money(b.build_fee), money(b.yearly_fee), vatNum(b.build_vat), vatNum(b.hosting_vat), yearsNum(b.hosting_years), hostingStr(b.hosting), dateStr(b.contract_date), body, t, t).run();
+    await audit('CONTRACT_NEW', company || name, `sign/${code}`);
     return json({ id: r.meta.last_row_id, code });
   }
   if (path === '/api/contracts/eul' && method === 'PUT') {
     const b = await readBody(request);
     const old = await getEul(db);
-    const eul = { name: str(b.name, 60) || old.name, phone: str(b.phone, 40), sign: b.sign === undefined ? old.sign : pngData(b.sign) };
+    const eul = { company: b.company === undefined ? old.company : str(b.company, 60), name: str(b.name, 60) || old.name, phone: str(b.phone, 40), sign: b.sign === undefined ? old.sign : pngData(b.sign) };
     await db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(EUL_KEY, JSON.stringify(eul)).run();
     await audit('CONTRACT_EUL', eul.name, b.sign === undefined ? '정보' : '사인 그림');
     return json({ ok: true });
@@ -96,19 +99,20 @@ export async function contractsApi(request, env, path, method, readBody, audit) 
     if (c.status === 'signed') throw bad('서명이 끝난 계약서는 고칠 수 없습니다.');
     const b = await readBody(request);
     const name = b.client_name === undefined ? c.client_name : str(b.client_name, 60);
-    if (!name) throw bad('갑(고객) 이름을 넣어 주세요.');
+    const company = b.client_company === undefined ? c.client_company || '' : str(b.client_company, 60);
+    if (!name && !company) throw bad('갑(고객) 업체명이나 대표자명을 넣어 주세요.');
     const body = b.body === undefined ? c.body : str(b.body, 20000);
     if (!body) throw bad('계약서 내용이 비어 있습니다.');
-    await db.prepare('UPDATE contracts SET client_name = ?, client_phone = ?, client_email = ?, build_fee = ?, yearly_fee = ?, build_vat = ?, hosting_vat = ?, hosting_years = ?, hosting = ?, contract_date = ?, body = ?, updated_at = ? WHERE id = ?')
-      .bind(name, b.client_phone === undefined ? c.client_phone : str(b.client_phone, 40), b.client_email === undefined ? c.client_email : emailStr(b.client_email),
+    await db.prepare('UPDATE contracts SET client_company = ?, client_name = ?, client_phone = ?, client_email = ?, build_fee = ?, yearly_fee = ?, build_vat = ?, hosting_vat = ?, hosting_years = ?, hosting = ?, contract_date = ?, body = ?, updated_at = ? WHERE id = ?')
+      .bind(company, name, b.client_phone === undefined ? c.client_phone : str(b.client_phone, 40), b.client_email === undefined ? c.client_email : emailStr(b.client_email),
         b.build_fee === undefined ? c.build_fee : money(b.build_fee), b.yearly_fee === undefined ? c.yearly_fee : money(b.yearly_fee), b.build_vat === undefined ? c.build_vat : vatNum(b.build_vat), b.hosting_vat === undefined ? c.hosting_vat : vatNum(b.hosting_vat), b.hosting_years === undefined ? c.hosting_years : yearsNum(b.hosting_years), b.hosting === undefined ? c.hosting : hostingStr(b.hosting),
         b.contract_date === undefined ? c.contract_date : dateStr(b.contract_date), body, now(), id).run();
-    await audit('CONTRACT_EDIT', name, `sign/${c.code}`);
+    await audit('CONTRACT_EDIT', company || name, `sign/${c.code}`);
     return json({ ok: true });
   }
   if (method === 'DELETE') {
     await db.prepare('DELETE FROM contracts WHERE id = ?').bind(id).run();
-    await audit('CONTRACT_DEL', c.client_name, `sign/${c.code}${c.status === 'signed' ? ' (서명 완료본)' : ''}`);
+    await audit('CONTRACT_DEL', label(c), `sign/${c.code}${c.status === 'signed' ? ' (서명 완료본)' : ''}`);
     return json({ ok: true });
   }
   return null;
@@ -150,7 +154,7 @@ const maskMail = (s) => String(s).replace(/^(.{1,2})[^@]*(@.*)$/, '$1***$2');
 async function signMail(request, env, code) {
   if (request.method !== 'POST') return json({ error: '지원하지 않는 요청입니다.' }, 405);
   const db = env.DB;
-  const c = CODE_RE.test(code) ? await db.prepare('SELECT id, code, client_name, client_email, status, mail_count, mailed_at FROM contracts WHERE code = ?').bind(code).first() : null;
+  const c = CODE_RE.test(code) ? await db.prepare('SELECT id, code, client_company, client_name, client_email, status, mail_count, mailed_at FROM contracts WHERE code = ?').bind(code).first() : null;
   if (!c) return json({ error: '없는 계약서 주소입니다.' }, 404);
   if (c.status !== 'signed') throw bad('서명이 끝난 계약서만 보낼 수 있습니다.');
   if (!c.client_email) throw bad('계약서에 갑 이메일이 적혀 있지 않습니다.');
@@ -167,16 +171,17 @@ async function signMail(request, env, code) {
   if (!r.meta.changes) throw bad('방금 보냈습니다. 1분 뒤에 다시 눌러 주세요.');
   const url = `https://${SIGN_HOST}/${c.code}`;
   const e = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
-  const safe = c.client_name.replace(/[\\/:*?"<>|\s]+/g, '').slice(0, 30);
+  const who = label(c);
+  const safe = who.replace(/[\\/:*?"<>|\s]+/g, '').slice(0, 30);
   try {
     await env.EMAIL.send({
       to: c.client_email, from: { email: env.MAIL_FROM, name: '전자계약서' },
-      subject: `[전자계약서] 홈페이지 제작 계약서 — ${c.client_name}`,
-      text: `${c.client_name} 님, 홈페이지 제작 계약서(No. ${c.code}) 서명이 완료되었습니다.\n서명된 계약서를 PDF 파일로 첨부합니다. 보관해 주세요.\n\n온라인에서 보기: ${url}`,
+      subject: `[전자계약서] 홈페이지 제작 계약서 — ${who}`,
+      text: `${who} 님, 홈페이지 제작 계약서(No. ${c.code}) 서명이 완료되었습니다.\n서명된 계약서를 PDF 파일로 첨부합니다. 보관해 주세요.\n\n온라인에서 보기: ${url}`,
       html: `<div style="font-family:Pretendard,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;max-width:560px;margin:0 auto;color:#171c27;font-size:15px;line-height:1.7">
         <p style="margin:0 0 6px;color:#5c6474;font-size:13px">전자계약서 · No. ${e(c.code)}</p>
         <h1 style="margin:0 0 16px;font-size:21px">홈페이지 제작 계약서</h1>
-        <p style="margin:0 0 18px"><b>${e(c.client_name)}</b> 님, 계약서 서명이 완료되었습니다.<br>서명된 계약서를 <b>PDF 파일로 첨부</b>합니다. 보관해 주세요.</p>
+        <p style="margin:0 0 18px"><b>${e(who)}</b> 님, 계약서 서명이 완료되었습니다.<br>서명된 계약서를 <b>PDF 파일로 첨부</b>합니다. 보관해 주세요.</p>
         <p style="margin:0"><a href="${e(url)}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#3b4cca;color:#fff;text-decoration:none;font-weight:700">온라인에서 보기</a></p>
       </div>`,
       attachments: [{ content: pdf, filename: `홈페이지제작계약서_${safe}_${c.code}.pdf`, type: 'application/pdf', disposition: 'attachment' }],
@@ -189,7 +194,7 @@ async function signMail(request, env, code) {
   }
   const ip = request.headers.get('CF-Connecting-IP') || 'local';
   await db.prepare('INSERT INTO audit_log (action, target, detail, ip, created_at) VALUES (?, ?, ?, ?, ?)')
-    .bind('CONTRACT_MAIL', c.client_name.slice(0, 200), `sign/${c.code} PDF 메일 → ${maskMail(c.client_email)}`, ip, t).run().catch(() => {});
+    .bind('CONTRACT_MAIL', who.slice(0, 200), `sign/${c.code} PDF 메일 → ${maskMail(c.client_email)}`, ip, t).run().catch(() => {});
   return json({ ok: true, to: maskMail(c.client_email), left: MAIL_MAX - c.mail_count - 1 });
 }
 
@@ -206,13 +211,13 @@ async function signApi(request, env, code) {
     return json({ error: '없는 계약서 주소입니다. 받은 주소를 다시 확인해 주세요.' }, 404);
   }
   let eul = await getEul(db);
-  if (c.status === 'signed' && c.eul_snapshot) { try { eul = { ...eul, email: '', ...JSON.parse(c.eul_snapshot) }; } catch { /* 지금 값 */ } }   // 서명된 계약서는 서명 때의 을 정보 그대로
+  if (c.status === 'signed' && c.eul_snapshot) { try { eul = { ...eul, email: '', company: '', ...JSON.parse(c.eul_snapshot) }; } catch { /* 지금 값 */ } }   // 서명된 계약서는 서명 때의 을 정보 그대로
   if (request.method === 'GET') {
     if (!c.viewed_at && c.status !== 'signed') await db.prepare('UPDATE contracts SET viewed_at = ? WHERE id = ?').bind(now(), c.id).run();
     return json({
-      code: c.code, client_name: c.client_name, client_phone: c.client_phone, client_email: c.client_email, build_fee: c.build_fee, yearly_fee: c.yearly_fee, build_vat: c.build_vat, hosting_vat: c.hosting_vat, hosting_years: c.hosting_years, hosting: c.hosting,
+      code: c.code, client_company: c.client_company || '', client_name: c.client_name, client_phone: c.client_phone, client_email: c.client_email, build_fee: c.build_fee, yearly_fee: c.yearly_fee, build_vat: c.build_vat, hosting_vat: c.hosting_vat, hosting_years: c.hosting_years, hosting: c.hosting,
       contract_date: c.contract_date, body: c.body, status: c.status, signed_at: c.signed_at, client_sign: c.client_sign, doc_hash: c.doc_hash,
-      eul: { name: eul.name, phone: eul.phone, email: eul.email, sign: eul.sign }, host: SIGN_HOST,
+      eul: { company: eul.company, name: eul.name, phone: eul.phone, email: eul.email, sign: eul.sign }, host: SIGN_HOST,
     });
   }
   if (request.method === 'POST') {
@@ -230,7 +235,7 @@ async function signApi(request, env, code) {
       .bind(sign, t, ip, ua, hash, JSON.stringify(eul), t, c.id).run();
     if (!r.meta.changes) throw bad('이미 서명이 끝난 계약서입니다.');
     await db.prepare('INSERT INTO audit_log (action, target, detail, ip, created_at) VALUES (?, ?, ?, ?, ?)')
-      .bind('CONTRACT_SIGNED', c.client_name.slice(0, 200), `sign/${c.code} 갑 서명 완료`, ip, t).run().catch(() => {});
+      .bind('CONTRACT_SIGNED', label(c).slice(0, 200), `sign/${c.code} 갑 서명 완료`, ip, t).run().catch(() => {});
     return json({ ok: true, signed_at: t, doc_hash: hash });
   }
   return json({ error: '지원하지 않는 요청입니다.' }, 405);

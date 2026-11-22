@@ -1,6 +1,6 @@
 // 계약서 서명 화면 (sign.plators.com/<5자>) — 갑이 계약서를 읽고, 손가락 · 마우스로 서명해 완료한 뒤 PDF 로 내려받는다
 import { $, esc, toast, pillTabs } from './common.js';
-import { contractHtml, downloadPdf, pdfBase64, markImage } from './contract-doc.js';
+import { clientLabel, contractHtml, downloadPdf, pdfBase64, markImage } from './contract-doc.js';
 
 const box = $('#sign');
 const code = (location.pathname.match(/([A-Za-z0-9]{5})\/?$/) || [])[1];
@@ -21,7 +21,7 @@ function fail(msg) { box.innerHTML = `<section class="card sign-msg"><h1>계약�
 
 function render() {
   const signed = c.status === 'signed';
-  document.title = `홈페이지 제작 계약서 — ${c.client_name}`;
+  document.title = `홈페이지 제작 계약서 — ${clientLabel(c)}`;
   box.innerHTML = `
     <div class="sign-top">
       <span class="badge ${signed ? 'done' : 'new'}">${signed ? '서명 완료' : '서명 대기'}</span>
@@ -31,7 +31,7 @@ function render() {
     <div data-doc>${contractHtml(c, c.eul)}</div>
     ${signed ? '' : `
     <section class="card sign-pad" aria-label="갑 서명 또는 도장" id="pad">
-      <div class="sign-pad-head"><h2>갑 서명 · 도장 <small>${esc(c.client_name)}</small></h2></div>
+      <div class="sign-pad-head"><h2>갑 서명 · 도장 <small>${esc(clientLabel(c))}</small></h2></div>
       <p class="sign-pad-note">서명이나 도장은 계약서의 갑 이름 옆 <b>(인)</b> 자리에 들어갑니다.</p>
       <nav class="tabs sign-mode" aria-label="서명 방법"></nav>
       <div data-mode="draw">

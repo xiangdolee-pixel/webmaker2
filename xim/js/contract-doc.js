@@ -66,9 +66,12 @@ const p2 = (n) => String(n).padStart(2, '0');
 export const today = () => { const d = new Date(); return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`; };
 const stamp = (ms) => { const d = new Date(ms); return `${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
 
+// 갑을 부르는 이름: 업체명, 없으면 대표자명 (목록 · 제목 · 파일 이름 · {갑} 자리)
+export const clientLabel = (c) => c?.client_company || c?.client_name || '';
+
 // 글자 → 단락 html (자리 표시를 채운다)
 function bodyHtml(c, eul, lines = false, edit = false) {
-  const fill = { '갑': c.client_name || '갑', '을': eul.name || '을', '제작비': moneyText(c.build_fee, c.build_vat), '연간비': moneyText(c.yearly_fee, c.hosting_vat), '기간': `${years(c)}년`, '용량': c.hosting || '1GB', '계약일': dateKo(c.contract_date) };
+  const fill = { '갑': clientLabel(c) || '갑', '을': eul.company || eul.name || '을', '제작비': moneyText(c.build_fee, c.build_vat), '연간비': moneyText(c.yearly_fee, c.hosting_vat), '기간': `${years(c)}년`, '용량': c.hosting || '1GB', '계약일': dateKo(c.contract_date) };
   const put = (t) => esc(t).replace(/\{(갑|을|제작비|연간비|기간|용량|계약일)\}/g, (_, k) => (edit ? `<b class="ct-ph" contenteditable="false" data-ph="${k}" title="왼쪽 칸 값이 들어가는 자리">${esc(fill[k])}</b>` : `<b>${esc(fill[k])}</b>`));
   return String(c.body || '').split(/\r?\n/).map((line, i) => {
     const t = line.trim();
@@ -90,16 +93,17 @@ export function contractHtml(c, eul, opt = {}) {
     <div class="ct-body">${bodyHtml(c, eul, opt.lines, opt.edit)}</div>
     <p class="ct-date">${esc(dateKo(c.contract_date) || '　　년　　월　　일')}</p>
     <div class="ct-parties">
-      ${party('갑', c.client_name, c.client_phone, c.client_sign || opt.preview || '', 'gap', eul.email ? c.client_email || '' : null)}
-      ${party('을', eul.name, eul.phone, eul.sign, 'eul', eul.email || null)}
+      ${party('갑', c.client_company, c.client_name, c.client_phone, c.client_sign || opt.preview || '', 'gap', eul.email ? c.client_email || '' : null)}
+      ${party('을', eul.company, eul.name, eul.phone, eul.sign, 'eul', eul.email || null)}
     </div>
     ${signed ? `<footer class="ct-foot">전자 서명 완료 ${esc(stamp(c.signed_at))} · 문서 확인 ${esc(c.host || 'sign.plators.com')}/${esc(c.code)}${c.doc_hash ? ` · 지문 ${esc(c.doc_hash.slice(0, 16))}` : ''}</footer>` : ''}
   </article>`;
 }
 // email 이 null 이면 이메일 줄을 그리지 않는다(이메일 칸이 생기기 전에 서명한 계약서는 서명 때 모습 그대로)
-const party = (role, name, phone, mark, who, email = null) => `<section class="ct-party">
+//   업체명이 없으면 업체명 줄 없이 '이름' 한 줄(업체명 칸이 생기기 전 계약서 모습 그대로)
+const party = (role, company, name, phone, mark, who, email = null) => `<section class="ct-party${company ? ' ct-party-co' : ''}">
   <h2>${role}</h2>
-  <dl><div><dt>이름</dt><dd class="ct-name"><span>${esc(name || '')}</span><span class="ct-in ct-in-${who}" data-in="${who}"><i>인</i>${mark ? `<img src="${esc(mark)}" alt="${esc(name)} 서명 · 도장">` : ''}</span></dd></div>
+  <dl>${company ? `<div><dt>업체명</dt><dd>${esc(company)}</dd></div>` : ''}<div><dt>${company ? '대표자' : '이름'}</dt><dd class="ct-name"><span>${esc(name || '')}</span><span class="ct-in ct-in-${who}" data-in="${who}"><i>인</i>${mark ? `<img src="${esc(mark)}" alt="${esc(name || company || '')} 서명 · 도장">` : ''}</span></dd></div>
   <div><dt>연락처</dt><dd>${esc(phone || '')}</dd></div>${email === null ? '' : `
   <div><dt>이메일</dt><dd class="ct-mail">${esc(email)}</dd></div>`}</dl>
 </section>`;
@@ -145,8 +149,8 @@ async function makePdf(c, eul) {
     let w = 210; let h = (canvas.height / canvas.width) * w;
     if (h > 297) { w *= 297 / h; h = 297; }
     pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', (210 - w) / 2, 0, w, h);
-    pdf.setProperties({ title: `홈페이지 제작 계약서 - ${c.client_name}`, subject: `No. ${c.code}` });
-    const safe = String(c.client_name || '').replace(/[\\/:*?"<>|\s]+/g, '').slice(0, 30);
+    pdf.setProperties({ title: `홈페이지 제작 계약서 - ${clientLabel(c)}`, subject: `No. ${c.code}` });
+    const safe = clientLabel(c).replace(/[\\/:*?"<>|\s]+/g, '').slice(0, 30);
     return { pdf, name: `홈페이지제작계약서_${safe}_${c.code}.pdf` };
   } finally { box.remove(); }
 }
