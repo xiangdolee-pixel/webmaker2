@@ -178,7 +178,7 @@ function showSrc() {
   $srcBtn.hidden = !token || !gs.length;
   $srcName.textContent = cur ? cur.name : '전체';
   $srcBtn.classList.toggle('on', !!cur);
-  $listen.hidden = !synth || !token || !items.length;
+  $listen.hidden = $ttsBtn.hidden = !synth || !token || !items.length;
 }
 function openSrc() {
   const gs = srcGroups();
@@ -202,27 +202,86 @@ function closeSrc() {
   setTimeout(() => { if (!$srcSheet.classList.contains('open')) $srcSheet.hidden = true; }, 280);
 }
 // ---------- 듣기 (사용자 지시 2026-11-22): 기기의 읽어 주기(Web Speech)로 지금 구절부터 읽고, 끝나면 다음 구절로 넘겨 계속 읽는다.
-//   출처를 골랐으면 그 출처 안에서만. 구절 수만큼(한 바퀴) 읽으면 멈춘다. 음성 파일을 만들지 않는다
+//   출처를 골랐으면 그 출처 안에서만. 음성 파일을 만들지 않는다
+//   설정(톱니 단추): 빠르기 · 한 바퀴만/계속 반복 · 목소리. 읽는 낱말을 표시한다. 화면을 꺼도 이어지게 소리 없는 음원을 함께 틀어 둔다
 const $listen = document.getElementById('listenBtn');
+const $ttsBtn = document.getElementById('ttsBtn');
+const $ttsSheet = document.getElementById('ttsSheet');
 const synth = window.speechSynthesis;
-let listening = false, heard = 0, sayNo = 0, curU = null, wake = null;
+let listening = false, heard = 0, sayNo = 0, curU = null, wake = null, hiT = 0;
+const tts = { rate: 1, loop: 0, voice: '' };
+let cps = 7; // 1배속에서 1초에 읽는 글자 수 (낱말 위치를 알려 주지 않는 기기에서 읽는 자리를 어림하는 데 쓴다 — 읽을 때마다 실제 걸린 시간으로 고친다)
+try { Object.assign(tts, JSON.parse(localStorage.getItem('ob_tts') || '{}')); cps = +localStorage.getItem('ob_cps') || 7; } catch {}
+const koVoices = () => synth.getVoices().filter(x => /^ko/i.test(x.lang));
 function say(item) {
   const no = ++sayNo;
+  clearInterval(hiT);
   if (!item.id) { stopListen(); return; }
-  const u = curU = new SpeechSynthesisUtterance(item.text.replace(/\s*\n\s*/g, ' '));
-  u.lang = 'ko-KR';
-  const v = synth.getVoices().find(x => /^ko/i.test(x.lang));
+  // 낱말마다 span 으로 나눠 그리고, 읽을 글은 낱말을 빈칸 하나로 이어 만든다 → 읽는 글자 위치로 낱말을 찾는다
+  const words = []; let spoken = '';
+  $quote.textContent = '';
+  item.text.split(/(\s+)/).forEach(tok => {
+    if (!tok) return;
+    if (/^\s+$/.test(tok)) { $quote.append(tok); return; }
+    const el = document.createElement('span'); el.className = 'w'; el.textContent = tok; $quote.append(el);
+    if (spoken) spoken += ' ';
+    words.push({ el, start: spoken.length });
+    spoken += tok;
+  });
+  const u = curU = new SpeechSynthesisUtterance(spoken);
+  u.lang = 'ko-KR'; u.rate = +tts.rate || 1;
+  const vs = koVoices();
+  const v = vs.find(x => x.voiceURI === tts.voice) || vs[0];
   if (v) u.voice = v;
+  let cur = -1, t0 = 0, aCh = 0, aT = 0, gotB = false; // aCh · aT = 기기가 마지막으로 알려 준 글자 위치와 그때
+  const mark = i => { if (i === cur || !words[i]) return; if (words[cur]) words[cur].el.classList.remove('now'); cur = i; words[i].el.classList.add('now'); };
+  const idxAt = ch => { let i = 0; while (i + 1 < words.length && words[i + 1].start <= ch) i++; return i; };
+  const begin = () => { t0 = aT = performance.now(); aCh = 0; mark(0); };
+  u.onstart = () => { if (no === sayNo) begin(); };
+  u.onboundary = e => { if (no !== sayNo) return; gotB = true; aCh = e.charIndex; aT = performance.now(); mark(idxAt(aCh)); };
   u.onend = () => {
     if (no !== sayNo || !listening) return;
+    clearInterval(hiT);
+    if (words[cur]) words[cur].el.classList.remove('now');
+    const d = (performance.now() - t0) / 1000;
+    if (t0 && d > .8) { cps = cps * .5 + .5 * spoken.length / d / u.rate; try { localStorage.setItem('ob_cps', cps.toFixed(2)); } catch {} }
     const n = src ? items.filter(r => String(r.source_id) === src).length : items.length;
-    if (++heard >= n) { stopListen(); return; }
+    if (++heard >= n) { if (!+tts.loop) { stopListen(); return; } heard = 0; } // 한 바퀴 다 읽음: 멈추거나(한 바퀴만) 새 바퀴로(계속 반복)
     setTimeout(() => { if (no === sayNo && listening) next(); }, 700); // 구절 사이 잠깐 쉼
   };
   u.onerror = e => { if (no === sayNo && listening && e.error !== 'interrupted' && e.error !== 'canceled') stopListen(); };
+  // 기기가 낱말 위치를 안 알려 주면(한 번도 없거나 0.7초 넘게 소식이 없으면) 걸린 시간으로 어림해 앞으로만 옮긴다
+  hiT = setInterval(() => {
+    if (no !== sayNo) return;
+    const dt = performance.now() - aT;
+    if (!t0 || (gotB && dt < 700)) return;
+    const i = idxAt(aCh + dt / 1000 * cps * u.rate);
+    if (i > cur) mark(i);
+  }, 120);
+  const go = () => { synth.speak(u); begin(); };
   // 읽던 것이 있으면 끊고 조금 뒤에 (끊자마자 말하면 크롬이 새 말을 버린다). 처음은 누른 그 순간에 바로(아이폰은 누를 때만 시작된다)
-  if (synth.speaking || synth.pending) { synth.cancel(); setTimeout(() => { if (no === sayNo && listening) synth.speak(u); }, 80); }
-  else synth.speak(u);
+  if (synth.speaking || synth.pending) { synth.cancel(); setTimeout(() => { if (no === sayNo && listening) go(); }, 80); }
+  else go();
+  if ('mediaSession' in navigator) { // 잠금 화면 · 알림 줄에 지금 읽는 구절
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: spoken.slice(0, 90), artist: item.source || '올리브바스켓', album: '올리브바스켓', artwork: [{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' }] });
+      navigator.mediaSession.playbackState = 'playing';
+    } catch {}
+  }
+}
+// 화면을 꺼도(다른 앱으로 가도) 이어 읽게: 소리 없는 10초짜리 음원을 되풀이해 틀어 둔다 → 브라우저가 '재생 중'으로 보고 페이지를 재우지 않는다
+let keep = null;
+function keepOn() {
+  if (!keep) {
+    const n = 8000 * 10, b = new Uint8Array(44 + n), d = new DataView(b.buffer);
+    [[0, 0x52494646], [8, 0x57415645], [12, 0x666d7420], [36, 0x64617461]].forEach(([o, x]) => d.setUint32(o, x));
+    d.setUint32(4, 36 + n, true); d.setUint32(16, 16, true); d.setUint16(20, 1, true); d.setUint16(22, 1, true);
+    d.setUint32(24, 8000, true); d.setUint32(28, 8000, true); d.setUint16(32, 1, true); d.setUint16(34, 8, true); d.setUint32(40, n, true);
+    b.fill(128, 44);
+    keep = new Audio(URL.createObjectURL(new Blob([b], { type: 'audio/wav' })));
+    keep.loop = true;
+  }
+  keep.play().catch(() => {});
 }
 function showListen() {
   $listen.classList.toggle('on', listening);
@@ -232,15 +291,36 @@ function showListen() {
 function startListen() {
   listening = true; heard = 0;
   showListen();
-  if (navigator.wakeLock) navigator.wakeLock.request('screen').then(w => { wake = w; if (!listening) w.release(); }).catch(() => {}); // 듣는 동안 화면이 꺼지지 않게
+  keepOn();
+  if (navigator.wakeLock) navigator.wakeLock.request('screen').then(w => { wake = w; if (!listening) w.release(); }).catch(() => {}); // 듣는 동안 화면이 저절로 꺼지지 않게
   const cur = hist[idx];
   if (cur && cur.id) say(cur); else next();
 }
 function stopListen() {
   listening = false; sayNo++;
+  clearInterval(hiT);
   if (synth) synth.cancel();
+  if (keep) keep.pause();
   if (wake) { wake.release().catch(() => {}); wake = null; }
+  $quote.querySelectorAll('.now').forEach(el => el.classList.remove('now'));
+  if ('mediaSession' in navigator) { try { navigator.mediaSession.playbackState = 'paused'; } catch {} }
   showListen();
+}
+// 알약 고르기: 떠 있는 배경 하나가 고른 칸으로 미끄러진다
+function seg(box, opts, val, onPick) {
+  const ind = document.createElement('i'); ind.className = 'seg-ind'; box.append(ind);
+  const btns = opts.map(([v, t]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.dataset.v = v; box.append(b); return b; });
+  const place = now => {
+    const on = btns.find(b => b.classList.contains('on'));
+    if (!on || !on.offsetWidth) return;
+    if (now) ind.style.transition = 'none';
+    ind.style.width = on.offsetWidth + 'px'; ind.style.transform = `translateX(${on.offsetLeft}px)`; ind.style.opacity = 1;
+    if (now) { void ind.offsetWidth; ind.style.transition = ''; }
+  };
+  const set = v => { btns.forEach(b => b.classList.toggle('on', b.dataset.v === String(v))); place(); };
+  box.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.classList.contains('on')) return; set(b.dataset.v); onPick(b.dataset.v); });
+  set(val);
+  return () => place(true);
 }
 if (synth) {
   synth.getVoices(); // 목소리 목록을 미리 불러 둔다
@@ -249,6 +329,40 @@ if (synth) {
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && listening && navigator.wakeLock) navigator.wakeLock.request('screen').then(w => { wake = w; }).catch(() => {});
   });
+  if ('mediaSession' in navigator) {
+    [['play', () => { if (!listening) startListen(); }], ['pause', () => stopListen()], ['nexttrack', () => next()], ['previoustrack', () => prev()]]
+      .forEach(([k, f]) => { try { navigator.mediaSession.setActionHandler(k, f); } catch {} });
+  }
+  // 설정 시트
+  const saveTts = () => { try { localStorage.setItem('ob_tts', JSON.stringify(tts)); } catch {} };
+  const again = () => { const c = hist[idx]; if (listening && c && c.id) say(c); }; // 듣는 중에 바꾸면 지금 구절을 새 설정으로 다시
+  const RATES = ['0.7', '1', '1.2', '1.5', '2'];
+  if (!RATES.includes(String(tts.rate))) tts.rate = 1;
+  const places = [
+    seg(document.getElementById('ttsRate'), RATES.map(v => [v, v + '배']), tts.rate, v => { tts.rate = +v; saveTts(); again(); }),
+    seg(document.getElementById('ttsLoop'), [['0', '한 바퀴만'], ['1', '계속 반복']], +tts.loop ? 1 : 0, v => { tts.loop = +v; saveTts(); }),
+  ];
+  const $voice = document.getElementById('ttsVoice');
+  const $vnote = document.getElementById('ttsVoiceNote');
+  const fillVoices = () => {
+    const vs = koVoices();
+    $voice.hidden = vs.length < 2; $vnote.hidden = vs.length >= 2;
+    $vnote.textContent = vs.length ? '이 기기에는 한국어 목소리가 하나뿐입니다. 폰 설정의 글자 읽어 주기(TTS)에서 다른 목소리를 받을 수 있습니다.' : '이 기기에서 한국어 목소리를 찾지 못했습니다.';
+    $voice.replaceChildren(...vs.map((x, i) => { const o = document.createElement('option'); o.value = x.voiceURI; o.textContent = x.name.replace(/\s*\(.*?\)\s*$/, '') || '목소리 ' + (i + 1); return o; }));
+    if (vs.some(x => x.voiceURI === tts.voice)) $voice.value = tts.voice;
+  };
+  $voice.addEventListener('change', () => { tts.voice = $voice.value; saveTts(); again(); });
+  synth.addEventListener && synth.addEventListener('voiceschanged', fillVoices);
+  const closeTts = () => { $ttsSheet.classList.remove('open'); setTimeout(() => { if (!$ttsSheet.classList.contains('open')) $ttsSheet.hidden = true; }, 280); };
+  $ttsBtn.addEventListener('click', () => {
+    fillVoices();
+    $ttsSheet.hidden = false;
+    places.forEach(f => f());
+    void $ttsSheet.offsetWidth;
+    $ttsSheet.classList.add('open');
+  });
+  $ttsSheet.addEventListener('click', e => { if (!e.target.closest('.src-panel')) closeTts(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$ttsSheet.hidden) closeTts(); });
 }
 
 $srcBtn.addEventListener('click', openSrc);
