@@ -247,13 +247,13 @@ function closeSrc() {
 }
 // ---------- 듣기 (사용자 지시 2026-11-22): 기기의 읽어 주기(Web Speech)로 지금 구절부터 읽고, 끝나면 다음 구절로 넘겨 계속 읽는다.
 //   출처를 골랐으면 그 출처 안에서만. 음성 파일을 만들지 않는다
-//   설정(톱니 단추): 빠르기 · 한 바퀴만/계속 반복 · 목소리. 읽는 낱말을 표시한다. 화면을 꺼도 이어지게 소리 없는 음원을 함께 틀어 둔다
+//   설정(톱니 단추): 빠르기 · 한 바퀴만/계속 반복 · 괄호 안 읽기/건너뛰기 (목소리 고르기는 뺌 — 사용자 지시 2026-11-22). 읽는 낱말을 표시한다. 화면을 꺼도 이어지게 소리 없는 음원을 함께 틀어 둔다
 const $listen = document.getElementById('listenBtn');
 const $ttsBtn = document.getElementById('ttsBtn');
 const $ttsSheet = document.getElementById('ttsSheet');
 const synth = window.speechSynthesis;
 let listening = false, heard = 0, sayNo = 0, curU = null, wake = null, hiT = 0;
-const tts = { rate: 1, loop: 0, voice: '' };
+const tts = { rate: 1, loop: 0, paren: 1 }; // paren: 1 = 괄호 안도 읽기 · 0 = 건너뛰기
 let cps = 7; // 1배속에서 1초에 읽는 글자 수 (낱말 위치를 알려 주지 않는 기기에서 읽는 자리를 어림하는 데 쓴다 — 읽을 때마다 실제 걸린 시간으로 고친다)
 try { Object.assign(tts, JSON.parse(localStorage.getItem('ob_tts') || '{}')); cps = +localStorage.getItem('ob_cps') || 7; } catch {}
 const koVoices = () => synth.getVoices().filter(x => /^ko/i.test(x.lang));
@@ -262,20 +262,27 @@ function say(item) {
   clearInterval(hiT);
   if (!item.id) { stopListen(); return; }
   // 낱말마다 span 으로 나눠 그리고, 읽을 글은 낱말을 빈칸 하나로 이어 만든다 → 읽는 글자 위치로 낱말을 찾는다
+  //   괄호 안을 건너뛰기로 했으면 (…) · （…） 안 글자는 화면에는 그대로 두고 읽을 글에서만 뺀다
   const words = []; let spoken = '';
+  const skip = new Uint8Array(item.text.length);
+  if (!+tts.paren) for (const m of item.text.matchAll(/[(（][^()（）]*[)）]/g)) skip.fill(1, m.index, m.index + m[0].length);
   $quote.textContent = '';
+  let at = 0;
   item.text.split(/(\s+)/).forEach(tok => {
+    const from = at; at += tok.length;
     if (!tok) return;
     if (/^\s+$/.test(tok)) { $quote.append(tok); return; }
     const el = document.createElement('span'); el.className = 'w'; el.textContent = tok; $quote.append(el);
+    const read = [...tok].length === tok.length ? tok.split('').filter((_, i) => !skip[from + i]).join('') : tok;
+    if (!read) return; // 통째로 괄호 안인 낱말
     if (spoken) spoken += ' ';
     words.push({ el, start: spoken.length });
-    spoken += tok;
+    spoken += read;
   });
+  if (!spoken) spoken = ' ';
   const u = curU = new SpeechSynthesisUtterance(spoken);
   u.lang = 'ko-KR'; u.rate = +tts.rate || 1;
-  const vs = koVoices();
-  const v = vs.find(x => x.voiceURI === tts.voice) || vs[0];
+  const v = koVoices()[0];
   if (v) u.voice = v;
   let cur = -1, t0 = 0, aCh = 0, aT = 0, gotB = false; // aCh · aT = 기기가 마지막으로 알려 준 글자 위치와 그때
   const mark = i => { if (i === cur || !words[i]) return; if (words[cur]) words[cur].el.classList.remove('now'); cur = i; words[i].el.classList.add('now'); };
@@ -385,21 +392,10 @@ if (synth) {
   const places = [
     seg(document.getElementById('ttsRate'), RATES.map(v => [v, v + '배']), tts.rate, v => { tts.rate = +v; saveTts(); again(); }),
     seg(document.getElementById('ttsLoop'), [['0', '한 바퀴만'], ['1', '계속 반복']], +tts.loop ? 1 : 0, v => { tts.loop = +v; saveTts(); }),
+    seg(document.getElementById('ttsParen'), [['1', '읽기'], ['0', '건너뛰기']], +tts.paren ? 1 : 0, v => { tts.paren = +v; saveTts(); again(); }),
   ];
-  const $voice = document.getElementById('ttsVoice');
-  const $vnote = document.getElementById('ttsVoiceNote');
-  const fillVoices = () => {
-    const vs = koVoices();
-    $voice.hidden = vs.length < 2; $vnote.hidden = vs.length >= 2;
-    $vnote.textContent = vs.length ? '이 기기에는 한국어 목소리가 하나뿐입니다. 폰 설정의 글자 읽어 주기(TTS)에서 다른 목소리를 받을 수 있습니다.' : '이 기기에서 한국어 목소리를 찾지 못했습니다.';
-    $voice.replaceChildren(...vs.map((x, i) => { const o = document.createElement('option'); o.value = x.voiceURI; o.textContent = x.name.replace(/\s*\(.*?\)\s*$/, '') || '목소리 ' + (i + 1); return o; }));
-    if (vs.some(x => x.voiceURI === tts.voice)) $voice.value = tts.voice;
-  };
-  $voice.addEventListener('change', () => { tts.voice = $voice.value; saveTts(); again(); });
-  synth.addEventListener && synth.addEventListener('voiceschanged', fillVoices);
   const closeTts = () => { $ttsSheet.classList.remove('open'); setTimeout(() => { if (!$ttsSheet.classList.contains('open')) $ttsSheet.hidden = true; }, 280); };
   $ttsBtn.addEventListener('click', () => {
-    fillVoices();
     $ttsSheet.hidden = false;
     places.forEach(f => f());
     void $ttsSheet.offsetWidth;

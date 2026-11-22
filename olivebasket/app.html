@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/noto-serif-kr@5.2.5/index.css" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="style.css?v=36">
+<link rel="stylesheet" href="style.css?v=37">
 <!-- 시작 화면(로고 · 이름): 설치한 앱으로 열면 휴대폰이 이미 로고 · 이름 화면을 보여 주므로 한 번 더 띄우지 않는다 (사용자 지시 2026-11-04).
      브라우저로 열 때만, 그것도 처음 한 번만 (당겨서 새로고침 때는 생략) -->
 <script>try { if (sessionStorage.getItem('ob_splash') || matchMedia('(display-mode: standalone)').matches || navigator.standalone) document.documentElement.classList.add('nosplash'); } catch {}</script>
@@ -62,18 +62,18 @@
 <button type="button" class="ob-lset" id="ttsBtn" aria-label="듣기 설정" aria-haspopup="dialog" hidden>
   <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h9M18 7h2M4 17h2M11 17h9"/><circle cx="15.5" cy="7" r="2.3"/><circle cx="8.5" cy="17" r="2.3"/></svg>
 </button>
-<!-- 듣기 설정: 빠르기 · 반복 · 목소리 -->
+<!-- 듣기 설정: 빠르기 · 반복 · 괄호 안 읽기 -->
 <div class="src-sheet" id="ttsSheet" hidden>
   <div class="src-panel tts-panel" role="dialog" aria-label="듣기 설정">
     <div class="src-head">듣기 설정</div>
     <div class="tts-row"><span class="tts-l">빠르기</span><div class="seg" id="ttsRate" role="group" aria-label="빠르기"></div></div>
     <div class="tts-row"><span class="tts-l">반복</span><div class="seg" id="ttsLoop" role="group" aria-label="반복"></div></div>
-    <div class="tts-row"><span class="tts-l">목소리</span><select id="ttsVoice" aria-label="목소리" hidden></select><p class="tts-note" id="ttsVoiceNote" hidden></p></div>
+    <div class="tts-row"><span class="tts-l">괄호 안</span><div class="seg" id="ttsParen" role="group" aria-label="괄호 안 글"></div></div>
   </div>
 </div>
 
 <a class="ob-fab" id="addLink" href="/basket" aria-label="올리브바스켓에 담기"><span class="ob-fab-plus" aria-hidden="true">+</span>담기</a>
 
-<script src="app.js?v=41"></script>
+<script src="app.js?v=42"></script>
 </body>
 </html>
