@@ -7,6 +7,7 @@ import { clientLabel, DEFAULT_BODY, contractHtml, a4Overflow, downloadPdf, won, 
 
 let deps = null; // { view, api, shrinkImage }
 let data = { items: [], eul: {}, host: 'sign.plators.com' };
+let customers = [];   // xim '고객' 목록 — 갑 업체명에서 고른다
 
 const signUrl = (code) => `https://${data.host}/${code}`;
 const digits = (v) => String(v ?? '').replace(/[^\d]/g, '');
@@ -15,7 +16,7 @@ const comma = (v) => (digits(v) ? Number(digits(v)).toLocaleString('ko-KR') : ''
 export async function renderContracts(d) {
   deps = d;
   const { view, api } = deps;
-  data = await api('/contracts');
+  [data, customers] = await Promise.all([api('/contracts'), api('/customers').catch(() => [])]);
   const n = { all: data.items.length, wait: data.items.filter((c) => c.status !== 'signed').length };
   view.innerHTML = `
     <div class="bar"><h2>계약서 ${n.all}</h2>
@@ -45,6 +46,14 @@ function row(c) {
   </div>`;
 }
 
+// 갑 업체명: xim '고객' 에서 고르거나 직접 입력. 고객을 고르면 업체명 · 대표자명(담당자) · 연락처 · 이메일을 끌어온다 (사용자 지시 2026-11-22)
+//   고객이 하나도 없으면 그냥 적는 칸. 업체명이 고객 목록에 없는 값이면 '직접 입력' 으로 열린다
+function companyField(v) {
+  const hit = customers.find((x) => x.name === v);
+  if (!customers.length) return `<label class="field"><span>갑 업체명</span><input class="input" name="client_company" maxlength="60" value="${esc(v)}" placeholder="업체 이름"></label>`;
+  return `<div class="field"><span>갑 업체명</span><select class="input" data-cust aria-label="고객에서 고르기"><option value="">직접 입력</option>${customers.map((x) => `<option value="${x.id}"${hit && hit.id === x.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select><input class="input ct-own" name="client_company" maxlength="60" value="${esc(v)}" placeholder="업체 이름" aria-label="갑 업체명 직접 입력"${hit ? ' hidden' : ''}></div>`;
+}
+
 // 금액 · 기간 · 용량 · 계약일 묶음 — 새 계약서 창과 고치기 화면이 같이 쓴다
 //   관리비: 30,000 · 60,000 · 90,000 · 120,000 중에 고르거나 직접 입력, 저장 용량: 1GB · 500MB · 300MB 또는 직접 입력 (사용자 지시 2026-11-22)
 const FEE_SIZES = ['30000', '60000', '90000', '120000'];
@@ -72,7 +81,7 @@ function newContract() {
     <h2>새 계약서</h2>
     <form data-f>
       <div class="row2">
-        <label class="field"><span>갑 업체명</span><input class="input" name="client_company" maxlength="60" placeholder="업체 이름"></label>
+        ${companyField('')}
         <label class="field"><span>갑 대표자명</span><input class="input" name="client_name" maxlength="60" placeholder="대표자 이름"></label>
       </div>
       <div class="row2">
@@ -108,6 +117,16 @@ function moneyInputs(root) {
   // 기간(년): 숫자만
   const y = root.querySelector('[data-years]');
   if (y) y.addEventListener('input', () => { y.value = digits(y.value).replace(/^0+/, '').slice(0, 2); });
+  // 갑 업체명: 고객을 고르면 네 칸을 채우고, '직접 입력' 이면 업체명 칸을 보여 준다
+  const sel = root.querySelector('[data-cust]');
+  if (sel) sel.addEventListener('change', () => {
+    const f = sel.closest('form'); const co = f.elements.client_company;
+    const x = customers.find((y) => String(y.id) === sel.value);
+    co.hidden = !!x;
+    if (x) { co.value = x.name; f.elements.client_name.value = x.contact || ''; f.elements.client_phone.value = x.phone || ''; f.elements.client_email.value = x.email || ''; }
+    else { co.focus(); co.select(); }
+    co.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   // 관리비 · 저장 용량: 정해진 값 중에 고르거나 '직접 입력' 을 누르면 적는 칸이 나온다
   const pick = (sel, name, sizes, norm, show) => root.querySelectorAll(sel).forEach((box) => {
     const inp = box.parentElement.querySelector(`input[name="${name}"]`);
@@ -144,7 +163,7 @@ async function editContract(id, fresh = false) {
         <div class="ct-ed-foot"><button class="btn sm danger" type="button" data-del>삭제</button><span class="iq-grow"></span><button class="btn primary" type="button" data-pdf>PDF 내려받기</button></div></div>`
     : `<form class="card ct-ed-form" data-f>
       <div class="row2">
-        <label class="field"><span>갑 업체명</span><input class="input" name="client_company" maxlength="60" value="${esc(c.client_company || '')}" placeholder="업체 이름"></label>
+        ${companyField(c.client_company || '')}
         <label class="field"><span>갑 대표자명</span><input class="input" name="client_name" maxlength="60" value="${esc(c.client_name || '')}" placeholder="대표자 이름"></label>
       </div>
       <div class="row2">
