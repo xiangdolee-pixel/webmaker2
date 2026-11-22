@@ -111,7 +111,7 @@
   f();
 })();
 
-// 첫 화면 가림막 — 들어오면 어두워지고 가운데 동그란 '홈페이지 제작신청' 을 누르면 걷히고 제작문의 창이 뜬다. 오른쪽 위 '닫기' 는 그냥 걷는다
+// 첫 화면 가림막 — 들어오면 어두워지고 가운데 동그란 '홈페이지 제작신청' 을 누르면 걷히고 제작문의 창이 뜬다. 오른쪽 위 '닫기' · 둘레 어두운 곳은 그냥 걷는다
 (function () {
   var gate = document.getElementById('gate'), btn = document.getElementById('gate-btn'), main = document.querySelector('main');
   if (!gate || !btn) return;
@@ -128,4 +128,5 @@
   });
   var x = document.getElementById('gate-x');
   if (x) x.addEventListener('click', close);
+  gate.addEventListener('click', function (e) { if (e.target === gate) close(); });   // 버튼 둘레 어두운 곳을 눌러도 걷힌다
 })();
