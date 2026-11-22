@@ -29,6 +29,32 @@ T = dict(
     t11=("team/t11", "윤*은", "작업치료사 · 감각발달재활사", "2센터"),
     t12=("team/t12", "윤*희", "작업치료사 · 특수체육지도사 2급", "2센터"),
 )
+# 선생님들의 한마디(전문가 소개 게시판에 실린 실제 문장 — pages_about.TEAM 의 quote 와 같다. 지어내지 않는다).  키: (말, 맡은 일)
+Q = dict(
+    t02=("언어로 이어진 세상에서 소통의 열쇠가 되어 주는 선생님이 되겠습니다.", "언어치료 · 1급 언어재활사"),
+    t18=("언어는 자신감! 에너지와 파이팅 넘치는 수업을 약속드립니다.", "언어치료 · 2급 언어재활사"),
+    t21=("아이들을 사랑하는 마음으로 함께 소통하고 즐겁게 수업하며 행복을 주는 선생님이 되겠습니다.", "언어치료 · 1급 언어재활사"),
+    t23=("늦게 피는 꽃은 있어도 피지 않는 꽃은 없습니다.", "언어치료 · 2급 언어재활사"),
+    t03=("한결같은 마음으로 채워 주고 지지하겠습니다.", "놀이 · 미술치료사"),
+    t04=("언제나 아이들에게 귀를 기울이고 함께 하며 따라가도록 하겠습니다.", "임상심리사 · 놀이치료사"),
+    t05=("단단하게 쌓아 올린 마음의 벽을 봄눈 녹듯 사르르 녹일 수 있는 포근하고 편한 시간이 되도록 하겠습니다.", "임상심리사 · 놀이치료사"),
+    t06=("여러분의 소중한 시간을 안전한 공간에서 함께 나누며 작은 변화를 만들어 나가고 싶어요. 마음의 작은 소리에 귀 기울이며, 따뜻한 치유의 시간을 함께해요.", "놀이 · 미술치료사"),
+    t07=("아이들이 성장하는 모습을 함께할 수 있어서 늘 감사합니다. 사랑으로 우리 아이들을 보듬으며 지도하겠습니다.", "인지치료사"),
+    t08=("신뢰와 믿음을 바탕으로 우리 아이가 성장할 수 있도록 책임감을 가지고 지도하겠습니다.", "감각통합치료사"),
+    t10=("아동이 가지고 있는 강점을 발견하고 키워서, 발달 과정에 좋은 자양분이 될 수 있도록 하겠습니다.", "감각통합치료사"),
+    t11=("아이들의 속도를 존중하며 곁에서 함께하겠습니다.", "감각통합치료사"),
+    t12=("아동 특성에 맞는 긍정적 피드백으로 아이들이 발달해 가는 모습으로 보답하겠습니다.", "감각통합치료사"),
+    t13=("즐겁게 소통하며, 감정을 안전하게 표현할 수 있는 공간, 마음을 치유할 수 있는 시간을 함께 만들어 나가겠습니다.", "심리상담사 1급 · 미술치료사"),
+    t14=("아이들이 자신을 마음껏 표현할 수 있도록 안전하고 편안한 공간을 만들겠습니다. 즐거운 놀이 경험 속에서 안정되게 잘 성장할 수 있도록 더욱 노력하겠습니다.", "임상심리사 · 놀이치료사"),
+    t15=("아동 특성에 맞는 긍정적 피드백으로, 아이들이 발달해 가는 모습으로 보답하겠습니다.", "임상심리사 · 놀이치료사"),
+)
+def who(k): return T[k][1] + " 선생님"
+def says(keys, **kw):
+    """한마디 줄 — 그 치료를 맡은 선생님의 실제 한마디 2 ~ 3개"""
+    return voices([(Q[k][0], who(k), Q[k][1], T[k][0]) for k in keys], **kw)
+def big(k):
+    """크게 인용할 한마디(문장마다 줄을 바꾼다)"""
+    return "“" + Q[k][0].replace(". ", ".<br>").replace("! ", "!<br>").replace("기울이며, ", "기울이며,<br>") + "”"
 def people(rows):
     """작은 선생님 카드 — rows = [(키, 맡은 일)]"""
     out = []
@@ -36,14 +62,15 @@ def people(rows):
         im, name, cert, where = T[k]
         out.append(f'<div class="tm rv"><div class="tm-face">{img(im, name + " 선생님")}</div><small>{role}</small><b>{name}<em>{where}</em></b><span class="tm-c">{cert}</span></div>')
     return '<div class="team">' + "".join(out) + "</div>"
+def tel(t): return f'<a href="tel:{t.replace("-", "")}" style="white-space:nowrap"><b>{t}</b></a>'
 def centers(keys):
-    rows = []
+    out = []
     for k in keys:
         b = BR[k]
-        rows.append((b["short"], [f'{b["addr"]} {b["addr2"]}', f'<a href="tel:{b["tel"].replace("-", "")}"><b>{b["tel"]}</b></a>'] if b["tel"] else [f'{b["addr"]} {b["addr2"]}']))
-    return dl(rows)
+        out.append(f'<b>{b["short"]}</b> — {b["addr"]} {b["addr2"]}' + (f' · {tel(b["tel"])}' if b["tel"] else ""))
+    return out
 
-CARD = dict(  # 같이 보면 좋은 치료 카드: 그림, 한 줄
+CARD = dict(  # 같이 보면 좋은 치료 카드: 그림, 이름, 한 줄
     speech=("p_speech", "언어치료", "언어 발달 수준을 평가하고 아이에게 맞는 계획으로 진행합니다."),
     play=("p_play", "놀이치료", "놀이를 통해 마음 상태를 살피고 정서적 어려움을 풀어 갑니다."),
     art=("p_art", "미술치료", "미술 매체로 내면의 감정을 표현하도록 돕습니다."),
@@ -51,122 +78,165 @@ CARD = dict(  # 같이 보면 좋은 치료 카드: 그림, 한 줄
     cognitive=("p_cognitive", "인지치료", "이해하고 처리하는 힘, 학습의 기초를 다집니다."),
     counsel=("p_counsel", "심리상담", "유아 · 아동부터 청소년 · 성인까지 연령별로 상담합니다."),
 )
-def related(files, eb="같이 보면 좋은 치료", h2="함께 살펴보면 <em>도움이 되는 치료</em>"):
+def related(files):
     cards = "".join(f'<a class="pc rv" href="{href(f)}"><div class="pc-img">{img(CARD[f][0], "")}</div><div class="pc-b"><small>{"유아 ~ 성인" if f == "counsel" else "1:1 치료"}</small><h3>{CARD[f][1]}</h3><p>{CARD[f][2]}</p>{more()}</div></a>' for f in files)
-    return head(eb, h2, "어떤 치료가 맞는지는 초기 상담과 평가 뒤에 함께 정합니다.") + f'<div class="cards">{cards}</div>'
+    return head("같이 보면 좋은 치료", "함께 살펴보면 <em>도움이 되는 치료</em>", "어떤 치료가 맞는지는 초기 상담과 평가 뒤에 함께 정합니다.", kind="line") + f'<div class="cards">{cards}</div>'
 
 VOUCHER = dict(dev="발달재활", com1="영유아 발달지원", com2="아동청소년 심리지원", edu="교육청(굳센카드)")
+SAY = "킨더윌은 우리 아이들에게 꼭 필요한 치료만을 권장하며 불필요한 치료를 권하지 않습니다."   # 현재 홈페이지 치료 5쪽의 머리 문장 그대로
 
+# 그림: bg = 머리 사진 / top = 첫 구간 ("duo", 큰 사진, 작은 사진, 캡션, 대체글, 대체글) 또는 ("fig", 사진, 캡션, 대체글, 모양)
+#       side = '이런 경우' 옆 세로 사진(없으면 두 단 줄 목록) / scene = 쉬어 가는 장면(사진, 대체글, 보일 자리) — 없으면 한마디만 크게
+#       say1 = 크게 인용할 선생님, say = 한마디 줄에 실을 선생님(Q 의 키).  lead = 현재 홈페이지 "○○치료 과정" 소개 문장
 THERAPY = [
-    dict(file="speech", name="언어치료", bg="p_speech", pic=("c1speech", "작은 책상과 교구장이 있는 언어치료실", "tall"),
+    dict(file="speech", name="언어치료", bg="p_speech", bg_pos="40% 60%",
+         top=("fig", "c1speech", "1센터 언어치료실", "작은 책상과 교구장이 있는 1센터 언어치료실", "tall arch dot"),
+         scene=("p_mirror", "거울 앞에서 입 모양 카드를 보며 발음을 연습하는 아이와 선생님", "62% 45%"), say1="t02", say=["t23", "t18", "t21"],
          ph="말이 늦거나 발음 · 유창성이 걱정될 때, 평가에서 시작하는 1:1 언어치료입니다.",
-         lead="언어치료는 아이의 <em>언어 발달 수준을 평가</em>하고, 아이에게 맞춘 치료 계획에 따라 체계적으로 진행합니다.",
-         needs=["언어발달지연<small>수용 언어 · 표현 언어 · 단순 언어 장애</small>", "조음장애<small>부정확한 발음</small>", "유창성장애<small>말 더듬기 · 빨리 말하기</small>",
-                "지적장애로 인한 언어발달지연", "신경언어장애<small>뇌 손상</small>", "청각장애<small>청력 손실</small>", "의사소통 기술의 어려움<small>화용언어 · 공감언어 사용의 어려움</small>"],
+         lead="언어치료는 아이의 <em>언어 발달 수준을 평가</em>하고, 개별 맞춤형 치료 계획을 통해 체계적으로 진행됩니다.",
+         needs=[("언어발달지연", "수용 언어 · 표현 언어 · 단순 언어 장애"), ("조음장애", "부정확한 발음"), ("유창성장애", "말 더듬기 · 빨리 말하기"),
+                ("지적장애로 인한 언어발달지연", ""), ("신경언어장애", "뇌 손상"), ("청각장애", "청력 손실"), ("의사소통 기술의 어려움", "화용언어 · 공감언어 사용의 어려움")],
          needs_note="킨더윌 언어치료는 <b>아동 · 성인 치료 모두 가능</b>합니다. 성인 언어치료가 필요하신 분도 편하게 문의해 주세요.",
          step2=("초기 상담 및 언어 검사", "상담 뒤 언어 검사로 아이의 언어 상태를 평가합니다."),
          team=[("lee", "대표원장")] + [(k, "언어치료") for k in "t02 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25".split()],
          vouchers=["dev", "com1", "com2", "edu"], vnote="", centers=["c1", "c2", "c3"], rel=["play", "sensory", "cognitive"]),
-    dict(file="play", name="놀이치료", bg="p_play", pic=("c2play", "주방놀이와 인형의 집이 있는 놀이치료실", "tall"),
+    dict(file="play", name="놀이치료", bg="p_play", bg_pos="50% 70%",
+         top=("duo", "p_sand", "c1play", "모래놀이 상자 · 1센터 놀이치료실", "모래 상자에 동물과 집 모형을 놓는 아이의 손", "장난감 선반과 놀이 매트가 있는 1센터 놀이치료실"),
+         side=("c2play", "2센터 놀이치료실", "주방놀이와 인형의 집이 있는 2센터 놀이치료실"), say1="t14", say=["t04", "t15"],
          ph="마음과 관계의 어려움을 아이에게 가장 편한 말, 놀이로 풀어 갑니다.",
-         lead="놀이치료는 초기 상담과 평가로 아이의 마음 상태를 살피고, <em>놀이를 통해</em> 정서적인 어려움을 풀어 가도록 돕습니다.",
-         needs=["상호작용이 부족하고 또래 관계를 잘 맺지 못하는 아이", "감정 조절이 어려운 아이", "불안 · 우울하거나 위축된 아이", "주의 집중이 어렵고 충동성을 조절하기 힘든 아이",
-                "놀이 기능이 많이 부족한 아이", "부모 · 형제와의 관계에서 어려움을 보이는 아이"],
+         lead="놀이치료는 초기 상담과 평가로 아이의 마음 상태를 살피고, <em>놀이를 통해</em> 정서적인 어려움을 풀어 가도록 돕는 맞춤형 치료입니다.",
+         needs=[("상호작용이 부족하고 또래 관계를 잘 맺지 못하는 아이", ""), ("감정 조절이 어려운 아이", ""), ("불안 · 우울하거나 위축된 아이", ""), ("주의 집중이 어렵고 충동성을 조절하기 힘든 아이", ""),
+                ("놀이 기능이 많이 부족한 아이", ""), ("부모 · 형제와의 관계에서 어려움을 보이는 아이", "")],
          step2=("초기 상담 및 놀이 평가", "상담 뒤 놀이를 통해 아이의 상태와 마음을 살핍니다."),
          team=[(k, "놀이치료") for k in "t04 t14 t15".split()],
          vouchers=["dev", "com1", "com2", "edu"], vnote="", centers=["c1", "c2"], rel=["art", "speech", "counsel"]),
-    dict(file="art", name="미술치료", bg="p_art", pic=("p_book", "색종이와 그림책이 놓인 책상에서 만들기를 하는 아이의 손", ""),
+    dict(file="art", name="미술치료", bg="p_art", bg_pos="50% 55%",
+         top=("fig", "p_clay", "점토로 빚어 보는 시간", "색 점토를 주무르는 아이의 손과 점토로 만든 사자 · 코끼리", "arch dot"),
+         scene=("p_book", "색종이와 그림책이 놓인 책상에서 만들기를 하는 아이의 손", "70% 60%"), say1="t05", say=["t03", "t13"],
          ph="말로 하기 어려운 감정을 그림과 만들기로 표현하도록 돕습니다.",
-         lead="미술치료는 초기 상담과 평가로 아이의 상태를 살피고, <em>미술 매체</em>로 내면의 감정을 표현하도록 돕습니다.",
-         needs=["상호작용이 부족하고 또래 관계를 잘 맺지 못하는 아이", "감정 조절이 어려운 아이", "불안 · 우울하거나 위축된 아이", "주의 집중이 어렵고 충동성을 조절하기 힘든 아이",
-                "자기표현(감정 표현)이 어려운 아이", "부모 · 형제와의 관계에서 어려움을 보이는 아이"],
+         lead="미술치료는 초기 상담과 평가로 아이의 상태를 살피고, <em>미술 매체</em>를 활용해 내면의 감정을 표현하도록 돕는 맞춤형 치료 프로그램입니다.",
+         needs=[("상호작용이 부족하고 또래 관계를 잘 맺지 못하는 아이", ""), ("감정 조절이 어려운 아이", ""), ("불안 · 우울하거나 위축된 아이", ""), ("주의 집중이 어렵고 충동성을 조절하기 힘든 아이", ""),
+                ("자기표현(감정 표현)이 어려운 아이", ""), ("부모 · 형제와의 관계에서 어려움을 보이는 아이", "")],
          step2=("초기 상담 및 평가", "상담 뒤 아이의 상태와 마음을 살핍니다."),
          team=[(k, "미술치료") for k in "t03 t05 t13 t06".split()],
          vouchers=["dev", "com1", "com2", "edu"], vnote="", centers=["c2"], rel=["play", "counsel", "sensory"]),
-    dict(file="sensory", name="감각통합치료", bg="c2sensory", pic=("p_sensory", "천 그네에 앉은 아이의 뒷모습과 그네를 잡아 주는 선생님", ""),
+    dict(file="sensory", name="감각통합치료", bg="c2sensory", bg_pos="50% 62%",
+         top=("duo", "p_sensory", "c2sensory2", "그네 활동 · 2센터 감각통합치료실", "천 그네에 앉은 아이의 뒷모습과 그네를 잡아 주는 선생님", "암벽과 평균대가 있는 2센터 감각통합치료실"),
+         scene=("p_tunnel", "무지개색 천 터널을 기어서 지나가는 아이", "60% 55%"), say1="t11", say=["t08", "t10", "t12"],
          ph="감각 · 자세 · 조절의 어려움을 몸으로 겪고 익히며 풀어 갑니다.",
-         lead="감각통합치료는 초기 상담과 평가로 아이의 상태를 살피고, 맞춤 계획을 세워 <em>신체와 감각 기능</em>의 발달을 돕습니다.",
-         needs=["감각이 예민하거나 둔감한 아이", "감각 자극을 추구하는 아이", "착석이 어려운 아이", "자기 조절 능력이 부족한 아이",
-                "대근육 발달이 부족한 아이", "소근육 발달이 부족한 아이", "협응 능력이 부족한 아이", "상호작용이 부족하고 언어 발달이 느린 아이"],
+         lead="감각통합치료는 초기 상담과 평가로 아이의 상태를 살피고, 맞춤형 치료 계획을 세워 <em>신체와 감각 기능</em>의 발달을 돕는 프로그램입니다.",
+         needs=[("감각이 예민하거나 둔감한 아이", ""), ("감각 자극을 추구하는 아이", ""), ("착석이 어려운 아이", ""), ("자기 조절 능력이 부족한 아이", ""),
+                ("대근육 발달이 부족한 아이", ""), ("소근육 발달이 부족한 아이", ""), ("협응 능력이 부족한 아이", ""), ("상호작용이 부족하고 언어 발달이 느린 아이", "")],
          step2=("초기 상담 및 평가", "상담 뒤 아이의 상태를 평가합니다."),
          team=[(k, "감각통합치료") for k in "t08 t09 t10 t11 t12".split()],
          vouchers=["dev", "com1", "com2", "edu"], vnote="", centers=["c2"], rel=["speech", "play", "cognitive"]),
-    dict(file="cognitive", name="인지치료", bg="p_cognitive", pic=("p_parent", "기록지를 함께 보며 이야기하는 보호자 상담", ""),
+    dict(file="cognitive", name="인지치료", bg="p_cognitive", bg_pos="55% 55%",
+         top=("duo", "p_sheet", "p_test", "활동지 · 초기 평가", "같은 그림을 찾아 스티커를 붙이는 활동지와 아이의 손", "블록을 쌓는 아이와 기록지에 적는 선생님의 손"),
+         say1="t07", say=[],
          ph="이해하고 처리하는 힘, 집중과 학습의 기초를 다지도록 돕습니다.",
-         lead="인지치료는 초기 상담과 평가로 아이의 <em>인지 · 학습 능력</em>을 살피고, 아이에게 맞춘 치료 계획으로 진행합니다.",
-         needs=["과제를 체계적으로 해내는 데 어려움이 있는 아이", "정보를 이해하고 처리하는 속도가 느린 아이", "학습 동기는 있으나 학습 방법을 모르는 아이", "주의 집중이 짧고 산만한 아이",
-                "지능은 평균이거나 그 이상이지만 특정 영역이 어려운 아이<small>읽기 · 쓰기 · 셈 · 독해력 등</small>", "발달장애로 교육적 도움이 필요한 아이"],
+         lead="인지치료는 초기 상담과 평가로 아이의 <em>인지 · 학습 능력</em>을 살피고, 아이에게 맞춘 치료 계획을 통해 진행됩니다.",
+         needs=[("과제를 체계적으로 해내는 데 어려움이 있는 아이", ""), ("정보를 이해하고 처리하는 속도가 느린 아이", ""), ("학습 동기는 있으나 학습 방법을 모르는 아이", ""), ("주의 집중이 짧고 산만한 아이", ""),
+                ("지능은 평균이거나 그 이상이지만 특정 영역이 어려운 아이", "읽기 · 쓰기 · 셈 · 독해력 등"), ("발달장애로 교육적 도움이 필요한 아이", "")],
          step2=("초기 상담 및 평가", "상담 뒤 아이의 상태를 평가합니다."),
          team=[("t07", "인지치료")],
          vouchers=["dev"], vnote="교육청 바우처는 인지 영역을 지원하지 않습니다. 그 밖의 바우처로 이용할 수 있는지는 상담 때 안내해 드립니다.", centers=["c2"], rel=["speech", "sensory", "play"]),
 ]
 
 def therapy(d):
-    n = d["name"]; pic, alt, pcls = d["pic"]
-    intro = sec(f'<div class="two">'
-                f'<div class="stack"><p class="lead rv">{d["lead"]}</p>'
-                f'<div class="body rv"><p>킨더윌은 아이에게 꼭 필요한 치료만 권하며 불필요한 치료는 권하지 않습니다. 그래서 치료를 시작하기 전에 초기 상담과 평가로 아이의 상태를 먼저 살피고, 치료가 필요한지부터 보호자와 함께 정합니다.</p></div>'
-                f'<div class="rv">{ticks(["1:1 수업 40분 + 보호자 상담 10분", "회기마다 담당 치료사가 목표를 점검", "사후검사로 종결 시기를 함께 결정"])}</div>'
-                f'<div class="about-act rv">{btn("상담 문의하기", href("contact"))}{btn("진행 과정 보기", "#steps", "btn-line", arrow=False)}</div></div>'
-                f'<div class="rv">{shot(pic, alt, pcls)}</div></div>')
-    need = sec(head("이런 경우에 도움이 됩니다", f"{n}, <em>이럴 때</em> 살펴보세요", "아래와 비슷한 모습이 보인다면 상담에서 함께 살펴볼 수 있습니다. 치료가 필요한지는 평가 뒤에 정합니다.")
-               + f'<div class="stack">{needs(d["needs"])}{note(d["needs_note"]) if d.get("needs_note") else ""}</div>', soft=True)
+    n = d["name"]; t = d["top"]; sc = d.get("scene")
+    pic = duo(t[1], t[2], t[3], alt_a=t[4], alt_b=t[5], flip=True) if t[0] == "duo" else figure(t[1], t[2], alt=t[3], cls=t[4])
+    # 1. 소개: 원문 한 문장 + 사진, 아래에 큰 숫자 줄(수업 시간)
+    intro = sec(f'<div class="stack-lg"><div class="two{" wide-l" if "tall" in t[4] else ""}"><div class="stack"><p class="lead rv">{d["lead"]}</p>'
+                f'<div class="body rv"><p>치료를 시작하기 전에 초기 상담과 평가로 아이의 상태를 먼저 살피고, 치료가 필요한지부터 보호자와 함께 정합니다. 수업이 끝나면 매번 담당 치료사가 그날의 수업 내용과 아이의 모습을 보호자께 말씀드립니다.</p></div>'
+                f'<div class="about-act rv">{btn("상담 문의하기", href("contact"))}{btn("진행 과정 보기", "#steps", "btn-line", arrow=False)}</div></div>{pic}</div>'
+                + nums([("1:1", "", "담당 치료사와 개별 수업"), ("40", "분", "매회 수업 시간"), ("10", "분", "수업 뒤 보호자 상담"), ("6", "단계", "예약부터 종결까지")]) + "</div>")
+    # 2. 이런 경우에 도움이 됩니다: 줄 목록(옆에 세로 사진이 있으면 한 단, 없으면 두 단)
+    nh = head("이런 경우에 도움이 됩니다", f"{n}, <em>이럴 때</em> 살펴보세요", "아래와 비슷한 모습이 보인다면 상담에서 함께 살펴볼 수 있습니다. 치료가 필요한지는 평가 뒤에 정합니다.")
+    nt = note(d["needs_note"]) if d.get("needs_note") else ""
+    if d.get("side"):
+        s = d["side"]
+        need = sec(nh + f'<div class="two wide-r top">{figure(s[0], s[1], alt=s[2], cls="tall arch")}<div class="stack">{rows(d["needs"])}{nt}</div></div>', soft=True)
+    else:
+        need = sec(nh + f'<div class="stack">{rows(d["needs"], cols=2)}{nt}</div>', soft=True)
+    # 3. 쉬어 가는 장면: 그 치료를 맡은 선생님의 한마디(사진이 없으면 글만 크게)
+    k1 = d["say1"]
+    mid = (scene(sc[0], big(k1), by=who(k1), role=Q[k1][1], alt=sc[1], pos=sc[2]) if sc
+           else sec(f'<div class="center">{quote(big(k1), by=who(k1), role=Q[k1][1])}</div>', tone="peach"))
+    # 4. 진행 과정: 번호 흐름 6단계
     st = [("초기 상담 예약", "전화로 초기 상담을 예약합니다."), d["step2"], ("검사 결과 상담", "결과를 바탕으로 치료가 필요한지 정하고 보호자와 상담합니다."),
           ("치료 시작", "매회 40분 수업과 10분 보호자 상담으로 진행합니다."), ("회기 목표 상담", "회기마다 담당 치료사가 목표를 이루었는지 점검하고 상담합니다."),
           ("사후검사 및 종결", "사후검사로 목표를 이룬 부분을 평가하고 종결 시기를 정합니다.")]
-    proc = sec(head("진행 과정", f"{n}는 <em>이렇게 진행</em>됩니다", "예약부터 종결까지 여섯 단계입니다.")
-               + f'<div class="stack">{steps(st)}{box("매회 수업 40분 + 보호자 상담 10분", "수업이 끝나면 매번 담당 치료사가 그날 수업 내용과 아이의 모습을 보호자께 말씀드립니다. 궁금한 점은 이 시간에 편하게 물어보세요.", small="수업 시간", icon="cal", cls="teal")}</div>', id="steps")
-    team = sec(head("담당 전문가", f"{n}를 맡는 <em>선생님</em>", "", act=btn("전문가 소개 전체 보기", href("team"), "btn-line")) + people(d["team"]), soft=True)
-    vb = (f'<div class="vbox rv"><h3>바우처로 이용할 수 있습니다</h3><p>{n}에 쓸 수 있는 바우처입니다. 대상과 신청 방법은 바우처 안내에서 확인해 주세요.</p>'
-          f'<ul>{"".join(f"<li>{VOUCHER[v]}</li>" for v in d["vouchers"])}</ul>{btn("바우처 안내 보기", href("voucher"), "")}</div>')
-    cen = (f'<div class="stack"><h3 class="h3 rv">어느 센터에서 하나요</h3>{centers(d["centers"])}'
-           f'{note("그 밖의 센터에서 가능한지, 어느 센터가 맞는지는 상담 때 안내해 드립니다.")}</div>')
-    use = sec(head("이용 안내", "바우처와 <em>센터</em>") + f'<div class="two top">{vb}{cen}</div>' + (f'<div style="margin-top:22px">{note(d["vnote"], warn=True)}</div>' if d["vnote"] else ""))
+    proc = sec(head("진행 과정", f"{n}는 <em>이렇게 진행</em>됩니다", "예약부터 종결까지 여섯 단계입니다. 궁금한 점은 수업 뒤 보호자 상담 시간에 편하게 물어보세요.", kind="line") + steps(st), id="steps")
+    # 5. 담당 선생님: 한마디 줄 + 작은 얼굴 카드
+    th = (f"{n}를 맡는 <em>선생님</em>", "선생님들이 전문가 소개에 직접 적은 한마디입니다."); ta = btn("전문가 소개 전체 보기", href("team"), "btn-line")
+    team = (sec(head("담당 전문가", *th, act=ta) + f'<div class="stack-lg">{says(d["say"])}{people(d["team"])}</div>', soft=True) if d["say"]      # 한마디 줄 + 얼굴 카드
+            else sec(split(head("담당 전문가", th[0], kind="stack") + f'<div class="about-act rv">{ta}</div>', people(d["team"]).replace('class="team"', 'class="team" style="grid-template-columns:minmax(0,1fr)"')), soft=True))   # 한 분뿐이면 제목 옆에
+    # 6. 바우처 · 센터: 간결한 줄
+    use = sec(split(head("이용 안내", "바우처와 <em>센터</em>", "대상과 신청 방법은 바우처 안내에서 확인해 주세요.", kind="stack")
+                    + f'<div class="about-act rv">{btn("바우처 안내 보기", href("voucher"), "btn-ink")}</div>',
+                    dl([("쓸 수 있는 바우처", " · ".join(VOUCHER[v] for v in d["vouchers"])), ("진행하는 센터", centers(d["centers"])), ("수업 시간", "1:1 수업 40분 + 보호자 상담 10분"), ("운영 시간", HOURS)])
+                    + '<div style="margin-top:22px">' + (note(d["vnote"], warn=True) if d["vnote"] else note("그 밖의 센터에서 가능한지, 어느 센터가 맞는지는 상담 때 안내해 드립니다.")) + "</div>"))
     extra = ""
     if d["file"] == "cognitive":
-        extra = sec(f'<div class="two wide-r"><div class="rv">{shot("p_alpha", "수 막대를 맞추는 아이의 손")}</div><div><span class="eb teal rv">러닝센터 · 킨더윌 알파α</span>'
-                    f'<h2 class="h3 rv" style="margin-top:12px">인지치료와 함께하는 인지학습 프로그램</h2><p class="body rv">인지치료와 더불어, 킨더윌에는 배움의 기초를 다지는 인지학습 프로그램이 있습니다.</p>'
-                    f'<div class="badges rv">{"".join(f"<span class=\"tag\">{x}</span>" for x in ["놀이수학", "사고력수학", "한글떼기", "독해논술"])}</div>'
-                    f'<div class="about-act rv">{btn("학습 프로그램 보기", href("alpha"), "btn-line")}</div></div></div>', soft=True)
-    rel = sec(related(d["rel"]), soft=not extra)
-    return subpage(d["file"], n, d["ph"], intro + need + proc + team + use + extra + rel, bg=d["bg"],
+        extra = band("p_alpha", caption="러닝센터 · 킨더윌 알파α", title="인지치료와 함께하는 인지학습 프로그램", text="킨더윌 러닝센터에는 놀이수학 · 사고력수학 · 한글떼기 · 독해논술로 배움의 기초를 다지는 학습 프로그램이 있습니다.", alt="수 막대를 맞추는 아이의 손", pos="50% 60%")
+        extra += sec(rows([("학습 프로그램 · 킨더윌 알파α 보기", "놀이수학 · 사고력수학 · 한글떼기 · 독해논술", href("alpha"))], num=False))
+    rel = sec(related(d["rel"]), soft=True)
+    return subpage(d["file"], n, d["ph"], intro + need + mid + proc + team + use + extra + rel, bg=d["bg"], say=SAY, bg_pos=d.get("bg_pos", ""),
                    desc=f"킨더윌 {n} — {re.sub(r'<[^>]+>', '', d['lead'])} 1:1 수업 40분과 보호자 상담 10분.")
 
 def counsel():
-    intro = sec(f'<div class="two"><div class="stack"><p class="lead rv">킨더윌은 전국민마음투자 전문센터를 독립적으로 갖추고 있으며, <em>연령별 맞춤 상담 프로그램</em>으로 진행합니다.</p>'
+    # 1. 소개
+    intro = sec(f'<div class="two wide-l"><div class="stack"><p class="lead rv">유아 · 아동을 위한 심리 프로그램, <em>청소년 · 성인</em>을 위한 상담 프로그램.</p>'
                 f'<div class="body rv"><p>유아 · 아동은 놀이와 미술로, 청소년과 성인은 상담으로 만납니다. 우울 · 불안 같은 정서적 어려움부터 대인관계 · 진로 고민까지, 지금의 마음을 편하게 이야기하실 수 있습니다.</p></div>'
                 f'<div class="about-act rv">{btn("상담 문의하기", href("contact"))}{btn("전국민마음투자 안내", "#maum", "btn-line", arrow=False)}</div></div>'
-                f'<div class="rv">{shot("c1counsel", "원목 책상과 화분이 있는 상담실", "tall")}</div></div>')
-    ages = sec(head("연령별 상담 프로그램", "나이에 맞는 방법으로 <em>마음을 만납니다</em>")
-               + grid([
-                   box("유아 · 아동", "유아와 아동은 말로 하는 표현이 아직 충분히 발달하지 않았기 때문에, 놀이치료나 미술치료로 정서적 안정을 돕습니다.", small="놀이치료 · 미술치료", icon="smile",
-                       items=["자신의 감정을 조절하는 힘", "사회성의 기초", "부모와의 애착", "자아존중감"]),
-                   box("청소년", "청소년기는 신체적 성장뿐 아니라 정체성 형성, 자율성 발달, 또래 관계 형성 등 여러 변화와 혼란을 겪는 시기입니다. 상담으로 그 시기의 성장을 돕습니다.", small="청소년 상담", icon="users",
-                       items=["정서적 안정", "자기 이해와 정체성 형성", "대인관계 문제 해결", "학업 스트레스 완화", "자율성과 책임감"]),
-                   box("성인", "심리 · 정서 · 사회 · 직업과 관련한 여러 어려움을 함께 살피고, 삶의 질을 높일 수 있도록 전문적인 상담을 제공합니다.", small="성인 상담", icon="heart",
-                       items=["정서적 안정", "자기 이해와 성장", "대인관계 개선", "삶의 전환기 문제 해결", "자기 계발"]),
-               ])
-               + f'<div class="about-act rv">{btn("놀이치료 보기", href("play"), "btn-line")}{btn("미술치료 보기", href("art"), "btn-line")}</div>', soft=True)
-    area = ["우울", "불안", "기타 정서 문제", "스트레스", "성격", "대인관계", "가족 간 갈등", "연애 · 부부 문제", "직장 문제", "진로 고민", "트라우마", "행동 · 습관 문제(주의 집중 · 불면)", "중독(알코올 · 흡연 · 약물 등)"]
-    areas = sec(head("전문상담 영역", "이런 고민을 <em>함께 이야기</em>합니다", "아래는 킨더윌이 상담하는 영역입니다. 상담의 진행과 변화는 사람마다 다를 수 있습니다.")
-                + '<div class="badges rv">' + "".join(f'<span class="tag">{x}</span>' for x in area) + "</div>")
-    maum = sec(head("전국민마음투자 지원사업", "바우처로 받는 <em>전문 심리상담 8회</em>", "킨더윌은 전국민마음투자 지원사업의 심리상담을 제공합니다.", act=btn("자세한 기준 · 금액 보기", href("voucher") + "#v-mind", "btn-line"))
-               + f'<div class="stack">' + dl([
+                f'{figure("c1counsel", "1센터 상담실", alt="원목 책상과 화분이 있는 1센터 상담실", cls="tall arch dot")}</div>')
+    # 2. 연령별 세 단: 사진 + 원문 + 줄
+    def age(no, small, title, text, items, pic, act="", cls=""):
+        return (f'<div class="two top{cls}">{pic}<div class="stack">{chapter(no, small)}<h3 class="h3 rv">{title}</h3><p class="body rv">{text}</p>'
+                f'<div class="rv">{ticks(items)}</div>{f"<div class=\"about-act rv\">{act}</div>" if act else ""}</div></div>')
+    ages = sec(head("연령별 맞춤 상담 프로그램", "나이에 맞는 방법으로 <em>마음을 만납니다</em>", "유아 · 아동, 청소년, 성인 — 세 가지 상담 프로그램으로 진행합니다.")
+               + '<div class="stack-lg">'
+               + age("01", "놀이치료 · 미술치료", "유아 · 아동을 위한 상담 프로그램", "유아와 아동은 언어적 표현이 아직 충분히 발달하지 않았기 때문에, 놀이치료나 미술치료로 정서적 안정을 돕습니다.",
+                     ["자신의 감정을 조절하는 힘", "사회성의 기초", "부모와의 애착", "자아존중감"],
+                     duo("p_play", "p_art", alt_a="인형의 집과 동물 인형으로 놀이하는 아이와 선생님의 손", alt_b="물감으로 무지개를 그리는 아이의 손"),
+                     btn("놀이치료 보기", href("play"), "btn-line") + btn("미술치료 보기", href("art"), "btn-line"))
+               + age("02", "청소년 상담", "청소년을 위한 상담 프로그램", "청소년기는 신체적 성장뿐 아니라 정체성 형성, 자율성 발달, 또래 관계 형성 등 다양한 변화와 혼란을 겪는 시기입니다. 상담으로 그 시기의 성장을 돕습니다.",
+                     ["정서적 안정", "자기 이해와 정체성 형성", "대인관계 문제 해결", "학업 스트레스 완화", "자율성과 책임감"],
+                     figure("p_teen", alt="창가 책상에 마주 앉아 이야기하는 청소년과 상담사", cls="arch"))
+               + age("03", "성인 상담", "성인을 위한 상담 프로그램", "개인의 다양한 심리적 · 정서적 · 사회적 · 직업적 어려움을 함께 살피고, 삶의 질을 높일 수 있도록 전문적인 상담을 제공합니다.",
+                     ["정서적 안정", "자기 이해와 성장", "대인관계 개선", "삶의 전환기 문제 해결", "자기 계발과 성장"],
+                     figure("p_adult", alt="소파에 앉은 내담자와 기록하는 상담사, 탁자 위의 찻잔", cls="dot-teal"))
+               + "</div>", soft=True)
+    # 3. 쉬어 가기: 상담 선생님의 한마디
+    mid = sec(f'<div class="center">{quote(big("t06"), by=who("t06"), role=Q["t06"][1])}</div>', tone="peach")
+    # 4. 전문상담 영역 13가지: 줄 목록
+    area = ["우울", "불안", "기타 정서 문제", "스트레스", "성격", "대인관계", "가족 간 갈등", "연애 · 부부 문제", "직장 문제", "진로 고민", "트라우마",
+            "행동 · 습관 문제<small>주의 집중 · 불면</small>", "중독<small>알코올 · 흡연 · 약물 등</small>"]
+    areas = sec(head("킨더윌의 전문상담 영역", "이런 고민을 <em>함께 이야기</em>합니다", "아래는 킨더윌이 상담하는 영역입니다. 상담의 진행과 변화는 사람마다 다를 수 있습니다.", kind="line") + needs(area, n3=True))
+    # 5. 전국민마음투자(청록 면)
+    maum = sec(head("전국민마음투자 지원사업", "바우처로 받는 <em>전문 심리상담 8회</em>", "킨더윌은 전국민마음투자 지원사업의 심리상담을 제공합니다.", act=btn("자세한 기준 · 금액 보기", href("voucher") + "#v-mind", "btn-brand"))
+               + dl([
                    ("사업 목적", "우울 · 불안 등 정서적 어려움이 있는 분께 심리상담 서비스를 제공해, 마음 건강을 돌보고 정서적 질환을 미리 예방하며 일찍 발견하기 위한 사업입니다."),
                    ("서비스 대상", "정서적으로 어려움이 있는 분 — 나이와 소득 기준은 없습니다."),
                    ("지원 내용", "전문 심리상담 서비스 총 8회(바우처)"),
-               ]) + note("신청에는 의뢰서 · 소견서 같은 증빙서류가 필요하며, 본인 부담금은 소득 수준에 따라 다릅니다. 서류와 금액은 바우처 안내에서 확인해 주세요.") + "</div>", soft=True, id="maum")
-    team = sec(head("담당 상담사", "상담을 맡는 <em>선생님</em>", "", act=btn("전문가 소개 전체 보기", href("team"), "btn-line"))
-               + people([("t13", "전국민마음 상담사"), ("t14", "전국민마음 상담사"), ("t15", "전국민마음 상담사"), ("t03", "심리치료"), ("t04", "심리치료"), ("t05", "심리치료"), ("t06", "심리치료")]))
+                   ("서류 · 금액", "신청에는 의뢰서 · 소견서 같은 증빙서류가 필요하며, 본인 부담금은 소득 수준에 따라 다릅니다. 서류와 금액은 바우처 안내에서 확인해 주세요."),
+               ]), tone="teal", id="maum")
+    # 6. 담당 상담사
+    team = sec(head("담당 상담사", "상담을 맡는 <em>선생님</em>", "선생님들이 전문가 소개에 직접 적은 한마디입니다.", act=btn("전문가 소개 전체 보기", href("team"), "btn-line"))
+               + '<div class="stack-lg">' + says(["t13", "t14", "t03"])
+               + people([("t13", "전국민마음 상담사"), ("t14", "전국민마음 상담사"), ("t15", "전국민마음 상담사"), ("t03", "심리치료"), ("t04", "심리치료"), ("t05", "심리치료"), ("t06", "심리치료")]) + "</div>")
+    # 7. 상담 장소
     b4 = BR["c4"]
-    place = sec(head("상담 장소", "상담 장소는 <em>예약 때</em> 안내해 드립니다", "전국민마음투자 상담은 4센터에서 진행합니다. 그 밖의 상담은 예약 때 장소를 안내해 드립니다.")
-                + f'<div class="two top"><div class="stack">' + dl([("4센터", [f'{b4["addr"]} {b4["addr2"]}', "전국민마음투자 상담 · 러닝센터"]), ("운영 시간", HOURS)])
-                + note('4센터는 직통 번호가 없습니다. 2센터 <a href="tel:029303421" style="white-space:nowrap"><b>02-930-3421</b></a> 또는 3센터 <a href="tel:029393421" style="white-space:nowrap"><b>02-939-3421</b></a>, 카카오톡 · 네이버 예약으로 문의하시면 일정과 장소를 안내해 드립니다.')
-                + f'<div class="about-act rv">{btn("상담 문의하기", href("contact"))}{btn("오시는 길", href("centers") + "#c4", "btn-line")}</div></div>'
-                + box("성인 언어치료도 가능합니다", "킨더윌 언어치료는 아동뿐 아니라 성인도 받을 수 있습니다. 말 · 발음 · 유창성과 관련한 어려움이 있다면 언어치료 안내를 함께 살펴보세요.", small="함께 보기", icon="talk", cls="teal")
-                .replace("</div>", f'<div class="about-act">{btn("언어치료 보기", href("speech"), "btn-line")}</div></div>', 1) + "</div>", soft=True)
-    rel = sec(related(["play", "art", "speech"], h2="아이를 위한 치료도 <em>함께 보세요</em>"))
-    return subpage("counsel", "심리상담", "유아 · 아동부터 청소년 · 성인까지, 연령에 맞춘 상담을 진행합니다.", intro + ages + areas + maum + team + place + rel, bg="p_counsel",
+    place = sec(split(head("상담 장소", "상담 장소는 <em>예약 때</em> 안내해 드립니다", "전국민마음투자 상담은 4센터에서 진행합니다. 그 밖의 상담은 예약 때 장소를 안내해 드립니다.", kind="stack")
+                      + f'<div class="about-act rv">{btn("상담 문의하기", href("contact"))}{btn("오시는 길", href("centers") + "#c4", "btn-line")}</div>',
+                      dl([("4센터", [f'{b4["addr"]} {b4["addr2"]}', "전국민마음투자 상담 · 러닝센터"]), ("운영 시간", HOURS),
+                          ("문의", f'4센터는 직통 번호가 없습니다. 2센터 {tel("02-930-3421")} 또는 3센터 {tel("02-939-3421")}, 카카오톡 · 네이버 예약으로 문의하시면 일정과 장소를 안내해 드립니다.')])), soft=True)
+    # 8. 함께 보기: 줄 목록(사진이 위와 겹치지 않게 글로만)
+    rel = sec(head("함께 보기", "아이를 위한 치료도 <em>함께 보세요</em>", "어떤 치료가 맞는지는 초기 상담과 평가 뒤에 함께 정합니다.", kind="line")
+              + rows([("놀이치료", CARD["play"][2], href("play")), ("미술치료", CARD["art"][2], href("art")),
+                      ("언어치료", "킨더윌 언어치료는 아동뿐 아니라 성인도 받을 수 있습니다. 말 · 발음 · 유창성과 관련한 어려움이 있다면 함께 살펴보세요.", href("speech"))]))
+    return subpage("counsel", "심리상담", "유아 · 아동부터 청소년 · 성인까지, 연령에 맞춘 상담을 진행합니다.", intro + ages + mid + areas + maum + team + place + rel, bg="p_counsel",
+                   say="킨더윌은 전국민마음투자 전문센터를 독립적으로 갖추고 있으며 연령별 맞춤 상담 프로그램으로 진행합니다.", bg_pos="50% 60%",
                    desc="킨더윌 심리상담 — 유아 · 아동, 청소년, 성인 연령별 맞춤 상담. 전국민마음투자 지원사업 전문 심리상담 8회.")
 
 def pages():

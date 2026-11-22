@@ -12,6 +12,53 @@
   var onScroll = function () { if (hd) hd.classList.toggle('scrolled', win.pageYOffset > 8); };
   win.addEventListener('scroll', onScroll, { passive: true }); onScroll();
 
+  /* 첫 화면 히어로: 사진과 글이 함께 넘어간다. 진행 막대(css 애니메이션)가 끝나면 다음 장 — 올리거나 탭이 숨으면 막대가 멈추므로 넘김도 멈춘다 */
+  var hero = $('[data-hero]');
+  if (hero) (function () {
+    var bgs = $$('.hb', hero), txs = $$('.ht', hero), n = bgs.length, cur = 0;
+    var num = $('.hero-n b', hero), bar = $('.hero-bar i', hero), pauseBtn = $('.hero-pause', hero), stopped = false;
+    var load = function (i) { var im = $('img[data-src]', bgs[i]); if (im) { im.src = im.getAttribute('data-src'); im.removeAttribute('data-src'); } };
+    var restart = function () { hero.classList.remove('run'); if (stopped || reduce) return; void bar.offsetWidth; hero.classList.add('run'); };
+    var go = function (i) {
+      i = (i + n) % n; if (i === cur) return;
+      load(i); load((i + 1) % n);
+      bgs[cur].classList.remove('on'); txs[cur].classList.remove('on'); txs[cur].setAttribute('aria-hidden', 'true');
+      cur = i;
+      bgs[cur].classList.add('on'); txs[cur].classList.add('on'); txs[cur].removeAttribute('aria-hidden');
+      num.textContent = (cur < 9 ? '0' : '') + (cur + 1);
+      restart();
+    };
+    bar.addEventListener('animationend', function () { go(cur + 1); });
+    $('.hero-prev', hero).addEventListener('click', function () { go(cur - 1); });
+    $('.hero-next', hero).addEventListener('click', function () { go(cur + 1); });
+    pauseBtn.addEventListener('click', function () {
+      stopped = !stopped; pauseBtn.setAttribute('aria-pressed', stopped ? 'true' : 'false'); pauseBtn.setAttribute('aria-label', stopped ? '자동 넘김 다시 시작' : '자동 넘김 멈춤');
+      if (stopped) hero.classList.remove('run'); else restart();
+    });
+    var hold = function (on) { hero.classList.toggle('hold', on); };
+    if (win.matchMedia && win.matchMedia('(hover: hover)').matches) { hero.addEventListener('mouseenter', function () { hold(true); }); hero.addEventListener('mouseleave', function () { hold(false); }); }
+    // 키보드로 들어왔을 때만 멈춘다(단추를 눌러 생긴 초점으로는 멈추지 않는다)
+    hero.addEventListener('focusin', function (e) { var kb = false; try { kb = e.target.matches(':focus-visible'); } catch (x) {} if (kb) hold(true); }); hero.addEventListener('focusout', function () { hold(false); });
+    doc.addEventListener('visibilitychange', function () { hold(doc.hidden); });
+    var x0 = null, y0 = 0;
+    hero.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+    hero.addEventListener('touchend', function (e) { if (x0 === null) return; var dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null; if (Math.abs(dx) > 44 && Math.abs(dx) > Math.abs(dy) * 1.4) go(cur + (dx < 0 ? 1 : -1)); }, { passive: true });
+    hero.addEventListener('keydown', function (e) { if (e.key === 'ArrowLeft') go(cur - 1); else if (e.key === 'ArrowRight') go(cur + 1); });
+    // 나머지 장의 사진은 화면이 뜬 뒤에 받는다(첫 장만 바로 — 속도)
+    var later = function () { setTimeout(function () { load(1); restart(); setTimeout(function () { for (var i = 2; i < n; i++) load(i); }, 2500); }, 600); };
+    if (doc.readyState === 'complete') later(); else win.addEventListener('load', later);
+  })();
+
+  /* 줄 목록에 올리면(초점이 가면) 옆의 큰 사진이 바뀐다: a[data-hover="묶음"][data-key] ↔ img[data-img-of="묶음"][data-img] */
+  $$('[data-hover]').forEach(function (a) {
+    var show = function () {
+      var name = a.getAttribute('data-hover'), key = a.getAttribute('data-key');
+      $$('[data-hover="' + name + '"]').forEach(function (x) { x.classList.toggle('on', x === a); });
+      $$('[data-img-of="' + name + '"]').forEach(function (im) { var on = im.getAttribute('data-img') === key; if (on && im.getAttribute('data-src')) { im.src = im.getAttribute('data-src'); im.removeAttribute('data-src'); } im.classList.toggle('on', on); });
+    };
+    a.addEventListener('mouseenter', show); a.addEventListener('focus', show);
+  });
+
   /* 큰 메뉴: 올린 1단의 2단만 편다. 메뉴 글자(xms 가 바꿔 끼울 수 있음)는 주소로 짝을 찾는다 */
   var mega = $('.mega'), gnb = $('.gnb'), megaT;
   if (mega && gnb) {
@@ -139,7 +186,7 @@
   var wOut = $('.worry-out'), wHome = wOut && wOut.parentNode;
   function placeWorry(b) {
     if (!wOut) return;
-    if (win.innerWidth < 900) { b = b || $('.worry-list button.on'); if (b) b.insertAdjacentElement('afterend', wOut); }
+    if (win.innerWidth < 900) { b = b || $('.worry-list button.on'); if (b && b.nextElementSibling !== wOut) b.insertAdjacentElement('afterend', wOut); }
     else if (wOut.parentNode !== wHome) wHome.appendChild(wOut);
   }
   if (wOut) { placeWorry(); win.addEventListener('resize', function () { placeWorry(); }); }

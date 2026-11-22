@@ -30,32 +30,36 @@ DIRECTOR = dict(
 현) (주)킨더윌알파 대표이사"""))
 
 def about():
-    name = sec(head("킨더윌이라는 이름", "Kinder <em>+</em> Will", "킨더윌은 우리 아이들이 주도적인 의지와 열정으로 행복한 꿈과 미래를 만들어 가는 곳입니다.", center=True)
-               + grid([box("우리 아이들", "킨더윌이 만나는 모든 아이들. 한 명 한 명의 속도와 가능성을 먼저 봅니다.", small="KINDER", icon="smile", cls="coral"),
-                       box("의지와 열정", "아이가 스스로 해 보려는 마음. 그 마음이 자라도록 곁에서 돕습니다.", small="WILL", icon="heart", cls="teal")], n=2))
-    greet = sec('<div class="two wide-r">'
-                f'<figure class="about-img rv">{img("director", "이유진 대표원장")}<figcaption><b>이유진 대표원장</b><span>1급 언어재활사 · 언어치료학 석사</span></figcaption></figure>'
+    # 인사말: 원장 사진을 크게, 원문을 편지처럼
+    greet = sec('<div class="two top">'
+                f'<figure class="about-img rv">{img("director", "이유진 대표원장", lazy=False)}<figcaption><b>이유진 대표원장</b><span>1급 언어재활사 · 언어치료학 석사</span></figcaption></figure>'
                 '<div><span class="eb rv">인사말</span>'
-                '<p class="lead rv" style="margin-top:14px">“킨더윌은 우리 아이들이 주도적인 <em>의지와 열정</em>으로 행복한 꿈과 미래를 만들어 가는 데 앞장서겠습니다.”</p>'
-                '<div class="body rv" style="margin-top:22px"><p>킨더윌 사회성언어전문센터를 찾아 주신 여러분을 진심으로 환영합니다.</p>'
+                '<p class="lead rv" style="margin-top:16px">“킨더윌은 우리 아이들이 주도적인 <em>의지와 열정</em>으로 행복한 꿈과 미래를 만들어 가는 데 앞장서겠습니다.”</p>'
+                '<div class="body rv" style="margin-top:28px"><p>킨더윌 사회성언어전문센터를 찾아 주신 여러분을 진심으로 환영합니다.</p>'
                 '<p>저희 킨더윌에 방문하신 모든 분들의 가정이 늘 행복하고 건강하길 진심으로 기원합니다.</p>'
                 '<p>저는 병원의 재활의학과와 신경정신과(학습클리닉), 그리고 타 기관의 언어치료사로서, 또한 아이들의 가정에서 홈티칭을 통해 다양한 경험을 쌓아 왔습니다.</p>'
                 '<p>이러한 경험과 노하우를 바탕으로 좋은 점들만을 모아, 통합적 접근 방식을 통해 우리 아이들의 잠재력을 최대한 끌어올리고자 킨더윌을 설립하게 되었습니다.</p></div>'
-                '<p class="quote rv">킨더윌 사회성언어전문센터 원장 이유진</p></div></div>', soft=True)
-    promise = sec(head("우리의 약속", "아이들과 함께, <em>진정성 있게</em>", "킨더윌을 믿고 맡겨 주신다면, 아이들의 성장과 발전을 위해 진정성 있는 치료를 약속드립니다.")
-                  + grid([box("한 명 한 명을 위한 맞춤형 통합치료", "아이들 한 명 한 명에게 맞춘 통합치료로, 아이들이 꾸준히 발전할 수 있도록 힘쓰겠습니다.", icon="puzzle"),
-                          box("부모님과 함께하는 노력", "아이들의 능력을 끌어올리기 위해 킨더윌에서 열심히 치료하겠습니다. 부모님도 함께 노력해 주셔야 합니다.", icon="users"),
-                          box("함박웃음을 지으실 그날까지", "부모님이 함박웃음을 지으실 그날까지, 아이들과 함께 정성을 다하겠습니다.", icon="smile")]))
+                '<p class="quote rv">킨더윌 사회성언어전문센터 원장 이유진</p></div></div>')
+    name = scene("ab_shelf", "Kinder(우리 아이들)<br>+ Will(<em>의지와 열정</em>)", by="킨더윌이라는 이름", role="우리 아이들이 주도적인 의지와 열정으로 꿈과 미래를 만들어 가는 곳",
+                 alt="그림책과 교구가 놓인 원목 책장", pos="60% 50%")
+    # 우리의 약속: 상자 대신 번호 줄 + 사진
+    promise = sec(split(head("우리의 약속", "어머님들이 <em>함박웃음</em>을 지으실 그날까지", "아이들과 함께 최선을 다하겠습니다.", kind="stack")
+                        + figure("cl_sit", "선생님과 그림책을 보는 시간", alt="나란히 앉아 선생님의 그림책을 보는 아이들의 뒷모습", cls="arch dot"),
+                        rows([("우리 아이들의 능력을 끌어올리기 위해 킨더윌에서 열심히 치료하겠습니다.", "어머님들도 함께 노력해 주셔야 합니다."),
+                                ("아이들 한 명 한 명을 위한 맞춤형 통합치료를 제공합니다.", "아이들이 꾸준히 발전할 수 있도록 최선을 다하겠습니다."),
+                                ("킨더윌을 믿고 맡겨 주신다면, 진정성 있는 치료를 약속드립니다.", "아이들의 성장과 발전을 위해서입니다.")]), wide="l"))
+    need = scene("c3wait", "“킨더윌은 우리 아이들에게 꼭 필요한 치료만을 권장하며 불필요한 치료를 권하지 않습니다.”", alt="킨더윌 3센터 대기실", pos="50% 60%", right=True)
+    # 사명 선언문: 번호와 큰 글자
     mission = sec(head("킨더윌 사명 선언문", "우리가 지키는 <em>네 가지</em>", "", center=True)
-                  + grid([box("아동 발달 전문가로서의 양심을 가지고 아이들의 성장 발달을 가장 먼저 생각하겠습니다.", small="01", cls="coral", tag="h3"),
-                          box("통합적 접근을 통해 아이들의 전인적인 발달을 돕겠습니다.", small="02", cls="teal"),
-                          box("아이들에게 알맞은 치료를 제공하기 위해 각 영역의 전문가들은 끊임없이 노력하겠습니다.", small="03", cls="teal"),
-                          box("모든 아이들이 자신의 가능성을 실현할 수 있도록 객관적이고 근거에 기반한 치료 계획을 세워 정직하게 지도하겠습니다.", small="04", cls="coral")], n=2), soft=True)
-    prof = sec(head("대표원장 약력", "이유진 <em>대표원장</em>", "병원 재활의학과와 정신건강의학과 학습클리닉, 여러 아동발달 기관에서 언어재활사로 일했습니다.",
-                    act=btn("전문가 소개 보기", href("team"), "btn-line"))
-               + dl([("학력 · 교육", DIRECTOR["edu"]), ("자격", DIRECTOR["cert"]), ("경력", DIRECTOR["career"])])
-               + f'<div class="about-act rv">{btn("걸어온 길", href("history"), "btn-ink")}{btn("센터 안내 · 오시는 길", href("centers"), "btn-line")}</div>')
-    return subpage("about", "인사말", "Kinder(우리 아이들) + Will(의지와 열정). 이름에 담은 뜻과 킨더윌의 약속을 전합니다.", name + greet + promise + mission + prof, bg="hero")
+                  + rows([("아동 발달 전문가로서의 양심을 가지고 아이들의 성장 발달을 가장 먼저 생각하겠습니다.", ""),
+                          ("통합적 접근을 통해 아이들의 전인적인 발달을 돕겠습니다.", ""),
+                          ("아이들에게 알맞은 치료를 제공하기 위해 각 영역의 전문가들은 끊임없이 노력하겠습니다.", ""),
+                          ("모든 아이들이 자신의 가능성을 실현할 수 있도록 객관적이고 근거에 기반한 치료 계획을 세워 정직하게 지도하겠습니다.", "")]), tone="peach")
+    prof = sec(split(head("대표원장 약력", "이유진 <em>대표원장</em>", "병원 재활의학과와 정신건강의학과 학습클리닉, 여러 아동발달 기관에서 언어재활사로 일했습니다.", kind="stack")
+                     + f'<div class="about-act rv">{btn("전문가 소개", href("team"), "btn-ink")}{btn("걸어온 길", href("history"), "btn-line")}</div>',
+                     dl([("학력 · 교육", DIRECTOR["edu"]), ("자격", DIRECTOR["cert"]), ("경력", DIRECTOR["career"])])))
+    return subpage("about", "인사말", "Kinder(우리 아이들) + Will(의지와 열정). 이름에 담은 뜻과 킨더윌의 약속을 전합니다.", greet + name + promise + need + mission + prof,
+                   bg="ab_door", say="킨더윌은 우리 아이들이 주도적인 의지와 열정으로 행복한 꿈과 미래를 만들어 가는 곳입니다.")
 
 # ───────────────────────── 걸어온 길
 TL = [("2016", "킨더윌 언어심리전문센터 개원", "상계동 보람상가에서 언어치료 전문센터(지금의 1센터)로 문을 열었습니다."),
@@ -75,18 +79,56 @@ PRESS = [("수상 · 2024", "2024 KBPA 한국브랜드언론평가 발달재활�
          ("내외경제TV · 2020. 11. 20", "“킨더윌언어심리전문센터, 주의집중훈련 · 독서테라피 등 학습 프로그램 선보일 예정”", "https://www.nbntv.co.kr/news/articleView.html?idxno=911238"),
          ("시선뉴스 · 2019. 01. 22", "킨더윌 언어 · 심리전문센터 이유진 원장 인터뷰", "https://www.sisunnews.co.kr/news/articleView.html?idxno=95981")]
 
+# 연혁 줄의 작은 사진: 해 → [(그림, 설명)] — 방송 · 기사 사진은 원본 그대로(press/), 공간 사진은 센터 사진
+TLP = {"2016": [("press/n-sisun2", "1센터 실내와 건물, EBS 방송 화면 — 2019년 시선뉴스 기사 사진")],
+       "2018": [("c2desk", "2센터 입구와 안내데스크")],
+       "2019": [("press/10dc2647", "EBS 메디컬다큐 7요일 출연 화면 모음")],
+       "2020": [("press/n-naewoe-sq", "안내데스크 앞의 이유진 원장 — 내외경제TV 기사 사진")],
+       "2022": [("press/n-alpha", "서대문구와 구로구에 연 스마트 헬스케어 센터 — IT동아 기사 사진(출처: 킨더윌알파)")],
+       "2023": [("press/817a9abf", "모아비전행복연구소 설립 기사 화면 — 강소기업뉴스")],
+       "2024": [("press/f12e1d82", "EBS 나눔 0700 출연 화면 모음"), ("press/45541303", "2024 KBPA 한국브랜드언론평가 발달재활서비스 분야 우수")],
+       "2026": [("k_space", "키즈스텝 스마트성장센터 운동 공간")]}
+def _pp(name, alt): return f'<figure class="pp rv"><span class="pp-i">{img(name, alt)}</span></figure>'
+def _art(pic, src, title, desc, url, cls=""):
+    return (f'<a class="pp rv" href="{e(url)}" target="_blank" rel="noopener">{figure(pic, "", alt=title, cls=cls)}'
+            f'<span class="pp-t"><small>{src}</small><b>{title}</b><span>{desc}</span></span>{more("기사 보기")}</a>')
+
 def history():
-    tl = '<ol class="tl">' + "".join(f'<li class="rv"><b>{y}</b><div><strong>{t}</strong><span>{d}</span></div></li>' for y, t, d in TL) + "</ol>"
-    s1 = sec(head("연혁", "2016년부터 <em>한 걸음씩</em>", "언어치료 전문센터로 시작해, 아이의 말과 마음과 관계를 함께 돌보는 센터로 자라 왔습니다.") + tl)
-    nums = '<ul class="nums rv">' + "".join(f"<li><b>{n}<small>{u}</small></b><span>{s}</span></li>" for n, u, s in NUMS) + "</ul>"
-    s2 = sec(head("숫자로 보는 킨더윌", "아이들을 위한 <em>공간과 사람</em>", "치료와 수업의 종류에 맞춰 교실을 나누고, 분야별 전문가가 한 팀으로 일합니다.") + nums, soft=True)
-    cards = "".join((f'<a class="rv" href="{e(u)}" target="_blank" rel="noopener"><small>{s}</small><b>{t}</b>{more("기사 · 방송 보기")}</a>' if u else f'<div class="rv"><small>{s}</small><b>{t}</b></div>') for s, t, u in PRESS)
-    s3 = sec(head("수상 · 방송 · 언론보도", "언론에 비친 <em>킨더윌</em>", "방송 출연과 기사, 수상 소식을 모았습니다. 기사는 각 언론사 사이트에서 새 창으로 열립니다.")
-             + '<div class="two top">' + video("t8EQ-n2xfvk", "EBS 메디컬다큐 7요일 출연 장면", start=1238)
-             + '<div class="rv"><span class="tag coral">EBS · 2019</span><h3 class="h3" style="margin-top:14px">EBS 메디컬다큐 7요일</h3>'
-               '<p class="body">이유진 원장이 인지 · 언어 치료사로 출연해 아이의 발달에 대해 조언했습니다. 영상을 누르면 출연 장면부터 이 자리에서 재생됩니다.</p></div></div>'
-             + f'<div class="press" style="margin-top:clamp(28px,3.4vw,48px)">{cards}</div>', id="press")
-    return subpage("history", "걸어온 길", "2016년 개원부터 지금까지, 킨더윌의 연혁과 언론 · 방송 소식입니다.", s1 + s2 + s3, bg="c3desk")
+    def li(y, t, d):
+        pics = "".join(img(n, a) for n, a in TLP.get(y, []))
+        return f'<li class="rv"><b>{y}</b><div><strong>{t}</strong><span>{d}</span>{f"<p class=\"x-tlp\">{pics}</p>" if pics else ""}</div></li>'
+    s1 = sec(head("연혁", "2016년부터 <em>한 걸음씩</em>", "언어치료 전문센터로 시작해, 아이의 말과 마음과 관계를 함께 돌보는 센터로 자라 왔습니다.", kind="line")
+             + '<ol class="tl">' + "".join(li(*x) for x in TL) + "</ol>")
+    sc = scene("cl_circle", "“우리 아이들의 무한한 성장과 발전을 위해 항상 노력하겠습니다.”", by="킨더윌", role="EBS 메디컬다큐 7요일 출연 소식에 적은 말",
+               alt="선생님과 아이들이 둥글게 앉아 이야기하는 사회성 그룹 수업", pos="60% 50%")
+    s2 = sec(head("숫자로 보는 킨더윌", "아이들을 위한 <em>공간과 사람</em>", "치료와 수업의 종류에 맞춰 교실을 나누고, 분야별 전문가가 한 팀으로 일합니다.", center=True) + nums(NUMS), tone="peach")
+    # 방송 · 수상: 실제 사진을 크게(원본 그대로)
+    tv1 = ('<div class="two">' + _pp("press/ebs0700", "EBS 나눔 0700 출연 화면 모음 — 킨더윌의 이유진 원장님이 ‘나눔 0700’에 출연하였습니다")
+           + f'<div>{chapter("방송", "EBS · 2024")}<h3 class="h3 rv">EBS 나눔 0700<br>698화 ‘엄마가 끝까지 지켜줄게’</h3>'
+           '<p class="body rv">이유진 원장이 EBS 나눔 0700에 출연했습니다.</p>'
+           + '<p class="quote rv">“우리 아이들이 주도적인 의지와 열정으로 행복한 꿈과 미래를 만들어 가도록 최선을 다하겠습니다.”</p>'
+           + f'<div class="about-act rv">{_ext("EBS에서 방송 보기", "https://anikids.ebs.co.kr/tv/show?prodId=8435&lectId=60437673")}</div></div></div>')
+    tv2 = (f'<div class="two"><div>{chapter("방송", "EBS · 2019")}<h3 class="h3 rv">EBS 메디컬다큐 7요일</h3>'
+           '<p class="body rv">이유진 원장이 인지 · 언어 치료사로 출연해 아이의 발달에 대해 조언했습니다. 영상을 누르면 출연 장면부터 이 자리에서 재생됩니다.</p>'
+           f'<div style="margin-top:24px">{video("t8EQ-n2xfvk", "EBS 메디컬다큐 7요일 출연 장면", start=1238)}</div></div>'
+           + _pp("press/ebs7", "EBS 메디컬다큐 7요일 출연 화면 모음 — 킨더윌의 이유진 원장님이 ‘메디컬 7요일’에 출연하였습니다") + "</div>")
+    aw = ('<div class="two">' + figure("press/kbpa", "2024 KBPA 한국브랜드언론평가 상패 그림", alt="2024 KBPA 한국브랜드언론평가 — 발달재활서비스 분야, 킨더윌사회성언어전문센터, 서울 노원구 / 언어재활 부문 우수", cls="sq")
+          + f'<div>{chapter("수상", "2024")}<h3 class="h3 rv">2024 KBPA 한국브랜드언론평가<br>발달재활서비스 분야 우수</h3>'
+          '<p class="body rv">킨더윌사회성언어전문센터가 발달재활서비스 분야(서울 노원구 / 언어재활 부문)에서 우수로 선정되었습니다. 아이들을 위한 다양한 프로그램과 꾸준한 노력을 인정받았습니다.</p>'
+          + '<p class="quote rv">“모든 아이들이 자신의 가능성을 실현할 수 있도록, 정직하게 지도하겠다는 굳은 의지로 아이들을 만나고 있습니다.”</p></div></div>')
+    s3 = sec(head("수상 · 방송", "킨더윌의 이야기가<br>만들어 가는 <em>변화</em>", "EBS 방송 출연과 수상 소식입니다. 사진은 킨더윌이 소식을 전하며 올린 실제 화면입니다.", kind="big")
+             + f'<div class="stack-lg">{tv1}{tv2}{aw}</div>', id="press")
+    # 기사: 실제 기사 사진
+    top = ('<div class="two">' + duo("press/n-itdonga", "press/n-itdonga2", "IT동아 인터뷰 사진", alt_a="인터뷰에서 설명하는 이유진 대표", alt_b="표창장과 상패 옆의 이유진 대표")
+           + f'<div>{chapter("기사", "동아일보(IT동아) · 2024. 06. 18")}<h3 class="h3 rv">킨더윌알파 “어린이의 종합적인 성장을 지원합니다”</h3>'
+           '<p class="body rv">이유진 대표가 동아닷컴과 인터뷰했습니다. 킨더윌알파는 어린이의 발달 상황을 측정하고 관리하는 스마트 육아 환경 플랫폼을 만들고 있습니다.</p>'
+           f'<div class="about-act rv">{_ext("기사 보기", "https://www.donga.com/news/It/article/all/20240618/125485270/1")}</div></div></div>')
+    arts = grid([_art("press/n-moa", "강소기업뉴스 · 2023. 07. 26", "“건강한 가정을 세우는 모아비전행복연구소 설립, 다양한 모아애착 프로그램 선보여”", "부모와 아이의 애착을 돕는 모아애착 프로그램을 소개했습니다.", "http://kangso.co.kr/View.aspx?No=2892334"),
+                 _art("press/n-naewoe", "내외경제TV · 2020. 11. 20", "“킨더윌언어심리전문센터, 주의집중훈련 · 독서테라피 등 학습 프로그램 선보일 예정”", "감각통합치료와 주의집중훈련을 함께 진행한다는 소식을 전했습니다.", "https://www.nbntv.co.kr/news/articleView.html?idxno=911238"),
+                 _art("press/n-sisun", "시선뉴스 · 2019. 01. 22", "킨더윌 언어 · 심리전문센터 이유진 원장 인터뷰", "1센터에 이어 2센터를 연 소감과 앞으로의 계획을 이야기했습니다.", "https://www.sisunnews.co.kr/news/articleView.html?idxno=95981")])
+    s4 = sec(head("언론보도", "기사로 만나는 <em>킨더윌</em>", "기사는 각 언론사 사이트에서 새 창으로 열립니다.", kind="line") + f'<div class="stack-lg">{top}{arts}</div>', soft=True)
+    return subpage("history", "걸어온 길", "2016년 개원부터 지금까지, 킨더윌의 연혁과 방송 · 수상 · 언론 소식입니다.", s1 + sc + s2 + s3 + s4,
+                   bg="c3social", say="킨더윌의 이야기가 만들어 가는 변화")
 
 # ───────────────────────── 전문가 소개
 _SP = {"사려깊은": "사려 깊은", "경륜많은": "경륜 많은", "센스있는": "센스 있는", "활력있는": "활력 있는", "열정있는": "열정 있는", "설득력있는": "설득력 있는", "주의깊은": "주의 깊은", "열정가득": "열정 가득"}
@@ -373,67 +415,80 @@ def _tm(i, t):
     return (f'<article class="tm rv" data-f="{t["f"]}"><div class="tm-face">{img(f"team/t{i:02d}", t["name"] + " 선생님을 본뜬 캐릭터", lazy=i > 6)}</div>'
             f'<small>{t["small"]}</small><b>{t["name"]}<em>{t["role"]}</em></b><span class="tm-c">{t["cen"]}</span>'
             + (f'<q>“{t["quote"]}”</q>' if t["quote"] else "") + (f'<q>{t["extra"]}</q>' if t["extra"] else "")
-            + ('<div class="tm-tags">' + "".join(f'<span class="tag">{x}</span>' for x in t["tags"]) + "</div>" if t["tags"] else "") + det + "</article>")
+            + (f'<div class="tm-tags"><span class="x-tm-k">{" · ".join(t["tags"])}</span></div>' if t["tags"] else "") + det + "</article>")
 
 def team():
+    who = lambda i: (TEAM[i - 1]["quote"], TEAM[i - 1]["name"] + " 선생님", TEAM[i - 1]["role"], f"team/t{i:02d}")
+    s0 = sec(head("선생님들의 한마디", "아이들 곁에서 <em>함께</em>하겠습니다", "선생님들이 직접 적은 말입니다.", center=True)
+             + voices([who(2), who(5), who(10)]), tone="peach")
     seg = ('<div class="seg coral rv" data-team-filter role="group" aria-label="분야로 보기">'
            + "".join(f'<button type="button"{" class=\"on\"" if k == "all" else ""} data-f="{k}">{n}</button>' for k, n in
                      [("all", "전체"), ("speech", "언어치료"), ("psy", "심리치료"), ("sensory", "감각통합"), ("learn", "인지 · 학습")]) + "</div>")
-    s = sec(head("전문가 소개", "분야별 전문가가 <em>한 팀으로</em>", "언어 · 심리 · 감각통합 · 인지 · 학습 분야의 선생님들이 아이의 발달을 함께 살핍니다. 분야를 고르면 해당 선생님만 볼 수 있습니다.")
-            + note("이름은 개인정보 보호를 위해 일부를 가렸습니다 · 그림은 선생님을 본뜬 캐릭터입니다.")
-            + f'<div style="margin-top:24px">{seg}</div>'
-            + '<div class="team" style="margin-top:24px">' + "".join(_tm(i, t) for i, t in enumerate(TEAM, 1)) + "</div>")
-    s2 = sec(grid([box("담당 선생님은 상담 뒤에 정합니다", "초기 상담과 평가로 아이의 상태를 살핀 뒤, 필요한 분야와 가까운 센터에 맞춰 담당 선생님을 안내해 드립니다.", icon="users"),
-                   box("수업 뒤에는 매번 보호자 상담", "1:1 수업 40분 뒤 보호자 상담 10분이 이어집니다. 회기마다 담당 선생님이 목표를 점검합니다.", icon="talk", cls="teal")], n=2)
-             + f'<div class="about-act rv">{btn("처음 오시는 분", href("guide"), "btn-ink")}{btn("상담 문의", href("contact"), "btn-line")}</div>', soft=True)
-    return subpage("team", "전문가 소개", "언어재활사 · 심리치료사 · 감각통합치료사 · 인지치료사 · 학습지도 선생님을 소개합니다.", s + s2, bg="c3wait")
+    s = sec(head("전문가 소개", "분야별 전문가가 <em>한 팀으로</em>", "언어 · 심리 · 감각통합 · 인지 · 학습 분야의 선생님들이 아이의 발달을 함께 살핍니다. 분야를 고르면 해당 선생님만 볼 수 있습니다.", kind="line")
+            + f'<div>{seg}</div>'
+            + '<div class="team" style="margin-top:24px">' + "".join(_tm(i, t) for i, t in enumerate(TEAM, 1)) + "</div>"
+            + '<div style="margin-top:28px">' + note("이름은 개인정보 보호를 위해 일부를 가렸습니다 · 그림은 선생님을 본뜬 캐릭터입니다.") + "</div>")
+    sc = scene("cl_pair", "“늦게 피는 꽃은 있어도<br>피지 않는 꽃은 없습니다.”", by="윤*지 선생님", role="언어치료 · 2급 언어재활사", alt="귓속말을 나누는 두 아이의 뒷모습", pos="70% 62%")
+    s2 = sec(split(head("담당 선생님", "아이에게 맞는 선생님을 <em>상담 뒤에</em> 정합니다", "", kind="stack")
+                   + f'<div class="about-act rv">{btn("처음 오시는 분", href("guide"), "btn-ink")}{btn("상담 문의", href("contact"), "btn-line")}</div>',
+                   rows([("담당 선생님은 상담 뒤에 정합니다", "초기 상담과 평가로 아이의 상태를 살핀 뒤, 필요한 분야와 가까운 센터에 맞춰 담당 선생님을 안내해 드립니다."),
+                         ("수업 뒤에는 매번 보호자 상담", "1:1 수업 40분 뒤 보호자 상담 10분이 이어집니다. 회기마다 담당 선생님이 목표를 점검합니다.")])))
+    return subpage("team", "전문가 소개", "언어재활사 · 심리치료사 · 감각통합치료사 · 인지치료사 · 학습지도 선생님을 소개합니다.", s0 + s + sc + s2,
+                   bg="h_team", say="30여 명의 전문가가 함께하는 맞춤형 프로그램", bg_pos="60% 40%")
 
 # ───────────────────────── 센터 안내 · 오시는 길
 CEN = dict(
-    c1=dict(pics=[("c1hall", "1센터 복도와 대기 공간"), ("c1speech", "1센터 언어치료실"), ("c1play", "1센터 놀이치료실")],
+    c1=dict(pics=[("c1counsel", "1센터 상담실"), ("c1speech", "1센터 언어치료실"), ("c1play", "1센터 놀이치료실")],
             more=[("오시는 길", ["지하철 7호선 마들역 3번 출구에서 약 700m", "전화 주시면 오시는 길을 자세히 안내해 드립니다."]), ("주차", "무료 주차 — 주차 방법은 전화로 안내해 드립니다.")]),
-    c2=dict(pics=[("c2desk", "2센터 입구와 안내데스크"), ("c2sensory", "2센터 감각통합치료실"), ("c2play", "2센터 놀이치료실")],
+    c2=dict(pics=[("c2desk", "2센터 입구와 안내데스크"), ("c2sensory2", "2센터 감각통합치료실"), ("c2play", "2센터 놀이치료실"), ("c2wait", "2센터 대기실"), ("c2hall", "2센터 복도")],
             more=[("오시는 길", ["지하철 4호선 상계역에서 걸어서 5분 거리(4번 출구에서 약 500m)", "전화 주시면 오시는 길을 자세히 안내해 드립니다."]), ("주차", "무료 주차 — 전화 주시면 주차 방법을 자세히 안내해 드립니다.")]),
-    c3=dict(pics=[("c3desk", "3센터 안내데스크"), ("c3wait", "3센터 대기실"), ("c3social", "3센터 사회성 교실")],
+    c3=dict(pics=[("c3social", "3센터 사회성 교실"), ("c3wait", "3센터 대기실"), ("cl_desk", "사회성 교실의 그룹 수업")],
             more=[("오시는 길 · 주차", "전화 주시면 자세히 안내해 드립니다.")]),
-    c4=dict(pics=[("c4hall", "4센터 러닝센터 홀")], more=[("오시는 길 · 주차", "2센터 02-930-3421 또는 3센터 02-939-3421로 문의해 주시면 안내해 드립니다.")]),
+    c4=dict(pics=[("c4hall", "4센터 러닝센터 홀"), ("p_alpha", "교구로 수 개념을 익히는 학습 수업"), ("a_read", "러닝센터의 학습 프로그램")],
+            more=[("오시는 길 · 주차", "2센터 02-930-3421 또는 3센터 02-939-3421로 문의해 주시면 안내해 드립니다.")]),
+    ks=dict(pics=[("k_space", "키즈스텝 운동 공간"), ("k_measure", "성장 측정"), ("k_balance", "균형 활동")], more=[]),
 )
-def _cen(b):
-    c = CEN.get(b["key"]); addr = f'{b["addr"]} {b["addr2"]}'
+def _cen(n, b):
+    c = CEN[b["key"]]; addr = f'{b["addr"]} {b["addr2"]}'
     go = _ext("네이버 길찾기", f'https://map.naver.com/p/search/{b["addr"]}')
     mp = f'<div class="cen-map rv"><iframe data-map data-addr="{b["addr"]}" data-name="{b["name"]}" title="{b["name"]} 지도" loading="lazy"></iframe></div>'
     if b["key"] == "ks":
-        return (f'<section class="cen" id="ks"><div class="cen-pics rv">{shot("k_hero", "키즈스텝 스마트성장센터 수업 공간")}</div>'
-                f'<div><h2 class="rv"><small>{b["does"]}</small>{b["name"]}</h2><p class="body rv" style="margin-top:12px">아이의 성장을 측정하고, 분석하고, 관리하는 성장 프로그램입니다. 3센터와 같은 건물에 있습니다.</p>'
-                f'<div style="margin-top:18px">{dl([("주소", addr), ("전화", b["tel"])])}</div>{mp}'
-                f'<div class="cen-act rv">{btn("키즈스텝 자세히 보기", href("kidstep"))}{_tel(b["tel"])}{go}</div></div></section>')
-    rows = [("주소", addr), ("전화", b["tel"] or "직통 번호가 없습니다. 2센터 02-930-3421 또는 3센터 02-939-3421로 문의해 주세요."), ("주요 공간", b["rooms"]), ("운영 시간", HOURS)] + c["more"]
-    act = (_tel(b["tel"]) if b["tel"] else btn("전화 문의 안내", href("contact") + "#call", "btn-ink")) + go
-    return (f'<section class="cen" id="{b["key"]}"><div class="cen-pics rv">' + "".join(shot(n, a) for n, a in c["pics"]) + "</div>"
-            f'<div><h2 class="rv"><small>{b["does"]}</small>{b["name"]}</h2><div style="margin-top:18px">{dl(rows)}</div>{mp}<div class="cen-act rv">{act}</div></div></section>')
+        info = [("주소", addr), ("전화", b["tel"]), ("하는 일", "아이의 성장을 측정하고, 분석하고, 관리하는 성장 프로그램입니다. 3센터와 같은 건물에 있습니다.")]
+        act = btn("키즈스텝 자세히 보기", href("kidstep")) + _tel(b["tel"]) + go
+    else:
+        info = [("주소", addr), ("전화", b["tel"] or "직통 번호가 없습니다. 2센터 02-930-3421 또는 3센터 02-939-3421로 문의해 주세요."), ("주요 공간", b["rooms"]), ("운영 시간", HOURS)] + c["more"]
+        act = (_tel(b["tel"]) if b["tel"] else btn("전화 문의 안내", href("contact") + "#call", "btn-ink")) + go
+    return sec(head(b["does"], b["name"], "", kind="line", n=f"{n:02d}") + mosaic(c["pics"])
+               + f'<div class="two top x-loc" style="margin-top:clamp(28px,3.4vw,48px)"><div>{dl(info)}<div class="cen-act rv">{act}</div></div>{mp}</div>', soft=n % 2 == 0, id=b["key"])
 
 def centers():
-    rows = [(f'<a href="#{b["key"]}">{b["short"]}</a>', b["does"], b["rooms"]) for b in BRANCHES]
-    s1 = sec(head("한눈에 보기", "어느 센터에서 <em>무엇을</em> 하나요", "센터마다 하는 일이 조금씩 다릅니다. 아이에게 맞는 센터와 시간은 상담 때 안내해 드립니다.")
-             + table(["센터", "하는 일", "주요 공간"], rows).replace('class="tbl"', 'class="tbl" style="min-width:540px"')
-             + '<div style="margin-top:18px">' + note("표에 없는 치료 · 수업을 그 센터에서 받을 수 있는지, 담당 선생님이 어느 센터에 있는지는 상담 때 안내해 드립니다. 운영 시간 — " + HOURS) + "</div>")
-    s2 = sec("".join(_cen(b) for b in BRANCHES), soft=True)
-    return subpage("centers", "센터 안내 · 오시는 길", "서울 노원구 상계동의 킨더윌 1 ~ 4센터와 키즈스텝 스마트성장센터를 안내합니다.", s1 + s2, bg="c2desk")
+    s1 = sec(split(head("한눈에 보기", "어느 센터에서 <em>무엇을</em> 하나요", "센터마다 하는 일이 조금씩 다릅니다. 아이에게 맞는 센터와 시간은 상담 때 안내해 드립니다.", kind="stack"),
+                   rows([(b["name"], f'{b["does"]}<br>{b["addr"]} {b["addr2"]}', "#" + b["key"]) for b in BRANCHES])
+                   + '<div style="margin-top:22px">' + note("목록에 없는 치료 · 수업을 그 센터에서 받을 수 있는지, 담당 선생님이 어느 센터에 있는지는 상담 때 안내해 드립니다. 운영 시간 — " + HOURS) + "</div>"))
+    return subpage("centers", "센터 안내 · 오시는 길", "서울 노원구 상계동의 킨더윌 1 ~ 4센터와 키즈스텝 스마트성장센터를 안내합니다.", s1 + "".join(_cen(n, b) for n, b in enumerate(BRANCHES, 1)),
+                   bg="c2sensory", say="언어 · 인지교실 12개, 놀이 · 미술치료실 5개, 감각통합실 2개, 독립적 공간의 사회성교실 1개, 상담실 4개")
 
 # ───────────────────────── 블로그 소식
 def news():
-    try: blog = json.loads((ROOT / "_dev" / "blog.json").read_text(encoding="utf-8"))[:24]
+    try: blog = json.loads((ROOT / "_dev" / "blog.json").read_text(encoding="utf-8"))[:21]
     except Exception: blog = []
     act = _ext("네이버 블로그", BLOG, "btn-brand") + _ext("인스타그램", INSTA) + _ext("카카오톡 채널", KAKAO)
-    hd = head("킨더윌 이야기", "블로그에서 전하는 <em>수업 이야기</em>", "수업 장면과 발달 정보를 블로그에 꾸준히 올리고 있습니다. 글을 누르면 네이버 블로그가 새 창으로 열립니다.")
+    hd = head("킨더윌 이야기", "블로그에서 전하는 <em>수업 이야기</em>", "수업 장면과 발달 정보를 블로그에 꾸준히 올리고 있습니다. 글을 누르면 네이버 블로그가 새 창으로 열립니다.", kind="line")
     acts = f'<div class="cen-act rv" style="margin-top:0;margin-bottom:clamp(24px,3vw,40px)">{act}</div>'
-    if blog:
-        cards = "".join(f'<a class="bl rv{"" if b.get("img") else " noimg"}" href="{e(b["link"])}" target="_blank" rel="noopener"><div class="bl-img">' + (img("blog/" + b["img"], "", lazy=i > 3) if b.get("img") else "KINDER WILL")
-                        + f'</div><div class="bl-b"><small>{e(b.get("cat", ""))}</small><b>{e(b["title"])}</b><time datetime="{b["date"]}">{b["date"].replace("-", ". ")}</time></div></a>' for i, b in enumerate(blog))
-        inner = hd + acts + f'<div class="blog">{cards}</div><div class="about-act rv" style="justify-content:center">{_ext("블로그에서 더 보기", BLOG)}</div>'
+    def card(b, i, big=False):
+        pic = img("blog/" + b["img"], "", lazy=i > 3) if b.get("img") else "<span>KINDER WILL</span>"
+        return (f'<a class="bl rv{" big" if big else ""}{"" if b.get("img") else " noimg"}" href="{e(b["link"])}" target="_blank" rel="noopener"><div class="bl-img">{pic}</div>'
+                f'<div class="bl-b"><small>{e(b.get("cat", "").split(":")[-1])}</small><b>{e(b["title"])}</b><time datetime="{b["date"]}">{b["date"].replace("-", ". ")}</time></div></a>')
+    if not blog:
+        inner = sec(hd + acts + note("최근 글을 불러오지 못했습니다. 위의 ‘네이버 블로그’ 단추로 블로그에서 바로 보실 수 있습니다."))
     else:
-        inner = hd + acts + note("최근 글을 불러오지 못했습니다. 위의 ‘네이버 블로그’ 단추로 블로그에서 바로 보실 수 있습니다.")
-    return subpage("news", "블로그 소식", "킨더윌 블로그에 올라온 최근 수업 이야기와 발달 정보입니다.", sec(inner), bg="c3social")
+        top = sec(hd + acts + f'<div class="two top">{card(blog[0], 0, True)}<div class="blog-rest">{"".join(card(b, i) for i, b in enumerate(blog[1:5], 1))}</div></div>')
+        sc = scene("cl_work", "“아이의 속도에 맞춰 함께 성장하는 킨더윌”", by="킨더윌 블로그", role="수업 이야기를 여는 인사말에서", alt="책상에 모여 앉아 활동지를 하는 아이들", pos="50% 45%")
+        rest = sec(head("지난 이야기", "수업 이야기 <em>더 보기</em>", "사회성 그룹 수업, 수학 · 한글 · 미술언어 수업, 독서 · 문해력 수업 이야기를 전합니다.", kind="line")
+                   + f'<div class="blog">{"".join(card(b, i) for i, b in enumerate(blog[5:], 5))}</div>'
+                   + f'<div class="about-act rv" style="justify-content:center">{_ext("블로그에서 더 보기", BLOG)}</div>', soft=True) if len(blog) > 5 else ""
+        inner = top + sc + rest
+    return subpage("news", "블로그 소식", "킨더윌 블로그에 올라온 최근 수업 이야기와 발달 정보입니다.", inner, bg="p_book", say="반갑습니다. 킨더윌사회성언어전문센터입니다.")
 
 def pages():
     return [("about", about()), ("history", history()), ("team", team()), ("centers", centers()), ("news", news())]
