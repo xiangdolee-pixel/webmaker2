@@ -1078,7 +1078,7 @@ button.je-yrow:hover { background: #f5f6fa; }
 .ct-in { position: relative; flex: none; display: inline-grid; place-items: center; width: 17px; height: 17px; border: 1px solid #9aa0aa; border-radius: 50%; color: #8a909c; font-size: 9.5px; font-weight: 600; line-height: 1; }   /* 사용자 지시 2026-11-12: 동그라미는 처음의 절반 */
 .ct-in i { font-style: normal; }
 .ct-in img { position: absolute; left: 50%; top: 50%; max-width: 120px; max-height: 58px; transform: translate(-50%, -50%); pointer-events: none; }
-.ct-in-eul img { width: 85.7px; max-height: none; opacity: .9; }   /* 도장: 기울이지 않고 똑바로 (사용자 지시 2026-11-22). 그림 폭 85.7px = 도장 몸통 83.2px = A4 위 2.2cm (사용자 지시 2026-11-22, 그 전 1.65cm) */
+.ct-in-eul img { width: 85.7px; max-height: none; opacity: .8; }   /* 도장: 기울이지 않고 똑바로 (사용자 지시 2026-11-22). 그림 폭 85.7px = 도장 몸통 83.2px = A4 위 2.2cm (사용자 지시 2026-11-22, 그 전 1.65cm) */
 .ct-in-gap img { max-width: 100px; max-height: 54px; }
 .ct-foot { margin-top: 18px; padding-top: 10px; border-top: 1px solid #e2e5ea; color: #8a909c; font-size: 11.5px; text-align: center; }
 /* PDF 용 A4(794 × 1123px) — 화면 크기와 상관없이 같은 모양 */
