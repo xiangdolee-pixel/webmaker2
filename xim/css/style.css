@@ -1066,8 +1066,9 @@ button.je-yrow:hover { background: #f5f6fa; }
 .ct-party h2 { margin: 0 0 6px; font-size: 1.08em; font-weight: 800; }
 .ct-party dl { margin: 0; display: grid; gap: 4px; }
 .ct-party dl > div { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; min-height: 38px; }
-.ct-party-co dl > div { min-height: 30px; }
+.ct-party-co dl > div { min-height: 27px; }
 .ct-party-co dl > div:nth-child(2) { min-height: 38px; }
+.ct-party-co .ct-name { justify-content: space-between; padding-right: 33px; }   /* 2.2cm 도장이 업체명 · 연락처 글자를 덮지 않게 (인) 을 칸 오른쪽으로 */
 .ct-party dt { color: #6a717e; font-size: .88em; }
 .ct-party dd { margin: 0; font-weight: 600; }
 .ct-party .ct-mail { overflow-wrap: anywhere; }
@@ -1077,7 +1078,7 @@ button.je-yrow:hover { background: #f5f6fa; }
 .ct-in { position: relative; flex: none; display: inline-grid; place-items: center; width: 17px; height: 17px; border: 1px solid #9aa0aa; border-radius: 50%; color: #8a909c; font-size: 9.5px; font-weight: 600; line-height: 1; }   /* 사용자 지시 2026-11-12: 동그라미는 처음의 절반 */
 .ct-in i { font-style: normal; }
 .ct-in img { position: absolute; left: 50%; top: 50%; max-width: 120px; max-height: 58px; transform: translate(-50%, -50%); pointer-events: none; }
-.ct-in-eul img { width: 62.4px; max-height: none; transform: translate(-50%, -50%) rotate(-8deg); opacity: .94; }   /* 도장: 살짝 기울게, 찍은 것처럼. 폭 62.4px = A4 위 1.65cm (사용자 지시 2026-11-13) */
+.ct-in-eul img { width: 85.7px; max-height: none; transform: translate(-50%, -50%) rotate(-8deg); opacity: .94; }   /* 도장: 살짝 기울게, 찍은 것처럼. 그림 폭 85.7px = 도장 몸통 83.2px = A4 위 2.2cm (사용자 지시 2026-11-22, 그 전 1.65cm) */
 .ct-in-gap img { max-width: 100px; max-height: 54px; }
 .ct-foot { margin-top: 18px; padding-top: 10px; border-top: 1px solid #e2e5ea; color: #8a909c; font-size: 11.5px; text-align: center; }
 /* PDF 용 A4(794 × 1123px) — 화면 크기와 상관없이 같은 모양 */
