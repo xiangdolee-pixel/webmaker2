@@ -1066,6 +1066,11 @@ button.je-yrow:hover { background: #f5f6fa; }
 .ct-party h2 { margin: 0 0 6px; font-size: 1.08em; font-weight: 800; }
 .ct-party dl { margin: 0; display: grid; gap: 4px; }
 .ct-party dl > div { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; min-height: 38px; }
+.ct-own { margin-top: 6px; }
+.ct-own[hidden] { display: none; }
+.ct-pick { max-width: 100%; flex-wrap: wrap; }
+.ct-pick > button { padding: 0 10px; }
+.ct-own + .ct-vat { margin-top: 8px; }
 .ct-party-co dl > div { min-height: 27px; }
 .ct-party-co dl > div:nth-child(2) { min-height: 38px; }
 .ct-party-co .ct-name { justify-content: space-between; padding-right: 33px; }   /* 2.2cm 도장이 업체명 · 연락처 글자를 덮지 않게 (인) 을 칸 오른쪽으로 */
