@@ -61,7 +61,7 @@ const HOST_SIZES = ['1GB', '500MB', '300MB'];
 const vatPick = (name, v) => `<div class="field"><span>부가세(VAT)</span><div class="tabs seg ct-vat" data-vat="${name}" data-v="${+v || 0}" role="group" aria-label="VAT 표시"></div><input type="hidden" name="${name}" value="${+v || 0}"></div>`;
 function formFields(c, fresh = false) {
   const fee = digits(c.yearly_fee); const host = c.hosting || '1GB';
-  return `<section class="ct-sec"><h3>갑(고객) 정보</h3>
+  return `<div class="ct-secs"><div class="ct-col"><section class="ct-sec"><h3>갑(고객) 정보</h3>
         <div class="row2">
           ${companyField(c.client_company || '')}
           <label class="field"><span>대표자명</span><input class="input" name="client_name" maxlength="60" value="${esc(c.client_name || '')}" placeholder="대표자 이름"></label>
@@ -76,11 +76,11 @@ function formFields(c, fresh = false) {
           <label class="field"><span>제작비(원)</span><input class="input ct-money" name="build_fee" inputmode="numeric" value="${c.build_fee || ''}" placeholder="0"></label>
           ${vatPick('build_vat', c.build_vat)}
         </div>
-      </section>
-      <section class="ct-sec"><h3>호스팅 · 유지보수</h3>
+      </section></div>
+      <div class="ct-col"><section class="ct-sec"><h3>호스팅 · 유지보수</h3>
         <div class="field"><span>관리비(원)</span><div class="tabs seg ct-vat ct-pick" data-fee role="group" aria-label="관리비 고르기"></div><input class="input ct-money ct-own" name="yearly_fee" inputmode="numeric" value="${c.yearly_fee || ''}" placeholder="0" aria-label="관리비 직접 입력"${FEE_SIZES.includes(fee) ? ' hidden' : ''}></div>
         <div class="row2">
-          <label class="field"><span>기간(년)</span><input class="input" name="hosting_years" inputmode="numeric" maxlength="2" value="${years(c)}" data-years>${fresh ? '<small>몇 년치 관리비인지 숫자로 적습니다.</small>' : ''}</label>
+          <label class="field"><span>기간(년)</span><input class="input" name="hosting_years" inputmode="numeric" maxlength="2" value="${years(c)}" data-years></label>
           ${vatPick('hosting_vat', c.hosting_vat)}
         </div>
         <div class="field"><span>저장 용량</span><div class="tabs seg ct-vat ct-pick" data-host role="group" aria-label="호스팅 저장 용량"></div><input class="input ct-own" name="hosting" maxlength="20" value="${esc(host)}" placeholder="예: 2GB" aria-label="저장 용량 직접 입력"${HOST_SIZES.includes(host) ? ' hidden' : ''}></div>
@@ -89,7 +89,7 @@ function formFields(c, fresh = false) {
         <div class="row2">
           <label class="field"><input class="input" type="date" name="contract_date" value="${esc(c.contract_date || '')}" aria-label="계약일"></label>
         </div>
-      </section>
+      </section></div></div>
 `;
 }
 const vatNote = (v) => (vatText(v) ? ` <small>${vatText(v)}</small>` : '');
@@ -99,11 +99,10 @@ const full = (id) => deps.api(`/contracts/${id}`).then((c) => ({ ...c, host: dat
 function newContract() {
   openDialog(`
     <h2>새 계약서</h2>
-    <form data-f>
+    <form data-f class="ct-new-form">
       ${formFields({ build_vat: 2, hosting_vat: 2, hosting_years: 1, hosting: '1GB', contract_date: today() }, true)}
-      <p class="meta">만들면 계약서 글자를 고칠 수 있는 창이 바로 열리고, 서명 주소(${esc(data.host)}/5자)가 생깁니다.</p>
       <p class="err" data-err></p>
-      <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">만들기</button></div>
+      <div class="dlg-foot"><p class="meta ct-new-note">만들면 글자를 고치는 화면이 열리고 서명 주소가 생깁니다.</p><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">만들기</button></div>
     </form>`, (dlg) => {
     moneyInputs(dlg);
     const f = dlg.querySelector('[data-f]');
