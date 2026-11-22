@@ -360,6 +360,14 @@ if ($splash && !document.documentElement.classList.contains('nosplash')) {
 }
 
 if ('serviceWorker' in navigator) {
+  // 새 버전이 깔리면 그 자리에서 한 번 다시 띄운다 (사용자 지시 2026-11-22: 배포했는데 설치한 앱에 안 보임 — 전에는 '다음에 열 때' 적용이었다)
+  //   처음 설치(전에 맡던 서비스워커가 없음)일 때는 그대로. 듣는 중이면 끊지 않는다. 잇달아 다시 뜨지 않게 1분에 한 번만
+  const had = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!had || listening) return;
+    try { if (Date.now() - (+sessionStorage.getItem('ob_swr') || 0) < 60000) return; sessionStorage.setItem('ob_swr', Date.now()); } catch { return; }
+    location.reload();
+  });
   navigator.serviceWorker.register('sw.js');
 }
 
