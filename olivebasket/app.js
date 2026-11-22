@@ -180,18 +180,62 @@ function showSrc() {
   $srcBtn.classList.toggle('on', !!cur);
   $listen.hidden = $ttsBtn.hidden = !synth || !token || !items.length;
 }
+// 검색 (사용자 지시 2026-11-22): 기본은 출처 이름으로 찾기, '글' 로 바꾸면 구절 속 낱말로 찾아 그 구절로 바로 간다
+const $srcQ = document.getElementById('srcQ');
+let findIn = 'src'; // 'src' = 출처 이름 · 'text' = 구절 글
+function drawSrc() {
+  const q = $srcQ.value.trim().toLowerCase();
+  const el = (tag, cls, text) => { const e = document.createElement(tag); e.className = cls; if (text != null) e.textContent = text; return e; };
+  let rows;
+  if (findIn === 'text') {
+    // 구절 찾기: 찾은 낱말 앞뒤를 잘라 보여 주고(찾은 곳은 표시) 아래에 출처
+    rows = !q ? [el('p', 'src-none', '찾을 낱말을 적으면 그 낱말이 든 구절이 나옵니다.')] : items.filter(r => r.text.toLowerCase().includes(q)).slice(0, 60).map(r => {
+      const b = el('button', 'src-it src-q'); b.type = 'button'; b.dataset.q = r.id;
+      const t = r.text.replace(/\s+/g, ' '); const at = t.toLowerCase().indexOf(q);
+      const nm = el('span', 'nm');
+      if (at < 0) nm.textContent = t;
+      else { const from = Math.max(0, at - 14); nm.append((from ? '…' : '') + t.slice(from, at), el('mark', '', t.slice(at, at + q.length)), t.slice(at + q.length)); }
+      b.append(nm);
+      if (r.grp || r.source) b.append(el('span', 's', r.grp || r.source));
+      return b;
+    });
+  } else {
+    const row = (id, name, n) => {
+      const b = el('button', 'src-it' + (id === src ? ' on' : '')); b.type = 'button'; b.dataset.id = id;
+      b.append(el('span', 'nm', name), el('span', 'n', n));
+      return b;
+    };
+    rows = srcGroups().filter(g => !q || g.name.toLowerCase().includes(q)).map(g => row(g.id, g.name, g.n));
+    if (!q) rows.unshift(row('', '전체', items.length));
+  }
+  if (!rows.length) rows = [el('p', 'src-none', findIn === 'text' ? '그 낱말이 든 구절이 없습니다.' : '그 이름의 출처가 없습니다.')];
+  $srcList.replaceChildren(...rows);
+  $srcList.scrollTop = 0;
+}
+$srcQ.addEventListener('input', drawSrc);
+$srcQ.addEventListener('keydown', e => { if (e.key === 'Enter') $srcQ.blur(); }); // 자판을 내려 결과가 보이게
+const placeFind = seg(document.getElementById('srcMode'), [['src', '출처'], ['text', '글']], findIn, v => {
+  findIn = v;
+  $srcQ.placeholder = v === 'text' ? '구절 속 낱말 검색' : '출처 이름 검색';
+  drawSrc();
+});
+// 찾은 구절로 바로: 그 구절의 출처로 바꾸고 그 구절을 띄운다
+function jump(it) {
+  setSrc(it.source_id ? String(it.source_id) : '');
+  const base = src ? items.filter(r => String(r.source_id) === src) : items;
+  const mine = new Set(base.map(r => r.id));
+  if (!seen.includes(it.id)) seen.push(it.id);
+  try { localStorage.setItem('ob_seen', JSON.stringify(seen)); } catch {}
+  const item = { ...it, pos: Math.min(base.length, seen.filter(id => mine.has(id)).length), of: base.length };
+  hist.push(item); idx = hist.length - 1; heard = 0;
+  transition(() => item, 1);
+}
 function openSrc() {
-  const gs = srcGroups();
-  const row = (id, name, n) => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'src-it' + (id === src ? ' on' : ''); b.dataset.id = id;
-    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = name;
-    const c = document.createElement('span'); c.className = 'n'; c.textContent = n;
-    b.append(nm, c);
-    return b;
-  };
-  $srcList.replaceChildren(row('', '전체', items.length), ...gs.map(g => row(g.id, g.name, g.n)));
+  $srcQ.value = '';
+  if (findIn !== 'src') document.querySelector('#srcMode button[data-v="src"]').click(); // 열 때마다 출처 검색부터
+  drawSrc();
   $srcSheet.hidden = false;
+  placeFind();
   void $srcSheet.offsetWidth;
   $srcSheet.classList.add('open');
   const on = $srcList.querySelector('.on');
@@ -370,6 +414,7 @@ $srcSheet.addEventListener('click', e => {
   const b = e.target.closest('.src-it');
   if (!b) { if (!e.target.closest('.src-panel')) closeSrc(); return; }
   closeSrc();
+  if (b.dataset.q) { const it = items.find(r => String(r.id) === b.dataset.q); if (it) jump(it); return; }
   if (b.dataset.id === src) return;
   setSrc(b.dataset.id);
   if (src) { // 고른 출처는 처음부터 (전체 보기에서 이미 본 구절도 다시 나온다)
