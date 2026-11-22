@@ -181,10 +181,12 @@ function showSug() {
 $('src').addEventListener('focus', showSug);
 $('src').addEventListener('input', showSug);
 $('src').addEventListener('blur', () => setTimeout(() => { $('srcSug').hidden = true; }, 150));
-$('srcSug').addEventListener('pointerdown', e => {
+// 고르는 것은 손을 뗄 때(click) — 닿자마자 넣으면 목록을 밀어 올리려 잡기만 해도 들어가고,
+// 목록이 먼저 사라져 그 밑에 있던 단추(로그아웃)가 대신 눌린다 (사용자 지적 2026-11-22)
+$('srcSug').addEventListener('mousedown', e => e.preventDefault()); // 칸에서 초점이 빠지지 않게
+$('srcSug').addEventListener('click', e => {
   const b = e.target.closest('button[data-name]');
   if (!b) return;
-  e.preventDefault(); // 칸에서 초점이 빠지지 않게
   $('src').value = b.dataset.name;
   $('srcSug').hidden = true;
 });
