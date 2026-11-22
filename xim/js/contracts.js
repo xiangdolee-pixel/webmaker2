@@ -50,26 +50,46 @@ function row(c) {
 //   고객이 하나도 없으면 그냥 적는 칸. 업체명이 고객 목록에 없는 값이면 '직접 입력' 으로 열린다
 function companyField(v) {
   const hit = customers.find((x) => x.name === v);
-  if (!customers.length) return `<label class="field"><span>갑 업체명</span><input class="input" name="client_company" maxlength="60" value="${esc(v)}" placeholder="업체 이름"></label>`;
-  return `<div class="field"><span>갑 업체명</span><select class="input" data-cust aria-label="고객에서 고르기"><option value="">직접 입력</option>${customers.map((x) => `<option value="${x.id}"${hit && hit.id === x.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select><input class="input ct-own" name="client_company" maxlength="60" value="${esc(v)}" placeholder="업체 이름" aria-label="갑 업체명 직접 입력"${hit ? ' hidden' : ''}></div>`;
+  if (!customers.length) return `<label class="field"><span>업체명</span><input class="input" name="client_company" maxlength="60" value="${esc(v)}" placeholder="업체 이름"></label>`;
+  return `<div class="field"><span>업체명</span><select class="input" data-cust aria-label="고객에서 고르기"><option value="">직접 입력</option>${customers.map((x) => `<option value="${x.id}"${hit && hit.id === x.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select><input class="input ct-own" name="client_company" maxlength="60" value="${esc(v)}" placeholder="업체 이름" aria-label="갑 업체명 직접 입력"${hit ? ' hidden' : ''}></div>`;
 }
 
-// 금액 · 기간 · 용량 · 계약일 묶음 — 새 계약서 창과 고치기 화면이 같이 쓴다
-//   관리비: 30,000 · 60,000 · 90,000 · 120,000 중에 고르거나 직접 입력, 저장 용량: 1GB · 500MB · 300MB 또는 직접 입력 (사용자 지시 2026-11-22)
+// 입력 칸 묶음 — 새 계약서 창과 고치기 화면이 같이 쓴다. 갑 정보 · 홈페이지 제작 · 호스팅 유지보수 · 계약일을 제목 달린 상자로 나눈다 (사용자 지시 2026-11-22 "구별되게")
+//   관리비: 30,000 · 60,000 · 90,000 · 120,000 중에 고르거나 직접 입력, 저장 용량: 1GB · 500MB · 300MB 또는 직접 입력
 const FEE_SIZES = ['30000', '60000', '90000', '120000'];
 const HOST_SIZES = ['1GB', '500MB', '300MB'];
-const vatPick = (name, v) => `<div class="tabs seg ct-vat" data-vat="${name}" data-v="${+v || 0}" role="group" aria-label="VAT 표시"></div><input type="hidden" name="${name}" value="${+v || 0}">`;
-function feeFields(c, fresh = false) {
+const vatPick = (name, v) => `<div class="field"><span>부가세(VAT)</span><div class="tabs seg ct-vat" data-vat="${name}" data-v="${+v || 0}" role="group" aria-label="VAT 표시"></div><input type="hidden" name="${name}" value="${+v || 0}"></div>`;
+function formFields(c, fresh = false) {
   const fee = digits(c.yearly_fee); const host = c.hosting || '1GB';
-  return `<div class="row2">
-        <label class="field"><span>홈페이지 제작비(원)</span><input class="input ct-money" name="build_fee" inputmode="numeric" value="${c.build_fee || ''}" placeholder="0">${vatPick('build_vat', c.build_vat)}</label>
-        <label class="field"><span>호스팅 · 유지보수 기간(년)</span><input class="input" name="hosting_years" inputmode="numeric" maxlength="2" value="${years(c)}" data-years>${fresh ? '<small>몇 년치로 계약할지 숫자로 적습니다.</small>' : ''}</label>
-      </div>
-      <div class="field"><span>호스팅 · 유지보수 관리비(원)</span><div class="tabs seg ct-vat ct-pick" data-fee role="group" aria-label="관리비 고르기"></div><input class="input ct-money ct-own" name="yearly_fee" inputmode="numeric" value="${c.yearly_fee || ''}" placeholder="0" aria-label="관리비 직접 입력"${FEE_SIZES.includes(fee) ? ' hidden' : ''}>${vatPick('hosting_vat', c.hosting_vat)}</div>
-      <div class="field"><span>호스팅 저장 용량</span><div class="tabs seg ct-vat ct-pick" data-host role="group" aria-label="호스팅 저장 용량"></div><input class="input ct-own" name="hosting" maxlength="20" value="${esc(host)}" placeholder="예: 2GB" aria-label="저장 용량 직접 입력"${HOST_SIZES.includes(host) ? ' hidden' : ''}></div>
-      <div class="row2">
-        <label class="field"><span>계약일</span><input class="input" type="date" name="contract_date" value="${esc(c.contract_date || '')}"></label>
-      </div>
+  return `<section class="ct-sec"><h3>갑(고객) 정보</h3>
+        <div class="row2">
+          ${companyField(c.client_company || '')}
+          <label class="field"><span>대표자명</span><input class="input" name="client_name" maxlength="60" value="${esc(c.client_name || '')}" placeholder="대표자 이름"></label>
+        </div>
+        <div class="row2">
+          <label class="field"><span>연락처</span><input class="input" name="client_phone" inputmode="tel" maxlength="40" value="${esc(c.client_phone || '')}" placeholder="010-0000-0000"></label>
+          <label class="field"><span>이메일</span><input class="input" type="email" name="client_email" inputmode="email" maxlength="120" value="${esc(c.client_email || '')}" placeholder="name@example.com"></label>
+        </div>
+      </section>
+      <section class="ct-sec"><h3>홈페이지 제작</h3>
+        <div class="row2">
+          <label class="field"><span>제작비(원)</span><input class="input ct-money" name="build_fee" inputmode="numeric" value="${c.build_fee || ''}" placeholder="0"></label>
+          ${vatPick('build_vat', c.build_vat)}
+        </div>
+      </section>
+      <section class="ct-sec"><h3>호스팅 · 유지보수</h3>
+        <div class="field"><span>관리비(원)</span><div class="tabs seg ct-vat ct-pick" data-fee role="group" aria-label="관리비 고르기"></div><input class="input ct-money ct-own" name="yearly_fee" inputmode="numeric" value="${c.yearly_fee || ''}" placeholder="0" aria-label="관리비 직접 입력"${FEE_SIZES.includes(fee) ? ' hidden' : ''}></div>
+        <div class="row2">
+          <label class="field"><span>기간(년)</span><input class="input" name="hosting_years" inputmode="numeric" maxlength="2" value="${years(c)}" data-years>${fresh ? '<small>몇 년치 관리비인지 숫자로 적습니다.</small>' : ''}</label>
+          ${vatPick('hosting_vat', c.hosting_vat)}
+        </div>
+        <div class="field"><span>저장 용량</span><div class="tabs seg ct-vat ct-pick" data-host role="group" aria-label="호스팅 저장 용량"></div><input class="input ct-own" name="hosting" maxlength="20" value="${esc(host)}" placeholder="예: 2GB" aria-label="저장 용량 직접 입력"${HOST_SIZES.includes(host) ? ' hidden' : ''}></div>
+      </section>
+      <section class="ct-sec"><h3>계약일</h3>
+        <div class="row2">
+          <label class="field"><input class="input" type="date" name="contract_date" value="${esc(c.contract_date || '')}" aria-label="계약일"></label>
+        </div>
+      </section>
 `;
 }
 const vatNote = (v) => (vatText(v) ? ` <small>${vatText(v)}</small>` : '');
@@ -80,15 +100,7 @@ function newContract() {
   openDialog(`
     <h2>새 계약서</h2>
     <form data-f>
-      <div class="row2">
-        ${companyField('')}
-        <label class="field"><span>갑 대표자명</span><input class="input" name="client_name" maxlength="60" placeholder="대표자 이름"></label>
-      </div>
-      <div class="row2">
-        <label class="field"><span>갑 연락처</span><input class="input" name="client_phone" inputmode="tel" maxlength="40" placeholder="010-0000-0000"></label>
-        <label class="field"><span>갑 이메일</span><input class="input" type="email" name="client_email" inputmode="email" maxlength="120" placeholder="name@example.com"></label>
-      </div>
-      ${feeFields({ build_vat: 2, hosting_vat: 2, hosting_years: 1, hosting: '1GB', contract_date: today() }, true)}
+      ${formFields({ build_vat: 2, hosting_vat: 2, hosting_years: 1, hosting: '1GB', contract_date: today() }, true)}
       <p class="meta">만들면 계약서 글자를 고칠 수 있는 창이 바로 열리고, 서명 주소(${esc(data.host)}/5자)가 생깁니다.</p>
       <p class="err" data-err></p>
       <div class="dlg-foot"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">만들기</button></div>
@@ -141,7 +153,7 @@ function moneyInputs(root) {
   // VAT 표시: 알약 탭으로 고르면 숨은 칸에 넣고, 폼이 바뀐 것으로 알린다(미리보기를 다시 그리게)
   root.querySelectorAll('[data-vat]').forEach((box) => {
     const hid = root.querySelector(`input[name="${box.dataset.vat}"]`);
-    pillTabs(box, [['2', 'VAT 별도'], ['1', 'VAT 포함'], ['0', '표시 안 함']], String(box.dataset.v), (v) => { hid.value = v; hid.dispatchEvent(new Event('input', { bubbles: true })); });
+    pillTabs(box, [['2', '별도'], ['1', '포함'], ['0', '표시 안 함']], String(box.dataset.v), (v) => { hid.value = v; hid.dispatchEvent(new Event('input', { bubbles: true })); });
     box.addEventListener('click', (e) => e.preventDefault());   // label 안이라 금액 칸으로 초점이 튀지 않게
   });
 }
@@ -162,15 +174,7 @@ async function editContract(id, fresh = false) {
       ${signed ? `<div class="card ct-ed-form"><p class="ct-ok">갑이 ${fmtDate(c.signed_at)} 에 서명했습니다. 서명된 계약서는 고칠 수 없습니다.</p>
         <div class="ct-ed-foot"><button class="btn sm danger" type="button" data-del>삭제</button><span class="iq-grow"></span><button class="btn primary" type="button" data-pdf>PDF 내려받기</button></div></div>`
     : `<form class="card ct-ed-form" data-f>
-      <div class="row2">
-        ${companyField(c.client_company || '')}
-        <label class="field"><span>갑 대표자명</span><input class="input" name="client_name" maxlength="60" value="${esc(c.client_name || '')}" placeholder="대표자 이름"></label>
-      </div>
-      <div class="row2">
-        <label class="field"><span>갑 연락처</span><input class="input" name="client_phone" inputmode="tel" maxlength="40" value="${esc(c.client_phone)}"></label>
-        <label class="field"><span>갑 이메일</span><input class="input" type="email" name="client_email" inputmode="email" maxlength="120" value="${esc(c.client_email || '')}" placeholder="name@example.com"></label>
-      </div>
-      ${feeFields(c)}
+      ${formFields(c)}
       <p class="ct-how"><b>계약서 문구는 오른쪽 문서를 눌러 바로 고칩니다.</b> Enter = 새 줄, 빈 줄에서 Backspace = 줄 지우기. 줄 첫머리 '제10조(…)' 는 조 제목, '①' 은 항이 됩니다. 색이 칠해진 이름 · 금액 · 날짜는 위 칸에서 바꿉니다.</p>
       <details class="ct-raw"><summary>글자 원문으로 고치기</summary><textarea class="input ct-text" name="body" spellcheck="false">${esc(c.body)}</textarea>
         <small>{갑} {을} {제작비} {연간비} {기간} {용량} {계약일} 은 위 칸 값으로 바뀝니다.</small></details>

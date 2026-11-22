@@ -1066,11 +1066,19 @@ button.je-yrow:hover { background: #f5f6fa; }
 .ct-party h2 { margin: 0 0 6px; font-size: 1.08em; font-weight: 800; }
 .ct-party dl { margin: 0; display: grid; gap: 4px; }
 .ct-party dl > div { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; min-height: 38px; }
+.ct-sec { margin: 0 0 12px; padding: 14px 16px 2px; border: 1px solid var(--line); border-radius: var(--radius); background: #f7f8fb; }
+.ct-sec > h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 15px; font-weight: 800; color: var(--ink); }
+.ct-sec > h3::before { content: ""; width: 4px; height: 15px; border-radius: 2px; background: var(--brand); }
+.ct-sec .input { background: #fff; }
+.ct-sec .ct-vat { margin-top: 0; }
+.ct-sec .ct-vat > button { min-height: 38px; }
 .ct-own { margin-top: 6px; }
 .ct-own[hidden] { display: none; }
 .ct-pick { max-width: 100%; flex-wrap: wrap; }
 .ct-pick > button { padding: 0 10px; }
-.ct-own + .ct-vat { margin-top: 8px; }
+.ct-pick { border-radius: 16px; }   /* 좁아서 두 줄이 돼도 모양이 어색하지 않게 */
+.ct-ed-form .ct-pick > button { padding: 0 7px; font-size: 13px; }
+.ct-ed-form .ct-sec { padding: 14px 12px 2px; }
 .ct-party-co dl > div { min-height: 27px; }
 .ct-party-co dl > div:nth-child(2) { min-height: 38px; }
 .ct-party-co .ct-name { justify-content: space-between; padding-right: 33px; }   /* 2.2cm 도장이 업체명 · 연락처 글자를 덮지 않게 (인) 을 칸 오른쪽으로 */
