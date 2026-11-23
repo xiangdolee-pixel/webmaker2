@@ -6,7 +6,7 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-V = "20261124j"          # css · js · 그림 주소 버전 — 파일을 바꾸면 올린다
+V = "20261124k"          # css · js · 그림 주소 버전 — 파일을 바꾸면 올린다
 FV = "4"                 # 글꼴 버전(style.css 의 @font-face 주소도 같이)
 NOINDEX = True           # 연구소가 내용을 확인하기 전까지 검색에 나오지 않게. 확인되면 False
 SITE = "이화아동발달연구소"

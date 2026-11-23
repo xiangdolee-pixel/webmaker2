@@ -778,3 +778,15 @@ h1, h2 { letter-spacing: -.012em; word-spacing: .02em; }
 .ph-card > p:not(.crumb) { max-width: none; text-wrap: balance; }
 @media (min-width: 761px) { .ph-card > p:not(.crumb) { max-width: calc(100% - 110px); } }
 .inner .sec-head .lead { max-width: 54em; }
+/* 큰 글자 덜어 내기(사용자 2026-11-24 "이런 건 글자가 너무 크다") — 첫 화면 제목 · 맺음말 인용 · 구간 제목 */
+@media (min-width: 761px) {
+  .hero h1 { font-size: clamp(28px, calc(2.9 * var(--hu) - 2px), 44px); line-height: 1.36; }
+  .hero-lead { font-size: clamp(16px, calc(1.1 * var(--hu)), 18px); }
+}
+.voice blockquote p { font-size: clamp(19px, 1.75vw, 26px); line-height: 1.65; }
+:root { --t-h2: clamp(25px, 2.5vw, 36px); }
+.ph-card h1 { font-size: clamp(30px, 3.1vw, 44px); }
+.inner .sec-head h2, .duo h2 { font-size: clamp(24px, 2.4vw, 34px); }
+.b-big strong { font-size: clamp(24px, 2.2vw, 31px); }
+.lead-card h3, .pf-top h3 { font-size: clamp(28px, 2.5vw, 36px); }
+@media (max-width: 760px) { .hero h1 { font-size: clamp(24px, 7vw, 30px); } .voice blockquote p { font-size: clamp(19px, 5.2vw, 22px); } }
