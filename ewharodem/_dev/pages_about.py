@@ -57,7 +57,7 @@ def space():
 def location():
     info = kv([("주소", f"{ADDR}<br><small>지번 {ADDR_OLD} · 계상초등학교 맞은편, 궁전보석사우나가 있는 건물 3층</small>"), ("지하철", "4호선 상계역에서 걸어서 9분<br>7호선 마들역에서 걸어서 15분"), ("주차", "건물 주차장을 이용할 수 있습니다"), ("운영 시간", OPEN_HOURS), ("전화 문의", f"{CALL_HOURS}<br><small>수업 중에는 전화를 받지 못할 수 있습니다</small>")])
     body = sec(f'''<div class="visit">
-  <div class="visit-map rv"><iframe title="{SITE} 지도" src="https://xim.plators.com/map?addr={e("서울 노원구 한글비석로 444")}&name={e(SITE)}&c=2b4bb5" loading="lazy"></iframe></div>
+  <div class="visit-map rv"><iframe title="{SITE} 지도" src="https://xim.plators.com/map?addr={e("서울 노원구 한글비석로 444")}&name={e(SITE)}&c=2f4880" loading="lazy"></iframe></div>
   <div class="visit-txt">{tag("오시는 길")}<h2><span class="nb">계상초등학교</span> <span class="nb">맞은편 3층</span></h2>{info}
     <div class="visit-btns">{btn("네이버 지도에서 보기", NMAP, "", "out", ' target="_blank" rel="noopener"')}</div>
   </div>

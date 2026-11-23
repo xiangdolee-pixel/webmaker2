@@ -114,7 +114,7 @@ def space():
 def visit():
     info = kv([("주소", f"{ADDR}<br><small>계상초등학교 맞은편, 궁전보석사우나 건물 3층</small>"), ("지하철", "4호선 상계역 걸어서 9분 · 7호선 마들역 걸어서 15분"), ("주차", "건물 주차장 이용"), ("수업 운영", OPEN_HOURS), ("전화 문의", CALL_HOURS)])
     return sec(f'''<div class="visit">
-  <div class="visit-map rv"><iframe title="{SITE} 지도" src="https://xim.plators.com/map?addr={e("서울 노원구 한글비석로 444")}&name={e(SITE)}&c=2b4bb5" loading="lazy"></iframe></div>
+  <div class="visit-map rv"><iframe title="{SITE} 지도" src="https://xim.plators.com/map?addr={e("서울 노원구 한글비석로 444")}&name={e(SITE)}&c=2f4880" loading="lazy"></iframe></div>
   <div class="visit-txt"><p class="eye">{PETAL}오시는 길</p><h2><span class="nb">상계역에서</span> <span class="nb">걸어서 9분</span></h2>{info}
     <a class="bigtel" href="tel:{TEL}">{I["phone"]}<b>{TEL}</b></a><p class="tel-state" data-tel-state>전화 문의 {CALL_HOURS}</p>
     <div class="visit-btns">{btn("네이버 지도에서 보기", NMAP, "line", "out", ' target="_blank" rel="noopener"')}{btn("오시는 길 자세히", href("location"), "line")}</div>

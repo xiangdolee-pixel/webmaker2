@@ -1,6 +1,6 @@
 """사이트에 실제로 쓰인 글자만 담아 글꼴 두 파일을 만든다 (속도 · 새로고침 때 글꼴이 바뀌어 보이지 않게 — 둘 다 preload)
    ① fonts/ew-pretendard.woff2 — 본문 Pretendard(SIL OFL). 사이트의 모든 글자
-   ② fonts/ew-head.woff2 — 제목용 Paperlogy 7 Bold(이주임 · 김도균, SIL OFL 1.1). h1 · h2 · 큰 숫자 · 인용문 등 css 의 var(--font-h)
+   ② fonts/ew-head.woff2 — 제목용 마루 부리 Bold(네이버, SIL OFL 1.1). h1 · h2 · 큰 숫자 · 인용문 등 css 의 var(--font-h)
    까닭: 바깥(jsdelivr) 글꼴 CSS 가 렌더를 막고 조각 17개(약 430KB)를 받았다 → 한 파일씩 미리 받는다.
    빠진 글자(게시판 · 회원 화면에 새로 적히는 글 등)는 뒤늦게 불러오는 바깥 Pretendard 가 채운다.
    실행: python ewharodem/_dev/build-fonts.py   (글을 고쳐 build.py 를 돌린 뒤 다시 실행하고, kit.FV 와 style.css 의 ?v= 를 올린다)   필요: pip install fonttools brotli
@@ -42,7 +42,7 @@ print(out.name, out.stat().st_size // 1024, "KB", "글자", len(chars))
 
 # ② 제목: 같은 글자 묶음을 그대로 담는다(제목에 쓰인 글자만 고르면 글을 고칠 때마다 빠지는 글자가 생긴다 — 전부 담아도 60KB 안팎)
 hc = set(chars)
-font = TTFont(str(fetch("Paperlogy-7Bold.woff2", "https://cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-7Bold.woff2")))
+font = TTFont(str(fetch("MaruBuri-Bold.woff2", "https://hangeul.pstatic.net/hangeul_static/webfont/MaruBuri/MaruBuri-Bold.woff2")))
 have = set(chr(c) for c in font.getBestCmap())
 miss = sorted(ch for ch in hc if ch not in have and not ch.isspace())
 opt = save(font, "ew-head.woff2", hc & have)
