@@ -1,7 +1,7 @@
 /* 이화아동발달연구소 — 사이트 전체 CSS 한 파일
    색: 치료실의 파란 벽(--brand) + 로고 꽃의 자두빛(--plum, 작은 강조에만). 흰 바탕, 큰 고딕, 둥근 판, 번호 · 표 · 격자. */
-@font-face { font-family: "Pretendard"; src: url("../fonts/ew-pretendard.woff2?v=3") format("woff2"); font-weight: 400 800; font-display: block; }
-@font-face { font-family: "EwHead"; src: url("../fonts/ew-head.woff2?v=3") format("woff2"); font-weight: 700; font-display: block; }
+@font-face { font-family: "Pretendard"; src: url("../fonts/ew-pretendard.woff2?v=4") format("woff2"); font-weight: 500 700; font-display: block; }
+@font-face { font-family: "EwHead"; src: url("../fonts/ew-head.woff2?v=4") format("woff2"); font-weight: 700; font-display: block; }
 
 :root {
   --brand: #2f4880; --brand-deep: #213560; --brand-10: #e3e8f2; --brand-5: #f2f4f9;

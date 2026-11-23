@@ -27,14 +27,14 @@ chars |= set("·…—–~‘’“”「」『』〈〉《》※→←↑↓○
 chars |= set("로그인아웃회원가입비밀번호이메일인증확인취소저장수정삭제글쓰기목록검색제목내용작성자날짜조회답글댓글첨부파일다음이전처음마지막페이지관리내정보유지보수요청문의접수완료오류다시시도")
 
 def save(font, name, keep):
-    opt = subset.Options(); opt.flavor = "woff2"; opt.layout_features = ["*"]; opt.name_IDs = [1, 2]; opt.notdef_outline = True
+    opt = subset.Options(); opt.flavor = "woff2"; opt.layout_features = ["kern", "ccmp", "locl", "mark", "mkmk", "tnum", "calt", "liga"]; opt.hinting = False; opt.desubroutinize = True; opt.name_IDs = [1, 2]; opt.notdef_outline = True
     s = subset.Subsetter(opt); s.populate(text="".join(sorted(keep))); s.subset(font)
     return opt
 
 # ① 본문
 font = TTFont(str(fetch("PretendardVariable.woff2", "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/variable/woff2/PretendardVariable.woff2")))
 opt = save(font, "ew-pretendard.woff2", chars)
-try: font = instancer.instantiateVariableFont(font, {"wght": (400, 800)})              # 쓰는 굵기 범위만(400 ~ 800)
+try: font = instancer.instantiateVariableFont(font, {"wght": (500, 700)})              # 쓰는 굵기 범위만(400 ~ 800)
 except Exception as ex: print("굵기 범위 줄이기는 건너뜀:", str(ex)[:80])
 (R / "fonts").mkdir(exist_ok=True); out = R / "fonts" / "ew-pretendard.woff2"
 subset.save_font(font, str(out), opt)
