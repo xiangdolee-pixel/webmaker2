@@ -765,3 +765,12 @@ h1, h2 { letter-spacing: -.012em; word-spacing: .02em; }
 .sec-people .lead-card { background: var(--plum-soft); }
 .sec-people .lead-card:nth-child(2) { background: var(--brand); }
 .sec-people .lead-card::before { background: rgba(138, 35, 48, .07); }
+/* 위 메뉴 글자는 큼직하게(사용자 지시 2026-11-24) */
+.gnb > ul > li > a { font-size: clamp(18px, 1.55vw, 21px); padding: 0 clamp(12px, 1.5vw, 24px); letter-spacing: -.01em; }
+.gnb > ul > li > a::after { bottom: 18px; }
+.hd-tel { font-size: clamp(17px, 1.4vw, 19px); min-height: 50px; padding: 0 22px; }
+.sub a b { font-size: 18.5px; }
+.sub a small { font-size: 16px; }
+.hd-account .xa-login { font-size: 17px; }
+@media (min-width: 1081px) { :root { --hd: 86px; } .logo img { height: clamp(48px, 4.3vw, 58px); } }
+@media (max-height: 520px) and (min-width: 761px) { :root { --hd: 60px; } .logo img { height: 40px; } .gnb > ul > li > a { font-size: 18px; } }
