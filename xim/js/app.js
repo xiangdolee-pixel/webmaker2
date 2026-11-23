@@ -248,20 +248,22 @@ async function renderSites() {
     <div class="tabs site-cats" id="site-cats"></div>
     <div class="rows">${sites.map(siteRow).join('') || '<div class="card empty">아직 등록된 사이트가 없습니다.</div>'}</div>
     <div class="card empty" data-none hidden>찾는 사이트가 없습니다.</div>`;
-  // 분류 탭: 전체 · 홈페이지 · 솔루션개발 · 웹앱 · 웹게임 … (사이트에 있는 분류만, 개수와 함께) — 찾기와 함께 걸러진다
+  // 분류 탭: 홈페이지 · 솔루션개발 · 웹앱 · 웹게임 … (사이트에 있는 분류만, 개수와 함께). '전체' 탭은 없고 첫 분류(홈페이지)가 먼저 보인다(사용자 지시 2026-11-24) — 찾는 말을 넣으면 분류와 상관없이 모든 사이트에서 찾는다
   const count = {};
   sites.forEach((s) => { const c = catOf(s); count[c] = (count[c] || 0) + 1; });
   const rank = (c) => (c === '미분류' ? 100 : CAT_ORDER.includes(c) ? CAT_ORDER.indexOf(c) : 50);
   const cats = Object.keys(count).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'ko'));
-  if (siteCat && !count[siteCat]) siteCat = '';
+  if (cats.length < 2) siteCat = ''; else if (!count[siteCat]) siteCat = cats[0];
   const catBox = view.querySelector('#site-cats');
   let refilter = null;
-  if (cats.length > 1) pillTabs(catBox, [['', `전체 ${sites.length}`], ...cats.map((c) => [c, `${c} ${count[c]}`])], siteCat, (v) => { siteCat = v; refilter?.(); showCat(); });
+  if (cats.length > 1) pillTabs(catBox, cats.map((c) => [c, `${c} ${count[c]}`]), siteCat, (v) => { siteCat = v; refilter?.(); showCat(); });
   else catBox.remove();
   // 좁은 화면에서 탭이 넘치면 고른 탭을 가운데로 밀어 보여 준다
   function showCat() { const on = catBox.querySelector('button.on'); if (on && catBox.scrollWidth > catBox.clientWidth) catBox.scrollTo({ left: on.offsetLeft - (catBox.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' }); }
   if (cats.length > 1 && siteCat) requestAnimationFrame(showCat);
-  refilter = liveSearch(view.querySelector('[data-q]'), (v) => { siteQ = v; }, (el) => !siteCat || el.dataset.cat === siteCat);
+  const qEl = view.querySelector('[data-q]');
+  refilter = liveSearch(qEl, (v) => { siteQ = v; }, (el) => !siteCat || !!qEl.value.trim() || el.dataset.cat === siteCat);
+  refilter?.();
   view.querySelectorAll('[data-term-site]').forEach((b) => { b.onclick = () => { const st = sites.find((x) => x.id === +b.dataset.termSite); if (st) siteDialog(st); }; });   // 알림을 누르면 그 사이트 수정 창
   view.querySelector('[data-term-more]')?.addEventListener('click', (e) => { const b = e.currentTarget, on = b.closest('.term-alert').classList.toggle('all'); b.textContent = on ? b.dataset.open : b.dataset.shut; });
   view.querySelector('[data-act="new-site"]').onclick = () => siteDialog();
