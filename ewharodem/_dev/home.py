@@ -37,7 +37,6 @@ def voice():
   <blockquote class="rv"><p><span class="nb">아이들이 자신의 방식으로</span> <span class="nb">세상과 소통하고,</span> <span class="nb">일상 속에서 보다 독립적이고</span> <span class="nb">의미 있는 삶을</span> <span class="nb">살아갈 수 있도록</span> <span class="nb">아이들과 함께 성장하고 있습니다.</span></p><footer>{PETAL}<span>연구소가 글마다 남기는 맺음말</span></footer></blockquote>
   <dl class="voice-facts">{"".join(f'<div class="rv"><dt>{t}</dt><dd>{d}</dd></div>' for t, d in rows)}</dl>
 
-  <figure class="voice-pic rv">{img("g-w-hands", "선생님의 손이 아이의 작은 손을 부드럽게 감싸 쥔 모습", sizes="100vw")}</figure>
 </div></section>
 '''
 
