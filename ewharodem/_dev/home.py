@@ -36,6 +36,8 @@ def voice():
     return f'''<section class="voice"><div class="wrap">
   <blockquote class="rv"><p><span class="nb">아이들이 자신의 방식으로</span> <span class="nb">세상과 소통하고,</span> <span class="nb">일상 속에서 보다 독립적이고</span> <span class="nb">의미 있는 삶을</span> <span class="nb">살아갈 수 있도록</span> <span class="nb">아이들과 함께 성장하고 있습니다.</span></p><footer>{PETAL}<span>연구소가 글마다 남기는 맺음말</span></footer></blockquote>
   <dl class="voice-facts">{"".join(f'<div class="rv"><dt>{t}</dt><dd>{d}</dd></div>' for t, d in rows)}</dl>
+
+  <figure class="voice-pic rv">{img("g-w-hands", "선생님의 손이 아이의 작은 손을 부드럽게 감싸 쥔 모습", sizes="100vw")}</figure>
 </div></section>
 '''
 
@@ -50,7 +52,7 @@ def programs():
     ]
     tiles = ""
     for i, (f, worry, name, kind, s, shape) in enumerate(T, 1):
-        pic = img("speech2", "", sizes="(max-width: 760px) 100vw, 640px") if shape == "big" else f'<span class="b-sym">{sym.icon(s)}</span>'
+        pic = img("g-speech-a", "", sizes="(max-width: 760px) 100vw, 640px") if shape == "big" else f'<span class="b-sym">{sym.icon(s)}</span>'
         tiles += f'<a class="bento{" b-" + shape if shape else ""} rv" href="{href(f)}"><span class="b-no">{i:02d}</span>{pic}<span class="b-txt"><strong>{worry}</strong><span class="b-name"><b>{name}</b><small>{kind}</small></span></span><span class="b-go">{I["arrow"]}</span></a>'
     return sec(head("프로그램", "이런 걱정이 있다면, <span class=\"nb\"><em class=\"mark\">여기서부터</em> 보세요</span>", "어디에 해당하는지 모르겠다면 전화로 먼저 물어보셔도 됩니다.") + f'<div class="bentos">{tiles}</div>', "sec-soft", "programs")
 
@@ -99,7 +101,7 @@ def start():
     st = [("전화로 예약합니다", f"아이의 나이와 걱정되는 점을 들려주세요. 전화 문의는 {CALL_HOURS}에 받습니다."), ("방문해서 상담합니다", "예약한 날 연구소에서 아이의 지금 모습을 함께 살펴봅니다. 필요하면 언어발달 평가를 합니다."), ("아이에게 맞춰 시작합니다", "발달 수준을 살핀 뒤 아이마다 목표를 정하고, 작은 단계로 나누어 수업합니다.")]
     rows = "".join(f'<li class="rv"><b>{i}</b><div><h3>{t}</h3><p>{d}</p></div></li>' for i, (t, d) in enumerate(st, 1))
     return sec(f'''<div class="start">
-  <div class="start-head"><h2><span class="nb">시작은</span> <span class="nb"><em class="mark">전화 한 통</em>입니다</span></h2><p class="lead">온라인 예약은 받지 않습니다. 전화로 예약한 뒤 방문해 주세요.</p>{btn("처음 오셨나요", href("guide"), "line")}</div>
+  <div class="start-head"><h2><span class="nb">시작은</span> <span class="nb"><em class="mark">전화 한 통</em>입니다</span></h2><p class="lead">온라인 예약은 받지 않습니다. 전화로 예약한 뒤 방문해 주세요.</p>{btn("처음 오셨나요", href("guide"), "line")}<figure class="start-pic">{img("g-w-read", "소파에 나란히 앉아 그림책을 함께 보는 엄마와 아이의 뒷모습", sizes="(max-width: 1080px) 100vw, 480px")}</figure></div>
   <ol class="start-list">{rows}</ol>
 </div>''', "sec-start")
 

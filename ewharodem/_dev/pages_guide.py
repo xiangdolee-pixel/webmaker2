@@ -11,7 +11,7 @@ def guide():
         f'또래보다 말이 늦다 <a class="tlink" href="{href("speech")}">말 · 언어</a>', f'표현이 제한적이고 의사소통이 어렵다 <a class="tlink" href="{href("aac")}">그림으로 말하기</a>',
         f'집중이 어렵고 학습 기초가 부족하다 <a class="tlink" href="{href("learning")}">읽기 · 학습</a>', f'또래와 관계 맺기가 어렵다 <a class="tlink" href="{href("group")}">그룹 활동</a>',
         f'발달지연이 의심된다 <a class="tlink" href="{href("aba")}">행동 · 조기교실</a>', "영유아 건강검진에서 늦다는 항목이 있었다"]), "sec-soft")
-    body += sec(head("전화하기 전에", "<span class=\"nb\">이것만 정리해 두면</span> <span class=\"nb\">통화가 쉬워집니다</span>") + cards([
+    body += sec(head("전화하기 전에", "<span class=\"nb\">이것만 정리해 두면</span> <span class=\"nb\">통화가 쉬워집니다</span>") + figure("g-w-read", "소파에 나란히 앉아 그림책을 함께 보는 엄마와 아이의 뒷모습", "", "wide") + cards([
         ("아이의 나이", "생년월과 다니는 기관(어린이집 · 유치원 · 학교)."), ("걱정되는 점", "언제부터, 어떤 상황에서 그런지 한두 가지."), ("받은 검사 · 진단", "영유아 건강검진 결과나 병원 진단이 있다면."), ("바우처", "쓰고 있거나 신청하려는 바우처가 있는지.")]))
     body += sec(head("자주 묻는 질문", "<span class=\"nb\">먼저</span> <span class=\"nb\">궁금해하시는 것들</span>") + faq([
         ("진단을 받지 않았어도 상담할 수 있나요?", "<p>네. 또래보다 말이 늦거나 발달이 걱정되는 단계에서도 상담을 권합니다. 다만 연구소의 상담과 평가는 진단이 아니며, 진단은 의료기관에서 받으셔야 합니다.</p>"),
@@ -34,7 +34,7 @@ def voucher():
   <div data-pane="m50">{mk(R50)}</div><div data-pane="m60" hidden>{mk(R60)}</div>
   {note(f"<b>{PRICE_DATE}.</b> 연구소가 안내한 발달재활서비스 단가표를 옮긴 것입니다. 본인부담금은 한 달 4회 기준이며, 유형은 주민센터에서 소득 기준에 따라 정해집니다. 금액은 바뀔 수 있으니 이용 전에 전화로 확인해 주세요.", "warm")}
 </div>'''
-    body = sec(head("쓸 수 있는 바우처", "<span class=\"nb\">두 가지 바우처의</span> <span class=\"nb\">제공기관입니다</span>") + '<div class="vs">' + "".join(f'<article class="vv rv"><p class="v-by">{by}</p><h3>{t}</h3>{kv(rows, "slim")}</article>' for t, by, rows in [
+    body = sec(head("쓸 수 있는 바우처", "<span class=\"nb\">두 가지 바우처의</span> <span class=\"nb\">제공기관입니다</span>") + figure("g-guide-a", "상담 테이블 위의 차 두 잔과 공책, 두 손을 모은 보호자와 메모하는 선생님", "", "wide") + '<div class="vs">' + "".join(f'<article class="vv rv"><p class="v-by">{by}</p><h3>{t}</h3>{kv(rows, "slim")}</article>' for t, by, rows in [
         ("발달재활서비스", "보건복지부 · 2011년부터 제공", [("대상", "만 18세 미만 장애아동 중 발달재활서비스 선정자<br><small>만 9세 미만 발달지연 아동도 신청할 수 있습니다</small>"), ("영역", "언어재활 · 인지재활 · 미술재활 · 음악재활 · 행동재활"), ("신청", "주소지 읍 · 면 · 동 주민센터")]),
         ("치료지원 (굳센카드)", "교육청 · 2012년부터 제공", [("대상", "유 · 초 · 중 · 고등학교 과정의 특수교육대상 학생 가운데 치료지원이 필요한 학생"), ("영역", "언어 · 인지 등 재활 영역"), ("신청", "다니는 학교에 신청")])]) + "</div>")
     body += sec(head("발달재활서비스 금액", "<span class=\"nb\">유형별 지원금과</span> <span class=\"nb\"><em class=\"mark\">내가 내는 돈</em></span>", "수업 시간을 고르면 유형별 금액이 바뀝니다.") + price, "sec-soft")

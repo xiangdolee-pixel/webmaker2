@@ -790,3 +790,24 @@ h1, h2 { letter-spacing: -.012em; word-spacing: .02em; }
 .b-big strong { font-size: clamp(24px, 2.2vw, 31px); }
 .lead-card h3, .pf-top h3 { font-size: clamp(28px, 2.5vw, 36px); }
 @media (max-width: 760px) { .hero h1 { font-size: clamp(24px, 7vw, 30px); } .voice blockquote p { font-size: clamp(19px, 5.2vw, 22px); } }
+
+/* 따뜻한 사진(GPT 로 만든 장면, 2026-11-24) */
+.fig.wide { margin: clamp(8px, 1.5vw, 16px) 0 clamp(28px, 3.4vw, 44px); }
+.fig.wide img { aspect-ratio: 21 / 8; object-fit: cover; }
+.sec-soft .fig.wide + .cards.box, .fig.wide + .vs { margin-top: 0; }
+.voice .wrap { grid-template-rows: auto auto; }
+.voice-pic { grid-column: 1 / -1; margin: clamp(24px, 3.4vw, 48px) 0 0; }
+.voice-pic img { width: 100%; aspect-ratio: 21 / 8; object-fit: cover; object-position: 70% 50%; border-radius: var(--r-lg); }
+.start-pic { margin-top: 32px; }
+.start-pic img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-lg); }
+.strip-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 24px; margin-top: 36px; }
+.strip-row .strip { margin-top: 0; }
+.fig.small { width: min(100%, 300px); }
+.fig.small img { aspect-ratio: 1; object-fit: cover; }
+.sec-recs { padding-top: 0 !important; }
+@media (max-width: 760px) {
+  .fig.wide img, .voice-pic img { aspect-ratio: 4 / 3; }
+  .start-pic { display: none; }
+}
+@media (max-width: 760px) { .b-band { padding-top: 64px; } }
+.voice-pic { margin-top: clamp(20px, 2.6vw, 36px); }
