@@ -811,3 +811,13 @@ h1, h2 { letter-spacing: -.012em; word-spacing: .02em; }
 }
 @media (max-width: 760px) { .b-band { padding-top: 64px; } }
 .voice-pic { margin-top: clamp(20px, 2.6vw, 36px); }
+/* 문장 띠 예시: 실제 그림 카드 책 사진 + 띠를 한 판에 */
+.strip-row { display: grid; grid-template-columns: minmax(0, 260px) 1fr; gap: clamp(20px, 3vw, 44px); align-items: center; margin-top: clamp(28px, 3.4vw, 44px); padding: clamp(18px, 2.4vw, 30px); border-radius: var(--r-lg); background: var(--soft); }
+.strip-row .fig.small { width: 100%; }
+.strip-row .fig.small img { border-radius: 18px; }
+.strip-k { font-weight: 700; color: var(--ink); margin-bottom: 14px; }
+.strip-row .strip { margin-top: 0; }
+.strip-cap { margin-top: 14px; font-size: 16px; color: var(--ink-3); line-height: 1.6; }
+@media (max-width: 760px) { .strip-row { grid-template-columns: 1fr; } .strip-row .fig.small { width: min(100%, 240px); } }
+.strip-txt { min-width: 0; }
+@media (max-width: 760px) { .strip-row .strip { width: 100%; } .strip-row .sym { min-width: 0; flex: 1; } }
