@@ -774,3 +774,7 @@ h1, h2 { letter-spacing: -.012em; word-spacing: .02em; }
 .hd-account .xa-login { font-size: 17px; }
 @media (min-width: 1081px) { :root { --hd: 86px; } .logo img { height: clamp(48px, 4.3vw, 58px); } }
 @media (max-height: 520px) and (min-width: 761px) { :root { --hd: 60px; } .logo img { height: 40px; } .gnb > ul > li > a { font-size: 18px; } }
+/* 하위 쪽 머리의 한 줄 설명: 들어갈 폭이 있으면 줄을 바꾸지 않는다(사용자 지시 2026-11-24) */
+.ph-card > p:not(.crumb) { max-width: none; text-wrap: balance; }
+@media (min-width: 761px) { .ph-card > p:not(.crumb) { max-width: calc(100% - 110px); } }
+.inner .sec-head .lead { max-width: 54em; }
