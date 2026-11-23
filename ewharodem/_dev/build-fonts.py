@@ -41,7 +41,10 @@ subset.save_font(font, str(out), opt)
 print(out.name, out.stat().st_size // 1024, "KB", "글자", len(chars))
 
 # ② 제목: 같은 글자 묶음을 그대로 담는다(제목에 쓰인 글자만 고르면 글을 고칠 때마다 빠지는 글자가 생긴다 — 전부 담아도 60KB 안팎)
-hc = set(chars)
+hc = set(chr(c) for c in range(0x20, 0x7F)) | set("·…—–~‘’“”→")
+for t in htmls:   # 제목 글꼴이 걸리는 자리(h1 · h2 · h3 · 인용문 · 굵은 글 · 서랍 메뉴 제목)의 글자만 — 빠진 글자는 본문 글꼴로 나오니 새 자리에 --font-h 를 쓰면 여기에도 더한다
+    for m in re.finditer(r"<(h1|h2|h3|blockquote|strong|b|dt)\b[^>]*>([\s\S]*?)</\1>|class=\"(?:dr-one|strip-say|hp-tel)\"[^>]*>([^<]*)<|<div class=\"dr-grp\"><p>([^<]*)<", t):
+        hc |= set(ch for ch in strip("".join(x or "" for x in m.groups()[1:])) if ord(ch) >= 0x20)
 font = TTFont(str(fetch("MaruBuri-Bold.woff2", "https://hangeul.pstatic.net/hangeul_static/webfont/MaruBuri/MaruBuri-Bold.woff2")))
 have = set(chr(c) for c in font.getBestCmap())
 miss = sorted(ch for ch in hc if ch not in have and not ch.isspace())

@@ -6,8 +6,8 @@ def hero():
     slides = [("hero-art", "미술치료실 — 파란 벽에 걸린 그림과 초록 책상", "미술치료실"), ("hero-speech", "언어치료실 — 교구가 놓인 선반과 책상", "언어치료실"), ("hero-lobby", "이화아동발달연구소 입구 — 가운데 연구소 간판과 치료실 문", "입구")]
     pics = ""
     for i, (n, a, _) in enumerate(slides):
-        if i == 0: pics += f'<div class="hero-pic on"><picture><source media="(max-width: 760px)" srcset="images/{n}-m.webp?v={V}"><img src="images/{n}.webp?v={V}" alt="{e(a)}" width="1920" height="1200" fetchpriority="high"></picture></div>'
-        else: pics += f'<div class="hero-pic"><img data-src="images/{n}.webp?v={V}" data-src-m="images/{n}-m.webp?v={V}" alt="{e(a)}" width="1920" height="1200"></div>'   # 둘째 장부터는 첫 화면이 뜬 뒤에 받는다
+        if i == 0: pics += f'<div class="hero-pic on"><picture><source media="(max-width: 760px)" srcset="images/{n}-m.webp?v={V}"><img src="images/{n}.webp?v={V}" alt="{e(a)}" width="1600" height="1000" fetchpriority="high"></picture></div>'
+        else: pics += f'<div class="hero-pic"><img data-src="images/{n}.webp?v={V}" data-src-m="images/{n}-m.webp?v={V}" alt="{e(a)}" width="1600" height="1000"></div>'   # 둘째 장부터는 첫 화면이 뜬 뒤에 받는다
     nav = "".join(f'<button type="button"{" class=\"on\"" if i == 0 else ""} aria-label="{n} 사진 보기"><i></i><span>{n}</span></button>' for i, (_, _, n) in enumerate(slides))
     return f'''<section class="hero">
   <div class="wrap">
