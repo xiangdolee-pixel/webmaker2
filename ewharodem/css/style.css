@@ -821,3 +821,13 @@ h1, h2 { letter-spacing: -.012em; word-spacing: .02em; }
 @media (max-width: 760px) { .strip-row { grid-template-columns: 1fr; } .strip-row .fig.small { width: min(100%, 240px); } }
 .strip-txt { min-width: 0; }
 @media (max-width: 760px) { .strip-row .strip { width: 100%; } .strip-row .sym { min-width: 0; flex: 1; } }
+/* 시작 순서: 왼쪽 사진(구간 높이만큼) + 오른쪽 제목 · 순서 · 단추 */
+.start { grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); align-items: stretch; gap: clamp(28px, 5vw, 80px); }
+.start-pic { margin: 0; display: block; }
+.start-pic img { width: 100%; height: 100%; min-height: 420px; aspect-ratio: auto; object-fit: cover; object-position: 40% 50%; border-radius: var(--r-lg); }
+.start-head { position: static; margin-bottom: 26px; }
+.start-head .lead { margin-top: 12px; }
+.start-list li { padding: clamp(18px, 2vw, 26px) 0; }
+.start-body > .btn { margin-top: 28px; }
+@media (max-width: 1080px) { .start { grid-template-columns: 1fr; } .start-pic img { min-height: 0; aspect-ratio: 16 / 9; } }
+@media (max-width: 760px) { .start-pic { display: block; } .start-pic img { aspect-ratio: 4 / 3; } }

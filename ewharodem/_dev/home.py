@@ -100,8 +100,12 @@ def start():
     st = [("전화로 예약합니다", f"아이의 나이와 걱정되는 점을 들려주세요. 전화 문의는 {CALL_HOURS}에 받습니다."), ("방문해서 상담합니다", "예약한 날 연구소에서 아이의 지금 모습을 함께 살펴봅니다. 필요하면 언어발달 평가를 합니다."), ("아이에게 맞춰 시작합니다", "발달 수준을 살핀 뒤 아이마다 목표를 정하고, 작은 단계로 나누어 수업합니다.")]
     rows = "".join(f'<li class="rv"><b>{i}</b><div><h3>{t}</h3><p>{d}</p></div></li>' for i, (t, d) in enumerate(st, 1))
     return sec(f'''<div class="start">
-  <div class="start-head"><h2><span class="nb">시작은</span> <span class="nb"><em class="mark">전화 한 통</em>입니다</span></h2><p class="lead">온라인 예약은 받지 않습니다. 전화로 예약한 뒤 방문해 주세요.</p>{btn("처음 오셨나요", href("guide"), "line")}<figure class="start-pic">{img("g-w-read", "소파에 나란히 앉아 그림책을 함께 보는 엄마와 아이의 뒷모습", sizes="(max-width: 1080px) 100vw, 480px")}</figure></div>
-  <ol class="start-list">{rows}</ol>
+  <figure class="start-pic rv">{img("g-w-read", "소파에 나란히 앉아 그림책을 함께 보는 엄마와 아이의 뒷모습", sizes="(max-width: 1080px) 100vw, 560px")}</figure>
+  <div class="start-body">
+    <div class="start-head"><h2><span class="nb">시작은</span> <span class="nb"><em class="mark">전화 한 통</em>입니다</span></h2><p class="lead">온라인 예약은 받지 않습니다. 전화로 예약한 뒤 방문해 주세요.</p></div>
+    <ol class="start-list">{rows}</ol>
+    {btn("처음 오셨나요 — 자세한 안내", href("guide"), "line")}
+  </div>
 </div>''', "sec-start")
 
 def space():
