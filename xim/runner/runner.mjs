@@ -515,7 +515,7 @@ async function runYoutube(payload, work) {
     const r = await py(['tools\\yt_upload_auto.py', jobJson], { cwd: DOCS, timeoutMin: 120, label: '유튜브 업로드' });
     const lines = (r.out || '').trim().split(/\r?\n/).filter(Boolean);
     let res = null; for (let i = lines.length - 1; i >= 0 && !res; i--) { try { if (lines[i].startsWith('{')) res = JSON.parse(lines[i]); } catch { /* 다음 줄 */ } }
-    if (r.code === 2 || res?.error === 'LOGIN_REQUIRED') { log('  유튜브: 로그인 필요'); notify('yt-login', '유튜브 로그인이 풀려 영상을 못 올리고 있습니다 — PC 에서 docs/tools/유튜브로그인.bat 로 로그인해 주세요.', 60); await report('login', { error: '자동화 프로필에 유튜브 로그인이 필요합니다 — PC 에서 docs\\tools\\유튜브로그인.bat 실행 후 다시' }); return; }
+    if (r.code === 2 || res?.error === 'LOGIN_REQUIRED') { log('  유튜브: 로그인 필요'); notify('yt-login', '유튜브 로그인을 구글이 다시 묻습니다 — PC 화면에 띄워 둔 엣지 창(자동화용)에서 계정을 누르고 비밀번호를 넣어 주세요. 그다음 스튜디오 카드에서 다시 올리기.', 60); await report('login', { error: '구글이 비밀번호를 다시 묻습니다 — PC 화면에 띄워 둔 엣지 창(자동화용)에서 비밀번호를 넣은 뒤 다시 올리기' }); return; }
     if (r.code !== 0 || !res?.ok) { const err = res?.error || lines.slice(-3).join(' | ').slice(0, 300) || `exit ${r.code}`; log('  유튜브: 실패', err); await report('failed', { error: err, sent: !!res?.sent || /전송 시작/.test(r.out || '') }); return; }
     log(`  유튜브: 완료 ${res.url || ''} (${res.took || 0}초)`);
     notify(`yt-done-${job.id}`, `유튜브에 올렸습니다(비공개 → 검토 끝나면 자동 공개): ${y.title || job.title}
@@ -578,6 +578,24 @@ async function runTelegram(payload) {
   } catch (e) { await report('tg_failed', { error: String(e.message || e).slice(0, 300) }); }
 }
 
+// 유튜브 로그인 미리 확인(2026-11-24, 사용자: "이런 거 다 자동으로 니가 해줘야 해") — 영상 만들기를 시작할 때 한 번(3시간에 한 번까지).
+//   풀려 있으면 계정 고르기 · '다음' 은 도구가 스스로 넘기고, 구글이 비밀번호를 물으면 로그인 창을 화면에 띄워 두고 텔레그램으로 바로 알린다
+//   (예전엔 1시간 반 뒤 올리기 단계에서야 알았다). 확인이 실패해도 작업은 그대로 이어 간다.
+let ytCheckedAt = 0;
+async function checkYoutubeLogin(job) {
+  if (Date.now() - ytCheckedAt < 3 * 3600000) return;
+  ytCheckedAt = Date.now();
+  const ch = job.channel === '순섬' ? '순수한크립토' : '사적인자산왕';
+  try {
+    const r = await py(['tools\\yt_upload_auto.py', '--check-login', ch], { cwd: DOCS, timeoutMin: 3, label: '유튜브 로그인 확인' });
+    if (r.code === 2 || /LOGIN_REQUIRED/.test(r.out || '')) {
+      ytCheckedAt = 0;   // 다음 작업에서 다시 본다
+      log('  유튜브: 로그인이 풀려 있음 — 로그인 창을 띄우고 알림');
+      notify('yt-login', `유튜브(${ch}) 로그인을 구글이 다시 묻습니다. PC 화면에 띄워 둔 엣지 창(자동화용)에서 계정을 누르고 비밀번호를 넣어 주세요 — 영상이 다 만들어지기 전(약 1시간 반 안)에 하면 그대로 올라갑니다.`, 60);
+    } else log('  유튜브: 로그인 확인됨');
+  } catch (e) { log('  (유튜브 로그인 확인 못 함)', e.message); }
+}
+
 // ───────── 모드 ─────────
 async function processJob(payload) {
   const job = payload.job, j = J(job.id);
@@ -587,6 +605,7 @@ async function processJob(payload) {
   if (job.phase === 'youtube-publish') { await runYoutubePublish(payload, work); return; }
   if (job.phase === 'telegram') { await runTelegram(payload); return; }
   try {
+    if (job.phase === 'text' && MODE === 'pc' && DOCS) await checkYoutubeLogin(job);   // 그림 엔진(같은 엣지 프로필)을 띄우기 전에
     if (job.phase === 'text') {
       let early = null;
       const onBlocks = MODE === 'pc' && DOCS ? async (blocks) => {
