@@ -18,21 +18,52 @@ const STATUS_TTL = 30000;
 let statusCache = { at: 0, value: 'active' };
 const XMS_PATHS = /^\/(admin|xms|xms-api|member|board)(\/|$)|^\/(robots\.txt|sitemap\.xml|rss\.xml|ads\.txt)$/;
 
-// 정지 여부: 이 Worker 메모리(30초) → Cloudflare 가장자리 캐시(30초, 도메인 주소에서) → xim 순서로 묻는다
-async function siteStatus(env, request) {
+// 정지 여부 · 봇 차단 여부: 이 Worker 메모리(30초) → Cloudflare 가장자리 캐시(30초, 도메인 주소에서) → xim 순서로 묻는다
+//   값은 'active' | 'suspended' | 'unknown' 뒤에 봇 차단이 켜져 있으면 ' nobot'
+async function siteFlags(env, request) {
   const t = Date.now();
-  if (t - statusCache.at < STATUS_TTL) return statusCache.value;
-  const key = new Request(`${new URL(request.url).origin}/__xim_status__`);
+  const parse = (v) => ({ status: v.split(' ')[0], nobot: / nobot$/.test(v) });
+  if (t - statusCache.at < STATUS_TTL) return parse(statusCache.value);
+  const key = new Request(`${new URL(request.url).origin}/__xim_flags__`);
   try {
     const hit = await caches.default.match(key).catch(() => null);
-    if (hit) { statusCache = { at: t, value: await hit.text() }; return statusCache.value; }
-    statusCache = { at: t, value: await env.XIM.status(env.XIM_SITE) };
+    if (hit) { statusCache = { at: t, value: await hit.text() }; return parse(statusCache.value); }
+    const f = await env.XIM.flags(env.XIM_SITE);
+    statusCache = { at: t, value: f.status + (f.nobot ? ' nobot' : '') };
     await caches.default.put(key, new Response(statusCache.value, { headers: { 'Cache-Control': 'public, max-age=30' } })).catch(() => {});
   } catch (e) {
-    console.error('xim status 실패', e);
+    console.error('xim flags 실패', e);
     statusCache = { at: t - STATUS_TTL + 5000, value: statusCache.value }; // 5초 뒤 다시 물어본다
   }
-  return statusCache.value;
+  return parse(statusCache.value);
+}
+const siteStatus = async (env, request) => (await siteFlags(env, request)).status;
+
+// ───── 봇 차단 (xim 사이트 줄의 '봇 차단' 스위치, sites.no_bots) ─────
+//   켠 사이트는 검색엔진 · AI 수집 · 미리보기 · 수집 프로그램이 아무것도 가져가지 못하게 한다:
+//     robots.txt = 전체 금지, sitemap · rss 없음, 봇으로 보이는 요청(이름 · Cloudflare 가 알아본 봇 · 이름 없음 · 언어 헤더 없는 페이지 요청)은 403,
+//     사람에게 가는 html 에도 X-Robots-Tag(noindex …) — 이름을 숨긴 프로그램이 가져가도 검색 결과에는 안 나오게.
+//   가장자리(site-edge)와 본체가 같이 쓴다. 사람 요청은 xim 에 묻지 않는다(봇으로 보일 때 · robots.txt 일 때만) — 속도 그대로.
+//   GET · HEAD 만 본다(결제 알림 같은 서버끼리 POST 는 막지 않게). 운영자 도구(xim-…)는 지나간다.
+const NOBOT_UA = /(?<!cu)bot(?![a-z])|crawl|spider|slurp|scrap|archiv|preview|fetch|curl|wget|python|java\/|go-http|okhttp|axios|undici|node|httpclient|libwww|lwp|aiohttp|httpx|guzzle|postman|headless|phantom|selenium|puppeteer|playwright|lighthouse|pagespeed|monitor|uptime|facebookexternalhit|meta-external|whatsapp|yeti|daumoa|claude|anthropic|perplexity|chatgpt|oai-search|google(other|-)|-google|google favicon|bingpreview|ia_archiver|feedly|rss/i;
+export const ROBOTS_TAG = 'noindex, nofollow, noarchive, nosnippet, noimageindex, noai, noimageai';
+export async function botGuard(request, env) {
+  if (!env.XIM || !env.XIM_SITE || (request.method !== 'GET' && request.method !== 'HEAD')) return null;
+  const p = new URL(request.url).pathname;
+  if (/^\/(cdn-cgi|\.well-known)\//.test(p)) return null;
+  const h = request.headers, ua = h.get('User-Agent') || '';
+  const special = /^\/(robots\.txt|sitemap\.xml|rss\.xml)$/.test(p);
+  const bot = !ua || NOBOT_UA.test(ua) || !!request.cf?.verifiedBotCategory || !!request.cf?.botManagement?.verifiedBot
+    || (!h.get('Accept-Language') && looksHtml(p) && !/^\/(api|ws|xms-api|site-api)(\/|$)/.test(p));
+  if (!special && !bot) return null;
+  if (/xim-(portfolio|studio)/.test(ua)) return null;
+  if (!(await siteFlags(env, request)).nobot) return null;
+  const head = { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': ROBOTS_TAG, 'X-Xim-Bot': '1' };
+  // robots.txt 는 봇에게도 200 으로 (403 이면 "규칙 없음 = 다 가져가도 됨" 으로 읽는 검색엔진이 있다)
+  //   'Disallow: /*' 를 함께: Cloudflare 가 앞에 붙이는 관리 robots.txt 의 'Allow: /' 보다 긴 규칙이어야 이긴다(같은 길이면 허용이 이김)
+  if (p === '/robots.txt') return new Response('User-agent: *\nDisallow: /\nDisallow: /*\n', { headers: head });
+  if (!bot) return new Response('Not found', { status: 404, headers: head });
+  return new Response('Forbidden', { status: 403, headers: head });
 }
 
 // 테스트모드(xms test.js): 쿠키 xms_test 가 있으면 xms 에게 사본 이름(<사이트>--t<10자>)으로 묻는다 — 실제 자료는 건드리지 않게.
@@ -129,7 +160,14 @@ export default {
         return new Response('Not found', { status: 404 });
       }
     }
+    const guard = await botGuard(request, env);
+    if (guard) return guard;
     let res = await handle(request, env, ctx);
+    // 봇 차단을 켠 사이트: 사람에게 가는 html 에도 "검색 결과 · AI 학습에 쓰지 말 것" 헤더 (값은 메모리에 있어 더 묻지 않는다)
+    if (env.XIM && (res.headers.get('Content-Type') || '').includes('text/html') && (await siteFlags(env, request)).nobot) {
+      res = new Response(res.body, res);
+      res.headers.set('X-Robots-Tag', ROBOTS_TAG);
+    }
     if (env.XMS) res = countVisit(request, env, ctx, res);
     if (ip && env.XIM && res.status === 404 && !BENIGN.test(url.pathname) && !GOOD_BOT.test(request.headers.get('User-Agent') || '')) {
       ctx.waitUntil(secReport(env, request, ip, '404'));

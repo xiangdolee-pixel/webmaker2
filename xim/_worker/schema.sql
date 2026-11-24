@@ -313,6 +313,9 @@ CREATE TABLE IF NOT EXISTS contracts (
 -- 2026-11-18 테스트모드 (xms test.js) — 한 번만 실행:
 --   ALTER TABLE sites ADD COLUMN test_mode INTEGER NOT NULL DEFAULT 0;  -- 1 이면 그 사이트 로그인 화면에 '테스트모드로 둘러보기' (xim 사이트 줄의 스위치)
 
+-- 2026-11-24 봇 차단 (site-worker botGuard) — 한 번만 실행:
+--   ALTER TABLE sites ADD COLUMN no_bots INTEGER NOT NULL DEFAULT 0;  -- 1 이면 검색엔진 · AI · 수집 봇을 모두 막는다 (xim 사이트 줄의 스위치)
+
 -- J-Docs (2026-11-20): xim 'J-Docs' 메뉴 — 견적서 · 거래명세서 · 청구서 · 공문. 코드 _worker/jdocs.js
 --   문서 내용은 data(JSON) 한 칸, 목록 · 검색용 값만 따로 둔다. slug = 고객에게 보내는 주소 6자(/d/<slug>)
 CREATE TABLE IF NOT EXISTS jd_docs (

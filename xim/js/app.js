@@ -290,6 +290,16 @@ async function renderSites() {
         .catch((e) => { ts.checked = !on; toast(e.message); })
         .finally(() => { ts.disabled = false; });
     };
+    // 봇 차단 켜기 · 끄기 — 누르는 즉시 저장, 실패하면 되돌린다
+    const nb = el.querySelector('[data-nobots]');
+    nb.onchange = () => {
+      const on = nb.checked;
+      nb.disabled = true;
+      api(`/sites/${site.id}/nobots`, { method: 'POST', data: { on } })
+        .then(() => { site.no_bots = on ? 1 : 0; toast(on ? `"${site.name}" 봇 차단을 켰습니다. 검색엔진 · AI · 수집 프로그램이 가져가지 못합니다(1분 안팎에 반영).` : `"${site.name}" 봇 차단을 껐습니다.`); })
+        .catch((e) => { nb.checked = !on; toast(e.message); })
+        .finally(() => { nb.disabled = false; });
+    };
     // 포트폴리오 켜기 · 끄기 — 누르는 즉시 저장, 실패하면 되돌린다
     const pf = el.querySelector('[data-pf]');
     pf.onchange = () => {
@@ -588,6 +598,7 @@ function siteRow(s) {
     </div>
     <div class="sr-sw">
       <label class="pf-sw" title="켜면 이 사이트 로그인 화면에 '테스트모드로 둘러보기' 단추가 생깁니다. 누구나 관리자처럼 고쳐 볼 수 있고, 로그아웃하면 원래대로 돌아갑니다(실제 자료는 바뀌지 않음)"><input type="checkbox" data-test${s.test_mode ? ' checked' : ''}><i aria-hidden="true"></i>테스트모드</label>
+      <label class="pf-sw" title="켜면 구글 · 네이버 같은 검색엔진, AI 수집, 카카오톡 미리보기, 수집 프로그램이 이 사이트를 가져가지 못합니다(검색 결과에서도 빠집니다). 1분 안팎에 반영"><input type="checkbox" data-nobots${s.no_bots ? ' checked' : ''}><i aria-hidden="true"></i>봇 차단</label>
       <label class="pf-sw" title="켜면 포트폴리오(portfolio.plators.com)에 나옵니다"><input type="checkbox" data-pf${s.portfolio ? ' checked' : ''}><i aria-hidden="true"></i>포트폴리오</label>
     </div>
     <div class="sr-addr">${s.domain ? link(s.url, s.domain) : '<span class="dim">도메인 없음</span>'}${link(dev, 'workers.dev')}${tags}</div>

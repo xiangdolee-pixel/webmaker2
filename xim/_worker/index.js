@@ -3,6 +3,7 @@
 //   기본 export (xim.….workers.dev)   운영자 관리 화면(/) + 운영자 API(/api/*)
 //   Engine (서비스 바인딩 전용)          각 고객 사이트 Worker 가 부른다. 공개 주소로는 닿지 않는다.
 //     status(slug)                      사이트 상태(active | suspended | unknown)
+//     flags(slug)                       { status, nobot } — 상태 + 봇 차단 스위치(site-worker botGuard)
 //     portfolio()                       포트폴리오에 켜 둔 사이트 [{ slug, name, url }] + 포트폴리오2 [{ slug:'', name, url, extra }], 최근 것부터 (portfolio 폴더가 쓴다)
 //     fetch(request)                    /__suspended (정지 화면). 업체 관리 화면 · 회원 · 게시판은 xms 가 맡는다.
 //
@@ -627,6 +628,17 @@ async function ximApi(request, env, url, ctx) {
     return json({ ok: true });
   }
 
+  // 봇 차단 켜기 · 끄기 (site-worker botGuard): 켜면 검색엔진 · AI · 수집 프로그램이 그 사이트를 가져가지 못한다(1분 안팎에 반영)
+  m = path.match(/^\/api\/sites\/(\d+)\/nobots$/);
+  if (m && method === 'POST') {
+    const on = (await body(request)).on ? 1 : 0;
+    const s = await db.prepare('SELECT slug, name FROM sites WHERE id = ?').bind(+m[1]).first();
+    if (!s) return json({ error: '사이트를 찾을 수 없습니다.' }, 404);
+    await db.prepare('UPDATE sites SET no_bots = ? WHERE id = ?').bind(on, +m[1]).run();
+    await audit(db, request, 'SITE_UPDATE', `${s.name} (${s.slug})`, `봇 차단 ${on ? '켬' : '끔'}`);
+    return json({ ok: true });
+  }
+
   // 포트폴리오(portfolio.plators.com)에 보이기 켜기 · 끄기
   m = path.match(/^\/api\/sites\/(\d+)\/portfolio$/);
   if (m && method === 'POST') {
@@ -1232,6 +1244,12 @@ export class Engine extends WorkerEntrypoint {
   async status(slug) {
     const site = await getSite(this.env, slug);
     return site ? site.status : 'unknown';
+  }
+
+  // 상태 + 봇 차단 여부를 한 번에 (site-worker siteFlags · botGuard)
+  async flags(slug) {
+    const site = await getSite(this.env, slug);
+    return { status: site ? site.status : 'unknown', nobot: !!site?.no_bots };
   }
 
   // 포트폴리오 사이트가 묻는다: 포트폴리오에 켜 둔 운영 중 사이트 [{ slug, name, url }] (만든 차례)

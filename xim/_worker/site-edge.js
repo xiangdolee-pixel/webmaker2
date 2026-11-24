@@ -5,7 +5,7 @@
 //   게시판 · 회원 · 관리 · API · 로그인한 사람 · 처음 받는 페이지는 지금처럼 본체로.
 //   자기 Worker 가 있는 사이트(roadbible · xip 등, 2026-11-15)도 같은 앞단: /api · /ws(웹소켓) · 그 밖에 html 이 아닌 답(/qt 같은 JSON · 그림 · 넘기기)은
 //   한 번 본 뒤 '본체로' 표시를 남겨 다음부터 곧장 본체로 보낸다(두 번 부르지 않게).
-import { countVisit } from './site-worker.js';
+import { countVisit, botGuard } from './site-worker.js';
 
 const DYN = /^\/(xms|xms-api|member|board|site-api|admin|cdn-cgi|api|ws|rss\.xml|sitemap\.xml|robots\.txt)(\/|$)/;
 const PASS_MS = 3600000;   // html 이 아닌 주소라는 표시를 믿는 시간(배포하면 열쇠가 바뀌어 새로)
@@ -14,6 +14,9 @@ const FRESH_MS = 30000;
 
 export default {
   async fetch(request, env, ctx) {
+    // 봇 차단을 켠 사이트(xim 스위치): 봇은 여기서 바로 403 — 캐시에 있는 페이지도 주지 않는다
+    const guard = await botGuard(request, env);
+    if (guard) return guard;
     const url = new URL(request.url);
     const p = url.pathname;
     const cookie = request.headers.get('Cookie') || '';
@@ -30,7 +33,7 @@ export default {
       const r = await env.CORE.fetch(new Request(request.url, { headers: h }));
       if (r.status !== 200 || !(r.headers.get('Content-Type') || '').includes('text/html') || r.headers.get('Set-Cookie')) {
         // html 이 아니거나 넘기기 · 쿠키가 붙는 주소 → '본체로' 표시(다음부터 곧장 본체, 가장자리가 두 번 부르지 않게)
-        if (r.status >= 500) return null;   // 잠깐 난 오류는 표시하지 않음
+        if (r.status >= 500 || r.headers.get('X-Xim-Bot')) return null;   // 잠깐 난 오류 · 봇 차단 응답은 표시하지 않음
         await cache.put(key, new Response('', { headers: { 'Cache-Control': 'public, max-age=86400', 'X-Edge-At': String(Date.now()), 'X-Edge-Pass': '1' } }));
         return null;
       }
