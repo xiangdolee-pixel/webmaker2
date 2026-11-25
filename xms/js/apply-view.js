@@ -4,6 +4,15 @@ import { $, $$, esc, makeApi, toast, openDialog, busy, confirmInline } from './c
 const admin = makeApi('/xms-api/admin');   // 최종 선정 등 레벨1 만 하는 일
 const judge = makeApi('/xms-api');         // 점수 주기 — 레벨1 · 2 (레벨2 는 관리 API 에 못 들어간다)
 const LABEL = { SUBMITTED: '접수', CHECKED: '서류 확인', SELECTED: '선정', REJECTED: '미선정' };
+const tagHtml = (st) => `<span class="apx-tag st-${st.toLowerCase()}">${LABEL[st]}</span>`;
+
+// 신청서에서 바꾼 점수 · 선정을 적어 두었다가, 뒤로 가기로 돌아온 목록(브라우저가 들고 있던 옛 화면)에 바로 반영한다.
+//   t = 서버 시각. 목록 화면이 그린 시각(data-t)보다 나중에 바꾼 것만 덮는다 → 새로 받은 목록은 그대로.
+const MEMO = 'apx-chg';
+const memo = () => { try { return JSON.parse(sessionStorage.getItem(MEMO)) || {}; } catch { return {}; } };
+const remember = (id, part) => {
+  try { const m = memo(); m[id] = { ...m[id], ...part }; sessionStorage.setItem(MEMO, JSON.stringify(m)); } catch { /* 저장 못 하면 새로고침 때 보임 */ }
+};
 
 // 목록: 위 숫자 칸을 누르면 그 상태만, 찾기 칸은 이름 · 학과 · 학번
 const list = $('[data-apx-list]');
@@ -26,13 +35,30 @@ if (list) {
     draw();
   }));
   q?.addEventListener('input', draw);
-  // 정렬: 접수 순(최근 먼저) · 합계 높은 순 — 카드만 다시 놓는다
+  // 정렬: 번호 순(먼저 낸 사람부터) · 합계 높은 순(같으면 번호 순) — 카드만 다시 놓는다
   $('[data-apx-sort]', list)?.addEventListener('change', (e) => {
     const box = $('.apx-list', list);
-    const key = e.target.value === 'sum' ? (c) => +c.dataset.sum * 1e13 + +c.dataset.at : (c) => +c.dataset.at;
-    $$('.apx-card', box).sort((x, y) => key(y) - key(x)).forEach((c) => box.append(c));
+    const bySum = e.target.value === 'sum';
+    $$('.apx-card', box).sort((x, y) => (bySum ? y.dataset.sum - x.dataset.sum : 0) || x.dataset.no - y.dataset.no).forEach((c) => box.append(c));
   });
   $('[data-apx-round]', list)?.addEventListener('change', (e) => { location.href = `/member/apply/list?round=${e.target.value}`; });
+  const sync = () => {
+    const t0 = +list.dataset.t || 0;
+    let moved = false;
+    Object.entries(memo()).forEach(([id, c]) => {
+      const card = $(`.apx-card[data-id="${id}"]`, list);
+      if (!card) return;
+      if (c.score && c.score.t > t0) { $('.apx-scores', card).innerHTML = c.score.html; card.dataset.sum = c.score.sum; moved = true; }
+      if (c.st && c.st.t > t0) { card.dataset.st = c.st.v; $('.apx-tag', card).outerHTML = tagHtml(c.st.v); moved = true; }
+    });
+    if (!moved) return;
+    const cnt = (k) => $$('.apx-card', list).filter((c) => k === 'all' || c.dataset.st === k).length;
+    $$('.apx-stat', list).forEach((b) => { $('b', b).textContent = cnt(b.dataset.f); });
+    $('[data-apx-sort]', list)?.dispatchEvent(new Event('change'));
+    draw();
+  };
+  sync();
+  addEventListener('pageshow', (e) => { if (e.persisted) sync(); });
 }
 
 // 신청서 하나: 심사 상태 · 서류 사진
@@ -44,7 +70,7 @@ if (view) {
     busy(b, null, async () => {
       await admin(`/apply/${id}`, { method: 'PUT', data: { status: b.dataset.st } });
       $$('.apx-chip', view).forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
-      $('[data-apx-tag]', view).innerHTML = `<span class="apx-tag st-${b.dataset.st.toLowerCase()}">${LABEL[b.dataset.st]}</span>`;
+      $('[data-apx-tag]', view).innerHTML = tagHtml(b.dataset.st);
       toast(`'${LABEL[b.dataset.st]}'(으)로 바꿨습니다.`);
     });
   }));
@@ -58,6 +84,7 @@ if (view) {
       const r = await judge(`/apply/${id}/score`, { method: 'PUT', data: { score: n } });
       $$('.apx-pt', sbox).forEach((x) => { const on = +x.dataset.pt === n; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); });
       $('[data-apx-scores]', sbox).innerHTML = r.html;
+      remember(id, { score: { html: r.html, sum: r.sum, t: r.at } });
       $('[data-my-note]', sbox).textContent = n ? `${n}점을 줬습니다 · 다시 누르면 바뀝니다` : '1~10점 중 하나를 누르세요';
       let clr = $('.apx-pt-clear', sbox);
       if (n && !clr) { clr = document.createElement('button'); clr.type = 'button'; clr.className = 'linkish apx-pt-clear'; clr.dataset.pt = '0'; clr.textContent = '내 점수 빼기'; $('.apx-pts', sbox).after(clr); }
@@ -80,14 +107,36 @@ if (view) {
       b.dataset.final = on ? 'SUBMITTED' : 'SELECTED';
       b.textContent = on ? '선정 취소' : '선정하기';
       b.classList.toggle('primary', !on);
-      $('[data-apx-tag]', view).innerHTML = `<span class="apx-tag st-${to.toLowerCase()}">${LABEL[to]}</span>`;
+      $('[data-apx-tag]', view).innerHTML = tagHtml(to);
+      remember(id, { st: { v: to, t: r.t } });
       toast(on ? '선정했습니다.' : '선정을 취소했습니다.');
     });
     if (to === 'SUBMITTED') confirmInline(b, '선정을 취소할까요?', '선정 취소', run); else run();
   });
+  // 서류는 이 화면 위에 띄워 본다 — 뒤로 가기는 띄운 창만 닫는다.
+  //   (PDF 를 새 창으로 열면 홈 화면에 설치한 앱에서는 앱 밖으로 나가, 뒤로 가기에 앱이 통째로 닫혔다 — 사용자 지적 2026-11-25)
+  const sheet = (html, setup) => {
+    history.pushState({ apxSheet: 1 }, '');
+    let popped = false;
+    const onPop = () => { popped = true; dlg.close(); };
+    addEventListener('popstate', onPop, { once: true });
+    const dlg = openDialog(html, setup);
+    dlg.addEventListener('close', () => { removeEventListener('popstate', onPop); if (!popped && history.state?.apxSheet) history.back(); });
+    return dlg;
+  };
   $$('[data-zoom]', view).forEach((b) => b.addEventListener('click', () => {
     const u = esc(b.dataset.zoom);
-    openDialog(`<div class="apx-big"><img src="${u}" alt=""></div>
-      <div class="apx-big-acts"><a class="btn" href="${u}?dl=1">내려받기</a><a class="btn" href="${u}" target="_blank" rel="noopener">새 창</a><button type="button" class="btn primary" data-close>닫기</button></div>`);
+    sheet(`<div class="apx-big"><img src="${u}" alt=""></div>
+      <div class="apx-big-acts"><a class="btn" href="${u}?dl=1">내려받기</a><button type="button" class="btn primary" data-close>닫기</button></div>`);
+  }));
+  $$('.apx-pdf', view).forEach((a) => a.addEventListener('click', (e) => {
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return; // 새 탭으로 열기는 그대로
+    e.preventDefault();
+    const u = a.getAttribute('href'), name = a.dataset.name || 'PDF';
+    sheet(`<div class="xv" data-xv="pdf" data-src="${esc(u)}" data-dl="${esc(u)}?dl=1" data-name="${esc(name)}"></div>
+      <div class="apx-big-acts"><button type="button" class="btn primary" data-close>닫기</button></div>`, (dlg) => {
+      dlg.classList.add('apx-doc-dlg');
+      import('./pdfview.js').then((m) => m.mountPdf($('.xv', dlg))).catch(() => { location.href = u; });
+    });
   }));
 }

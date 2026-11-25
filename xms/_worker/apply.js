@@ -370,14 +370,15 @@ export async function applicantsPage(ctx, { page, msgPage, needLogin }) {
   if (!round) return msgPage(ctx, '신청 기간이 없습니다', admin ? '관리 화면에서 신청 기간을 먼저 만들어 주세요.' : '아직 신청 기간이 정해지지 않았습니다.', admin ? '<div class="actions center"><a class="btn primary" href="/xms/#/apply/rounds/new">신청 기간 만들기</a></div>' : '');
   const [{ results: rounds }, { results }] = await db.batch([
     db.prepare('SELECT r.id, r.title, (SELECT COUNT(*) FROM applications a WHERE a.round_id = r.id) AS n FROM apply_rounds r WHERE r.site = ? AND r.deleted_at IS NULL ORDER BY r.starts_on DESC, r.id DESC').bind(site),
-    db.prepare('SELECT a.*, mb.name AS m_name, mb.login_id FROM applications a LEFT JOIN members mb ON mb.id = a.member_id WHERE a.site = ? AND a.round_id = ? ORDER BY a.created_at DESC').bind(site, round.id),
+    db.prepare('SELECT a.*, mb.name AS m_name, mb.login_id FROM applications a LEFT JOIN members mb ON mb.id = a.member_id WHERE a.site = ? AND a.round_id = ? ORDER BY a.created_at, a.id').bind(site, round.id),
   ]);
-  const list = results.map(appRow);
+  const list = results.map((a, i) => ({ ...appRow(a), no: i + 1 })); // 번호 = 접수 순서 (먼저 낸 사람이 1번)
   const cnt = (k) => list.filter((a) => a.status === k).length;
   const [sc, judges] = await Promise.all([scoresOf(db, site, list.map((a) => a.id)), judgesOf(db, site)]);
   const t = kstDay();
   const state = round.starts_on > t ? ['soon', '시작 전'] : round.ends_on < t ? ['closed', '마감'] : ['open', '접수 중'];
-  const card = (a) => `<a class="apx-card" href="/member/apply/${a.id}" data-q="${esc([a.name, a.dept, a.student_no, a.mobile, a.role].join(' ').toLowerCase())}" data-st="${a.status}" data-sum="${sumOf(sc.get(a.id))}" data-at="${a.created_at}">
+  const card = (a) => `<a class="apx-card" href="/member/apply/${a.id}" data-q="${esc([a.name, a.dept, a.student_no, a.mobile, a.role].join(' ').toLowerCase())}" data-st="${a.status}" data-id="${a.id}" data-sum="${sumOf(sc.get(a.id))}" data-no="${a.no}">
+      <span class="apx-no" aria-label="${a.no}번">${a.no}</span>
       <span class="apx-av">${initial(a.name)}</span>
       <span class="apx-card-b">
         <span class="apx-card-t"><b>${esc(a.name)}</b>${statusTag(a.status)}</span>
@@ -386,7 +387,7 @@ export async function applicantsPage(ctx, { page, msgPage, needLogin }) {
         <small>${fmtTime(a.created_at)} 접수${a.updated_at > a.created_at + 60000 ? ' · 고침' : ''}</small>
         <span class="apx-scores">${scoreLine(sc.get(a.id), judges)}</span>
       </span><span class="apx-chev" aria-hidden="true">›</span></a>`;
-  return page(ctx, '신청자 확인', `<div class="apx" data-apx-list>
+  return page(ctx, '신청자 확인', `<div class="apx" data-apx-list data-t="${Date.now()}">
   <a class="apx-back" href="/member/apply">‹ 장학금 신청</a>
   <header class="apx-head">
     <p class="apx-eyebrow"><i class="apx-dot st-${state[0]}"></i>${state[1]} · ${esc(periodLabel(round))}</p>
@@ -400,7 +401,7 @@ export async function applicantsPage(ctx, { page, msgPage, needLogin }) {
     <button type="button" class="apx-stat sel" data-f="SELECTED" aria-pressed="false"><b>${cnt('SELECTED')}</b><span>선정</span></button>
   </div>
   ${list.length ? `<div class="apx-tools"><input class="input apx-q" type="search" placeholder="이름 · 학과 · 학번으로 찾기" data-apx-q aria-label="신청자 찾기">
-    <select class="input apx-sort" data-apx-sort aria-label="정렬"><option value="at">접수 순</option><option value="sum">합계 높은 순</option></select>
+    <select class="input apx-sort" data-apx-sort aria-label="정렬"><option value="no">번호 순</option><option value="sum">합계 높은 순</option></select>
     ${admin ? `<a class="btn apx-xls" href="/xms-api/admin/apply/export?round=${round.id}">엑셀</a>` : ''}</div>
   <div class="apx-list">${list.map(card).join('')}</div>
   <p class="apx-none" data-apx-none hidden>조건에 맞는 신청자가 없습니다.</p>`
@@ -417,9 +418,9 @@ export async function applicantPage(ctx, id, { page, msgPage, needLogin }) {
   if (stop) return stop;
   const a = await db.prepare('SELECT a.*, mb.name AS m_name, mb.login_id, mb.email AS m_email FROM applications a LEFT JOIN members mb ON mb.id = a.member_id WHERE a.id = ? AND a.site = ?').bind(id, site).first();
   if (!a) return msgPage(ctx, '없는 신청서입니다', '지워졌거나 주소가 바뀌었습니다.', '<div class="actions center"><a class="btn" href="/member/apply/list">신청자 목록</a></div>', 404);
-  const { results: ids } = await db.prepare('SELECT id FROM applications WHERE site = ? AND round_id = ? ORDER BY created_at DESC').bind(site, a.round_id).all();
-  const i = ids.findIndex((x) => x.id === a.id);
-  const prev = ids[i - 1]?.id; const next = ids[i + 1]?.id;
+  const { results: ids } = await db.prepare("SELECT a.id, COALESCE(NULLIF(json_extract(a.answers, '$.name'), ''), mb.name, '') AS name FROM applications a LEFT JOIN members mb ON mb.id = a.member_id WHERE a.site = ? AND a.round_id = ? ORDER BY a.created_at, a.id").bind(site, a.round_id).all();
+  const i = ids.findIndex((x) => x.id === a.id); // 번호 = i + 1 (목록과 같은 접수 순서)
+  const prev = i > 0 ? { ...ids[i - 1], no: i } : null; const next = i >= 0 && ids[i + 1] ? { ...ids[i + 1], no: i + 2 } : null;
   const v = parse(a.answers, {});
   const docs = await docsOf(db, site, a);
   const row = appRow(a);
@@ -428,7 +429,11 @@ export async function applicantPage(ctx, id, { page, msgPage, needLogin }) {
   const kv = (f) => (f.type === 'textarea'
     ? `<div class="apx-long"><dt>${esc(f.label)}<small>${String(v[f.k] || '').length.toLocaleString()}자</small></dt><dd>${esc(v[f.k] || '-')}</dd></div>`
     : `<div><dt>${esc(f.label)}</dt><dd>${esc(v[f.k] || '-')}</dd></div>`);
-  const step = (to, label, cls) => (to ? `<a class="btn ${cls}" href="/member/apply/${to}">${label}</a>` : `<span class="btn ${cls} off" aria-disabled="true">${label}</span>`);
+  const step = (to, dir) => { // 이전 · 다음 신청자: 번호와 이름이 보이게
+    const cls = `apx-step ${dir}`; const l = dir === 'prev' ? '‹ 이전 신청자' : '다음 신청자 ›';
+    return to ? `<a class="${cls}" href="/member/apply/${to.id}"><small>${l}</small><b><em>${to.no}</em>${esc(to.name || '이름 없음')}</b></a>`
+      : `<span class="${cls} off" aria-disabled="true"><small>${l}</small><b>${dir === 'prev' ? '처음입니다' : '마지막입니다'}</b></span>`;
+  };
   const docCount = FORM.files.filter((f) => (docs[f.k] || []).length).length;
   const scores = (await scoresOf(db, site, [a.id])).get(a.id);
   const judges = await judgesOf(db, site);
@@ -438,7 +443,7 @@ export async function applicantPage(ctx, id, { page, msgPage, needLogin }) {
   const mine = scores.find((x) => x.member_id === meId)?.score || 0;
   const admin = ctx.me.level === 1; // 최종 선정 · 관리 화면 가는 길은 레벨1만
   return page(ctx, `${row.name} 신청서`, `<div class="apx" data-apx-view data-id="${a.id}">
-  <div class="apx-topnav"><a class="apx-back" href="/member/apply/list?round=${a.round_id}">‹ 신청자 목록</a><span>${i + 1} / ${ids.length}</span></div>
+  <div class="apx-topnav"><a class="apx-back" href="/member/apply/list?round=${a.round_id}">‹ 신청자 목록</a><span><b class="apx-no-t">${i + 1}번</b> / ${ids.length}명</span></div>
   <div class="apx-hero">
     <div class="apx-hero-top">
       <span class="apx-av lg">${initial(row.name)}</span>
@@ -469,11 +474,11 @@ export async function applicantPage(ctx, id, { page, msgPage, needLogin }) {
     ${FORM.files.map((f) => `<div class="apx-doc"><h3>${esc(f.label)}<small>${(docs[f.k] || []).length}개</small></h3>
       ${(docs[f.k] || []).length ? `<div class="apx-files">${docs[f.k].map((u) => (/^image\//.test(u.mime)
         ? `<button type="button" class="apx-img" data-zoom="${esc(u.url)}" aria-label="${esc(f.label)} 크게 보기"><img src="${esc(u.url)}" alt="" loading="lazy"></button>`
-        : `<a class="apx-pdf" href="${esc(u.url)}" target="_blank" rel="noopener"><b>PDF</b><span>${esc(u.name)}</span></a>`)).join('')}</div>`
+        : `<a class="apx-pdf" href="${esc(u.url)}" data-name="${esc(u.name)}" target="_blank" rel="noopener"><b>PDF</b><span>${esc(u.name)}</span></a>`)).join('')}</div>`
         : '<p class="apx-miss">올린 파일이 없습니다.</p>'}</div>`).join('')}
   </div>
   ${a.memo ? `<div class="apx-sec apx-memo"><h2>관리자 메모</h2><p>${esc(a.memo)}</p></div>` : ''}
-  <nav class="apx-pager">${step(prev, '‹ 이전', '')}${step(next, '다음 신청자 ›', 'primary')}</nav>
+  <nav class="apx-pager" aria-label="다른 신청자">${step(prev, 'prev')}${step(next, 'next')}</nav>
   ${admin ? `<p class="apx-foot"><a href="/xms/#/apply/${a.id}">관리 화면에서 열기 (메모 · 지우기) →</a></p>` : ''}
 </div>`, { noindex: true });
 }
@@ -549,7 +554,7 @@ async function giveScore(ctx, id) {
   }
   await audit(db, site, me, request, 'APPLY_SCORE', parse(a.answers, {}).name || String(a.id), score ? `${score}점` : '점수 뺌');
   const list = (await scoresOf(db, site, [a.id])).get(a.id);
-  return json({ ok: true, mine: score, scores: list, sum: sumOf(list), html: scoreLine(list, await judgesOf(db, site)) });
+  return json({ ok: true, mine: score, scores: list, sum: sumOf(list), html: scoreLine(list, await judgesOf(db, site)), at: now() });
 }
 
 export async function adminApply(ctx, path, method) {
@@ -643,7 +648,7 @@ export async function adminApply(ctx, path, method) {
       await db.prepare(`UPDATE applications SET status = ?, memo = ?${sel ? ', selected_by = ?, selected_at = ?' : unsel ? ', selected_by = NULL, selected_at = NULL' : ''} WHERE id = ?`)
         .bind(status, memo, ...(sel ? [me.kind === 'member' ? me.member.id : null, now()] : []), a.id).run();
       if (status !== a.status) await audit(db, site, me, request, 'APPLY_STATUS', appRow(a).name, STATUS[status]);
-      return json({ ok: true, status, by: sel ? (me.kind === 'member' ? me.member.name : '운영자') : '', at: sel ? now() : 0 });
+      return json({ ok: true, status, by: sel ? (me.kind === 'member' ? me.member.name : '운영자') : '', at: sel ? now() : 0, t: now() });
     }
     if (method === 'DELETE') {
       await removeUploads(env, site, 'post_id = ?', [APPLY_BASE - a.id]);

@@ -1260,9 +1260,28 @@ input[type="date"], input[type="datetime-local"], input[type="time"], input[type
 .apx-pdf span { max-width: 100%; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .apx-miss { margin: 0; color: var(--danger); font-size: 14px; font-weight: 600; }
 .apx-memo p { margin: 0; white-space: pre-wrap; }
-.apx-pager { display: flex; gap: 8px; }
-.apx-pager .btn { flex: 1; min-height: 52px; border-radius: 14px; font-size: 16px; font-weight: 700; }
-.apx-pager .off { opacity: .4; pointer-events: none; }
+.apx-no { display: grid; place-items: center; flex: none; min-width: 26px; color: var(--mute); font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.apx-card { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+.apx-no-t { color: var(--ink); }
+/* 이전 · 다음 신청자: 위에 방향, 아래에 번호 + 이름 */
+.apx-pager { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.apx-step { display: grid; gap: 2px; min-width: 0; padding: 12px 18px; border: 1px solid rgba(20, 26, 40, .1); border-radius: 14px; background: #fff; color: var(--ink); text-decoration: none; transition: background .2s, border-color .2s, color .2s; }
+.apx-step.next { text-align: right; }
+.apx-step small { color: var(--sub); font-size: 13px; font-weight: 600; transition: color .2s; }
+.apx-step b { overflow: hidden; font-size: 17px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.apx-step em { margin-right: 6px; color: var(--brand); font-style: normal; font-variant-numeric: tabular-nums; transition: color .2s; }
+.apx-step.next:not(.off) { border-color: var(--ink); background: var(--ink); color: #fff; }
+.apx-step.next:not(.off) small { color: rgba(255, 255, 255, .72); }
+.apx-step.next:not(.off) em { color: rgba(255, 255, 255, .6); }
+.apx-step:not(.off):hover { border-color: var(--brand); background: var(--brand); color: var(--brand-ink); }
+.apx-step:not(.off):hover small, .apx-step:not(.off):hover em { color: var(--brand-ink); opacity: .8; }
+.apx-step.off { opacity: .45; pointer-events: none; }
+.apx-step.off b { color: var(--mute); font-size: 15px; font-weight: 600; }
+/* 서류 PDF 를 이 화면 위에서 보기 */
+dialog.apx-doc-dlg { width: min(980px, calc(100vw - 16px)); }
+.apx-doc-dlg .dlg { --dp: 10px; padding: 10px; }
+.apx-doc-dlg .xv { margin: 0; }
+.apx-doc-dlg .xv[data-mode="pdf"] .xv-body { max-height: calc(100dvh - 150px); }
 .apx-big { max-height: 72vh; overflow: auto; }
 .apx-big img { display: block; width: 100%; height: auto; }
 .apx-big-acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
@@ -1272,7 +1291,11 @@ input[type="date"], input[type="datetime-local"], input[type="time"], input[type
   .apx-stat { padding: 10px 4px; }
   .apx-stat b { font-size: 19px; }
   .apx-stat span { font-size: 12px; }
-  .apx-card { gap: 12px; padding: 14px; }
+  .apx-card { gap: 10px; padding: 14px 12px; }
+  .apx-no { min-width: 20px; font-size: 14px; }
+  .apx-step { padding: 10px 12px; }
+  .apx-step b { font-size: 15px; }
+  .apx-step em { margin-right: 4px; }
   .apx-av { width: 40px; height: 40px; font-size: 16px; }
   .apx-hero { padding: 18px; }
   .apx-hero h1 { font-size: 23px; }
