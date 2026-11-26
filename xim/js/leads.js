@@ -8,6 +8,7 @@ let filter = '';   // '' 전체 · 'has' 번호 있음 · 'none' 번호 없음 �
 let q = '';
 let items = [];
 let scopes = [];
+let sms = '';      // 복사해 쓰는 문자 내용(xim settings.lead_sms — 리포에는 두지 않는다)
 let lastScan = null;
 const open = new Set();   // 펼쳐 둔 줄(id)
 
@@ -17,7 +18,7 @@ const ext = (url, label, cls = '') => `<a class="${cls}" href="${esc(url)}" targ
 export async function renderLeads(d) {
   deps = d;
   const { view, api } = deps;
-  ({ items, scopes = [] } = await api('/leads'));
+  ({ items, scopes = [], sms = '' } = await api('/leads'));
   const has = items.filter((i) => i.phone).length;
   view.innerHTML = `
     <div class="bar"><h2>상담연락 ${items.length}</h2>
@@ -27,6 +28,9 @@ export async function renderLeads(d) {
       ${scopes.map((s) => { const mine = items.filter((i) => i.area === s.area); return `<div class="ld-scope-item"><b>${esc(s.area)}</b> <span class="badge idle">${esc(s.source)}</span>
         <span class="badge done">휴대폰 있음 ${mine.filter((i) => i.phone).length}</span> <span class="badge idle">없음 ${mine.filter((i) => !i.phone).length}</span>
         <p>${esc(s.note)}</p><small>${fmtDate(s.checked_at)} 확인</small></div>`; }).join('')}</details>` : ''}
+    <details class="card ld-scope ld-sms"><summary>보낼 문자 <small>눌러서 내용 보기 · 고치기</small><button type="button" class="btn sm primary" id="ld-sms-copy">문자 복사</button></summary>
+      <div class="ld-form"><textarea class="input" id="ld-sms" rows="14" maxlength="4000" placeholder="업체에 보낼 문자 내용" aria-label="보낼 문자">${esc(sms)}</textarea>
+        <div class="ld-form-foot ld-sms-foot"><button type="button" class="btn sm" id="ld-sms-save">저장</button></div></div></details>
     <details class="card ld-scope"><summary>주소를 넣어 더 모으기 <small>홈페이지 · 블로그 · 인스타그램 · 네이버 지도(플레이스) 주소</small></summary>
       <form class="ld-form" id="ld-form">
         <label class="field"><span>주소 붙여 넣기 <small>한 줄에 하나 · 한 번에 15개까지</small></span>
@@ -43,6 +47,9 @@ export async function renderLeads(d) {
   pillTabs($('#ld-tabs'), [['', `전체 ${items.length}`], ['has', `번호 있음 ${has}`], ['none', `번호 없음 ${items.length - has}`], ['done', `연락함 ${items.filter((i) => i.done).length}`]], filter, (v) => { filter = v; renderList(); });
   $('#ld-q').oninput = (e) => { q = e.target.value; renderList(); };
   $('#ld-csv').onclick = downloadCsv;
+  // 보낼 문자: 접혀 있어도 "문자 복사"는 바로 된다(입력칸에 있는 지금 내용 그대로)
+  $('#ld-sms-copy').onclick = (e) => { e.preventDefault(); const t = $('#ld-sms').value; if (!t.trim()) return toast('문자 내용이 비어 있습니다.'); navigator.clipboard.writeText(t).then(() => toast('문자를 복사했습니다.')); };
+  $('#ld-sms-save').onclick = (e) => busy(e.currentTarget, null, async () => { sms = $('#ld-sms').value; await api('/leads/sms', { method: 'PUT', data: { text: sms } }); toast('문자를 저장했습니다.'); });
   $('#ld-form').onsubmit = (e) => {
     e.preventDefault();
     const f = e.currentTarget;

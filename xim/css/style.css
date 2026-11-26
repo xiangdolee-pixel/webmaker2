@@ -1265,6 +1265,11 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-scope { margin-bottom: 10px; padding: 0 16px; }
 .ld-scope > summary { padding: 12px 0; font-weight: 700; cursor: pointer; }
 .ld-scope > summary small { margin-left: 8px; color: var(--mute); font-size: 13px; font-weight: 400; }
+.ld-sms > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; list-style: none; }
+.ld-sms > summary::-webkit-details-marker { display: none; }
+.ld-sms > summary .btn { margin-left: auto; }
+.ld-sms textarea { min-height: 300px; font-size: 14.5px; line-height: 1.6; }
+.ld-sms-foot { justify-content: flex-end; margin-top: 8px; }
 .ld-scope-item { padding: 12px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .ld-scope-item p { margin: 8px 0 4px; color: var(--sub); line-height: 1.7; }
 .ld-scope-item small { color: var(--mute); font-size: 13px; }

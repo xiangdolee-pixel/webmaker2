@@ -472,7 +472,11 @@ async function ximApi(request, env, url, ctx) {
   // 상담연락 (2026-11-26): 주소를 넣으면 그 페이지(플레이스 · 홈페이지 · 블로그 · 인스타그램)에서 휴대폰 번호를 찾아 쌓는다. 같은 번호는 한 번만
   if (path === '/api/leads' && method === 'GET') {
     const [a, s] = await db.batch([db.prepare("SELECT * FROM leads ORDER BY (phone = ''), id LIMIT 3000"), db.prepare('SELECT * FROM lead_scopes ORDER BY checked_at DESC')]);
-    return json({ items: a.results, scopes: s.results });   // scopes = 어디까지 알아봤는지(영역마다 한 줄)
+    return json({ items: a.results, scopes: s.results, sms: (await getSetting(db, 'lead_sms')) || '' });   // scopes = 어디까지 알아봤는지(영역마다 한 줄), sms = 복사해 쓰는 문자 내용
+  }
+  if (path === '/api/leads/sms' && method === 'PUT') {
+    await setSetting(db, 'lead_sms', str((await body(request)).text, 4000));
+    return json({ ok: true });
   }
   if (path === '/api/leads' && method === 'POST') {
     const b = await body(request);
