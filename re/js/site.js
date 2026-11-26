@@ -110,6 +110,71 @@
     requestAnimationFrame(function () { requestAnimationFrame(function () { tabs.classList.add('ready'); }); });
   }
 
+  // 맡은 일(기획 · PM · 디자인 · 퍼블리싱 · 개발): 표와 아래 항목이 늘 같게.
+  //  - 표의 프로젝트 이름 = 아래 항목 제목(수정 모드로 제목을 고치면 표도 따라간다)
+  //  - 관리자가 수정 모드에서 점 · 알약을 누르면 켜지고 꺼지며 바로 저장된다
+  //    (저장 = xms 수정 모드 글자 저장소 page_texts, 키 rrole000.<항목 번호>, 값 ['11100'] — 글자 지문(7자 이하)과 겹치지 않는 8자 키)
+  var dev = d.getElementById('dev');
+  if (dev) {
+    var NAMES = ['기획', 'PM', '디자인', '퍼블리싱', '개발'];
+    var rows = dev.querySelectorAll('li.row[id^="dev-"]');
+    var saved = (window.__XE_T && window.__XE_T.page) || {};
+    var trOf = function (n) { var a = dev.querySelector('.roles-t a[href="#dev-' + n + '"]'); return a ? a.closest('tr') : null; };
+    var bitsOf = function (li) { var o = '', sp = li.querySelectorAll('.roles span:not(.solo)'); for (var i = 0; i < sp.length; i++) o += sp[i].classList.contains('on') ? '1' : '0'; return o; };
+    var paint = function (li, bits) {
+      var n = li.id.slice(4), box = li.querySelector('.roles'), sp = box.querySelectorAll('span:not(.solo)'), tr = trOf(n), did = [], solo = bits.indexOf('0') < 0, i;
+      for (i = 0; i < sp.length; i++) {
+        var on = bits.charAt(i) === '1';
+        sp[i].classList.toggle('on', on);
+        if (on) { sp[i].removeAttribute('aria-hidden'); did.push(NAMES[i]); } else sp[i].setAttribute('aria-hidden', 'true');
+      }
+      box.setAttribute('aria-label', '맡은 일: ' + did.join(' · '));
+      var tag = box.querySelector('.solo');
+      if (solo && !tag) { tag = d.createElement('span'); tag.className = 'solo'; tag.textContent = '원스톱 제작'; box.appendChild(tag); }
+      if (!solo && tag) box.removeChild(tag);
+      if (!tr) return;
+      var tds = tr.querySelectorAll('td');
+      for (i = 0; i < NAMES.length; i++) {
+        var c = tds[i + 1]; if (!c) continue;
+        c.querySelector('.rd').classList.toggle('on', bits.charAt(i) === '1');
+        c.querySelector('.sr').textContent = bits.charAt(i) === '1' ? '수행' : '해당 없음';
+      }
+      var th = tr.querySelector('th'), em = th.querySelector('em');
+      if (solo && !em) { em = d.createElement('em'); em.textContent = '원스톱'; th.appendChild(em); }
+      if (!solo && em) th.removeChild(em);
+    };
+    var names = function () {
+      for (var i = 0; i < rows.length; i++) {
+        var tr = trOf(rows[i].id.slice(4)), h = rows[i].querySelector('h3');
+        if (tr && h) { var a = tr.querySelector('a'), tx = h.textContent.replace(/\s+/g, ' ').trim(); if (a.textContent !== tx) a.textContent = tx; }
+      }
+    };
+    for (var r = 0; r < rows.length; r++) {
+      var v = saved['rrole000.' + rows[r].id.slice(4)];
+      if (v && /^[01]{5}$/.test(v[0])) paint(rows[r], v[0]);
+    }
+    names();
+    dev.addEventListener('input', names);
+    var tip = d.createElement('p');
+    tip.className = 'roles-tip'; tip.setAttribute('data-xe-off', '');
+    tip.textContent = '수정 모드: 색 점이나 알약(기획 · PM · 디자인 · 퍼블리싱 · 개발)을 누르면 켜지고 꺼지며 바로 저장됩니다. 글자는 눌러서 고친 뒤 저장을 누르세요.';
+    dev.querySelector('.sec-b').insertBefore(tip, dev.querySelector('.roles-t'));
+    dev.addEventListener('click', function (e) {
+      if (!d.body.classList.contains('xe-on') || !e.target.closest) return;
+      var li = null, idx = -1, sp = e.target.closest('.roles span:not(.solo)'), td = e.target.closest('.roles-t tbody td');
+      if (sp) { li = sp.closest('li.row'); idx = Array.prototype.indexOf.call(sp.parentNode.querySelectorAll('span:not(.solo)'), sp); }
+      else if (td) { idx = Array.prototype.indexOf.call(td.parentNode.querySelectorAll('td'), td) - 1; var a = td.parentNode.querySelector('a'); li = a ? d.getElementById(a.getAttribute('href').slice(1)) : null; }
+      if (!li || idx < 0 || idx > 4) return;
+      e.preventDefault();
+      var was = bitsOf(li), now = was.slice(0, idx) + (was.charAt(idx) === '1' ? '0' : '1') + was.slice(idx + 1);
+      paint(li, now);
+      fetch('/xms-api/admin/page-texts', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: '/', items: [{ g: '.', k: 'rrole000.' + li.id.slice(4), t: [now] }] }) })
+        .then(function (r) { if (!r.ok) throw 0; })
+        .catch(function () { paint(li, was); tip.textContent = '저장하지 못했습니다. 로그인 상태를 확인하고 다시 눌러 주세요.'; });
+    });
+  }
+
   // 구간이 보이면 떠오르기
   var secs = d.querySelectorAll('.sec');
   if ('IntersectionObserver' in window) {

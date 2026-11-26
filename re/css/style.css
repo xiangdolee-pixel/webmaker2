@@ -8,6 +8,7 @@
   --line: #dcd8cf;
   --bar: #b9b4a8;
   --now: #1d4ed8;
+  --r1: #2f5fd0; --r2: #0e8468; --r3: #d2452f; --r4: #a86200; --r5: #6b3fc4; /* 맡은 일: 기획 · PM · 디자인 · 퍼블리싱 · 개발 */
   --gut: clamp(20px, 5vw, 48px);
   --ease: cubic-bezier(.22, .8, .24, 1);
   --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
@@ -108,25 +109,36 @@ a { color: inherit; text-decoration: none; }
 /* 프로젝트 한 건: 맡은 일 네 칸(기획 · PM · 디자인 · 개발 — 늘 같은 자리, 한 것만 진하게) + 항목 이름 · 내용 두 칸 */
 .roles { display: flex; flex-wrap: wrap; gap: 6px; margin: 9px 0 13px; }
 .roles span { min-width: 54px; padding: 3px 10px; border: 1px dashed var(--line); border-radius: 999px; color: #b3aea3; font-size: 14px; font-weight: 600; line-height: 1.5; text-align: center; white-space: nowrap; }
-.roles .on { border: 1px solid var(--ink); background: var(--ink); color: var(--paper); }
-.roles .solo { border: 1px solid var(--now); background: none; color: var(--now); }
+.roles .on { border: 1px solid var(--rc, var(--ink)); background: var(--rc, var(--ink)); color: #fff; }
+.roles span:nth-child(1), .roles-t tr > :nth-child(3) { --rc: var(--r1); }
+.roles span:nth-child(2), .roles-t tr > :nth-child(4) { --rc: var(--r2); }
+.roles span:nth-child(3), .roles-t tr > :nth-child(5) { --rc: var(--r3); }
+.roles span:nth-child(4), .roles-t tr > :nth-child(6) { --rc: var(--r4); }
+.roles span:nth-child(5), .roles-t tr > :nth-child(7) { --rc: var(--r5); }
+.roles .solo { border: 1px solid var(--ink); background: none; color: var(--ink); }
 /* 한눈에 보기 표: 프로젝트 × 맡은 일 */
 .roles-t { width: 100%; border-collapse: collapse; margin-bottom: clamp(26px, 4vw, 40px); background: var(--card); border: 1px solid var(--line); border-radius: 16px; border-spacing: 0; font-size: 17px; }
 .roles-t caption { caption-side: top; text-align: left; padding-bottom: 12px; font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
 .roles-t caption span { float: right; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 500; color: var(--sub); }
 .roles-t th, .roles-t td { padding: 11px 8px; border-top: 1px solid var(--line); text-align: center; vertical-align: middle; }
 .roles-t thead th { border-top: 0; font-size: 15px; font-weight: 600; color: var(--sub); white-space: nowrap; }
+.roles-t thead th:nth-child(n+3) { color: var(--rc); font-weight: 700; }
+.roles-t caption em { padding: 1px 8px; border: 1px solid var(--ink); border-radius: 999px; color: var(--ink); font-style: normal; font-size: 13px; font-weight: 600; }
+/* 수정 모드(관리자): 점 · 알약을 누르면 맡은 일이 켜지고 꺼진다(바로 저장) */
+.xe-on .roles span:not(.solo), .xe-on .roles-t tbody td:nth-child(n+3) { cursor: pointer; }
+.xe-on .roles span:not(.solo):hover, .xe-on .roles-t tbody td:nth-child(n+3):hover .rd { box-shadow: 0 0 0 3px rgba(59, 130, 246, .35); }
+.roles-tip { display: none; margin-bottom: 14px; padding: 11px 14px; border-radius: 12px; background: #e7efff; color: #1b3c8f; font-size: 15px; font-weight: 500; }
+.xe-on .roles-tip { display: block; }
 .roles-t thead th:nth-child(-n+2), .roles-t tbody th, .roles-t tbody td:first-child { text-align: left; }
 .roles-t th:first-child, .roles-t td:first-child { padding-left: clamp(14px, 2.2vw, 24px); }
 .roles-t th:last-child, .roles-t td:last-child { padding-right: clamp(10px, 2vw, 22px); }
 .roles-t tbody td:first-child { color: var(--sub); font-variant-numeric: tabular-nums; white-space: nowrap; width: 1%; padding-right: 18px; }
 .roles-t tbody th { font-weight: 600; line-height: 1.4; }
 .roles-t tbody th a:hover { text-decoration: underline; text-underline-offset: 4px; }
-.roles-t tbody th em { display: inline-block; margin-left: 8px; padding: 1px 8px; border: 1px solid var(--now); border-radius: 999px; color: var(--now); font-style: normal; font-size: 13px; font-weight: 600; vertical-align: 2px; white-space: nowrap; }
+.roles-t tbody th em { display: inline-block; margin-left: 8px; padding: 1px 8px; border: 1px solid var(--ink); border-radius: 999px; color: var(--ink); font-style: normal; font-size: 13px; font-weight: 600; vertical-align: 2px; white-space: nowrap; }
 .roles-t tbody td:nth-child(n+3), .roles-t thead th:nth-child(n+3) { width: 68px; }
 .rd { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line); vertical-align: middle; }
-.rd.on { border-color: var(--ink); background: var(--ink); }
-.is-solo .rd.on, .rd.on.solo { border-color: var(--now); background: var(--now); }
+.rd.on { border-color: var(--rc, var(--ink)); background: var(--rc, var(--ink)); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 #dev .row:first-child { padding-top: 16px; border-top: 1px solid var(--ink); }
 .pts { display: grid; gap: 7px; }
@@ -222,7 +234,7 @@ a { color: inherit; text-decoration: none; }
   .roles-t tbody th, .roles-t tbody td { border: 0; padding: 0; width: auto; }
   .roles-t tbody td:first-child { display: none; }
   .roles-t tbody th { grid-column: 1 / -1; min-width: 0; padding-inline: 2px; font-size: 16px; }
-  .roles-t tbody td { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; letter-spacing: -.03em; color: var(--sub); }
+  .roles-t tbody td { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; letter-spacing: -.03em; color: var(--rc, var(--sub)); }
   .roles-t tbody td:nth-child(3)::before { content: "기획"; }
   .roles-t tbody td:nth-child(4)::before { content: "PM"; }
   .roles-t tbody td:nth-child(5)::before { content: "디자인"; }
