@@ -77,3 +77,9 @@ node deploy.mjs --wrangler secret put XIM_ADMIN_PASSWORD --name xim     # 운영
 - **사진 · CSS · JS 는 사이트 Worker 를 거치지 않는다**(build.mjs run_worker_first 예외 + `_headers` 캐시) — html 만 Worker.
 - **게시판 첨부**: 올리기 = 브라우저 → R2 바로(xms `/xms-api/uploads/sign` · `/done`), 내려받기 · 보기 · 본문 그림 · 목록 썸네일 = 공개 글이면 R2 서명 주소, 아니면 `/xms/upload/<id>`(권한 확인 뒤 R2 로 넘김).
 - 열쇠: R2 계정 토큰 `xms-upload`(xms-files 읽기 · 쓰기) → xms 비밀값 `R2_KEY_ID` · `R2_SECRET`. 버킷 CORS: PUT · GET · HEAD 허용.
+
+## 상담연락 (2026-11-26)
+
+- 메뉴 맨 아래 **상담연락**: 주소(네이버 플레이스 · 홈페이지 · 블로그 · 인스타그램)를 붙여 넣으면 xim 이 그 페이지를 열어 공개된 휴대폰 번호(010 등)를 찾아 `leads` 표에 쌓는다(같은 번호는 한 번만). 화면 `js/leads.js`, 읽는 코드 `_worker/leads.js`, API `/api/leads` · `/api/leads/scan`.
+- 네이버 지도 **검색 목록**은 자동으로 읽지 않는다(네이버가 봇 확인으로 막음 — 우회하지 않는다). 플레이스 주소를 넣는 방식.
+- 로그인 · 봇 확인이 막은 페이지(인스타그램 등)는 "못 읽음"으로 알려 준다.

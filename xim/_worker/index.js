@@ -11,6 +11,7 @@
 import { ensureMailDomain, ensureTurnstile } from './mail-domain.js';
 import { deleteRequest } from './request-files.js';
 import { linkUrl as cleanUrl, scrapeMeta } from './scrape.js';
+import { scanUrl, normPhone } from './leads.js';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 // 스튜디오(유튜브 발표자료 제작) — /api/studio/* · /studio/* · Workflow StudioMain (xim/_worker/studio.js)
 import { studioApi, studioHelper, studioPublic, studioScheduled, StudioMain } from './studio.js';
@@ -465,6 +466,53 @@ async function ximApi(request, env, url, ctx) {
         await audit(db, request, 'INQUIRY_DELETE', `제작문의 #${id}`);
         return json({ ok: true });
       }
+    }
+  }
+
+  // 상담연락 (2026-11-26): 주소를 넣으면 그 페이지(플레이스 · 홈페이지 · 블로그 · 인스타그램)에서 휴대폰 번호를 찾아 쌓는다. 같은 번호는 한 번만
+  if (path === '/api/leads' && method === 'GET') {
+    const { results } = await db.prepare('SELECT * FROM leads ORDER BY id DESC LIMIT 2000').all();
+    return json({ items: results });
+  }
+  if (path === '/api/leads' && method === 'POST') {
+    const b = await body(request);
+    const phone = normPhone(b.phone), name = str(b.name, 80);
+    if (!name) throw bad('이름을 넣어 주세요.');
+    if (!phone) throw bad('휴대폰 번호(010-0000-0000)를 넣어 주세요.');
+    const r = await db.prepare("INSERT OR IGNORE INTO leads (keyword, name, phone, source, memo, created_at) VALUES (?, ?, ?, 'manual', ?, ?)").bind(str(b.keyword, 40), name, phone, str(b.memo, 500), now()).run();
+    if (!r.meta.changes) throw bad('이미 있는 번호입니다.');
+    return json({ ok: true });
+  }
+  if (path === '/api/leads/scan' && method === 'POST') {
+    const b = await body(request);
+    const keyword = str(b.keyword, 40);
+    const urls = [...new Set(String(b.text ?? '').split(/\s+/).map((v) => cleanUrl(v)).filter((r) => r.ok).map((r) => r.url))];
+    if (!urls.length) throw bad('주소를 한 줄에 하나씩 넣어 주세요.');
+    if (urls.length > 15) throw bad('한 번에 15개까지 넣을 수 있습니다.');
+    const scans = await Promise.all(urls.map((u) => scanUrl(u).catch((e) => ({ url: u, found: [], errors: [String(e?.message || e)] }))));
+    let added = 0;
+    for (const sc of scans) {
+      sc.added = 0;
+      for (const f of sc.found) {
+        const r = await db.prepare('INSERT OR IGNORE INTO leads (keyword, name, category, address, phone, source, source_url, place_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          .bind(keyword, str(sc.name, 80) || new URL(sc.url).hostname, str(sc.category, 60), str(sc.address, 200), f.phone, f.source, str(f.sourceUrl, 1000), str(sc.placeUrl, 300), now()).run();
+        sc.added += r.meta.changes; added += r.meta.changes;
+      }
+    }
+    if (added) await audit(db, request, 'LEAD_SCAN', `상담연락 ${added}건`, keyword);
+    return json({ added, results: scans.map((sc) => ({ url: sc.url, name: sc.name, found: sc.found.length, added: sc.added, errors: sc.errors })) });
+  }
+  {
+    const lm = path.match(/^\/api\/leads\/(\d+)$/);
+    if (lm && method === 'PATCH') {
+      const b = await body(request);
+      await db.prepare('UPDATE leads SET done = ?, memo = ? WHERE id = ?').bind(b.done ? 1 : 0, str(b.memo, 500), +lm[1]).run();
+      return json({ ok: true });
+    }
+    if (lm && method === 'DELETE') {
+      await db.prepare('DELETE FROM leads WHERE id = ?').bind(+lm[1]).run();
+      await audit(db, request, 'LEAD_DELETE', `상담연락 #${lm[1]}`);
+      return json({ ok: true });
     }
   }
 
@@ -1407,7 +1455,7 @@ export default {
 // 화면 파일: 배포 번호(?v=)를 붙여 한 번 받으면 브라우저가 다시 묻지 않게 (배포하면 번호가 바뀌어 새로 받음)
 //   index.html → css · js 주소에 ?v=번호,  js 안의 import './x.js' 에도 같은 번호.  번호 붙은 파일 = 1년, 첫 화면 = 매번 확인
 // 메뉴마다 주소(사용자 지시 2026-11-11: xim.plators.com/studio 처럼) — 이 주소들은 첫 화면(index.html)을 내주고, 화면(app.js)이 주소를 보고 그 메뉴를 연다
-const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'monitor', 'security', 'audit', 'naver', 'contracts', 'jdocs', 'bookkeeping', 'pricing', 'studio', 'voice', 'pc', 'domains']);
+const NAV_PATHS = new Set(['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'monitor', 'security', 'audit', 'naver', 'contracts', 'jdocs', 'bookkeeping', 'pricing', 'studio', 'voice', 'pc', 'domains', 'leads']);
 async function staticFile(request, env, url) {
   const v = String(env.VER?.id || 'dev').slice(0, 8);
   const isNav = NAV_PATHS.has(url.pathname.slice(1));

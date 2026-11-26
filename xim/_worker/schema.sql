@@ -341,3 +341,21 @@ CREATE TABLE IF NOT EXISTS jd_counters (k TEXT PRIMARY KEY, n INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS jd_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL, updated_at INTEGER);   -- k = 'main': 회사 정보(주소 없음) · 기본값 · 항목 창고
 CREATE TABLE IF NOT EXISTS jd_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, type TEXT, data TEXT NOT NULL, sort INTEGER DEFAULT 0, updated_at INTEGER);
 CREATE TABLE IF NOT EXISTS jd_clients (name TEXT PRIMARY KEY, recipient TEXT, aliases TEXT, ref TEXT, tel TEXT, memo TEXT, created_at INTEGER, updated_at INTEGER);
+
+-- 상담연락 (2026-11-26): 공개된 페이지(플레이스 · 홈페이지 · 블로그 · 인스타그램)에서 찾은 휴대폰 번호. 같은 번호는 한 줄만
+--   source: place | homepage | blog | instagram | manual,  done = 연락함
+CREATE TABLE IF NOT EXISTS leads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  keyword TEXT NOT NULL DEFAULT '',      -- 무엇을 찾다 모았나 (예: 상담)
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT '',
+  address TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL,                   -- 010-0000-0000
+  source TEXT NOT NULL DEFAULT '',
+  source_url TEXT NOT NULL DEFAULT '',   -- 번호가 적혀 있던 주소
+  place_url TEXT NOT NULL DEFAULT '',
+  memo TEXT NOT NULL DEFAULT '',
+  done INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS leads_phone ON leads (phone);

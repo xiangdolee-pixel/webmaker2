@@ -6,6 +6,7 @@ import { renderVoice, stopVoice } from './voice.js';
 import { renderPc } from './pc.js';
 import { renderDomains, stopDomains } from './domains.js';
 import { renderInquiries } from './inquiries.js';
+import { renderLeads } from './leads.js';
 import { renderContracts } from './contracts.js';
 import { renderJdocs, stopJdocs } from './jdocs.js';
 import { renderJest, stopJest } from './jest.js';
@@ -15,7 +16,7 @@ const api = makeApi('/api');
 const view = $('#view');
 const TAB_KEY = 'xim.tab';
 let tab = 'sites';
-const TABS = ['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'studio', 'voice', 'pc', 'domains', 'monitor', 'security', 'audit', 'naver', 'contracts', 'jdocs', 'bookkeeping', 'pricing'];
+const TABS = ['sites', 'customers', 'portfolio2', 'requests', 'inquiries', 'studio', 'voice', 'pc', 'domains', 'monitor', 'security', 'audit', 'naver', 'contracts', 'jdocs', 'bookkeeping', 'pricing', 'leads'];
 try { const t = localStorage.getItem(TAB_KEY); if (t && TABS.includes(t)) tab = t; } catch { /* 저장소 못 쓰면 사이트 */ }   // F5 해도 보던 메뉴로 (사용자 지시 2026-11-09)
 // 메뉴마다 주소(사용자 지시 2026-11-11): xim.plators.com/studio 로 들어오면 스튜디오. 주소가 있으면 저장된 메뉴보다 먼저
 const pathTab = location.pathname.slice(1);
@@ -83,6 +84,7 @@ const NAV_ICON = {
   voice: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>',
   domains: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>',
   inquiries: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+  leads: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M10.5 17.500h3"/></svg>',
   pc: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M2 20h20M9.5 9L7 11.5 9.5 14M14.5 9l2.5 2.5-2.5 2.5"/></svg>',
 };
 let navReady = false;
@@ -91,7 +93,7 @@ function showApp() {
   $('#app').hidden = false;
   if (!navReady) {
     navReady = true;
-    const NAV = [['sites', '사이트'], ['domains', '도메인 부스터'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['inquiries', '제작문의'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['naver', '네이버 지도'], ['contracts', '계약서'], ['jdocs', '문서관리'], ['bookkeeping', '부기'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC']];
+    const NAV = [['sites', '사이트'], ['domains', '도메인 부스터'], ['customers', '고객'], ['portfolio2', '포트폴리오2'], ['requests', '수정요청'], ['inquiries', '제작문의'], ['monitor', '감시'], ['security', '보안'], ['audit', '관리 로그'], ['naver', '네이버 지도'], ['contracts', '계약서'], ['jdocs', '문서관리'], ['bookkeeping', '부기'], ['pricing', '요금제'], ['studio', '스튜디오'], ['voice', '내 목소리'], ['pc', '다른 PC'], ['leads', '상담연락']];
     const navTitle = () => { $('#mtop-title').textContent = (NAV.find(([v]) => v === tab) || NAV[0])[1]; };
     pillTabs($('#nav'), NAV, tab, (v) => {
       tab = v;
@@ -208,7 +210,7 @@ function meter(name, sub, used, limit, cls) {
 
 function render() {
   guarded(async () => {
-    const noTiles = tab === 'studio' || tab === 'voice' || tab === 'pc' || tab === 'domains' || tab === 'contracts' || tab === 'jdocs' || tab === 'bookkeeping' || tab === 'naver';   // 계약서도 문서를 넓게 보려고 타일을 숨긴다   // 제작 도구 화면에서는 사이트 요약 타일을 숨긴다 (사용자 지시 2026-11-09)
+    const noTiles = tab === 'studio' || tab === 'voice' || tab === 'pc' || tab === 'domains' || tab === 'contracts' || tab === 'jdocs' || tab === 'bookkeeping' || tab === 'naver' || tab === 'leads';   // 계약서도 문서를 넓게 보려고 타일을 숨긴다   // 제작 도구 화면에서는 사이트 요약 타일을 숨긴다 (사용자 지시 2026-11-09)
     $('#tiles').hidden = noTiles;
     const tasks = noTiles ? [] : [renderTiles()];
     if (tab === 'sites') tasks.push(renderSites());
@@ -227,6 +229,7 @@ function render() {
     if (tab === 'studio') tasks.push(renderStudio({ view, api, shrinkImage })); else stopStudio();
     if (tab === 'voice') tasks.push(renderVoice({ view, api })); else stopVoice();
     if (tab === 'pc') tasks.push(renderPc({ view, api }));
+    if (tab === 'leads') tasks.push(renderLeads({ view, api }));
     if (tab === 'domains') tasks.push(renderDomains({ view, api })); else stopDomains();
     await Promise.all(tasks);
   });
@@ -1197,7 +1200,7 @@ const AUDIT_ACTIONS = {
   SITE_CREATE: '사이트 만들기', SITE_UPDATE: '사이트 수정', SITE_SUSPEND: '사이트 정지', SITE_RESUME: '사이트 재개', SITE_MAIL: '메일 · 봇확인 등록',
   ADMIN_CREATE: '관리자 계정 추가', ADMIN_DELETE: '관리자 계정 삭제', STAFF_ENTER: 'xms 들어가기',
   SEC_BLOCK: 'IP 차단', SEC_UNBLOCK: 'IP 차단 풀기', SEC_ALLOW: '막지 않을 IP 추가', SEC_UNALLOW: '막지 않을 IP 빼기',
-  REQUEST_REPLY: '수정요청 답변', REQUEST_STATUS: '수정요청 상태', REQUEST_DELETE: '수정요청 삭제', INQUIRY_UPDATE: '제작문의 상태', INQUIRY_DELETE: '제작문의 삭제', CONNECT: 'GitHub에서 연결',
+  REQUEST_REPLY: '수정요청 답변', REQUEST_STATUS: '수정요청 상태', REQUEST_DELETE: '수정요청 삭제', INQUIRY_UPDATE: '제작문의 상태', INQUIRY_DELETE: '제작문의 삭제', CONNECT: 'GitHub에서 연결', LEAD_SCAN: '상담연락 수집', LEAD_DELETE: '상담연락 삭제',
   SITE_PORTFOLIO_ON: '포트폴리오 올림', SITE_PORTFOLIO_OFF: '포트폴리오 내림', PF2_CREATE: '포트폴리오2 추가', PF2_UPDATE: '포트폴리오2 수정', PF2_DELETE: '포트폴리오2 삭제',
 };
 let auditPage = 1;

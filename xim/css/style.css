@@ -1259,3 +1259,28 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ct-vat { margin-top: 2px; }
 .ct-vat > button { min-height: 32px; padding: 0 12px; font-size: 13.5px; }
 .ct-fees small { color: var(--mute); font-size: 12.5px; }
+
+/* ───── 상담연락 (js/leads.js) ───── */
+.ld-q { max-width: 260px; min-height: 36px; }
+.ld-rule { display: block; }
+.ld-form { margin-bottom: 16px; padding: 16px; }
+.ld-form-foot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.ld-kw { flex: 0 1 180px; margin-bottom: 0; }
+.ld-err { margin: 8px 0 0; color: var(--danger); font-size: 14px; }
+.ld-err:empty { display: none; }
+.ld-scan { display: grid; gap: 6px; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line); list-style: none; font-size: 14px; }
+.ld-scan li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; overflow-wrap: anywhere; }
+.ld-scan small { flex-basis: 100%; color: var(--mute); font-size: 13px; }
+.ld-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; }
+.ld-item.is-done { opacity: .7; }
+.ld-main { display: grid; gap: 6px; flex: 1; min-width: 0; }
+.ld-phone { justify-self: start; color: var(--brand); font-size: 20px; font-weight: 700; letter-spacing: .01em; text-decoration: none; font-variant-numeric: tabular-nums; }
+.ld-meta { font-size: 13px; }
+.ld-memo { min-height: 36px; font-size: 14px; }
+.ld-act { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex: none; max-width: 300px; }
+@media (max-width: 640px) {
+  .ld-q { flex-basis: 100%; max-width: none; }
+  .ld-item { flex-direction: column; }
+  .ld-act { justify-content: flex-start; max-width: none; }
+  .ld-form-foot .btn { flex: 1; }
+}
