@@ -113,10 +113,10 @@
   // 맡은 일(기획 · PM · 디자인 · 퍼블리싱 · 개발): 표와 아래 항목이 늘 같게.
   //  - 표의 프로젝트 이름 = 아래 항목 제목(수정 모드로 제목을 고치면 표도 따라간다)
   //  - 관리자가 수정 모드에서 점 · 알약을 누르면 켜지고 꺼지며 바로 저장된다
-  //    (저장 = xms 수정 모드 글자 저장소 page_texts, 키 rrole000.<항목 번호>, 값 ['11100'] — 글자 지문(7자 이하)과 겹치지 않는 8자 키)
+  //    (저장 = xms 수정 모드 글자 저장소 page_texts, 키 rrole001.<항목 번호>, 값 ['11100'] = PM · 기획 · 디자인 · 퍼블리싱 · 개발 순 — 글자 지문(7자 이하)과 겹치지 않는 8자 키)
   var dev = d.getElementById('dev');
   if (dev) {
-    var NAMES = ['기획', 'PM', '디자인', '퍼블리싱', '개발'];
+    var NAMES = ['PM', '기획', '디자인', '퍼블리싱', '개발'];
     var rows = dev.querySelectorAll('li.row[id^="dev-"]');
     var saved = (window.__XE_T && window.__XE_T.page) || {};
     var trOf = function (n) { var a = dev.querySelector('.roles-t a[href="#dev-' + n + '"]'); return a ? a.closest('tr') : null; };
@@ -150,14 +150,15 @@
       }
     };
     for (var r = 0; r < rows.length; r++) {
-      var v = saved['rrole000.' + rows[r].id.slice(4)];
+      var v = saved['rrole001.' + rows[r].id.slice(4)], old = saved['rrole000.' + rows[r].id.slice(4)];
+      if (!v && old && /^[01]{5}$/.test(old[0])) v = [old[0].charAt(1) + old[0].charAt(0) + old[0].slice(2)];   // 옛 순서(기획 · PM)로 저장된 값
       if (v && /^[01]{5}$/.test(v[0])) paint(rows[r], v[0]);
     }
     names();
     dev.addEventListener('input', names);
     var tip = d.createElement('p');
     tip.className = 'roles-tip'; tip.setAttribute('data-xe-off', '');
-    tip.textContent = '수정 모드: 색 점이나 알약(기획 · PM · 디자인 · 퍼블리싱 · 개발)을 누르면 켜지고 꺼지며 바로 저장됩니다. 글자는 눌러서 고친 뒤 저장을 누르세요.';
+    tip.textContent = '수정 모드: 색 점이나 알약(PM · 기획 · 디자인 · 퍼블리싱 · 개발)을 누르면 켜지고 꺼지며 바로 저장됩니다. 글자는 눌러서 고친 뒤 저장을 누르세요.';
     dev.querySelector('.sec-b').insertBefore(tip, dev.querySelector('.roles-t'));
     dev.addEventListener('click', function (e) {
       if (!d.body.classList.contains('xe-on') || !e.target.closest) return;
@@ -169,7 +170,7 @@
       var was = bitsOf(li), now = was.slice(0, idx) + (was.charAt(idx) === '1' ? '0' : '1') + was.slice(idx + 1);
       paint(li, now);
       fetch('/xms-api/admin/page-texts', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: '/', items: [{ g: '.', k: 'rrole000.' + li.id.slice(4), t: [now] }] }) })
+        body: JSON.stringify({ path: '/', items: [{ g: '.', k: 'rrole001.' + li.id.slice(4), t: [now] }] }) })
         .then(function (r) { if (!r.ok) throw 0; })
         .catch(function () { paint(li, was); tip.textContent = '저장하지 못했습니다. 로그인 상태를 확인하고 다시 눌러 주세요.'; });
     });

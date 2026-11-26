@@ -8,7 +8,7 @@
   --line: #dcd8cf;
   --bar: #b9b4a8;
   --now: #1d4ed8;
-  --r1: #4d6a96; --r2: #4c8273; --r3: #ad6156; --r4: #97793f; --r5: #77669b; /* 맡은 일: 기획 · PM · 디자인 · 퍼블리싱 · 개발 */
+  --r1: #4c8273; --r2: #4d6a96; --r3: #ad6156; --r4: #97793f; --r5: #77669b; /* 맡은 일: PM · 기획 · 디자인 · 퍼블리싱 · 개발 */
   --gut: clamp(20px, 5vw, 48px);
   --ease: cubic-bezier(.22, .8, .24, 1);
   --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
@@ -78,11 +78,11 @@ a { color: inherit; text-decoration: none; }
 /* 흐름(막대) */
 .flow { padding-bottom: clamp(40px, 7vw, 80px); }
 .flow-box { --span: 1; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: clamp(18px, 3vw, 30px) clamp(16px, 3vw, 30px) 14px; overflow: hidden; }
-.flow-row { --l: 0%; --w: 0%; display: grid; gap: 5px; margin-bottom: 14px; }
-.flow-name { font-size: 16px; font-weight: 600; color: var(--sub); white-space: nowrap; width: max-content; max-width: 100%;
+.flow-row { --l: 0%; --w: 0%; display: grid; gap: 7px; margin-bottom: 18px; }
+.flow-name { font-size: 19px; font-weight: 600; color: var(--sub); white-space: nowrap; width: max-content; max-width: 100%;
   margin-left: min(var(--l), calc(100% - var(--nw, 0px))); }
 .flow-name em { font-style: normal; font-weight: 600; color: var(--now); margin-left: 4px; }
-.flow-bar { display: block; height: 10px; border-radius: 5px; background: var(--bar); margin-left: var(--l); width: var(--w);
+.flow-bar { display: block; height: 12px; border-radius: 6px; background: var(--bar); margin-left: var(--l); width: var(--w);
   transform: scaleX(0); transform-origin: left center; transition: transform .9s var(--ease); }
 .flow-row.is-now .flow-name { color: var(--ink); }
 .flow-row.is-now .flow-bar { background: var(--now); }
@@ -90,8 +90,8 @@ a { color: inherit; text-decoration: none; }
 .flow-box.on .flow-row:nth-child(2) .flow-bar { transition-delay: .12s; }
 .flow-box.on .flow-row:nth-child(3) .flow-bar { transition-delay: .24s; }
 .flow-box.on .flow-row:nth-child(4) .flow-bar { transition-delay: .36s; }
-.flow-axis { position: relative; height: 26px; margin-top: 18px; border-top: 1px solid var(--line); }
-.flow-axis span { position: absolute; top: 0; left: var(--l); padding-top: 8px; transform: translateX(-50%); font-size: 14px; line-height: 1; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.flow-axis { position: relative; height: 30px; margin-top: 18px; border-top: 1px solid var(--line); }
+.flow-axis span { position: absolute; top: 0; left: var(--l); padding-top: 10px; transform: translateX(-50%); font-size: 17px; line-height: 1; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .flow-axis span::before { content: ""; position: absolute; top: 0; left: 50%; width: 1px; height: 5px; background: var(--faint); }
 
 /* 구간: 왼쪽 제목 + 오른쪽 내용 */
@@ -217,10 +217,10 @@ a { color: inherit; text-decoration: none; }
   .row-when { grid-column: 1 / -1; font-size: 16px; }
   .row-what h3 { font-size: 20px; }
   .skills li { font-size: 18px; gap: 12px; }
-  .flow-name { font-size: 14px; }
+  .flow-name { font-size: 16px; }
   .row-what p, .caps p, .sec-note, .works-empty { font-size: 17px; }
   .row-note { font-size: 16px; }
-  .flow-axis span { font-size: 12px; }
+  .flow-axis span { font-size: 14px; }
   .lv i { width: 18px; }
   .caps li { grid-template-columns: 1fr; }
   .skills small { display: block; margin-left: 0; }
@@ -235,8 +235,8 @@ a { color: inherit; text-decoration: none; }
   .roles-t tbody td:first-child { display: none; }
   .roles-t tbody th { grid-column: 1 / -1; min-width: 0; padding-inline: 2px; font-size: 16px; }
   .roles-t tbody td { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; letter-spacing: -.03em; color: var(--rc, var(--sub)); }
-  .roles-t tbody td:nth-child(3)::before { content: "기획"; }
-  .roles-t tbody td:nth-child(4)::before { content: "PM"; }
+  .roles-t tbody td:nth-child(3)::before { content: "PM"; }
+  .roles-t tbody td:nth-child(4)::before { content: "기획"; }
   .roles-t tbody td:nth-child(5)::before { content: "디자인"; }
   .roles-t tbody td:nth-child(6)::before { content: "퍼블리싱"; }
   .roles-t tbody td:nth-child(7)::before { content: "개발"; }
