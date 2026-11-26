@@ -86,7 +86,9 @@ async function scanPage(url, kind) {
   if (kind === 'instagram' && /\/accounts\/login/.test(r.url)) return { error: '인스타그램이 로그인을 요구함' };
   // 인스타그램 소개글은 meta description 에만 들어 있다
   const meta = [...r.html.matchAll(/<meta[^>]+content=["']([^"']*)["']/gi)].map((x) => unEnt(x[1])).join(' ');
-  return { title: titleOf(r.html), phones: mobiles(`${visible(r.html)} ${meta}`) };
+  // 홈페이지에 걸린 블로그 · 인스타그램 주소(다음에 같이 본다)
+  const links = kind === 'homepage' ? [...new Set([...r.html.matchAll(/href\s*=\s*["'](https?:\/\/(?:(?:m\.)?blog\.naver\.com|(?:www\.)?instagram\.com)\/[\w.\-]+)\/?["'?]/gi)].map((x) => x[1]))].slice(0, 3) : [];
+  return { title: titleOf(r.html), phones: mobiles(`${visible(r.html)} ${meta}`), links };
 }
 
 // 주소 하나 → { url, kind, name, category, address, placeUrl, found: [{ phone, source, sourceUrl }], errors: [] }
@@ -109,5 +111,7 @@ export async function scanUrl(url) {
   if (r.error) { out.errors.push(r.error); return out; }
   out.name = r.title || '';
   add(r.phones, kind, url);
+  const subs = await Promise.all((r.links || []).map(async (u) => ({ u, k: linkKind(u), r: await scanPage(u, linkKind(u)) })));
+  for (const x of subs) { if (x.r.error) out.errors.push(`${x.u} ${x.r.error}`); else add(x.r.phones, x.k, x.u); }
   return out;
 }
