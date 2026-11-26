@@ -47,33 +47,6 @@
     requestAnimationFrame(function () { requestAnimationFrame(function () { box.classList.add('on'); }); });
   }
 
-  // 머리 메뉴: 지금 있는 곳 표시(메뉴는 xms 가 다시 그릴 수 있어 주소로 고른다)
-  var path = location.pathname.replace(/\/index\.html$/, '/');
-  var links = d.querySelectorAll('.gnb a');
-  for (var k = 0; k < links.length; k++) {
-    var h = links[k].getAttribute('href') || '';
-    if (h === '/' ? path === '/' : path.indexOf(h) === 0) links[k].classList.add('on');
-  }
-
-  // 프로젝트: 페이지에 함께 온 게시판 최근 글을 카드로(없으면 받아 온다)
-  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
-  var lists = d.querySelectorAll('[data-xms-latest]');
-  for (var j = 0; j < lists.length; j++) (function (ul) {
-    var slug = ul.getAttribute('data-xms-latest'), n = ul.getAttribute('data-n') || 6;
-    var draw = function (list) {
-      if (!list || !list.length) return;
-      ul.innerHTML = list.map(function (p, i) {
-        return '<li class="work' + (p.thumb ? '' : ' no-img') + '"><a href="' + esc(p.url) + '">' +
-          (p.thumb ? '<span class="work-img"><img src="' + esc(p.thumb) + '" alt=""' + (i > 1 ? ' loading="lazy"' : '') + '></span>' : '') +
-          '<b>' + esc(p.title) + '</b>' + (p.sub ? '<small>' + esc(p.sub) + '</small>' : '') + (p.date ? '<time>' + esc(p.date) + '</time>' : '') + '</a></li>';
-      }).join('');
-    };
-    var emb = d.getElementById('xms-latest-' + slug);
-    if (emb) { try { draw(JSON.parse(emb.textContent)); } catch (e) { /* 빈 목록 그대로 */ } return; }
-    if (!/^https?:/.test(location.protocol) || /^(localhost|127\.)/.test(location.hostname)) return;
-    fetch('/xms-api/boards/' + slug + '/latest?n=' + n).then(function (r) { return r.ok ? r.json() : []; }).then(draw).catch(function () {});
-  })(lists[j]);
-
   // 탭(기본 이력 · 웹 프로젝트): 떠 있는 배경이 미끄러진다. 주소 뒤 #project 면 웹 프로젝트부터
   var tabs = d.querySelector('.tabs');
   if (tabs) {
