@@ -104,6 +104,9 @@ a { color: inherit; text-decoration: none; }
 .row-what h3 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.45; }
 .row-what p { color: var(--sub); font-size: 18px; }
 .row-note { color: var(--sub); font-size: 17px; white-space: nowrap; }
+.pts { margin-top: 10px; display: grid; gap: 7px; }
+.pts li { position: relative; padding-left: 16px; color: var(--sub); font-size: 17px; line-height: 1.6; }
+.pts li::before { content: ""; position: absolute; left: 0; top: .72em; width: 6px; height: 2px; border-radius: 1px; background: var(--ink); }
 .row.is-now .row-when { color: var(--now); font-weight: 600; }
 
 .skills li { display: grid; grid-template-columns: 1fr auto minmax(28px, auto); gap: 16px; align-items: center; padding: 14px 0; border-top: 1px solid var(--line); font-size: 19px; font-weight: 600; }

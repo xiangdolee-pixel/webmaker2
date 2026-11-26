@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#f5f3ee">
 <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png?v=1">
 <link rel="apple-touch-icon" href="/icon-180.png?v=1">
-<link rel="stylesheet" href="/css/style.css?v=7">
+<link rel="stylesheet" href="/css/style.css?v=8">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'">
 <script src="/js/site.js?v=7" defer></script>
 </head>
@@ -144,6 +144,14 @@
         </div>
       </li>
       <li class="row">
+        <p class="row-when">2023.03</p>
+        <div class="row-what">
+          <h3>온라인 전자투표 시스템 개발</h3>
+          <p>기획 · 개발</p>
+          <p>기관 · 기업의 투표를 스마트폰으로 진행하는 전자투표 시스템. 투표자에게 문자로 개인별 투표 주소를 보내고, 본인 인증을 거쳐 안건별 찬반 · 후보 선택 등 여러 방식으로 투표하며, 투표율을 실시간으로 집계합니다. 실제 투표에 쓰이고 있습니다.</p>
+        </div>
+      </li>
+      <li class="row">
         <p class="row-when">2026.09</p>
         <div class="row-what">
           <h3>스쿨디스플레이 전면 리뉴얼</h3>
@@ -157,6 +165,20 @@
           <h3>백석TV 온라인방송국 전면 개편</h3>
           <p>기획 · 디자인 · 개발 · 론칭 단독 수행</p>
           <p>시청자용 서비스 화면과 관리자 시스템, 이용자 유형별로 쓰는 별도 페이지까지 방송국 전체를 새로 만들었습니다. 기획부터 화면 디자인, 프로그래밍, 론칭까지 모든 과정을 혼자 수행했습니다.</p>
+        </div>
+      </li>
+      <li class="row is-now">
+        <p class="row-when">2026.09</p>
+        <div class="row-what">
+          <h3>홈페이지 구축 서비스 ‘XIM’ 론칭</h3>
+          <p>기획 · 디자인 · 개발 · 론칭 단독 수행</p>
+          <p>여러 고객사의 홈페이지를 한 곳에서 만들고 운영하는 통합 플랫폼. 디자인한 사이트를 배포하면 회원 · 게시판 · 메뉴 · 관리 화면이 자동으로 연결되고, 운영자는 전체 사이트의 상태 · 용량 · 수정 요청을 한 화면에서 관리합니다.</p>
+          <ul class="pts">
+            <li>사이트별 관리 시스템(CMS) — 이메일 인증 회원가입, 네이버 · 카카오 로그인, 등급별 권한, 게시판 · 메뉴 · 페이지를 화면에서 바로 고치는 수정 모드, 홈페이지와 관리 화면의 통합 로그인(SSO)</li>
+            <li>서버리스 구조 — Cloudflare Workers(가장자리 캐시 + 서울 실행), D1 데이터베이스, R2 저장소. 사이트끼리 자료가 섞이지 않도록 사이트 단위로 분리</li>
+            <li>운영 자동화 — 도메인 · 메일 발송 · 봇 확인 자동 등록, 사이트별 검색 · AI 수집 차단, 자료에 영향 없이 관리 화면을 체험하는 테스트모드, 유지보수 요청 접수 · 처리</li>
+            <li>속도 — 방문자 화면을 가장자리 캐시에서 바로 응답하고, 다음 페이지를 미리 그려 페이지 이동을 즉시 처리</li>
+          </ul>
         </div>
       </li>
     </ol>
