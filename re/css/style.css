@@ -8,7 +8,7 @@
   --line: #dcd8cf;
   --bar: #b9b4a8;
   --now: #1d4ed8;
-  --r1: #2f5fd0; --r2: #0e8468; --r3: #d2452f; --r4: #a86200; --r5: #6b3fc4; /* 맡은 일: 기획 · PM · 디자인 · 퍼블리싱 · 개발 */
+  --r1: #4d6a96; --r2: #4c8273; --r3: #ad6156; --r4: #97793f; --r5: #77669b; /* 맡은 일: 기획 · PM · 디자인 · 퍼블리싱 · 개발 */
   --gut: clamp(20px, 5vw, 48px);
   --ease: cubic-bezier(.22, .8, .24, 1);
   --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
