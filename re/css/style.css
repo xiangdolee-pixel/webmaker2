@@ -50,7 +50,7 @@ a { color: inherit; text-decoration: none; }
 .intro-en { color: var(--faint); font-size: clamp(15px, 1.6vw, 18px); font-weight: 500; }
 .intro-name { font-size: clamp(52px, 11vw, 112px); font-weight: 800; line-height: 1.08; letter-spacing: -.045em; margin-top: 4px; }
 .intro-lead { margin-bottom: clamp(8px, 1.2vw, 14px); padding-left: clamp(20px, 3vw, 40px); border-left: 2px solid var(--ink);
-  font-size: clamp(20px, 2.3vw, 26px); font-weight: 600; line-height: 1.46; letter-spacing: -.025em; }
+  font-size: clamp(20px, 2vw, 23px); font-weight: 600; line-height: 1.46; letter-spacing: -.025em; }
 .facts { margin-top: clamp(24px, 3.6vw, 40px); display: grid; grid-template-columns: 1.25fr 1.6fr .7fr .5fr;
   background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
 .facts div { min-width: 0; padding: 18px clamp(16px, 2.4vw, 28px) 20px; border-left: 1px solid var(--line); }
@@ -96,7 +96,7 @@ a { color: inherit; text-decoration: none; }
 /* 구간: 왼쪽 제목 + 오른쪽 내용 */
 .sec { display: grid; grid-template-columns: 200px 1fr; gap: 0 24px; padding-top: clamp(26px, 4vw, 40px); padding-bottom: clamp(26px, 4vw, 40px); position: relative; }
 .sec::before { content: ""; position: absolute; top: 0; left: var(--gut); right: var(--gut); height: 1px; background: var(--ink); }
-.sec-wide { grid-template-columns: 1fr; }
+.sec-wide { grid-template-columns: minmax(0, 1fr); }
 .sec-t { font-size: clamp(22px, 2.4vw, 26px); font-weight: 700; letter-spacing: -.03em; line-height: 1.4; }
 .row { display: grid; grid-template-columns: 200px 1fr auto; gap: 4px 24px; align-items: baseline; padding: 16px 0; border-top: 1px solid var(--line); }
 .row:first-child { border-top: 0; padding-top: 2px; }
@@ -192,16 +192,6 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 767px) {
   .tabs a { padding-inline: 4px; font-size: 15px; letter-spacing: -.03em; }
   .pts li { grid-template-columns: 84px 1fr; gap: 10px; font-size: 16px; }
-  .roles-t { font-size: 15px; }
-  .roles-t thead th { font-size: 13px; }
-  .roles-t thead th:first-child, .roles-t tbody td:first-child { display: none; }
-  .roles-t th, .roles-t td { padding: 10px 2px; }
-  .roles-t thead th:nth-child(2), .roles-t tbody th { padding-left: 14px; }
-  .roles-t tbody td:nth-child(n+3), .roles-t thead th:nth-child(n+3) { width: 36px; }
-  .roles-t thead th { font-size: 12px; letter-spacing: -.04em; }
-  .roles-t .pc { display: none; }
-  .roles-t tbody th em { margin-left: 5px; padding: 0 6px; font-size: 12px; }
-  .roles-t caption span { font-size: 14px; }
   .roles span { min-width: 48px; padding-inline: 8px; }
   .facts dd { font-size: 18px; }
   .sec { grid-template-columns: 1fr; }
@@ -222,6 +212,24 @@ a { color: inherit; text-decoration: none; }
   .lv i { width: 18px; }
   .caps li { grid-template-columns: 1fr; }
   .skills small { display: block; margin-left: 0; }
+  .roles-t, .roles-t tbody { display: block; }
+  .roles-t { border: 0; background: none; }
+  .roles-t tbody { border: 1px solid var(--line); border-radius: 16px; background: var(--card); }
+  .roles-t caption { display: block; }
+  .roles-t thead { display: none; }
+  .roles-t tbody tr { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px 0; padding: 14px 12px 13px; border-top: 1px solid var(--line); }
+  .roles-t tbody tr:first-child { border-top: 0; }
+  .roles-t tbody th, .roles-t tbody td { border: 0; padding: 0; width: auto; }
+  .roles-t tbody td:first-child { display: none; }
+  .roles-t tbody th { grid-column: 1 / -1; min-width: 0; padding-inline: 2px; font-size: 16px; }
+  .roles-t tbody td { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; letter-spacing: -.03em; color: var(--sub); }
+  .roles-t tbody td:nth-child(3)::before { content: "기획"; }
+  .roles-t tbody td:nth-child(4)::before { content: "PM"; }
+  .roles-t tbody td:nth-child(5)::before { content: "디자인"; }
+  .roles-t tbody td:nth-child(6)::before { content: "퍼블리싱"; }
+  .roles-t tbody td:nth-child(7)::before { content: "개발"; }
+  .roles-t tbody th em { margin-left: 5px; padding: 0 6px; font-size: 12px; }
+  .roles-t caption span { float: none; display: flex; margin-top: 4px; font-size: 14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -238,9 +246,4 @@ a { color: inherit; text-decoration: none; }
   .js .sec { opacity: 1; transform: none; }
   .flow-bar { transform: none; }
   .sec, .flow-box { break-inside: avoid; }
-}
-
-@media (max-width: 340px) {
-  .roles-t { font-size: 14px; }
-  .roles-t caption span { float: none; display: flex; margin-top: 4px; }
 }
