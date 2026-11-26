@@ -197,7 +197,9 @@ a { color: inherit; text-decoration: none; }
   .roles-t thead th:first-child, .roles-t tbody td:first-child { display: none; }
   .roles-t th, .roles-t td { padding: 10px 2px; }
   .roles-t thead th:nth-child(2), .roles-t tbody th { padding-left: 14px; }
-  .roles-t tbody td:nth-child(n+3), .roles-t thead th:nth-child(n+3) { width: 38px; }
+  .roles-t tbody td:nth-child(n+3), .roles-t thead th:nth-child(n+3) { width: 36px; }
+  .roles-t thead th { font-size: 12px; letter-spacing: -.04em; }
+  .roles-t .pc { display: none; }
   .roles-t tbody th em { margin-left: 5px; padding: 0 6px; font-size: 12px; }
   .roles-t caption span { font-size: 14px; }
   .roles span { min-width: 48px; padding-inline: 8px; }
