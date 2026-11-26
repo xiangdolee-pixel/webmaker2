@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>머스트</title>
+<meta name="description" content="매일 반드시 해야 할 일을 적어 두면, 정한 시간에 알려 드리고 했는지 날마다 기록합니다.">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="/manifest.webmanifest?v=1">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png?v=1">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png?v=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="머스트">
+<link rel="stylesheet" href="/css/style.css?v=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'">
+<script src="/js/app.js?v=1" defer></script>
+</head>
+<body>
+<!--M-->
+<header class="top">
+  <div class="wrap top-in">
+    <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span>머스트</a>
+    <span class="acc" data-xms-account></span>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- 로그인 전: 짧은 소개 -->
+  <section class="hello" id="hello">
+    <h1 class="hello-t">매일 반드시<br>해야 할 일,<br><em>잊지 않게.</em></h1>
+    <p class="hello-p">꼭 해야 하는 일을 적어 두면 정한 시간에 알려 드려요. 했으면 체크하고, 다음 날이면 다시 처음부터. 날마다 했는지는 달력에 남습니다.</p>
+    <ul class="hello-demo" aria-hidden="true">
+      <li class="is-done"><i class="dot"></i><span>아침 약 먹기</span><small>08:00</small></li>
+      <li class="is-done"><i class="dot"></i><span>영어 30분</span><small>13:00</small></li>
+      <li><i class="dot"></i><span>가계부 쓰기</span><small>21:30</small></li>
+    </ul>
+    <div class="hello-btns">
+      <a class="btn primary" href="/member/login?next=%2F">로그인</a>
+      <a class="btn" href="/member/signup">회원가입</a>
+    </div>
+  </section>
+
+  <!-- 로그인 후: 앱 -->
+  <div class="app" id="app">
+    <nav class="tabs" id="tabs" aria-label="화면 고르기">
+      <i class="tab-ind" aria-hidden="true"></i>
+      <button type="button" class="on" data-tab="today">오늘</button>
+      <button type="button" data-tab="log">기록</button>
+      <button type="button" data-tab="set">알림</button>
+    </nav>
+
+    <section class="panel" id="p-today">
+      <div class="day-head">
+        <h1 class="day-t" id="dayT"></h1>
+        <p class="day-n" id="dayN"></p>
+        <div class="bar" aria-hidden="true"><i id="dayBar"></i></div>
+      </div>
+      <ul class="list" id="list"></ul>
+      <p class="empty" id="empty" hidden>아직 적어 둔 일이 없어요.<br>매일 반드시 할 일을 아래에 적어 보세요.</p>
+      <form class="add" id="add" autocomplete="off">
+        <input class="inp" id="addText" type="text" maxlength="80" placeholder="반드시 할 일 적기" aria-label="반드시 할 일" enterkeyhint="done">
+        <div class="add-row">
+          <label class="sw"><input type="checkbox" id="addOn" checked><i aria-hidden="true"></i><span>알림</span></label>
+          <input class="inp time" id="addTime" type="time" value="09:00" aria-label="알림 시간">
+          <button class="btn primary" type="submit">추가</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel" id="p-log" hidden>
+      <div class="mon">
+        <button type="button" class="mon-b" id="monPrev" aria-label="이전 달"><i class="arw l"></i></button>
+        <h2 class="mon-t" id="monT"></h2>
+        <button type="button" class="mon-b" id="monNext" aria-label="다음 달"><i class="arw r"></i></button>
+      </div>
+      <div class="cal-w" aria-hidden="true"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+      <div class="cal" id="cal"></div>
+      <div class="pick" id="pick" hidden>
+        <h3 class="pick-t" id="pickT"></h3>
+        <ul class="list small" id="pickList"></ul>
+      </div>
+      <div class="sum" id="sumBox" hidden>
+        <h3 class="sum-t">이번 달, 일마다</h3>
+        <ul class="sum-l" id="sum"></ul>
+      </div>
+    </section>
+
+    <section class="panel" id="p-set" hidden>
+      <div class="box">
+        <h2 class="box-t">이 기기에서 알림 받기</h2>
+        <div id="pushBox"></div>
+      </div>
+      <div class="box" id="instBox">
+        <h2 class="box-t">폰에 설치</h2>
+        <div id="instBody"></div>
+      </div>
+      <ul class="notes">
+        <li>알림 시간은 할 일마다 따로 정해요. 오늘 탭에서 할 일을 누르면 바꿀 수 있어요.</li>
+        <li>이미 한 일은 알리지 않아요.</li>
+        <li>알림에서 <b>했어요</b>를 누르면 앱을 열지 않아도 체크돼요.</li>
+        <li>밤 12시가 지나면 모두 다시 안 한 상태로 돌아가고, 그날까지의 기록은 달력에 남아요.</li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<footer class="foot"><div class="wrap">© 머스트</div></footer>
+
+<!-- 할 일 고치기 -->
+<dialog class="sheet" id="sheet">
+  <form method="dialog" class="sheet-in" id="sheetForm" autocomplete="off">
+    <h2 class="sheet-t">할 일 고치기</h2>
+    <input class="inp" id="edText" type="text" maxlength="80" aria-label="반드시 할 일">
+    <div class="add-row">
+      <label class="sw"><input type="checkbox" id="edOn"><i aria-hidden="true"></i><span>알림</span></label>
+      <input class="inp time" id="edTime" type="time" aria-label="알림 시간">
+    </div>
+    <div class="sheet-btns">
+      <button type="button" class="btn danger" id="edDel">지우기</button>
+      <span class="grow"></span>
+      <button type="button" class="btn" id="edNo">닫기</button>
+      <button type="submit" class="btn primary" id="edOk">저장</button>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

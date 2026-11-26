@@ -1,0 +1,35 @@
+{
+  "xim": true,
+  "assets": {
+    "run_worker_first": [
+      "/*",
+      "!/css/*",
+      "!/js/*",
+      "!/icons/*",
+      "!/sw.js",
+      "!/manifest.webmanifest"
+    ]
+  },
+  "vars": {
+    "VAPID_PUBLIC": "BCEDnx0Fcl_FkXAZJojb9g-Ax19p9sMNFrAzDmpIRGCvR28OEp9xngVdtmmCIOCB3GLvoreEukeeBx_TNqKI3Bs"
+  },
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "must",
+      "database_id": "ea65374a-48bb-4795-a5a5-8885d600f61c"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "must.plators.com",
+      "custom_domain": true
+    }
+  ],
+  "workers_dev": true
+}
