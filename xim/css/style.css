@@ -1260,10 +1260,15 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ct-vat > button { min-height: 32px; padding: 0 12px; font-size: 13.5px; }
 .ct-fees small { color: var(--mute); font-size: 12.5px; }
 
-/* ───── 상담연락 (js/leads.js) ───── */
+/* ───── 상담연락 (js/leads.js) — 한 줄 = 업체 하나, 누르면 펼침 ───── */
 .ld-q { max-width: 260px; min-height: 36px; }
-.ld-rule { display: block; }
-.ld-form { margin-bottom: 16px; padding: 16px; }
+.ld-scope { margin-bottom: 10px; padding: 0 16px; }
+.ld-scope > summary { padding: 12px 0; font-weight: 700; cursor: pointer; }
+.ld-scope > summary small { margin-left: 8px; color: var(--mute); font-size: 13px; font-weight: 400; }
+.ld-scope-item { padding: 12px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.ld-scope-item p { margin: 8px 0 4px; color: var(--sub); line-height: 1.7; }
+.ld-scope-item small { color: var(--mute); font-size: 13px; }
+.ld-form { padding: 12px 0 16px; border-top: 1px solid var(--line); }
 .ld-form-foot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
 .ld-kw { flex: 0 1 180px; margin-bottom: 0; }
 .ld-err { margin: 8px 0 0; color: var(--danger); font-size: 14px; }
@@ -1271,16 +1276,43 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-scan { display: grid; gap: 6px; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line); list-style: none; font-size: 14px; }
 .ld-scan li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; overflow-wrap: anywhere; }
 .ld-scan small { flex-basis: 100%; color: var(--mute); font-size: 13px; }
-.ld-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; }
-.ld-item.is-done { opacity: .7; }
-.ld-main { display: grid; gap: 6px; flex: 1; min-width: 0; }
-.ld-phone { justify-self: start; color: var(--brand); font-size: 20px; font-weight: 700; letter-spacing: .01em; text-decoration: none; font-variant-numeric: tabular-nums; }
-.ld-meta { font-size: 13px; }
+.ld-list { margin: 0; padding: 0; list-style: none; overflow: hidden; }
+.ld-item + .ld-item { border-top: 1px solid var(--line); }
+.ld-item.is-done .ld-row { opacity: .6; }
+.ld-item.is-open { background: #fbfbfd; }
+.ld-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px 132px 36px; align-items: center; gap: 12px; min-height: 48px; padding: 4px 8px 4px 16px; }
+.ld-name { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 40px; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.ld-name b { overflow: hidden; font-size: 15.5px; text-overflow: ellipsis; white-space: nowrap; }
+.ld-phone { color: var(--brand); font-size: 16px; font-weight: 700; text-decoration: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ld-phone.none { color: var(--mute); font-size: 14px; font-weight: 400; }
+.ld-links { display: flex; gap: 4px; }
+.ld-links a { padding: 3px 9px; border-radius: 99px; color: var(--brand); background: var(--brand-soft); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; transition: color .2s, background .2s; }
+.ld-links a:hover { color: #fff; background: var(--brand); }
+.ld-more { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--mute); cursor: pointer; }
+.ld-more:hover { background: var(--bg); color: var(--sub); }
+.ld-more svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s var(--ease); }
+.is-open .ld-more svg { transform: rotate(180deg); }
+.ld-detail { display: grid; gap: 10px; padding: 4px 16px 16px; animation: rise .25s var(--ease) both; }
+.ld-dl { display: grid; gap: 6px; margin: 0; font-size: 14px; }
+.ld-dl > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; }
+.ld-dl dt { color: var(--mute); }
+.ld-dl dd { margin: 0; color: var(--sub); overflow-wrap: anywhere; }
+.ld-dl a { color: var(--brand); text-decoration: none; }
+.ld-urls { display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .ld-memo { min-height: 36px; font-size: 14px; }
-.ld-act { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex: none; max-width: 300px; }
+.ld-act { display: flex; flex-wrap: wrap; gap: 6px; }
 @media (max-width: 640px) {
   .ld-q { flex-basis: 100%; max-width: none; }
-  .ld-item { flex-direction: column; }
-  .ld-act { justify-content: flex-start; max-width: none; }
+  .ld-scope > summary small { display: block; margin: 2px 0 0; }
+  .ld-row { grid-template-columns: auto minmax(0, 1fr) 32px; grid-template-areas: "name name more" "phone links more"; gap: 0 10px; padding: 6px 4px 8px 14px; }
+  .ld-name { grid-area: name; min-height: 30px; }
+  .ld-phone { grid-area: phone; }
+  .ld-links { grid-area: links; justify-content: flex-end; flex-wrap: wrap; min-width: 0; }
+  .ld-links a { padding: 2px 8px; font-size: 12.5px; }
+  .ld-more { grid-area: more; width: 32px; }
   .ld-form-foot .btn { flex: 1; }
+  .ld-tabs { display: flex; }
+  .ld-tabs > button { flex: 1; min-width: 0; padding: 0 4px; font-size: 13px; white-space: nowrap; }
+  .ld-dl > div { grid-template-columns: 1fr; gap: 0; }
 }
+@media (prefers-reduced-motion: reduce) { .ld-detail { animation: none; } .ld-more svg { transition: none; } }

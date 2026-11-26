@@ -342,20 +342,29 @@ CREATE TABLE IF NOT EXISTS jd_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL, upd
 CREATE TABLE IF NOT EXISTS jd_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, type TEXT, data TEXT NOT NULL, sort INTEGER DEFAULT 0, updated_at INTEGER);
 CREATE TABLE IF NOT EXISTS jd_clients (name TEXT PRIMARY KEY, recipient TEXT, aliases TEXT, ref TEXT, tel TEXT, memo TEXT, created_at INTEGER, updated_at INTEGER);
 
--- 상담연락 (2026-11-26): 공개된 페이지(플레이스 · 홈페이지 · 블로그 · 인스타그램)에서 찾은 휴대폰 번호. 같은 번호는 한 줄만
---   source: place | homepage | blog | instagram | manual,  done = 연락함
+-- 상담연락 (2026-11-26): 지도에 나온 업체 한 줄씩 — 그 업체의 홈페이지 · 블로그 · 인스타그램과, 거기 공개된 휴대폰 번호(없으면 phone = '')
+--   source = 번호가 나온 곳(map 지도 업체 정보 | place | homepage | blog | instagram | manual),  checked = 그 업체에서 무엇을 확인했나,  done = 연락함
 CREATE TABLE IF NOT EXISTS leads (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   keyword TEXT NOT NULL DEFAULT '',      -- 무엇을 찾다 모았나 (예: 상담)
+  area TEXT NOT NULL DEFAULT '',         -- 어느 영역(lead_scopes.area)
   name TEXT NOT NULL,
   category TEXT NOT NULL DEFAULT '',
   address TEXT NOT NULL DEFAULT '',
-  phone TEXT NOT NULL,                   -- 010-0000-0000
+  tel TEXT NOT NULL DEFAULT '',          -- 지도에 적힌 대표 전화
+  phone TEXT NOT NULL DEFAULT '',        -- 휴대폰 010-0000-0000 (없으면 빈칸)
   source TEXT NOT NULL DEFAULT '',
   source_url TEXT NOT NULL DEFAULT '',   -- 번호가 적혀 있던 주소
   place_url TEXT NOT NULL DEFAULT '',
+  homepage TEXT NOT NULL DEFAULT '',
+  blog TEXT NOT NULL DEFAULT '',
+  instagram TEXT NOT NULL DEFAULT '',
+  links TEXT NOT NULL DEFAULT '',        -- 그 밖의 링크(띄어쓰기로 나눔)
+  checked TEXT NOT NULL DEFAULT '',
   memo TEXT NOT NULL DEFAULT '',
   done INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS leads_phone ON leads (phone);
+CREATE UNIQUE INDEX IF NOT EXISTS leads_phone ON leads (phone) WHERE phone != '';
+-- 어디까지 알아봤나: 영역마다 한 줄(어느 목록 · 몇 곳 · 무엇을 확인했는지)
+CREATE TABLE IF NOT EXISTS lead_scopes (area TEXT PRIMARY KEY, keyword TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', total INTEGER NOT NULL DEFAULT 0, checked_at INTEGER NOT NULL);

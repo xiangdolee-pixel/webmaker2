@@ -471,8 +471,8 @@ async function ximApi(request, env, url, ctx) {
 
   // 상담연락 (2026-11-26): 주소를 넣으면 그 페이지(플레이스 · 홈페이지 · 블로그 · 인스타그램)에서 휴대폰 번호를 찾아 쌓는다. 같은 번호는 한 번만
   if (path === '/api/leads' && method === 'GET') {
-    const { results } = await db.prepare('SELECT * FROM leads ORDER BY id DESC LIMIT 2000').all();
-    return json({ items: results });
+    const [a, s] = await db.batch([db.prepare("SELECT * FROM leads ORDER BY (phone = ''), id LIMIT 3000"), db.prepare('SELECT * FROM lead_scopes ORDER BY checked_at DESC')]);
+    return json({ items: a.results, scopes: s.results });   // scopes = 어디까지 알아봤는지(영역마다 한 줄)
   }
   if (path === '/api/leads' && method === 'POST') {
     const b = await body(request);
@@ -493,9 +493,12 @@ async function ximApi(request, env, url, ctx) {
     let added = 0;
     for (const sc of scans) {
       sc.added = 0;
+      // 그 업체의 홈페이지 · 블로그 · 인스타그램 주소도 같이 남긴다(넣은 주소 + 번호가 나온 주소)
+      const link = { [sc.kind]: sc.url };
+      for (const f of sc.found) link[f.source] ||= f.sourceUrl;
       for (const f of sc.found) {
-        const r = await db.prepare('INSERT OR IGNORE INTO leads (keyword, name, category, address, phone, source, source_url, place_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-          .bind(keyword, str(sc.name, 80) || new URL(sc.url).hostname, str(sc.category, 60), str(sc.address, 200), f.phone, f.source, str(f.sourceUrl, 1000), str(sc.placeUrl, 300), now()).run();
+        const r = await db.prepare('INSERT OR IGNORE INTO leads (keyword, name, category, address, phone, source, source_url, place_url, homepage, blog, instagram, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          .bind(keyword, str(sc.name, 80) || new URL(sc.url).hostname, str(sc.category, 60), str(sc.address, 200), f.phone, f.source, str(f.sourceUrl, 1000), str(sc.placeUrl, 300), str(link.homepage, 1000), str(link.blog, 1000), str(link.instagram, 1000), now()).run();
         sc.added += r.meta.changes; added += r.meta.changes;
       }
     }
