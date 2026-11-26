@@ -115,7 +115,14 @@ a { color: inherit; text-decoration: none; }
 .roles span:nth-child(3), .roles-t tr > :nth-child(5) { --rc: var(--r3); }
 .roles span:nth-child(4), .roles-t tr > :nth-child(6) { --rc: var(--r4); }
 .roles span:nth-child(5), .roles-t tr > :nth-child(7) { --rc: var(--r5); }
-.roles .solo { border: 1px solid var(--ink); background: none; color: var(--ink); }
+.roles .solo { border: 1px solid var(--ink); background: var(--ink); color: var(--paper); }
+/* 원스톱 제작: 다섯 가지를 한 테두리로 묶고 끝에 이름표 */
+.roles.is-solo { display: inline-flex; gap: 5px; padding: 5px; border: 1.5px solid var(--ink); border-radius: 22px; }
+.roles.is-solo .solo { margin-left: 3px; padding-inline: 13px; }
+.roles-t .is-solo td:nth-child(n+3) { position: relative; }
+.roles-t .is-solo td:nth-child(n+3)::after { content: ""; position: absolute; inset: 9px 0; border-block: 1.5px solid var(--ink); pointer-events: none; }
+.roles-t .is-solo td:nth-child(3)::after { left: 12px; border-left: 1.5px solid var(--ink); border-radius: 999px 0 0 999px; }
+.roles-t .is-solo td:last-child::after { right: 6px; border-right: 1.5px solid var(--ink); border-radius: 0 999px 999px 0; }
 /* 한눈에 보기 표: 프로젝트 × 맡은 일 */
 .roles-t { width: 100%; border-collapse: collapse; margin-bottom: clamp(26px, 4vw, 40px); background: var(--card); border: 1px solid var(--line); border-radius: 16px; border-spacing: 0; font-size: 17px; }
 .roles-t caption { caption-side: top; text-align: left; padding-bottom: 12px; font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
@@ -235,6 +242,9 @@ a { color: inherit; text-decoration: none; }
   .roles-t tbody td:first-child { display: none; }
   .roles-t tbody th { grid-column: 1 / -1; min-width: 0; padding-inline: 2px; font-size: 16px; }
   .roles-t tbody td { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; letter-spacing: -.03em; color: var(--rc, var(--sub)); }
+  .roles-t .is-solo td:nth-child(n+3)::after { inset: -6px 0 -7px; }
+  .roles-t .is-solo td:nth-child(3)::after { left: 0; border-radius: 14px 0 0 14px; }
+  .roles-t .is-solo td:last-child::after { right: 0; border-radius: 0 14px 14px 0; }
   .roles-t tbody td:nth-child(3)::before { content: "PM"; }
   .roles-t tbody td:nth-child(4)::before { content: "기획"; }
   .roles-t tbody td:nth-child(5)::before { content: "디자인"; }

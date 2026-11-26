@@ -132,7 +132,9 @@
       var tag = box.querySelector('.solo');
       if (solo && !tag) { tag = d.createElement('span'); tag.className = 'solo'; tag.textContent = '원스톱 제작'; box.appendChild(tag); }
       if (!solo && tag) box.removeChild(tag);
+      box.classList.toggle('is-solo', solo);
       if (!tr) return;
+      tr.classList.toggle('is-solo', solo);
       var tds = tr.querySelectorAll('td');
       for (i = 0; i < NAMES.length; i++) {
         var c = tds[i + 1]; if (!c) continue;
