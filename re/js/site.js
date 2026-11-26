@@ -11,6 +11,7 @@
 
   // 흐름 막대: 시작(data-start)부터 오늘까지를 100% 로
   var box = d.getElementById('flow');
+  var fit = function () {};
   if (box) {
     var now = new Date();
     var start = ym(box.getAttribute('data-start'));
@@ -27,7 +28,7 @@
       r.style.setProperty('--w', (b - a).toFixed(2) + '%');
     }
     // 이름이 오른쪽 끝을 넘지 않게 — 이름 폭을 재서 css 가 왼쪽 여백을 줄인다(글꼴이 바뀌면 다시)
-    var fit = function () {
+    fit = function () {
       for (var i = 0; i < rows.length; i++) {
         var n = rows[i].querySelector('.flow-name');
         if (n) n.style.setProperty('--nw', Math.ceil(n.getBoundingClientRect().width) + 'px');
@@ -72,6 +73,42 @@
     if (!/^https?:/.test(location.protocol) || /^(localhost|127\.)/.test(location.hostname)) return;
     fetch('/xms-api/boards/' + slug + '/latest?n=' + n).then(function (r) { return r.ok ? r.json() : []; }).then(draw).catch(function () {});
   })(lists[j]);
+
+  // 탭(기본 이력 · 웹 프로젝트): 떠 있는 배경이 미끄러진다. 주소 뒤 #project 면 웹 프로젝트부터
+  var tabs = d.querySelector('.tabs');
+  if (tabs) {
+    var ind = tabs.querySelector('.tab-ind'), tl = tabs.querySelectorAll('a');
+    var place = function () {
+      var a = tabs.querySelector('a.on');
+      if (!a || !a.offsetWidth) return;
+      ind.style.width = a.offsetWidth + 'px';
+      ind.style.transform = 'translateX(' + a.offsetLeft + 'px)';
+    };
+    var show = function (name) {
+      for (var i = 0; i < tl.length; i++) {
+        var t = tl[i].getAttribute('data-tab'), on = t === name, pn = d.getElementById('p-' + t);
+        tl[i].classList.toggle('on', on);
+        if (on) tl[i].setAttribute('aria-current', 'true'); else tl[i].removeAttribute('aria-current');
+        if (pn) pn.hidden = !on;
+      }
+      place();
+      if (name === 'resume') fit();
+    };
+    var fromHash = function () { show(location.hash === '#project' ? 'project' : 'resume'); };
+    tabs.addEventListener('click', function (e) {
+      var a = e.target.closest ? e.target.closest('a[data-tab]') : null;
+      if (!a) return;
+      e.preventDefault();
+      var name = a.getAttribute('data-tab');
+      show(name);
+      if (history.replaceState) history.replaceState(null, '', name === 'project' ? '#project' : location.pathname + location.search);
+    });
+    window.addEventListener('hashchange', fromHash);
+    window.addEventListener('resize', place);
+    if (d.fonts && d.fonts.ready) d.fonts.ready.then(place);
+    fromHash();
+    requestAnimationFrame(function () { requestAnimationFrame(function () { tabs.classList.add('ready'); }); });
+  }
 
   // 구간이 보이면 떠오르기
   var secs = d.querySelectorAll('.sec');
