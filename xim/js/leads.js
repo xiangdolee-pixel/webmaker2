@@ -72,7 +72,7 @@ export async function renderLeads(d) {
       <ol>
         <li><b>문자는 통화로 동의를 받은 곳에만</b> 보냅니다. 동의 없이 보내면 하루 한 통이어도 <b>과태료(최대 3천만 원)</b>, 신고가 쌓이면 <b>내 휴대폰 문자 차단</b>.</li>
         <li><b>전화 첫마디에 연락처를 어디서 알았는지 꼭 밝힙니다.</b> "○○ 보고 연락드렸습니다" — 업체를 펼치면 <b>"전화할 때"</b> 에 그 업체 번호가 나온 곳이 적혀 있습니다.</li>
-        <li>동의를 받으면 업체를 펼쳐 <b>[동의 받음]</b> 에 날짜 · 방법을 남기고, 거절하면 다시 연락하지 않습니다(메모에 "거절").</li>
+        <li>업체를 펼쳐 <b>문자 받기 ☑ 동의함 / ☑ 거절함</b> 을 체크합니다(체크한 날짜 · 시간이 찍힘). 거절한 곳은 다시 연락하지 않습니다.</li>
         <li>홍보 전화도 정보통신망법이 적용될 수 있습니다 — 확실한 기준은 <b>118</b>(KISA, 무료)에 물어보기.</li>
       </ol>
     </section>
@@ -89,7 +89,7 @@ export async function renderLeads(d) {
           <ul>
             <li><b>보내는 법:</b> 폰에서 xim 을 열고 업체를 펼쳐 <b>[내 폰으로 문자]</b> → 문자 앱이 번호 · 내용(<b>{업체명}</b> 이 그 업체 이름으로 바뀐 것)까지 채워져 열림 → 보내기. PC 에서 누르면 내용이 복사됩니다. 보낸 뒤 <b>[연락함]</b> 표시.</li>
             <li><b>하루 몇 통:</b> 하루 <b>20~30통 안쪽</b>을 권합니다. 같은 내용을 한꺼번에 많이 보내면 통신사가 스팸으로 보고 막거나, 받은 사람의 스팸 신고가 쌓이면 <b>내 휴대폰 번호 문자 발송이 정지</b>될 수 있습니다(통신사 기준은 공개돼 있지 않음 — 넉넉히 적게).</li>
-            <li><b>먼저 전화:</b> 처음 연락은 전화로. 통화에서 "자료 보내 드려도 될까요?" 동의를 받은 곳에만 보내고, 업체를 펼쳐 <b>[동의 받음]</b> 에 날짜 · 방법을 남깁니다. 말로만 받은 동의는 증거로 약하니 상대가 문자로 "네" 라고 답해 주면 더 좋습니다.</li>
+            <li><b>먼저 전화:</b> 처음 연락은 전화로. 통화에서 "자료 보내 드려도 될까요?" 동의를 받은 곳에만 보내고, 업체를 펼쳐 <b>☑ 동의함</b> 을 체크합니다(날짜 · 시간이 찍힘). 말로만 받은 동의는 증거로 약하니 상대가 문자로 "네" 라고 답해 주면 더 좋습니다.</li>
             <li><b>광고인지 아닌지:</b> 상대가 요청한 자료 · 답변이면 그냥 보내도 됩니다. 홍보 내용(처음 소개 · 할인 안내 등)이면 내 폰이어도 <b>광고 문자</b>라서 맨 앞 <b>(광고)</b>, 보내는 사람 이름, 수신거부 방법을 넣어야 합니다(정보통신망법 제50조).</li>
             <li><b>시간:</b> 광고 문자는 <b>밤 9시 ~ 아침 8시 금지</b>. 안내 문자도 근무 시간(평일 9~18시)에 보내는 게 좋습니다.</li>
             <li><b>거절하면 끝:</b> "보내지 마세요" 라고 하면 바로 멈추고, 업체를 펼쳐 동의 취소 + 메모에 "수신거부" 를 적어 둡니다. 다시 보내면 신고 대상입니다.</li>
@@ -213,7 +213,7 @@ function paintPick() {
   const bar = $('#ld-pick'); if (!bar) return;
   const vis = shown().filter((i) => i.phone);
   const sel = items.filter((i) => picked.has(i.id));
-  const ok = sel.filter((i) => i.consent).length;
+  const ok = sel.filter((i) => i.consent > 0).length;
   const allOn = vis.length && vis.every((i) => picked.has(i.id));
   bar.hidden = false;
   bar.innerHTML = `<span class="ld-pick-n">${sel.length ? `<b>${sel.length}곳</b> 고름 · 수신 동의 <b>${ok}</b>` : '문자 보낼 곳을 왼쪽 네모로 고르세요'}</span>
@@ -250,7 +250,7 @@ async function sendDialog() {
         ${v.sample ? `<p class="meta">미리보기 — ${esc(v.sample.name)} (${v.bytes}바이트)</p><pre class="ld-preview">${esc(v.sample.text)}</pre>` : ''}
         ${miss.length ? `<p class="ld-warn">문자 설정에 ${miss.join(' · ')}이(가) 없어 아직 보낼 수 없습니다.</p>` : ''}
         ${v.night ? '<p class="ld-warn">지금은 밤 9시 ~ 아침 8시라 광고 문자를 보낼 수 없습니다.</p>' : ''}
-        ${!v.sendable ? '<p class="ld-warn">보낼 수 있는 곳이 없습니다. 업체를 펼쳐 <b>수신 동의</b>를 먼저 표시해 주세요(전화로 동의를 받은 곳만).</p>' : ''}`;
+        ${!v.sendable ? '<p class="ld-warn">보낼 수 있는 곳이 없습니다. 업체를 펼쳐 <b>☑ 동의함</b>을 먼저 체크해 주세요(전화로 동의를 받은 곳만).</p>' : ''}`;
       go.disabled = !v.sendable || miss.length > 0 || v.night;
       go.textContent = v.sendable ? `${v.sendable}곳에 보내기` : '보내기';
     } catch (e) { body.innerHTML = ''; err.textContent = e.message; }
@@ -307,7 +307,7 @@ function renderList() {
       <li class="ld-item${it.done ? ' is-done' : ''}${open.has(it.id) ? ' is-open' : ''}" data-id="${it.id}">
         <div class="ld-row">
           ${it.phone ? `<label class="ld-chk"><input type="checkbox" data-pick${picked.has(it.id) ? ' checked' : ''} aria-label="${esc(it.name)} 고르기"></label>` : '<span class="ld-chk"></span>'}
-          <button type="button" class="ld-name" data-toggle aria-expanded="${open.has(it.id)}"><span class="ld-area">${esc(regionOf(it))}</span><b>${esc(it.name)}</b>${it.consent ? '<span class="badge done">동의</span>' : ''}${it.sent_n ? `<span class="badge idle">문자 ${it.sent_n}</span>` : ''}${it.done ? '<span class="badge done">연락함</span>' : ''}</button>
+          <button type="button" class="ld-name" data-toggle aria-expanded="${open.has(it.id)}"><span class="ld-area">${esc(regionOf(it))}</span><b>${esc(it.name)}</b>${it.consent > 0 ? '<span class="badge done">문자 동의</span>' : it.consent < 0 ? '<span class="badge ld-no">문자 거절</span>' : ''}${it.sent_n ? `<span class="badge idle">문자 ${it.sent_n}</span>` : ''}${it.done ? '<span class="badge done">연락함</span>' : ''}</button>
           ${it.phone ? `<span class="ld-pcell"><a class="ld-phone" href="tel:${esc(it.phone)}">${esc(it.phone)}</a><small class="ld-src s-${esc(it.source)}" title="이 번호를 찾은 곳">${esc(SRC_SHORT[it.source] || it.source || '?')}</small></span>` : '<span class="ld-phone none">번호 없음</span>'}
           ${it.phone || it.tel ? `<select class="ld-call c-${it.call || 'none'}" data-call aria-label="${esc(it.name)} 통화 표시">${Object.entries(CALL).map(([v, l]) => `<option value="${v}"${(it.call || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select>` : '<span></span>'}
           <span class="ld-links">${it.homepage ? ext(it.homepage, '홈') : ''}${it.blog ? ext(it.blog, '블') : ''}${it.instagram ? ext(it.instagram, '인스타') : ''}</span>
@@ -361,7 +361,7 @@ function callScript(it) {
       <li><span class="ld-step">① 인사 · 출처</span>"안녕하세요, ${n} 맞으시죠? 저는 상담센터 홈페이지를 만드는 <b>자두랩스</b> 박민진입니다. <b>${esc(srcLabel(it))}</b>에 나온 번호를 보고 연락드렸어요. 1분만 여쭤봐도 될까요?"<small>→ "바빠요 · 괜찮아요" 하면: "네, 알겠습니다. 바쁘신데 죄송합니다." 하고 바로 끊고 <b>거절</b> 표시.</small></li>
       <li><span class="ld-step">② 묻기 (팔지 말고 듣기)</span>${ask.map((q) => `"${esc(q)}"`).join('<br>')}<small>→ 원장님이 "그게 좀 불편해요 · 없어요 · 생각은 있었어요" 라고 <b>스스로 말하게</b> 하는 게 목표. 말이 나오면 "아 그러시군요, 많이들 그러세요" 하고 맞장구.</small></li>
       <li><span class="ld-step">③ 짧게 제안</span>"${esc(offer)}"</li>
-      <li><span class="ld-step">④ 문자 동의 받기</span>"제가 비슷한 상담센터 홈페이지 예시를 <b>문자로 하나 보내 드려도 될까요?</b> 보시고 아니다 싶으시면 답 안 주셔도 괜찮아요."<small>→ "네" 하면 <b>[동의 받음]</b>(방법: 전화 통화) 누르고, 그다음에 문자. "아니요" 하면 <b>거절</b> 표시 · 다시 연락 안 함.</small></li>
+      <li><span class="ld-step">④ 문자 동의 받기</span>"제가 비슷한 상담센터 홈페이지 예시를 <b>문자로 하나 보내 드려도 될까요?</b> 보시고 아니다 싶으시면 답 안 주셔도 괜찮아요."<small>→ "네" 하면 <b>☑ 동의함</b> 체크하고 그다음에 문자. "아니요" 하면 <b>☑ 거절함</b> 체크 · 다시 연락 안 함.</small></li>
       <li><span class="ld-step">⑤ 마무리</span>"시간 내 주셔서 감사합니다. 궁금하신 거 있으시면 이 번호로 편하게 연락 주세요."</li>
     </ol></details>`;
 }
@@ -380,9 +380,9 @@ function detail(it) {
         <div><dt>모은 때</dt><dd>${fmtDate(it.created_at)}${it.area ? ` · ${esc(it.area)}` : ''}</dd></div>
       </dl>
       ${it.phone || it.tel ? callScript(it) : ''}
-      ${it.phone ? `<div class="ld-consent${it.consent ? ' on' : ''}"><b>${it.consent ? '수신 동의 받음' : '수신 동의 없음'}</b>
-        ${it.consent ? `<small>${esc(it.consent_note)} · ${fmtDate(it.consent_at)}</small><button type="button" class="btn sm" data-consent>동의 취소</button>`
-          : '<input class="input" data-consent-note placeholder="어떻게 받았나 (예: 전화 통화)" maxlength="200" aria-label="동의 받은 방법"><button type="button" class="btn sm primary" data-consent>동의 받음</button>'}
+      ${it.phone ? `<div class="ld-consent${it.consent > 0 ? ' on' : it.consent < 0 ? ' no' : ''}"><b>문자 받기</b>
+        <label class="ld-ck"><input type="checkbox" data-consent="1"${it.consent > 0 ? ' checked' : ''}> 동의함${it.consent > 0 ? ` <small>${fmtDate(it.consent_at)}</small>` : ''}</label>
+        <label class="ld-ck"><input type="checkbox" data-consent="-1"${it.consent < 0 ? ' checked' : ''}> 거절함${it.consent < 0 ? ` <small>${fmtDate(it.consent_at)}</small>` : ''}</label>
         ${it.sent_at ? `<small class="ld-sent">마지막 문자 ${fmtDate(it.sent_at)} · 모두 ${it.sent_n}번</small>` : ''}</div>` : ''}
       <input class="input ld-memo" type="text" value="${esc(it.memo)}" placeholder="메모" maxlength="500" aria-label="메모">
       <div class="ld-act">
@@ -396,13 +396,16 @@ function detail(it) {
 function bindDetail(li, it) {
   const { api } = deps;
   const save = (data) => api(`/leads/${it.id}`, { method: 'PATCH', data: { done: !!it.done, memo: it.memo, ...data } });
-  const cs = li.querySelector('[data-consent]');
-  if (cs) cs.onclick = (e) => busy(e.currentTarget, null, async () => {
-    const note = li.querySelector('[data-consent-note]')?.value.trim() || '';
-    if (!it.consent && !note) { li.querySelector('[data-consent-note]').focus(); throw new Error('어떻게 동의를 받았는지 적어 주세요(예: 전화 통화).'); }
-    await save({ consent: !it.consent, consent_note: note });
-    await renderLeads(deps);
-  });
+  // 문자 받기 동의 / 거절: 체크하면 그때 날짜 · 시간이 찍힘, 둘 중 하나만(다시 누르면 지움)
+  li.querySelectorAll('[data-consent]').forEach((ck) => { ck.onchange = async () => {
+    const v = ck.checked ? +ck.dataset.consent : 0;
+    try {
+      await save({ consent: v, consent_note: v ? '전화 통화' : '' });
+      it.consent = v; it.consent_at = v ? Date.now() : 0;
+      toast(`${it.name} — ${v > 0 ? '문자 동의' : v < 0 ? '문자 거절' : '동의 표시 지움'}`);
+      renderList(); paintPick();
+    } catch (e) { toast(e.message); ck.checked = !ck.checked; }
+  }; });
   // 내 폰으로 문자: 폰이면 문자 앱(번호 · 내용 채움), PC 면 내용 복사 — {업체명} 은 이 업체 이름으로
   const mp = li.querySelector('[data-myphone]');
   if (mp) {

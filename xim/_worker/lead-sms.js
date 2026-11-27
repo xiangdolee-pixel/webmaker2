@@ -111,7 +111,7 @@ export async function sendLeads(env, cfg, leads, { text, ad }) {
   const skipped = []; const groups = { SMS: [], LMS: [] };
   for (const l of leads) {
     if (!/^01[016789]\d{7,8}$/.test(digits(l.phone))) { skipped.push({ id: l.id, name: l.name, why: '휴대폰 번호 없음' }); continue; }
-    if (!l.consent) { skipped.push({ id: l.id, name: l.name, why: '수신 동의 없음' }); continue; }
+    if (!(l.consent > 0)) { skipped.push({ id: l.id, name: l.name, why: l.consent < 0 ? '수신 거절' : '수신 동의 없음' }); continue; }
     const content = compose(text, l, { ad, optout: optoutOf(cfg) });
     if (bytes(content) > LMS_MAX) { skipped.push({ id: l.id, name: l.name, why: '너무 긺(2,000바이트 넘음)' }); continue; }
     groups[kindOf(content)].push({ id: l.id, name: l.name, phone: l.phone, content });

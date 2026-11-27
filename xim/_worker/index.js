@@ -499,11 +499,11 @@ async function ximApi(request, env, url, ctx) {
     for (let i = 0; i < ids.length; i += 90) rows.push(...(await db.prepare(`SELECT id, name, phone, consent FROM leads WHERE id IN (${ids.slice(i, i + 90).map(() => '?').join(',')})`).bind(...ids.slice(i, i + 90)).all()).results);
     const text = str(b.text, 4000), ad = b.ad !== false;
     if (b.preview) {
-      const ok = rows.filter((r) => r.phone && r.consent);
+      const ok = rows.filter((r) => r.phone && r.consent > 0);
       const sample = ok[0] || rows[0];
       const each = ok.map((r) => compose(text, r, { ad, optout: optoutOf(cfg) || '080-000-0000' }));
       const lms = each.filter((t) => kindOf(t) === 'LMS').length;
-      return json({ total: rows.length, sendable: ok.length, noPhone: rows.filter((r) => !r.phone).length, noConsent: rows.filter((r) => r.phone && !r.consent).length,
+      return json({ total: rows.length, sendable: ok.length, noPhone: rows.filter((r) => !r.phone).length, noConsent: rows.filter((r) => r.phone && !(r.consent > 0)).length,
         sample: sample ? { name: sample.name, text: compose(text, sample, { ad, optout: optoutOf(cfg) || '080-000-0000' }) } : null,
         bytes: sample ? smsBytes(compose(text, sample, { ad, optout: optoutOf(cfg) || '080-000-0000' })) : 0, sms: ok.length - lms, lms,
         cost: Math.round(((ok.length - lms) * SMS_PRICES[providerOf(cfg)].SMS + lms * SMS_PRICES[providerOf(cfg)].LMS) * 10) / 10, night: ad && nightBlocked(), ready: cfgReady(env, cfg) });
@@ -575,8 +575,9 @@ async function ximApi(request, env, url, ctx) {
       await db.prepare('UPDATE leads SET done = ?, memo = ? WHERE id = ?').bind(b.done ? 1 : 0, str(b.memo, 500), +lm[1]).run();
       // 수신 동의(문자 보내기 조건): 언제 · 어떻게 받았는지 함께 남긴다
       if ('consent' in b) {
-        await db.prepare('UPDATE leads SET consent = ?, consent_note = ?, consent_at = ? WHERE id = ?').bind(b.consent ? 1 : 0, str(b.consent_note, 200), b.consent ? now() : 0, +lm[1]).run();
-        await audit(db, request, 'LEAD_CONSENT', `상담연락 #${lm[1]}`, b.consent ? `수신 동의 · ${str(b.consent_note, 200)}` : '수신 동의 취소');
+        const cv = b.consent === -1 ? -1 : b.consent ? 1 : 0;   // 1 동의 · -1 거절 · 0 아직 — 체크한 때(날짜 · 시간)를 찍는다
+        await db.prepare('UPDATE leads SET consent = ?, consent_note = ?, consent_at = ? WHERE id = ?').bind(cv, str(b.consent_note, 200), cv ? now() : 0, +lm[1]).run();
+        await audit(db, request, 'LEAD_CONSENT', `상담연락 #${lm[1]}`, cv === 1 ? '문자 수신 동의' : cv === -1 ? '문자 수신 거절' : '동의 표시 지움');
       }
       return json({ ok: true });
     }
