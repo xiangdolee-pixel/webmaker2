@@ -1359,6 +1359,8 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-tile.lv5 { background: #3b4cca; color: #fff; }
 .ld-tile.on { border-color: var(--ink); box-shadow: 0 0 0 2px #fff inset; transform: translateY(-2px); }
 .ld-tile.lv4.on, .ld-tile.lv5.on { border-color: #ffb547; }
+.ld-moreall { display: flex; gap: 8px; align-items: baseline; justify-content: center; width: 100%; margin-top: 10px; }
+.ld-moreall small { color: var(--mute); font-weight: 400; }
 .ld-pick { position: sticky; bottom: 12px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--ink); color: #fff; box-shadow: var(--shadow); }
 .ld-pick-n { margin-right: auto; font-size: 14.5px; }
 .ld-pick .btn:not(.primary) { border-color: rgba(255, 255, 255, .3); background: transparent; color: #fff; }

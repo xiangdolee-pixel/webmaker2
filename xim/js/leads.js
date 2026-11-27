@@ -16,6 +16,9 @@ let scopes = [];
 let sms = '';      // 복사해 쓰는 문자 내용(xim settings.lead_sms — 리포에는 두지 않는다)
 let lastScan = null;
 const open = new Set();   // 펼쳐 둔 줄(id)
+const PAGE = 100;         // 한 번에 그리는 줄 수 — 나머지는 "더 보기" (사용자 지시 2026-11-27 "처음에 목록 다 불러오지 않아도")
+let limit = PAGE;
+const full = new Map();   // 펼친 줄의 긴 칸(checked · links · source_url) — 펼칠 때 받아 둔다
 const picked = new Set(); // 문자 보낼 곳으로 고른 줄(id) — 휴대폰 있는 곳만
 let smsCfg = {};          // 문자 설정(네이버 클라우드 SENS) + 준비 상태
 // 서울 25개 구 — 칸 지도(대략 실제 위치대로 7칸 × 6줄). 구 이름은 주소 둘째 마디와 같다
@@ -138,7 +141,7 @@ function paintGu() {
   pillTabs(fresh('#ld-gu'), [['', `전체 ${count(inSido)}`], ...gus.map((v) => [v, `${v} ${count((i) => inSido(i) && guOf(i) === v)}`])], gu, (v) => { gu = v; update(); });
 }
 
-const update = () => { paintCounts(); paintMap(); renderList(); paintPick(); };
+const update = () => { limit = PAGE; paintCounts(); paintMap(); renderList(); paintPick(); };
 const smsReady = () => { const r = smsCfg.ready || {}; return r.keys && r.service && r.from; };
 const byteLen = (t) => { let n = 0; for (const ch of String(t)) n += ch.charCodeAt(0) > 127 ? 2 : 1; return n; };
 
@@ -254,7 +257,8 @@ function renderList() {
   const list = shown();
   // 같은 지역끼리 붙어 나오게(지역 안에서는 원래 순서 그대로) — 줄마다 업체명 앞에 지역(서울시 노원구)
   list.sort((a, b) => regionOf(a).localeCompare(regionOf(b), 'ko'));
-  box.innerHTML = list.length ? `<ul class="ld-list card">${list.map((it) => `
+  const page = list.slice(0, limit);
+  box.innerHTML = list.length ? `<ul class="ld-list card">${page.map((it) => `
       <li class="ld-item${it.done ? ' is-done' : ''}${open.has(it.id) ? ' is-open' : ''}" data-id="${it.id}">
         <div class="ld-row">
           ${it.phone ? `<label class="ld-chk"><input type="checkbox" data-pick${picked.has(it.id) ? ' checked' : ''} aria-label="${esc(it.name)} 고르기"></label>` : '<span class="ld-chk"></span>'}
@@ -264,17 +268,24 @@ function renderList() {
           <button type="button" class="ld-more" data-toggle aria-label="자세히"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         </div>
         ${open.has(it.id) ? detail(it) : ''}
-      </li>`).join('')}</ul>`
+      </li>`).join('')}</ul>${list.length > limit ? `<button type="button" class="btn ld-moreall" id="ld-moreall">더 보기 <small>${limit.toLocaleString()} / ${list.length.toLocaleString()}곳</small></button>` : ''}`
     : `<section class="card item"><p class="meta">${items.length ? '이 보기에는 없습니다.' : '아직 모은 곳이 없습니다.'}</p></section>`;
+  const more = $('#ld-moreall'); if (more) more.onclick = () => { limit += PAGE * 2; renderList(); };
   box.querySelectorAll('.ld-item').forEach((li) => {
     const it = items.find((x) => x.id === +li.dataset.id);
-    li.querySelectorAll('[data-toggle]').forEach((b) => { b.onclick = () => { if (open.has(it.id)) open.delete(it.id); else open.add(it.id); renderList(); }; });
+    li.querySelectorAll('[data-toggle]').forEach((b) => { b.onclick = async () => {
+      if (open.has(it.id)) { open.delete(it.id); renderList(); return; }
+      open.add(it.id);
+      if (!full.has(it.id)) { try { const r = await deps.api(`/leads/${it.id}`); full.set(it.id, r.item || {}); } catch { full.set(it.id, {}); } }
+      renderList();
+    }; });
     const pk = li.querySelector('[data-pick]'); if (pk) pk.onchange = () => { if (pk.checked) picked.add(it.id); else picked.delete(it.id); paintPick(); };
     if (open.has(it.id)) bindDetail(li, it);
   });
 }
 
 function detail(it) {
+  it = { ...it, ...(full.get(it.id) || {}) };   // 펼칠 때 받은 긴 칸
   const more = it.links ? it.links.split(' ').filter(Boolean) : [];
   return `<div class="ld-detail">
       <dl class="ld-dl">
@@ -320,9 +331,10 @@ function bindDetail(li, it) {
   };
 }
 
-function downloadCsv() {
-  const list = shown();
-  if (!list.length) return toast('받을 것이 없습니다.');
+async function downloadCsv() {
+  const ids = new Set(shown().map((i) => i.id));
+  if (!ids.size) return toast('받을 것이 없습니다.');
+  const list = (await deps.api('/leads?full=1')).items.filter((i) => ids.has(i.id));
   const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const rows = [['이름', '분류', '휴대폰', '대표 전화', '주소', '홈페이지', '블로그', '인스타그램', '지도', '번호 나온 곳', '확인한 것', '메모', '연락함', '지역', '영역'],
     ...list.map((it) => [it.name, it.category, it.phone, it.tel, it.address, it.homepage, it.blog, it.instagram, it.place_url, it.source_url, it.checked, it.memo, it.done ? '예' : '', regionOf(it), it.area])];
