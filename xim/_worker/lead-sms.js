@@ -41,8 +41,8 @@ async function sensSend(env, cfg, type, ad, msgs) {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       'x-ncp-apigw-timestamp': ts,
-      'x-ncp-iam-access-key': env.NCP_ACCESS_KEY,
-      'x-ncp-apigw-signature-v2': await sign(env.NCP_SECRET_KEY, `POST ${path}\n${ts}\n${env.NCP_ACCESS_KEY}`),
+      'x-ncp-iam-access-key': keyOf(env, cfg).ak,
+      'x-ncp-apigw-signature-v2': await sign(keyOf(env, cfg).sk, `POST ${path}\n${ts}\n${keyOf(env, cfg).ak}`),
     },
     body: JSON.stringify({
       type, contentType: ad ? 'AD' : 'COMM', countryCode: '82', from: digits(cfg.from),
@@ -55,15 +55,17 @@ async function sensSend(env, cfg, type, ad, msgs) {
   return { ok: res.status === 202 && j.statusCode === '202', status: res.status, requestId: j.requestId || '', error: j.statusName || j.error?.message || j.errorMessage || `HTTP ${res.status}` };
 }
 
+// 키: Worker 비밀값(NCP_ACCESS_KEY · NCP_SECRET_KEY)이 있으면 그것, 없으면 xim 문자 설정에서 넣은 값(settings.lead_sms_cfg — 화면에는 다시 보여 주지 않음)
+export const keyOf = (env, cfg) => ({ ak: env.NCP_ACCESS_KEY || cfg.ak || '', sk: env.NCP_SECRET_KEY || cfg.sk || '' });
 export const cfgReady = (env, cfg) => ({
-  keys: !!(env.NCP_ACCESS_KEY && env.NCP_SECRET_KEY),
+  keys: !!(keyOf(env, cfg).ak && keyOf(env, cfg).sk),
   service: !!cfg.serviceId, from: !!digits(cfg.from), optout: !!digits(cfg.optout),
 });
 
 // leads = [{id, name, phone, consent}] — 동의 · 번호 없는 곳은 빼고, 나머지를 보낸 뒤 줄마다 결과
 export async function sendLeads(env, cfg, leads, { text, ad }) {
   const r = cfgReady(env, cfg);
-  if (!r.keys) throw new Error('네이버 클라우드 키(NCP_ACCESS_KEY · NCP_SECRET_KEY)가 아직 없습니다.');
+  if (!r.keys) throw new Error('네이버 클라우드 API 키가 아직 없습니다. 문자 설정에 넣어 주세요.');
   if (!r.service || !r.from) throw new Error('문자 설정(서비스 ID · 발신번호)을 먼저 넣어 주세요.');
   if (ad && !r.optout) throw new Error('광고 문자에는 무료 수신거부 080 번호가 꼭 있어야 합니다. 문자 설정에 넣어 주세요.');
   if (ad && nightBlocked()) throw new Error('광고 문자는 밤 9시부터 아침 8시까지 보낼 수 없습니다(정보통신망법).');

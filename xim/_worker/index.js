@@ -482,7 +482,9 @@ async function ximApi(request, env, url, ctx) {
   // 문자 설정: 서비스 ID · 발신번호 · 080 수신거부 번호 · LMS 제목 (키 두 개는 Worker 비밀값)
   if (path === '/api/leads/sms-cfg' && method === 'PUT') {
     const b = await body(request);
-    const cfg = { serviceId: str(b.serviceId, 80), from: str(b.from, 20), optout: str(b.optout, 20), subject: str(b.subject, 40) };
+    const old = JSON.parse((await getSetting(db, 'lead_sms_cfg')) || '{}');
+    // API 키는 새로 넣었을 때만 바꾼다(빈칸이면 그대로 — 화면에 다시 내려보내지 않으니까)
+    const cfg = { serviceId: str(b.serviceId, 80), from: str(b.from, 20), optout: str(b.optout, 20), subject: str(b.subject, 40), ak: str(b.ak, 100) || old.ak || '', sk: str(b.sk, 200) || old.sk || '' };
     await setSetting(db, 'lead_sms_cfg', JSON.stringify(cfg));
     await audit(db, request, 'LEAD_SMS_CFG', '상담연락 문자 설정');
     return json({ ok: true, ready: cfgReady(env, cfg) });

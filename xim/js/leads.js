@@ -75,8 +75,10 @@ export async function renderLeads(d) {
           <label class="field"><span>발신번호 <small>SENS 에 등록 · 승인된 번호</small></span><input class="input" name="from" value="${esc(smsCfg.from)}" placeholder="010-0000-0000" inputmode="tel"></label>
           <label class="field"><span>무료 수신거부 번호 <small>광고 문자 끝에 붙음 — 080</small></span><input class="input" name="optout" value="${esc(smsCfg.optout)}" placeholder="080-000-0000" inputmode="tel"></label>
           <label class="field"><span>장문(LMS) 제목</span><input class="input" name="subject" value="${esc(smsCfg.subject)}" placeholder="안내" maxlength="40"></label>
+          <label class="field"><span>Access Key ID <small>네이버 클라우드 › Sub Account › xim-sms › Access Key</small></span><input class="input" name="ak" placeholder="${smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : 'ncp_iam_BPA…'}" autocomplete="off" spellcheck="false"></label>
+          <label class="field"><span>Secret Key <small>같은 줄의 [보기]</small></span><input class="input" type="password" name="sk" placeholder="${smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : 'ncp_iam_BPK…'}" autocomplete="new-password" spellcheck="false"></label>
         </div>
-        <ul class="ld-ready">${[['keys', 'API 키(비밀값)'], ['service', '서비스 ID'], ['from', '발신번호'], ['optout', '080 수신거부 번호']].map(([k, l]) => `<li class="${smsCfg.ready?.[k] ? 'ok' : ''}">${l}</li>`).join('')}</ul>
+        <ul class="ld-ready">${[['keys', 'API 키'], ['service', '서비스 ID'], ['from', '발신번호'], ['optout', '080 수신거부 번호']].map(([k, l]) => `<li class="${smsCfg.ready?.[k] ? 'ok' : ''}">${l}</li>`).join('')}</ul>
         <div class="ld-form-foot ld-sms-foot"><button type="submit" class="btn sm primary">설정 저장</button></div>
       </form></details>
     <details class="card ld-scope"><summary>주소를 넣어 더 모으기 <small>홈페이지 · 블로그 · 인스타그램 · 네이버 지도(플레이스) 주소</small></summary>
@@ -115,7 +117,7 @@ export async function renderLeads(d) {
     e.preventDefault();
     const f = e.currentTarget;
     busy(f.querySelector('[type=submit]'), null, async () => {
-      await api('/leads/sms-cfg', { method: 'PUT', data: { serviceId: f.serviceId.value, from: f.from.value, optout: f.optout.value, subject: f.subject.value } });
+      await api('/leads/sms-cfg', { method: 'PUT', data: { serviceId: f.serviceId.value, from: f.from.value, optout: f.optout.value, subject: f.subject.value, ak: f.ak.value.trim(), sk: f.sk.value.trim() } });
       toast('문자 설정을 저장했습니다.');
       await renderLeads(deps);
     });
