@@ -1282,7 +1282,12 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-rule ol { margin: 0; padding-left: 22px; font-size: 15.5px; line-height: 1.7; color: var(--ink); }
 .ld-rule li + li { margin-top: 4px; }
 .ld-script { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--brand-soft); font-size: 14.5px; line-height: 1.6; }
-.ld-script > b:first-child { display: block; margin-bottom: 2px; color: var(--brand); }
+.ld-script > summary { cursor: pointer; color: var(--brand); }
+.ld-script > summary small { margin-left: 6px; color: var(--mute); font-size: 12.5px; }
+.ld-script ol { display: grid; gap: 10px; margin: 10px 0 2px; padding: 0; list-style: none; }
+.ld-script li { color: var(--ink); }
+.ld-step { display: block; margin-bottom: 2px; color: var(--brand); font-size: 13px; font-weight: 700; }
+.ld-script li small { display: block; margin-top: 3px; color: var(--sub); font-size: 13px; }
 .ld-warnbox { margin: 0 0 12px; padding: 12px 14px; border: 2px solid var(--danger); border-radius: var(--radius-sm); background: var(--danger-soft); font-size: 14px; line-height: 1.65; }
 .ld-warnbox > b { color: var(--danger); font-size: 15.5px; }
 .ld-warnbox ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink); }

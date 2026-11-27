@@ -341,6 +341,31 @@ function srcLabel(it) {
   return `${it.name} ${SRC_SHORT[it.source] && it.source !== 'manual' ? SRC_SHORT[it.source] : '지도'}`;
 }
 
+// 전화 멘트(사용자 지시 2026-11-28 "뭐라고 말하면 저쪽에서 필요하다고 말하게 될지") — 그 업체 상황(홈페이지 · 블로그 · 인스타 있음/없음)에 맞춰
+//   원칙: 누구인지 · 번호 어디서 봤는지 먼저 밝히고, 팔기보다 묻기(원장님이 스스로 "그게 불편하다" 말하게), 거절하면 바로 끝.
+function callScript(it) {
+  const n = esc(it.name);
+  const has = it.homepage ? 'home' : it.blog || it.instagram ? 'sns' : 'none';
+  const ask = {
+    home: ['지금 홈페이지는 원장님이 직접 글을 올리고 고치실 수 있으세요, 아니면 업체에 매번 부탁하셔야 하나요?', '혹시 휴대폰으로 열었을 때 글씨가 작거나 예약 · 전화 버튼이 잘 안 보이지는 않으세요?', '상담 오시는 분들이 홈페이지 보고 왔다고 하시는 경우가 있으세요?'],
+    sns: [`지금은 ${it.blog ? '블로그' : '인스타그램'}로 센터를 알리고 계시죠? 처음 오시는 분들이 "센터 홈페이지 주소가 뭐예요?" 하고 묻는 경우는 없으세요?`, '네이버에서 센터 이름을 검색하면 블로그 글이 섞여 나와서, 상담 과정 · 비용 · 오시는 길을 한눈에 보기 어렵다는 말씀은 없으셨어요?', '바우처나 기관 연계할 때 "홈페이지 있으세요?" 질문 받아 보신 적 있으세요?'],
+    none: ['처음 상담 문의하시는 분들은 주로 어떻게 알고 연락 오세요?', '네이버에서 센터 이름을 검색했을 때 상담 분야 · 선생님 소개 · 비용 · 오시는 길이 한 번에 나오면 좋겠다고 생각해 보신 적 있으세요?', '바우처나 기관 연계할 때 홈페이지 주소를 물어보는 경우는 없으셨어요?'],
+  }[has];
+  const offer = {
+    home: '저희는 상담센터 홈페이지를 주로 만드는데요, 원장님이 휴대폰으로 공지 · 프로그램을 바로 고치실 수 있고, 예약 · 문의 버튼이 폰에서 크게 보이게 만들어 드려요.',
+    sns: `${it.blog ? '블로그' : '인스타그램'}는 그대로 두시고, 센터 소개 · 선생님 · 프로그램 · 비용 · 오시는 길을 한 장에 정리한 홈페이지를 붙여 드려요. 블로그 새 글이 홈페이지에 같이 보이게도 할 수 있고요.`,
+    none: '저희는 상담센터 홈페이지를 주로 만드는데요, 센터 소개 · 선생님 · 프로그램 · 비용 · 오시는 길 · 예약 문의까지 한 곳에 정리해서, 원장님이 휴대폰으로 직접 고치실 수 있게 만들어 드려요.',
+  }[has];
+  return `<details class="ld-script" open><summary><b>전화 멘트</b> <small>이 업체 상황: ${has === 'home' ? '홈페이지 있음' : has === 'sns' ? (it.blog ? '블로그' : '인스타그램') + '만 있음' : '홈페이지 · 블로그 없음'}</small></summary>
+    <ol>
+      <li><span class="ld-step">① 인사 · 출처</span>"안녕하세요, ${n} 맞으시죠? 저는 상담센터 홈페이지를 만드는 <b>자두랩스</b> 박민진입니다. <b>${esc(srcLabel(it))}</b>에 나온 번호를 보고 연락드렸어요. 1분만 여쭤봐도 될까요?"<small>→ "바빠요 · 괜찮아요" 하면: "네, 알겠습니다. 바쁘신데 죄송합니다." 하고 바로 끊고 <b>거절</b> 표시.</small></li>
+      <li><span class="ld-step">② 묻기 (팔지 말고 듣기)</span>${ask.map((q) => `"${esc(q)}"`).join('<br>')}<small>→ 원장님이 "그게 좀 불편해요 · 없어요 · 생각은 있었어요" 라고 <b>스스로 말하게</b> 하는 게 목표. 말이 나오면 "아 그러시군요, 많이들 그러세요" 하고 맞장구.</small></li>
+      <li><span class="ld-step">③ 짧게 제안</span>"${esc(offer)}"</li>
+      <li><span class="ld-step">④ 문자 동의 받기</span>"제가 비슷한 상담센터 홈페이지 예시를 <b>문자로 하나 보내 드려도 될까요?</b> 보시고 아니다 싶으시면 답 안 주셔도 괜찮아요."<small>→ "네" 하면 <b>[동의 받음]</b>(방법: 전화 통화) 누르고, 그다음에 문자. "아니요" 하면 <b>거절</b> 표시 · 다시 연락 안 함.</small></li>
+      <li><span class="ld-step">⑤ 마무리</span>"시간 내 주셔서 감사합니다. 궁금하신 거 있으시면 이 번호로 편하게 연락 주세요."</li>
+    </ol></details>`;
+}
+
 function detail(it) {
   it = { ...it, ...(full.get(it.id) || {}) };   // 펼칠 때 받은 긴 칸
   const more = it.links ? it.links.split(' ').filter(Boolean) : [];
@@ -354,7 +379,7 @@ function detail(it) {
         ${it.checked ? `<div><dt>확인한 것</dt><dd>${esc(it.checked)}</dd></div>` : ''}
         <div><dt>모은 때</dt><dd>${fmtDate(it.created_at)}${it.area ? ` · ${esc(it.area)}` : ''}</dd></div>
       </dl>
-      ${it.phone || it.tel ? `<div class="ld-script"><b>전화할 때 첫마디</b> "안녕하세요, ${esc(it.name)} 맞으시죠? <b>${esc(srcLabel(it))}</b>에 나온 번호를 보고 연락드렸습니다. 홈페이지 제작 관련해서 잠깐 여쭤봐도 될까요?"</div>` : ''}
+      ${it.phone || it.tel ? callScript(it) : ''}
       ${it.phone ? `<div class="ld-consent${it.consent ? ' on' : ''}"><b>${it.consent ? '수신 동의 받음' : '수신 동의 없음'}</b>
         ${it.consent ? `<small>${esc(it.consent_note)} · ${fmtDate(it.consent_at)}</small><button type="button" class="btn sm" data-consent>동의 취소</button>`
           : '<input class="input" data-consent-note placeholder="어떻게 받았나 (예: 전화 통화)" maxlength="200" aria-label="동의 받은 방법"><button type="button" class="btn sm primary" data-consent>동의 받음</button>'}
