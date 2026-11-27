@@ -1306,13 +1306,19 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-item + .ld-item { border-top: 1px solid var(--line); }
 .ld-item.is-done .ld-row { opacity: .6; }
 .ld-item.is-open { background: #fbfbfd; }
-.ld-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) 150px 132px 36px; align-items: center; gap: 12px; min-height: 48px; padding: 4px 8px 4px 12px; }
+.ld-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) 230px 132px 36px; align-items: center; gap: 12px; min-height: 48px; padding: 4px 8px 4px 12px; }
 .ld-chk { display: grid; place-items: center; width: 24px; height: 40px; cursor: pointer; }
 .ld-chk input { width: 18px; height: 18px; margin: 0; accent-color: var(--brand); cursor: pointer; }
 .ld-name { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 40px; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .ld-area { flex: none; min-width: 96px; padding: 3px 8px; border-radius: 6px; background: var(--bg); color: var(--sub); font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; }
 .ld-name b { overflow: hidden; font-size: 15.5px; text-overflow: ellipsis; white-space: nowrap; }
 .ld-phone { color: var(--brand); font-size: 16px; font-weight: 700; text-decoration: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ld-pcell { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ld-src { flex: none; padding: 2px 7px; border-radius: 6px; background: var(--bg); color: var(--sub); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.ld-src.s-homepage { background: #e8f1ff; color: #1d4f9c; }
+.ld-src.s-blog { background: #e6f6ea; color: #1b6b35; }
+.ld-src.s-instagram { background: #fde8f1; color: #9c1d55; }
+.ld-src.s-map, .ld-src.s-place { background: #fff3d6; color: #7a5200; }
 .ld-phone.none { color: var(--mute); font-size: 14px; font-weight: 400; }
 .ld-links { display: flex; gap: 4px; }
 .ld-links a { padding: 3px 9px; border-radius: 99px; color: var(--brand); background: var(--brand-soft); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; transition: color .2s, background .2s; }
@@ -1343,7 +1349,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
   .ld-chk { grid-area: chk; width: 22px; }
   .ld-name { grid-area: name; min-height: 30px; }
   .ld-area { min-width: 0; padding: 2px 6px; font-size: 12px; }
-  .ld-phone { grid-area: phone; }
+  .ld-phone, .ld-pcell { grid-area: phone; }
   .ld-links { grid-area: links; justify-content: flex-end; flex-wrap: wrap; min-width: 0; }
   .ld-links a { padding: 2px 8px; font-size: 12.5px; }
   .ld-more { grid-area: more; width: 32px; }

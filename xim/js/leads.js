@@ -302,7 +302,7 @@ function renderList() {
         <div class="ld-row">
           ${it.phone ? `<label class="ld-chk"><input type="checkbox" data-pick${picked.has(it.id) ? ' checked' : ''} aria-label="${esc(it.name)} 고르기"></label>` : '<span class="ld-chk"></span>'}
           <button type="button" class="ld-name" data-toggle aria-expanded="${open.has(it.id)}"><span class="ld-area">${esc(regionOf(it))}</span><b>${esc(it.name)}</b>${it.consent ? '<span class="badge done">동의</span>' : ''}${it.sent_n ? `<span class="badge idle">문자 ${it.sent_n}</span>` : ''}${it.done ? '<span class="badge done">연락함</span>' : ''}</button>
-          ${it.phone ? `<a class="ld-phone" href="tel:${esc(it.phone)}">${esc(it.phone)}</a>` : '<span class="ld-phone none">번호 없음</span>'}
+          ${it.phone ? `<span class="ld-pcell"><a class="ld-phone" href="tel:${esc(it.phone)}">${esc(it.phone)}</a><small class="ld-src s-${esc(it.source)}" title="이 번호를 찾은 곳">${esc(SRC_SHORT[it.source] || it.source || '?')}</small></span>` : '<span class="ld-phone none">번호 없음</span>'}
           <span class="ld-links">${it.homepage ? ext(it.homepage, '홈') : ''}${it.blog ? ext(it.blog, '블') : ''}${it.instagram ? ext(it.instagram, '인스타') : ''}</span>
           <button type="button" class="ld-more" data-toggle aria-label="자세히"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         </div>
@@ -324,9 +324,9 @@ function renderList() {
 }
 
 // 번호를 어디서 알았는지(전화 첫마디용)
+const SRC_SHORT = { map: '카카오맵', place: '네이버 지도', homepage: '홈페이지', blog: '블로그', instagram: '인스타그램', manual: '직접 넣음' };
 function srcLabel(it) {
-  const src = it.source === 'map' || it.source === 'place' ? '지도(카카오맵)' : it.source === 'homepage' ? '홈페이지' : it.source === 'blog' ? '네이버 블로그' : it.source === 'instagram' ? '인스타그램' : '';
-  return src ? `${it.name} ${src}` : `${it.name} 지도(카카오맵)`;
+  return `${it.name} ${SRC_SHORT[it.source] && it.source !== 'manual' ? SRC_SHORT[it.source] : '지도'}`;
 }
 
 function detail(it) {
