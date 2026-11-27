@@ -381,7 +381,7 @@ function proofBox(it) {
 }
 
 function detail(it) {
-  it = { ...it, ...(full.get(it.id) || {}) };   // 펼칠 때 받은 긴 칸
+  it = { ...(full.get(it.id) || {}), ...it };   // 펼칠 때 받은 긴 칸 — 목록 값(동의 · 통화 등 방금 바꾼 것)이 먼저
   const more = it.links ? it.links.split(' ').filter(Boolean) : [];
   return `<div class="ld-detail">
       <dl class="ld-dl">
