@@ -1262,6 +1262,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 
 /* ───── 상담연락 (js/leads.js) — 한 줄 = 업체 하나, 누르면 펼침 ───── */
 .ld-q { max-width: 260px; min-height: 36px; }
+.ld-region { width: auto; max-width: 200px; min-height: 36px; }
 .ld-scope { margin-bottom: 10px; padding: 0 16px; }
 .ld-scope > summary { padding: 12px 0; font-weight: 700; cursor: pointer; }
 .ld-scope > summary small { margin-left: 8px; color: var(--mute); font-size: 13px; font-weight: 400; }
@@ -1308,6 +1309,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-act { display: flex; flex-wrap: wrap; gap: 6px; }
 @media (max-width: 640px) {
   .ld-q { flex-basis: 100%; max-width: none; }
+  .ld-region { flex: 1 1 auto; max-width: none; }
   .ld-scope > summary small { display: block; margin: 2px 0 0; }
   .ld-row { grid-template-columns: auto minmax(0, 1fr) 32px; grid-template-areas: "name name more" "phone links more"; gap: 0 10px; padding: 6px 4px 8px 14px; }
   .ld-name { grid-area: name; min-height: 30px; }

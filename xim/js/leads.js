@@ -6,6 +6,7 @@ import { $, esc, toast, busy, fmtDate, pillTabs } from './common.js';
 let deps = null;   // { view, api }
 let filter = '';   // '' 전체 · 'has' 번호 있음 · 'none' 번호 없음 · 'done' 연락함
 let q = '';
+let region = '';   // '' 모든 지역 · '서울 노원구' 처럼 주소 앞 두 마디(시도 + 시군구)
 let items = [];
 let scopes = [];
 let sms = '';      // 복사해 쓰는 문자 내용(xim settings.lead_sms — 리포에는 두지 않는다)
@@ -13,19 +14,29 @@ let lastScan = null;
 const open = new Set();   // 펼쳐 둔 줄(id)
 
 const SRC = { map: '지도 업체 정보', place: '네이버 플레이스', homepage: '홈페이지', blog: '블로그', instagram: '인스타그램', manual: '직접 넣음' };
+// 지역 = 주소의 시도 + 시군구(예: "서울 노원구"). 모을 때 따로 적지 않아도 주소만 있으면 지역별로 묶인다
+const regionOf = (it) => (it.address || '').split(/\s+/).slice(0, 2).join(' ') || '지역 모름';
+const inRegion = (it) => !region || regionOf(it) === region;
+// 어디까지 알아봤나(lead_scopes.area 예: "노원구")는 고른 지역 이름에 그 말이 들어 있으면 보인다
+const scopeIn = (sc) => !region || region.includes(sc.area) || sc.area.includes(region.split(' ').pop());
 const ext = (url, label, cls = '') => `<a class="${cls}" href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a>`;
 
 export async function renderLeads(d) {
   deps = d;
   const { view, api } = deps;
   ({ items, scopes = [], sms = '' } = await api('/leads'));
-  const has = items.filter((i) => i.phone).length;
+  const regions = [...new Set(items.map(regionOf))].sort((a, b) => a.localeCompare(b, 'ko'));
+  if (region && !regions.includes(region)) region = '';
+  const mineAll = items.filter(inRegion);
+  const has = mineAll.filter((i) => i.phone).length;
+  const scs = scopes.filter(scopeIn);
   view.innerHTML = `
-    <div class="bar"><h2>상담연락 ${items.length}</h2>
+    <div class="bar"><h2>상담연락 ${mineAll.length}</h2>
+      <select class="input ld-region" id="ld-region" aria-label="지역"><option value="">모든 지역 ${items.length}</option>${regions.map((r) => `<option value="${esc(r)}"${r === region ? ' selected' : ''}>${esc(r)} ${items.filter((i) => regionOf(i) === r).length}</option>`).join('')}</select>
       <input class="input search-q ld-q" id="ld-q" type="search" placeholder="이름 · 번호 · 주소 찾기" value="${esc(q)}" aria-label="찾기">
       <button type="button" class="btn sm" id="ld-csv">엑셀(CSV) 받기</button></div>
-    ${scopes.length ? `<details class="card ld-scope"><summary>어디까지 알아봤나 <small>${scopes.map((s) => `${esc(s.area)} ${s.total}곳`).join(' · ')}</small></summary>
-      ${scopes.map((s) => { const mine = items.filter((i) => i.area === s.area); return `<div class="ld-scope-item"><b>${esc(s.area)}</b> <span class="badge idle">${esc(s.source)}</span>
+    ${scs.length ? `<details class="card ld-scope"><summary>어디까지 알아봤나 <small>${scs.map((s) => `${esc(s.area)} ${items.filter((i) => i.area === s.area && inRegion(i)).length}곳`).join(' · ')}</small></summary>
+      ${scs.map((s) => { const mine = items.filter((i) => i.area === s.area && inRegion(i)); return `<div class="ld-scope-item"><b>${esc(s.area)}</b> <span class="badge idle">${esc(s.source)}</span>
         <span class="badge done">휴대폰 있음 ${mine.filter((i) => i.phone).length}</span> <span class="badge idle">없음 ${mine.filter((i) => !i.phone).length}</span>
         <p>${esc(s.note)}</p><small>${fmtDate(s.checked_at)} 확인</small></div>`; }).join('')}</details>` : ''}
     <details class="card ld-scope ld-sms"><summary>보낼 문자 <small>눌러서 내용 보기 · 고치기</small><button type="button" class="btn sm primary" id="ld-sms-copy">문자 복사</button></summary>
@@ -44,7 +55,8 @@ export async function renderLeads(d) {
       </form></details>
     <nav class="tabs iq-tabs ld-tabs" id="ld-tabs" aria-label="보기"></nav>
     <div id="ld-body"></div>`;
-  pillTabs($('#ld-tabs'), [['', `전체 ${items.length}`], ['has', `번호 있음 ${has}`], ['none', `번호 없음 ${items.length - has}`], ['done', `연락함 ${items.filter((i) => i.done).length}`]], filter, (v) => { filter = v; renderList(); });
+  pillTabs($('#ld-tabs'), [['', `전체 ${mineAll.length}`], ['has', `번호 있음 ${has}`], ['none', `번호 없음 ${mineAll.length - has}`], ['done', `연락함 ${mineAll.filter((i) => i.done).length}`]], filter, (v) => { filter = v; renderList(); });
+  $('#ld-region').onchange = (e) => { region = e.target.value; renderLeads(deps); };
   $('#ld-q').oninput = (e) => { q = e.target.value; renderList(); };
   $('#ld-csv').onclick = downloadCsv;
   // 보낼 문자: 접혀 있어도 "문자 복사"는 바로 된다(입력칸에 있는 지금 내용 그대로)
@@ -74,7 +86,7 @@ function renderScan() {
 
 const shown = () => {
   const k = q.trim().toLowerCase().replace(/-/g, '');
-  return items.filter((it) => (filter === 'has' ? it.phone : filter === 'none' ? !it.phone : filter === 'done' ? it.done : true)
+  return items.filter((it) => inRegion(it) && (filter === 'has' ? it.phone : filter === 'none' ? !it.phone : filter === 'done' ? it.done : true)
     && (!k || `${it.name} ${it.phone.replace(/-/g, '')} ${it.tel.replace(/-/g, '')} ${it.address} ${it.category} ${it.memo}`.toLowerCase().includes(k)));
 };
 
@@ -138,11 +150,11 @@ function downloadCsv() {
   const list = shown();
   if (!list.length) return toast('받을 것이 없습니다.');
   const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const rows = [['이름', '분류', '휴대폰', '대표 전화', '주소', '홈페이지', '블로그', '인스타그램', '지도', '번호 나온 곳', '확인한 것', '메모', '연락함', '영역'],
-    ...list.map((it) => [it.name, it.category, it.phone, it.tel, it.address, it.homepage, it.blog, it.instagram, it.place_url, it.source_url, it.checked, it.memo, it.done ? '예' : '', it.area])];
+  const rows = [['이름', '분류', '휴대폰', '대표 전화', '주소', '홈페이지', '블로그', '인스타그램', '지도', '번호 나온 곳', '확인한 것', '메모', '연락함', '지역', '영역'],
+    ...list.map((it) => [it.name, it.category, it.phone, it.tel, it.address, it.homepage, it.blog, it.instagram, it.place_url, it.source_url, it.checked, it.memo, it.done ? '예' : '', regionOf(it), it.area])];
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([`﻿${rows.map((r) => r.map(cell).join(',')).join('\r\n')}`], { type: 'text/csv;charset=utf-8' }));
-  a.download = '상담연락.csv';
+  a.download = `상담연락${region ? `-${region.split(' ').pop()}` : ''}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
