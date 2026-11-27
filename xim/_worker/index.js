@@ -12,7 +12,7 @@ import { ensureMailDomain, ensureTurnstile } from './mail-domain.js';
 import { deleteRequest } from './request-files.js';
 import { linkUrl as cleanUrl, scrapeMeta } from './scrape.js';
 import { scanUrl, normPhone } from './leads.js';
-import { sendLeads, cfgReady, compose, kindOf, bytes as smsBytes, nightBlocked, PRICES as SMS_PRICES, providerOf } from './lead-sms.js';
+import { sendLeads, cfgReady, compose, kindOf, bytes as smsBytes, nightBlocked, PRICES as SMS_PRICES, providerOf, optoutOf } from './lead-sms.js';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 // 스튜디오(유튜브 발표자료 제작) — /api/studio/* · /studio/* · Workflow StudioMain (xim/_worker/studio.js)
 import { studioApi, studioHelper, studioPublic, studioScheduled, StudioMain } from './studio.js';
@@ -477,14 +477,14 @@ async function ximApi(request, env, url, ctx) {
     const [a, s] = await db.batch([db.prepare(`SELECT ${cols} FROM leads ORDER BY (phone = ''), id LIMIT 8000`), db.prepare('SELECT * FROM lead_scopes ORDER BY checked_at DESC')]);
     const cfg = JSON.parse((await getSetting(db, 'lead_sms_cfg')) || '{}');
     return json({ items: a.results, scopes: s.results, sms: (await getSetting(db, 'lead_sms')) || '',   // scopes = 어디까지 알아봤는지(영역마다 한 줄), sms = 보낼 문자 내용({업체명} 은 업체마다 바뀜)
-      smsCfg: { provider: providerOf(cfg), from: cfg.from || '', optout: cfg.optout || '', serviceId: cfg.serviceId || '', subject: cfg.subject || '', ready: cfgReady(env, cfg), night: nightBlocked(), price: SMS_PRICES[providerOf(cfg)] } });
+      smsCfg: { provider: providerOf(cfg), from: cfg.from || '', optout: cfg.optout || '', optoutUsed: optoutOf(cfg), serviceId: cfg.serviceId || '', subject: cfg.subject || '', ready: cfgReady(env, cfg), night: nightBlocked(), price: SMS_PRICES[providerOf(cfg)] } });
   }
   // 문자 설정: 서비스 ID · 발신번호 · 080 수신거부 번호 · LMS 제목 (키 두 개는 Worker 비밀값)
   if (path === '/api/leads/sms-cfg' && method === 'PUT') {
     const b = await body(request);
     const old = JSON.parse((await getSetting(db, 'lead_sms_cfg')) || '{}');
     // API 키는 새로 넣었을 때만 바꾼다(빈칸이면 그대로 — 화면에 다시 내려보내지 않으니까)
-    const cfg = { serviceId: str(b.serviceId, 80), from: str(b.from, 20), optout: str(b.optout, 20), subject: str(b.subject, 40), ak: str(b.ak, 100) || old.ak || '', sk: str(b.sk, 200) || old.sk || '', hk: str(b.hk, 200) || old.hk || '', provider: b.provider === 'sens' ? 'sens' : 'hackle' };
+    const cfg = { serviceId: str(b.serviceId, 80), from: str(b.from, 20), optout: str(b.optout, 20), subject: str(b.subject, 40), ak: str(b.ak, 100) || old.ak || '', sk: str(b.sk, 200) || old.sk || '', hk: str(b.hk, 200) || old.hk || '', sak: str(b.sak, 100) || old.sak || '', sas: str(b.sas, 200) || old.sas || '', provider: ['sens', 'hackle'].includes(b.provider) ? b.provider : 'solapi' };
     await setSetting(db, 'lead_sms_cfg', JSON.stringify(cfg));
     await audit(db, request, 'LEAD_SMS_CFG', '상담연락 문자 설정');
     return json({ ok: true, ready: cfgReady(env, cfg) });
@@ -501,11 +501,11 @@ async function ximApi(request, env, url, ctx) {
     if (b.preview) {
       const ok = rows.filter((r) => r.phone && r.consent);
       const sample = ok[0] || rows[0];
-      const each = ok.map((r) => compose(text, r, { ad, optout: cfg.optout || '080-000-0000' }));
+      const each = ok.map((r) => compose(text, r, { ad, optout: optoutOf(cfg) || '080-000-0000' }));
       const lms = each.filter((t) => kindOf(t) === 'LMS').length;
       return json({ total: rows.length, sendable: ok.length, noPhone: rows.filter((r) => !r.phone).length, noConsent: rows.filter((r) => r.phone && !r.consent).length,
-        sample: sample ? { name: sample.name, text: compose(text, sample, { ad, optout: cfg.optout || '080-000-0000' }) } : null,
-        bytes: sample ? smsBytes(compose(text, sample, { ad, optout: cfg.optout || '080-000-0000' })) : 0, sms: ok.length - lms, lms,
+        sample: sample ? { name: sample.name, text: compose(text, sample, { ad, optout: optoutOf(cfg) || '080-000-0000' }) } : null,
+        bytes: sample ? smsBytes(compose(text, sample, { ad, optout: optoutOf(cfg) || '080-000-0000' })) : 0, sms: ok.length - lms, lms,
         cost: Math.round(((ok.length - lms) * SMS_PRICES[providerOf(cfg)].SMS + lms * SMS_PRICES[providerOf(cfg)].LMS) * 10) / 10, night: ad && nightBlocked(), ready: cfgReady(env, cfg) });
     }
     let out;

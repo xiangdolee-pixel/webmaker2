@@ -68,14 +68,16 @@ export async function renderLeads(d) {
     <details class="card ld-scope ld-sms"><summary>보낼 문자 <small>눌러서 내용 보기 · 고치기 · <b>{업체명}</b> 은 업체마다 그 이름으로 바뀝니다</small><button type="button" class="btn sm primary" id="ld-sms-copy">문자 복사</button></summary>
       <div class="ld-form"><textarea class="input" id="ld-sms" rows="14" maxlength="4000" placeholder="[{업체명}] 원장님 안녕하세요…" aria-label="보낼 문자">${esc(sms)}</textarea>
         <div class="ld-form-foot ld-sms-foot"><small class="ld-bytes" id="ld-bytes"></small><button type="button" class="btn sm" id="ld-sms-ins">{업체명} 넣기</button><button type="button" class="btn sm" id="ld-sms-save">저장</button></div></div></details>
-    <details class="card ld-scope"><summary>문자 설정 <small>${smsReady() ? '<span class="badge done">보낼 준비 됨</span>' : '<span class="badge idle">아직 준비 안 됨</span>'} ${smsCfg.provider === 'sens' ? '네이버 클라우드 SENS' : '핵클 메시지'}</small></summary>
+    <details class="card ld-scope"><summary>문자 설정 <small>${smsReady() ? '<span class="badge done">보낼 준비 됨</span>' : '<span class="badge idle">아직 준비 안 됨</span>'} ${{ solapi: '솔라피', sens: '네이버 클라우드 SENS', hackle: '핵클 메시지' }[smsCfg.provider] || '솔라피'}</small></summary>
       <form class="ld-form ld-cfg" id="ld-cfg">
         <div class="ld-cfg-grid">
-          <label class="field"><span>보내는 곳</span><select class="input" name="provider"><option value="hackle"${smsCfg.provider !== 'sens' ? ' selected' : ''}>핵클 메시지 (080 무료)</option><option value="sens"${smsCfg.provider === 'sens' ? ' selected' : ''}>네이버 클라우드 SENS</option></select></label>
+          <label class="field"><span>보내는 곳</span><select class="input" name="provider">${[['solapi', '솔라피 (080 무료 · 고정 IP 필요 없음)'], ['sens', '네이버 클라우드 SENS (080 월 29,000원)'], ['hackle', '핵클 메시지 (허용 IP 필수 — xim 에서는 안 됨)']].map(([v, l]) => `<option value="${v}"${smsCfg.provider === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+          <label class="field" data-p="solapi"><span>솔라피 API Key <small>솔라피 › 개발/연동 › API Key 관리</small></span><input class="input" name="sak" placeholder="${smsCfg.provider === 'solapi' && smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : 'NCS…'}" autocomplete="off" spellcheck="false"></label>
+          <label class="field" data-p="solapi"><span>솔라피 API Secret</span><input class="input" type="password" name="sas" placeholder="${smsCfg.provider === 'solapi' && smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : 'API Secret'}" autocomplete="new-password" spellcheck="false"></label>
           <label class="field" data-p="hackle"><span>핵클 API 키 <small>핵클 › API 발송</small></span><input class="input" type="password" name="hk" placeholder="${smsCfg.provider !== 'sens' && smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : '핵클 API 키'}" autocomplete="new-password" spellcheck="false"></label>
           <label class="field" data-p="sens"><span>서비스 ID <small>SENS › Project 의 SMS 서비스 ID</small></span><input class="input" name="serviceId" value="${esc(smsCfg.serviceId)}" placeholder="ncp:sms:kr:000000000000:xim" autocomplete="off"></label>
           <label class="field"><span>발신번호 <small>SENS 에 등록 · 승인된 번호</small></span><input class="input" name="from" value="${esc(smsCfg.from)}" placeholder="010-0000-0000" inputmode="tel"></label>
-          <label class="field"><span>무료 수신거부 번호 <small>광고 문자 끝에 붙음 — 080</small></span><input class="input" name="optout" value="${esc(smsCfg.optout)}" placeholder="080-000-0000" inputmode="tel"></label>
+          <label class="field"><span>무료 수신거부 번호 <small>광고 문자 끝에 붙음 — 솔라피는 비워 두면 공용 080-500-4233</small></span><input class="input" name="optout" value="${esc(smsCfg.optout)}" placeholder="${smsCfg.provider === 'solapi' ? '080-500-4233 (솔라피 공용, 무료)' : '080-000-0000'}" inputmode="tel"></label>
           <label class="field"><span>장문(LMS) 제목</span><input class="input" name="subject" value="${esc(smsCfg.subject)}" placeholder="안내" maxlength="40"></label>
           <label class="field" data-p="sens"><span>Access Key ID <small>네이버 클라우드 › Sub Account › xim-sms › Access Key</small></span><input class="input" name="ak" placeholder="${smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : 'ncp_iam_BPA…'}" autocomplete="off" spellcheck="false"></label>
           <label class="field" data-p="sens"><span>Secret Key <small>같은 줄의 [보기]</small></span><input class="input" type="password" name="sk" placeholder="${smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : 'ncp_iam_BPK…'}" autocomplete="new-password" spellcheck="false"></label>
@@ -128,7 +130,7 @@ export async function renderLeads(d) {
     e.preventDefault();
     const f = e.currentTarget;
     busy(f.querySelector('[type=submit]'), null, async () => {
-      await api('/leads/sms-cfg', { method: 'PUT', data: { provider: f.provider.value, serviceId: f.serviceId.value, from: f.from.value, optout: f.optout.value, subject: f.subject.value, ak: f.ak.value.trim(), sk: f.sk.value.trim(), hk: f.hk.value.trim() } });
+      await api('/leads/sms-cfg', { method: 'PUT', data: { provider: f.provider.value, serviceId: f.serviceId.value, from: f.from.value, optout: f.optout.value, subject: f.subject.value, ak: f.ak.value.trim(), sk: f.sk.value.trim(), hk: f.hk.value.trim(), sak: f.sak.value.trim(), sas: f.sas.value.trim() } });
       toast('문자 설정을 저장했습니다.');
       await renderLeads(deps);
     });
