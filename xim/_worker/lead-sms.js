@@ -6,7 +6,10 @@
 const SENS = 'https://sens.apigw.ntruss.com';
 export const SMS_MAX = 80;      // SENS SMS 최대 바이트(EUC-KR 기준 — 한글 2 · 그 밖 1)
 export const LMS_MAX = 2000;
-export const PRICE = { SMS: 9, LMS: 30 };   // 원(부가세 별도), 2026-11-27 네이버 클라우드 요금표
+// 원(부가세 별도). sens = 네이버 클라우드 요금표(2026-11-27), hackle = 핵클 문서 프로모션가(첫 충전 한 달은 SMS 7.3 · LMS 23.7)
+export const PRICES = { sens: { SMS: 9, LMS: 30 }, hackle: { SMS: 10, LMS: 33 } };
+export const providerOf = (cfg) => (cfg.provider === 'sens' ? 'sens' : 'hackle');
+export const PRICE = PRICES.sens;
 
 export const bytes = (s) => { let n = 0; for (const ch of String(s)) n += ch.charCodeAt(0) > 127 ? 2 : 1; return n; };
 const digits = (s) => String(s || '').replace(/\D/g, '');
@@ -57,16 +60,28 @@ async function sensSend(env, cfg, type, ad, msgs) {
 
 // 키: Worker 비밀값(NCP_ACCESS_KEY · NCP_SECRET_KEY)이 있으면 그것, 없으면 xim 문자 설정에서 넣은 값(settings.lead_sms_cfg — 화면에는 다시 보여 주지 않음)
 export const keyOf = (env, cfg) => ({ ak: env.NCP_ACCESS_KEY || cfg.ak || '', sk: env.NCP_SECRET_KEY || cfg.sk || '' });
-export const cfgReady = (env, cfg) => ({
-  keys: !!(keyOf(env, cfg).ak && keyOf(env, cfg).sk),
-  service: !!cfg.serviceId, from: !!digits(cfg.from), optout: !!digits(cfg.optout),
-});
+export const hackleKey = (env, cfg) => env.HACKLE_API_KEY || cfg.hk || '';
+export const cfgReady = (env, cfg) => providerOf(cfg) === 'hackle'
+  ? { keys: !!hackleKey(env, cfg), service: true, from: !!digits(cfg.from), optout: !!digits(cfg.optout) }
+  : { keys: !!(keyOf(env, cfg).ak && keyOf(env, cfg).sk), service: !!cfg.serviceId, from: !!digits(cfg.from), optout: !!digits(cfg.optout) };
+
+// 핵클 메시지 API — 한 요청에 받는 사람 1명(https://hackle.gitbook.io/hackle-docs/api/text-message.md)
+async function hackleSend(env, cfg, type, ad, m) {
+  const res = await fetch('https://message-api.hackle.io/v1/messages/text/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-HACKLE-API-KEY': hackleKey(env, cfg), 'X-IDEMPOTENCY-KEY': `xim-${m.id}-${m.stamp}` },
+    body: JSON.stringify({ messageType: type, sender: digits(cfg.from), recipient: digits(m.phone), body: m.content, ...(type === 'LMS' ? { title: cfg.subject || '안내' } : {}), isAd: !!ad }),
+  });
+  const j = await res.json().catch(() => ({}));
+  return { ok: res.ok, requestId: j.messageId || j.id || j.data?.messageId || '', error: j.message || j.code || j.error?.message || `HTTP ${res.status}` };
+}
 
 // leads = [{id, name, phone, consent}] — 동의 · 번호 없는 곳은 빼고, 나머지를 보낸 뒤 줄마다 결과
 export async function sendLeads(env, cfg, leads, { text, ad }) {
   const r = cfgReady(env, cfg);
-  if (!r.keys) throw new Error('네이버 클라우드 API 키가 아직 없습니다. 문자 설정에 넣어 주세요.');
-  if (!r.service || !r.from) throw new Error('문자 설정(서비스 ID · 발신번호)을 먼저 넣어 주세요.');
+  const hk = providerOf(cfg) === 'hackle';
+  if (!r.keys) throw new Error(`${hk ? '핵클' : '네이버 클라우드'} API 키가 아직 없습니다. 문자 설정에 넣어 주세요.`);
+  if (!r.service || !r.from) throw new Error('문자 설정(발신번호)을 먼저 넣어 주세요.');
   if (ad && !r.optout) throw new Error('광고 문자에는 무료 수신거부 080 번호가 꼭 있어야 합니다. 문자 설정에 넣어 주세요.');
   if (ad && nightBlocked()) throw new Error('광고 문자는 밤 9시부터 아침 8시까지 보낼 수 없습니다(정보통신망법).');
   if (!String(text || '').trim()) throw new Error('문자 내용이 비어 있습니다.');
@@ -79,6 +94,18 @@ export async function sendLeads(env, cfg, leads, { text, ad }) {
     groups[kindOf(content)].push({ id: l.id, name: l.name, phone: l.phone, content });
   }
   const results = [];
+  if (hk) {   // 1명씩, 동시에 5개까지
+    const all = [...groups.SMS.map((m) => ({ ...m, type: 'SMS' })), ...groups.LMS.map((m) => ({ ...m, type: 'LMS' }))];
+    const stamp = Date.now(); let next = 0;
+    await Promise.all(Array.from({ length: 5 }, async () => {
+      while (next < all.length) {
+        const m = all[next++];
+        let out; try { out = await hackleSend(env, cfg, m.type, ad, { ...m, stamp }); } catch (e) { out = { ok: false, error: String(e?.message || e) }; }
+        results.push({ ...m, ok: out.ok, requestId: out.requestId || '', error: out.ok ? '' : out.error });
+      }
+    }));
+    return { results, skipped };
+  }
   for (const type of ['SMS', 'LMS']) {
     const g = groups[type];
     for (let i = 0; i < g.length; i += 100) {
