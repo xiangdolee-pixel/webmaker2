@@ -366,6 +366,20 @@ function callScript(it) {
     </ol></details>`;
 }
 
+// 동의받음 → 증거 남기기(사용자 지시 2026-11-28 "이거 중요하네"): 말로 받은 동의는 효력은 있어도 증명이 어렵다
+const ymd = (ms) => { const d = new Date(ms); return `${d.getMonth() + 1}월 ${d.getDate()}일`; };
+const confirmText = (it) => `안녕하세요, 방금 통화드린 홈페이지 제작 자두랩스 박민진입니다. ${ymd(it.consent_at || Date.now())} 통화로 ${it.name} 홈페이지 예시 · 안내 문자 받기에 동의해 주셨습니다. 맞으시면 "네" 라고 답장 부탁드립니다. 원치 않으시면 언제든 "거부" 라고 답장 주시면 바로 보내지 않겠습니다.`;
+function proofBox(it) {
+  const until = it.consent_at ? new Date(it.consent_at + 2 * 365 * 86400000) : null;
+  return `<div class="ld-proof"><b>✅ 동의받음 — 꼭 증거를 남기세요</b> <small>말로 받은 동의도 효력은 있지만, 신고가 들어오면 <b>보낸 사람이 동의를 증명</b>해야 합니다.</small>
+    <ol>
+      <li><b>확인 문자 보내고 답장 받아 두기</b> — 통화 직후 아래 [동의 확인 문자] 로 보내고, 상대가 "네" 라고 답한 문자를 지우지 말고 보관(광고 내용 없이 확인만).</li>
+      <li><b>14일 안에 동의 사실 알리기</b> — 법은 동의를 받으면 14일 안에 "누가 · 언제 동의를 받았는지" 알려 주라고 합니다. 확인 문자에 날짜가 들어 있어 이걸로 같이 됩니다.${it.consent_at ? ` <span class="ld-due">기한: ${ymd(it.consent_at + 14 * 86400000)}</span>` : ''}</li>
+      <li><b>2년마다 다시 확인</b> — 동의를 받은 날부터 2년마다 계속 받을지 다시 물어야 합니다.${until ? ` <span class="ld-due">다음 확인: ${until.getFullYear()}년 ${ymd(until.getTime())}</span>` : ''}</li>
+    </ol>
+    <div class="ld-act"><a class="btn sm primary" data-confirm href="#">동의 확인 문자 (내 폰)</a><small>폰에서 누르면 문자 앱이 열리고, PC 에서 누르면 내용이 복사됩니다.</small></div></div>`;
+}
+
 function detail(it) {
   it = { ...it, ...(full.get(it.id) || {}) };   // 펼칠 때 받은 긴 칸
   const more = it.links ? it.links.split(' ').filter(Boolean) : [];
@@ -381,6 +395,7 @@ function detail(it) {
       </dl>
       ${it.calls?.length ? `<div class="ld-calllog"><b>통화 기록</b><ul>${it.calls.map((c) => `<li><span class="ld-call-dot c-${esc(c.call)}"></span>${esc(CALL[c.call] || '통화함')} <small>${fmtDate(c.created_at)}</small></li>`).join('')}</ul></div>` : ''}
       ${it.phone || it.tel ? callScript(it) : ''}
+      ${it.phone && it.consent > 0 ? proofBox(it) : ''}
       ${it.phone ? `<div class="ld-consent${it.consent > 0 ? ' on' : it.consent < 0 ? ' no' : ''}"><b>문자 받기</b>
         <label class="ld-ck"><input type="checkbox" data-consent="1"${it.consent > 0 ? ' checked' : ''}> 동의함${it.consent > 0 ? ` <small>${fmtDate(it.consent_at)}</small>` : ''}</label>
         <label class="ld-ck"><input type="checkbox" data-consent="-1"${it.consent < 0 ? ' checked' : ''}> 거절함${it.consent < 0 ? ` <small>${fmtDate(it.consent_at)}</small>` : ''}</label>
@@ -407,6 +422,13 @@ function bindDetail(li, it) {
       renderList(); paintPick();
     } catch (e) { toast(e.message); ck.checked = !ck.checked; }
   }; });
+  const cf = li.querySelector('[data-confirm]');
+  if (cf) cf.onclick = (e) => {
+    const body = confirmText(it);
+    cf.href = `sms:${it.phone.replace(/\D/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+    navigator.clipboard?.writeText(body).catch(() => {});
+    if (!matchMedia('(pointer: coarse)').matches) { e.preventDefault(); toast('동의 확인 문자를 복사했습니다 — 폰 문자에 붙여 넣어 보내세요.'); }
+  };
   // 내 폰으로 문자: 폰이면 문자 앱(번호 · 내용 채움), PC 면 내용 복사 — {업체명} 은 이 업체 이름으로
   const mp = li.querySelector('[data-myphone]');
   if (mp) {
