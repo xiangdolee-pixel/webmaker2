@@ -167,6 +167,10 @@ css · js · 그림 · 음성 · 영상 등 **같은 이름의 파일을 다시 
 - "비번 넣어야 볼 수 있게" → 가장자리 Worker 비밀값 `SITE_LOCK`: `printf '<비번>' | node deploy.mjs --wrangler secret put SITE_LOCK --name <사이트>` (끄기: `secret delete`). 비밀번호는 리포(공개)에 두지 않는다. 코드는 `xim/_worker/site-edge.js` `siteLock` — html · 게시판 · 관리 모두 막고, css · 그림 같은 정적 파일은 열려 있다.
 - 리포가 공개라 폴더의 html 원본은 GitHub 에서 그대로 보인다 — 정말 숨길 내용이면 사용자에게 알린다.
 
+## 상담연락 다시시작 (2026-11-27 멈춤, 다른 PC 에서 이어 하기)
+
+- 사용자가 **"상담연락 다시시작해줘"** 라고 하면: 리포 루트에서 `node deploy.mjs --wrangler r2 object get xms-files/leads-work/README.md --file <스크래치>/leads-work/README.md --remote` 로 설명서를 받아 그 순서대로 이어 간다(서울 19개 구 휴대폰 번호 수집 — 진행 파일 · 스크립트가 같은 R2 폴더에 있다). 업체 번호가 들어 있어 이 공개 리포에는 올리지 않는다. 끝나면 이 절을 지운다.
+
 ## 네이버 지도 = xim 공용 지도 iframe (사용자 지시 2026-11-14)
 
 - 고객 사이트에 네이버 지도를 넣을 때 네이버 클라우드 콘솔에 사이트 주소를 등록하지 않는다. 지도 자리에 `<iframe src="https://xim.plators.com/map?addr=주소&name=이름" loading="lazy">` (선택 `&zoom=` `&c=색hex` `&shift=1`). 키(Client ID)는 xim DB settings.naver_map 에서 xim 이 읽는다. 참고: `bsf/js/site.js` 지도 부분.
