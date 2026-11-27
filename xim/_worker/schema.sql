@@ -144,6 +144,8 @@ CREATE TABLE IF NOT EXISTS otp_trust (
 --   ALTER TABLE leads ADD COLUMN consent_at INTEGER NOT NULL DEFAULT 0;
 --   ALTER TABLE leads ADD COLUMN sent_at INTEGER NOT NULL DEFAULT 0;
 --   ALTER TABLE leads ADD COLUMN sent_n INTEGER NOT NULL DEFAULT 0;
+--   ALTER TABLE leads ADD COLUMN call TEXT NOT NULL DEFAULT '';          -- 전화 통화 표시 (2026-11-28)
+--   ALTER TABLE leads ADD COLUMN call_at INTEGER NOT NULL DEFAULT 0;
 
 -- 관리 로그: 운영자가 xim 에서 한 일 (2026-11-04, 1개월 보관 — xms audit_log 와 같은 방식)
 CREATE TABLE IF NOT EXISTS audit_log (
@@ -373,6 +375,8 @@ CREATE TABLE IF NOT EXISTS leads (
   consent_at INTEGER NOT NULL DEFAULT 0,
   sent_at INTEGER NOT NULL DEFAULT 0,     -- 마지막으로 문자 보낸 때
   sent_n INTEGER NOT NULL DEFAULT 0,
+  call TEXT NOT NULL DEFAULT '',         -- 전화 통화: '' 안 함 · ok 통화함 · miss 부재중 · no 거절
+  call_at INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS leads_phone ON leads (phone) WHERE phone != '';

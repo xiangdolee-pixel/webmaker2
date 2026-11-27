@@ -473,7 +473,7 @@ async function ximApi(request, env, url, ctx) {
   // 상담연락 (2026-11-26): 주소를 넣으면 그 페이지(플레이스 · 홈페이지 · 블로그 · 인스타그램)에서 휴대폰 번호를 찾아 쌓는다. 같은 번호는 한 번만
   if (path === '/api/leads' && method === 'GET') {
     // 목록은 가볍게(긴 칸 checked · links · source_url 은 빼고 — 줄을 펼칠 때 /api/leads/<id> 로). full=1 이면 다 (엑셀 받기)
-    const cols = url.searchParams.get('full') ? '*' : 'id, keyword, area, name, category, address, tel, phone, source, place_url, homepage, blog, instagram, memo, done, consent, consent_note, consent_at, sent_at, sent_n, created_at';
+    const cols = url.searchParams.get('full') ? '*' : 'id, keyword, area, name, category, address, tel, phone, source, place_url, homepage, blog, instagram, memo, done, consent, consent_note, consent_at, sent_at, sent_n, call, call_at, created_at';
     const [a, s] = await db.batch([db.prepare(`SELECT ${cols} FROM leads ORDER BY (phone = ''), id LIMIT 8000`), db.prepare('SELECT * FROM lead_scopes ORDER BY checked_at DESC')]);
     const cfg = JSON.parse((await getSetting(db, 'lead_sms_cfg')) || '{}');
     return json({ items: a.results, scopes: s.results, sms: (await getSetting(db, 'lead_sms')) || '',   // scopes = 어디까지 알아봤는지(영역마다 한 줄), sms = 보낼 문자 내용({업체명} 은 업체마다 바뀜)
@@ -564,6 +564,12 @@ async function ximApi(request, env, url, ctx) {
   {
     const lm = path.match(/^\/api\/leads\/(\d+)$/);
     if (lm && method === 'GET') return json({ item: await db.prepare('SELECT * FROM leads WHERE id = ?').bind(+lm[1]).first() });
+    // 전화 통화 표시(사용자 지시 2026-11-28): '' 안 함 · ok 통화함 · miss 부재중 · no 거절
+    if (lm && method === 'PUT' && url.searchParams.get('call') !== null) {
+      const c = ['ok', 'miss', 'no'].includes(url.searchParams.get('call')) ? url.searchParams.get('call') : '';
+      await db.prepare('UPDATE leads SET call = ?, call_at = ? WHERE id = ?').bind(c, c ? now() : 0, +lm[1]).run();
+      return json({ ok: true, call: c, call_at: c ? now() : 0 });
+    }
     if (lm && method === 'PATCH') {
       const b = await body(request);
       await db.prepare('UPDATE leads SET done = ?, memo = ? WHERE id = ?').bind(b.done ? 1 : 0, str(b.memo, 500), +lm[1]).run();

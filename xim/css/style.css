@@ -1306,13 +1306,17 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-item + .ld-item { border-top: 1px solid var(--line); }
 .ld-item.is-done .ld-row { opacity: .6; }
 .ld-item.is-open { background: #fbfbfd; }
-.ld-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) 230px 132px 36px; align-items: center; gap: 12px; min-height: 48px; padding: 4px 8px 4px 12px; }
+.ld-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) 230px 92px 132px 36px; align-items: center; gap: 12px; min-height: 48px; padding: 4px 8px 4px 12px; }
 .ld-chk { display: grid; place-items: center; width: 24px; height: 40px; cursor: pointer; }
 .ld-chk input { width: 18px; height: 18px; margin: 0; accent-color: var(--brand); cursor: pointer; }
 .ld-name { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 40px; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .ld-area { flex: none; min-width: 96px; padding: 3px 8px; border-radius: 6px; background: var(--bg); color: var(--sub); font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; }
 .ld-name b { overflow: hidden; font-size: 15.5px; text-overflow: ellipsis; white-space: nowrap; }
 .ld-phone { color: var(--brand); font-size: 16px; font-weight: 700; text-decoration: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ld-call { min-height: 32px; padding: 0 6px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--sub); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.ld-call.c-ok { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); }
+.ld-call.c-miss { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.ld-call.c-no { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
 .ld-pcell { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ld-src { flex: none; padding: 2px 7px; border-radius: 6px; background: var(--bg); color: var(--sub); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .ld-src.s-homepage { background: #e8f1ff; color: #1d4f9c; }
@@ -1345,7 +1349,8 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
   .ld-f .iq-tabs { display: flex; flex: 1; min-width: 0; }
   .ld-f .iq-tabs > button { flex: 1; min-width: 0; padding: 0 4px; font-size: 13px; }
   .ld-scope > summary small { display: block; margin: 2px 0 0; }
-  .ld-row { grid-template-columns: 22px auto minmax(0, 1fr) 32px; grid-template-areas: "chk name name more" "chk phone links more"; gap: 0 10px; padding: 6px 4px 8px 8px; }
+  .ld-row { grid-template-columns: 22px auto minmax(0, 1fr) 32px; grid-template-areas: "chk name name more" "chk phone links more" "chk call call more"; gap: 0 10px; padding: 6px 4px 8px 8px; }
+  .ld-call { grid-area: call; justify-self: start; margin-top: 4px; }
   .ld-chk { grid-area: chk; width: 22px; }
   .ld-name { grid-area: name; min-height: 30px; }
   .ld-area { min-width: 0; padding: 2px 6px; font-size: 12px; }
