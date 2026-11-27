@@ -5,8 +5,8 @@ import { $, esc, toast, busy, fmtDate, pillTabs, slideTabs, openDialog } from '.
 
 let deps = null;   // { view, api }
 let filter = '';   // '' 전체 · 'has' 번호 있음 · 'none' 번호 없음 · 'done' 연락함
-let callF = '';    // 통화: '' 전체 · '-' 안 함 · ok 통화함 · miss 부재중 · no 거절
-const CALL = { '': '통화 전', ok: '통화함', miss: '부재중', no: '거절' };
+let callF = '';    // 통화: '' 전체 · '-' 통화 전 · yes 동의받음 · no 거절 · miss 부재중
+const CALL = { '': '통화 전', yes: '통화 · 동의받음', no: '통화 · 거절', miss: '부재중' };   // ok = 예전 '통화함'(남아 있으면 그대로 보임)
 let q = '';
 let sido = '';     // '' 모든 시 · 도 · '서울시'
 let gu = '';       // '' 모든 구 · '노원구'
@@ -140,7 +140,7 @@ export async function renderLeads(d) {
   pillTabs($('#ld-sido'), [['', `전체 ${items.length}`], ...uniq(items.map(sidoOf)).map((v) => [v, `${v} ${count((i) => sidoOf(i) === v)}`])], sido, (v) => { sido = v; gu = ''; paintGu(); update(); });
   paintGu();
   for (const [k] of LINKS) pillTabs($(`#ld-f-${k}`), [['', '전체'], ['y', '있음'], ['n', '없음']], link[k], (v) => { link[k] = v; update(); });
-  pillTabs($('#ld-f-call'), [['', '전체'], ['-', '통화 전'], ['ok', '통화함'], ['miss', '부재중'], ['no', '거절']], callF, (v) => { callF = v; update(); });
+  pillTabs($('#ld-f-call'), [['', '전체'], ['-', '통화 전'], ['yes', '동의받음'], ['no', '거절'], ['miss', '부재중']], callF, (v) => { callF = v; update(); });
   pillTabs($('#ld-tabs'), [['', '전체'], ['has', '번호 있음'], ['none', '번호 없음'], ['done', '연락함']], filter, (v) => { filter = v; update(); });
   update();
   $('#ld-q').oninput = (e) => { q = e.target.value; update(); };
@@ -272,7 +272,7 @@ function paintCounts() {
   const mine = area.filter((i) => linkOk(i) && textOk(i));
   const has = mine.filter((i) => i.phone).length;
   { const base = area.filter((i) => phoneOk(i) && linkOk(i) && textOk(i)); const c = (v) => base.filter((i) => (v === '-' ? !i.call : i.call === v)).length;
-    relabel($('#ld-f-call'), { '': `전체 ${base.length}`, '-': `통화 전 ${c('-')}`, ok: `통화함 ${c('ok')}`, miss: `부재중 ${c('miss')}`, no: `거절 ${c('no')}` }); }
+    relabel($('#ld-f-call'), { '': `전체 ${base.length}`, '-': `통화 전 ${c('-')}`, yes: `동의받음 ${c('yes')}`, no: `거절 ${c('no')}`, miss: `부재중 ${c('miss')}` }); }
   relabel($('#ld-tabs'), { '': `전체 ${mine.length}`, has: `번호 있음 ${has}`, none: `번호 없음 ${mine.length - has}`, done: `연락함 ${mine.filter((i) => i.done).length}` });
   for (const [k] of LINKS) {
     const base = area.filter((i) => phoneOk(i) && linkOk(i, k) && textOk(i));
@@ -309,7 +309,7 @@ function renderList() {
           ${it.phone ? `<label class="ld-chk"><input type="checkbox" data-pick${picked.has(it.id) ? ' checked' : ''} aria-label="${esc(it.name)} 고르기"></label>` : '<span class="ld-chk"></span>'}
           <button type="button" class="ld-name" data-toggle aria-expanded="${open.has(it.id)}"><span class="ld-area">${esc(regionOf(it))}</span><b>${esc(it.name)}</b>${it.consent > 0 ? '<span class="badge done">문자 동의</span>' : it.consent < 0 ? '<span class="badge ld-no">문자 거절</span>' : ''}${it.sent_n ? `<span class="badge idle">문자 ${it.sent_n}</span>` : ''}${it.done ? '<span class="badge done">연락함</span>' : ''}</button>
           ${it.phone ? `<span class="ld-pcell"><a class="ld-phone" href="tel:${esc(it.phone)}">${esc(it.phone)}</a><small class="ld-src s-${esc(it.source)}" title="이 번호를 찾은 곳">${esc(SRC_SHORT[it.source] || it.source || '?')}</small></span>` : '<span class="ld-phone none">번호 없음</span>'}
-          ${it.phone || it.tel ? `<select class="ld-call c-${it.call || 'none'}" data-call aria-label="${esc(it.name)} 통화 표시">${Object.entries(CALL).map(([v, l]) => `<option value="${v}"${(it.call || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select>` : '<span></span>'}
+          ${it.phone || it.tel ? `<select class="ld-call c-${it.call || 'none'}" data-call aria-label="${esc(it.name)} 통화 표시">${Object.entries(it.call === 'ok' ? { ...CALL, ok: '통화함' } : CALL).map(([v, l]) => `<option value="${v}"${(it.call || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select>` : '<span></span>'}
           <span class="ld-links">${it.homepage ? ext(it.homepage, '홈') : ''}${it.blog ? ext(it.blog, '블') : ''}${it.instagram ? ext(it.instagram, '인스타') : ''}</span>
           <button type="button" class="ld-more" data-toggle aria-label="자세히"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         </div>
@@ -327,7 +327,7 @@ function renderList() {
     }; });
     const cs = li.querySelector('[data-call]');
     if (cs) cs.onchange = async () => {
-      try { const r = await deps.api(`/leads/${it.id}?call=${encodeURIComponent(cs.value)}`, { method: 'PUT', data: {} }); it.call = r.call; it.call_at = r.call_at; cs.className = `ld-call c-${it.call || 'none'}`; paintCounts(); toast(`${it.name} — ${CALL[it.call || '']}`); }
+      try { const r = await deps.api(`/leads/${it.id}?call=${encodeURIComponent(cs.value)}`, { method: 'PUT', data: {} }); Object.assign(it, r); toast(`${it.name} — ${CALL[it.call || ''] || '통화함'}`); renderList(); paintCounts(); paintPick(); }
       catch (e) { toast(e.message); cs.value = it.call || ''; }
     };
     const pk = li.querySelector('[data-pick]'); if (pk) pk.onchange = () => { if (pk.checked) picked.add(it.id); else picked.delete(it.id); paintPick(); };
