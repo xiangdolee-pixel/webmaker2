@@ -337,8 +337,9 @@ function renderList() {
 
 // 번호를 어디서 알았는지(전화 첫마디용)
 const SRC_SHORT = { map: '카카오맵', place: '네이버 지도', homepage: '홈페이지', blog: '블로그', instagram: '인스타그램', manual: '직접 넣음' };
+// 전화 첫마디에 쓰는 말 — 업체 이름은 앞에서 이미 불렀으니 짧게("센터 블로그")
 function srcLabel(it) {
-  return `${it.name} ${SRC_SHORT[it.source] && it.source !== 'manual' ? SRC_SHORT[it.source] : '지도'}`;
+  return { map: '카카오맵', place: '네이버 지도', homepage: '센터 홈페이지', blog: '센터 블로그', instagram: '센터 인스타그램' }[it.source] || '지도';
 }
 
 // 전화 멘트(사용자 지시 2026-11-28 "뭐라고 말하면 저쪽에서 필요하다고 말하게 될지") — 그 업체 상황(홈페이지 · 블로그 · 인스타 있음/없음)에 맞춰
