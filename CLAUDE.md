@@ -162,6 +162,11 @@ css · js · 그림 · 음성 · 영상 등 **같은 이름의 파일을 다시 
 - xim 사이트 줄의 **봇 차단** 스위치를 켠 사이트는 구글 · 네이버 등 검색엔진, AI 수집, 카카오톡 같은 링크 미리보기, 수집 프로그램이 **아무것도 가져가지 못한다**(봇 403 · robots.txt 전체 금지 · sitemap/rss 없음 · html 에 noindex 헤더). 코드는 `xim/_worker/site-worker.js` `botGuard`(가장자리 · 본체가 같이 씀), 값은 xim DB `sites.no_bots`.
 - 사람 요청은 xim 에 더 묻지 않는다(봇으로 보일 때 · robots.txt 일 때만) — 속도 규칙 그대로. 새 공개 주소(피드 · 내보내기 등)를 만들면 켠 사이트에서 봇에게 새지 않는지 같이 본다.
 
+## 비밀번호 잠금 (사용자 지시 2026-11-27, re)
+
+- "비번 넣어야 볼 수 있게" → 가장자리 Worker 비밀값 `SITE_LOCK`: `printf '<비번>' | node deploy.mjs --wrangler secret put SITE_LOCK --name <사이트>` (끄기: `secret delete`). 비밀번호는 리포(공개)에 두지 않는다. 코드는 `xim/_worker/site-edge.js` `siteLock` — html · 게시판 · 관리 모두 막고, css · 그림 같은 정적 파일은 열려 있다.
+- 리포가 공개라 폴더의 html 원본은 GitHub 에서 그대로 보인다 — 정말 숨길 내용이면 사용자에게 알린다.
+
 ## 네이버 지도 = xim 공용 지도 iframe (사용자 지시 2026-11-14)
 
 - 고객 사이트에 네이버 지도를 넣을 때 네이버 클라우드 콘솔에 사이트 주소를 등록하지 않는다. 지도 자리에 `<iframe src="https://xim.plators.com/map?addr=주소&name=이름" loading="lazy">` (선택 `&zoom=` `&c=색hex` `&shift=1`). 키(Client ID)는 xim DB settings.naver_map 에서 xim 이 읽는다. 참고: `bsf/js/site.js` 지도 부분.

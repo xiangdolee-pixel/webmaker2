@@ -17,6 +17,8 @@ export default {
     // 봇 차단을 켠 사이트(xim 스위치): 봇은 여기서 바로 403 — 캐시에 있는 페이지도 주지 않는다
     const guard = await botGuard(request, env);
     if (guard) return guard;
+    // 비밀번호 잠금 (2026-11-27, re): 가장자리 Worker 비밀값 SITE_LOCK 이 있으면 비밀번호를 넣은 사람만 — 캐시에 있는 페이지보다 먼저
+    if (env.SITE_LOCK) { const locked = await siteLock(request, env); if (locked) return locked; }
     const url = new URL(request.url);
     const p = url.pathname;
     const cookie = request.headers.get('Cookie') || '';
@@ -65,6 +67,49 @@ export default {
     return countVisit(request, env, ctx, res);   // 방문 통계 · 첫 방문 쿠키는 그대로(기다리지 않음)
   },
 };
+
+// ───────── 비밀번호 잠금 ─────────
+//   켜기: npx wrangler secret put SITE_LOCK --name <사이트> (node deploy.mjs --wrangler …) — 비밀번호는 리포(공개)에 두지 않는다. 끄기: secret delete.
+//   맞으면 30일 쿠키(비밀번호 · 주소로 만든 값, 비밀번호를 바꾸면 모두 다시 물음). 틀리면 IP 마다 10분에 10번까지.
+//   정적 파일(css · 그림)은 Worker 를 거치지 않아 열려 있다 — 내용은 html 에만 둔다.
+const LOCK_COOKIE = 'xim_lock';
+async function lockToken(env, host) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`xim-lock|${host}|${env.SITE_LOCK}`));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+async function siteLock(request, env) {
+  const url = new URL(request.url);
+  if (url.pathname === '/robots.txt') return new Response('User-agent: *\nDisallow: /\n', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  const token = await lockToken(env, url.host);
+  const cookie = request.headers.get('Cookie') || '';
+  if (cookie.split(/;\s*/).includes(`${LOCK_COOKIE}=${token}`)) return null;
+  if (request.method === 'POST' && url.pathname === '/__unlock') {
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    const key = new Request(`https://edge-lock.xim/${url.host}/${encodeURIComponent(ip)}`);
+    const tries = +(await (await caches.default.match(key).catch(() => null))?.text() || 0);
+    if (tries >= 10) return lockPage('잠시 뒤에 다시 해 주세요. (10분)', 429);
+    const form = await request.formData().catch(() => null);
+    const pw = String(form?.get('pw') || '');
+    let next = String(form?.get('next') || '/');
+    if (!next.startsWith('/') || next.startsWith('//')) next = '/';
+    if (pw && pw === String(env.SITE_LOCK)) {
+      return new Response(null, { status: 303, headers: { Location: next, 'Cache-Control': 'no-store', 'Set-Cookie': `${LOCK_COOKIE}=${token}; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax` } });
+    }
+    await caches.default.put(key, new Response(String(tries + 1), { headers: { 'Cache-Control': 'public, max-age=600' } })).catch(() => {});
+    return lockPage('비밀번호가 맞지 않습니다.', 401, next);
+  }
+  if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('잠긴 사이트입니다.', { status: 403, headers: { 'Cache-Control': 'no-store' } });
+  return lockPage('', 401, url.pathname + url.search);
+}
+function lockPage(msg, status, next = '/') {
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  return new Response(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>비밀번호</title>
+<style>*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f3ee;color:#222;font:16px/1.5 Pretendard,system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;padding:24px}
+form{width:100%;max-width:320px;text-align:center}h1{font-size:18px;font-weight:600;margin:0 0 20px}input{width:100%;height:52px;border:1px solid #ccc8bd;border-radius:12px;padding:0 16px;font:inherit;font-size:20px;letter-spacing:.3em;text-align:center;background:#fff}
+input:focus-visible,button:focus-visible{outline:2px solid #222;outline-offset:2px}button{width:100%;height:50px;margin-top:10px;border:0;border-radius:12px;background:#222;color:#fff;font:inherit;font-weight:600;cursor:pointer}p{color:#b3261e;font-size:14px;margin:12px 0 0;min-height:21px}</style></head>
+<body><form method="post" action="/__unlock"><h1>비밀번호를 넣어 주세요</h1><input type="password" name="pw" inputmode="numeric" autocomplete="current-password" aria-label="비밀번호" autofocus required><input type="hidden" name="next" value="${esc(next)}"><button type="submit">보기</button><p role="alert">${esc(msg)}</p></form></body></html>`,
+  { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' } });
+}
 
 // Early Hints (2026-11-14): html 의 <head> 에서 렌더를 막는 CSS · 미리 연결할 곳 · 먼저 받을 그림을 Link 헤더로 →
 //   Cloudflare 가 이 헤더를 기억해 다음 방문 때 페이지를 만들기도 전에 '103 Early Hints' 로 먼저 알려 준다(브라우저가 그동안 연결 · CSS 받기 시작)
