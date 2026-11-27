@@ -351,10 +351,10 @@ function bindDetail(li, it) {
   // 내 폰으로 문자: 폰이면 문자 앱(번호 · 내용 채움), PC 면 내용 복사 — {업체명} 은 이 업체 이름으로
   const mp = li.querySelector('[data-myphone]');
   if (mp) {
-    const body = (($('#ld-sms')?.value || sms) || '').replace(/\{업체명\}/g, it.name).trim();
     const num = it.phone.replace(/\D/g, '');
-    mp.href = `sms:${num}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
     mp.onclick = (e) => {
+      const body = (($('#ld-sms')?.value || sms) || '').replace(/\{업체명\}/g, it.name).trim();   // 누를 때의 내용으로(고친 뒤에도 맞게)
+      mp.href = `sms:${num}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
       if (!body) { e.preventDefault(); $('#ld-sms').closest('details').open = true; toast('위 "보낼 문자" 에 내용을 먼저 써 주세요.'); return; }
       const touch = matchMedia('(pointer: coarse)').matches;
       navigator.clipboard?.writeText(body).catch(() => {});
