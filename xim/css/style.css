@@ -1375,6 +1375,10 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-sent { flex-basis: 100%; }
 .ld-bytes { margin-right: auto; color: var(--mute); font-size: 13px; }
 .ld-cfg-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+.ld-note { margin: 4px 0 12px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--warn-soft); font-size: 14px; line-height: 1.65; }
+.ld-note > b { color: var(--warn); }
+.ld-note ul { margin: 6px 0 0; padding-left: 18px; color: var(--sub); }
+.ld-note li + li { margin-top: 4px; }
 .ld-ready { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; padding: 0; list-style: none; }
 .ld-ready li { padding: 3px 10px; border-radius: 99px; background: var(--danger-soft); color: var(--danger); font-size: 13px; }
 .ld-ready li::before { content: '✕ '; }

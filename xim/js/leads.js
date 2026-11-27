@@ -78,6 +78,13 @@ export async function renderLeads(d) {
           <label class="field"><span>Access Key ID <small>네이버 클라우드 › Sub Account › xim-sms › Access Key</small></span><input class="input" name="ak" placeholder="${smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : 'ncp_iam_BPA…'}" autocomplete="off" spellcheck="false"></label>
           <label class="field"><span>Secret Key <small>같은 줄의 [보기]</small></span><input class="input" type="password" name="sk" placeholder="${smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : 'ncp_iam_BPK…'}" autocomplete="new-password" spellcheck="false"></label>
         </div>
+        <div class="ld-note"><b>홍보(광고) 문자는 080 수신거부 번호가 있어야 보낼 수 있습니다</b>
+          <ul>
+            <li>정보통신망법 제50조: 광고 문자는 수신 동의를 받았어도 맨 앞 <b>(광고)</b> + <b>무료 수신거부 번호</b>(080)를 넣어야 합니다. 080 없이 보내면 과태료(최대 3천만 원) · 발신번호 차단 위험.</li>
+            <li><b>네이버 클라우드 080</b>: 회선당 <b>월 29,000원</b>(부가세 별도, 수신거부 전화 월 1,000통 포함 · 넘으면 통당 25원). 개통 영업일 3~4일, 중간 해지는 쓴 날만큼만 — 홍보 문자 보낼 때만 며칠 켰다 끄는 방법도 됩니다.</li>
+            <li><b>핵클 메시지</b>: 080 번호를 <b>무료</b>로 줍니다. 대신 한 번 충전할 때 <b>최소 10만 원</b> 이상(SMS 7.3 · LMS 23.7원은 첫 충전 뒤 한 달만).</li>
+            <li>광고가 아닌 문자(문의해 온 곳에 답변 · 요청받은 자료 · 계약 고객 안내)는 080 없이 보낼 수 있습니다 — 보내기 창에서 "광고 문자입니다" 를 끄고 보내기.</li>
+          </ul></div>
         <ul class="ld-ready">${[['keys', 'API 키'], ['service', '서비스 ID'], ['from', '발신번호'], ['optout', '080 수신거부 번호']].map(([k, l]) => `<li class="${smsCfg.ready?.[k] ? 'ok' : ''}">${l}</li>`).join('')}</ul>
         <div class="ld-form-foot ld-sms-foot"><button type="submit" class="btn sm primary">설정 저장</button></div>
       </form></details>
