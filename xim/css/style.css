@@ -1277,6 +1277,10 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-sms > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; list-style: none; }
 .ld-sms > summary::-webkit-details-marker { display: none; }
 .ld-sms > summary .btn { margin-left: auto; }
+.ld-warnbox { margin: 0 0 12px; padding: 12px 14px; border: 2px solid var(--danger); border-radius: var(--radius-sm); background: var(--danger-soft); font-size: 14px; line-height: 1.65; }
+.ld-warnbox > b { color: var(--danger); font-size: 15.5px; }
+.ld-warnbox ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink); }
+.ld-warnbox li + li { margin-top: 4px; }
 .ld-phone-note { margin: 0 0 12px; background: var(--brand-soft); }
 .ld-phone-note > b { color: var(--brand); }
 .ld-sms textarea { min-height: 300px; font-size: 14.5px; line-height: 1.6; }

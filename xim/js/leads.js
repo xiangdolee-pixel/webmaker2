@@ -66,7 +66,14 @@ export async function renderLeads(d) {
       <button type="button" class="btn sm" id="ld-csv">엑셀(CSV) 받기</button></div>
     <div id="ld-scopes"></div>
     <details class="card ld-scope ld-sms"><summary>보낼 문자 <small>눌러서 내용 보기 · 고치기 · <b>{업체명}</b> 은 업체마다 그 이름으로 바뀝니다</small><button type="button" class="btn sm primary" id="ld-sms-copy">문자 복사</button></summary>
-      <div class="ld-form"><div class="ld-note ld-phone-note"><b>내 폰으로 보낼 때 (지금 쓰는 방법 — 2026-11-27)</b>
+      <div class="ld-form"><div class="ld-warnbox"><b>⚠ 절대 그냥 홍보 문자를 보내지 마세요</b>
+          <ul>
+            <li><b>하루 몇 통이어도, 내 폰이어도 똑같이 위반</b>입니다. 홍보(광고) 문자는 ① 받는 사람의 미리 받은 수신 동의 ② 맨 앞 (광고) · 보내는 사람 이름 ③ 무료 수신거부 방법(080)이 모두 있어야 합니다(정보통신망법 제50조).</li>
+            <li><b>신고 한 건이면</b> 받은 사람이 휴대폰 스팸 신고나 118(KISA 불법스팸대응센터)로 신고 → KISA 가 번호 주인 확인 · 자료 제출 요구 → 방송통신위원회 <b>과태료</b>(상한 3천만 원, 첫 위반도 수백만 원대 가능) → 신고가 쌓이면 통신사가 <b>내 휴대폰 문자 발송 차단</b>.</li>
+            <li><b>문자로 보내도 되는 것:</b> 상대가 요청한 자료 · 문의 답변 · 계약 고객 안내(광고 아님). <b>처음 홍보는 전화로</b> 합니다.</li>
+            <li>홍보 문자를 꼭 보내야 하면: 동의 받은 곳에만 + 네이버 080 을 한 달 켜고(문자 설정 안내) + (광고) · 자두랩스 · 무료수신거부 080 넣기. 헷갈리면 118 에 무료로 물어보기.</li>
+          </ul></div>
+        <div class="ld-note ld-phone-note"><b>내 폰으로 보낼 때 (지금 쓰는 방법 — 2026-11-27)</b>
           <ul>
             <li><b>보내는 법:</b> 폰에서 xim 을 열고 업체를 펼쳐 <b>[내 폰으로 문자]</b> → 문자 앱이 번호 · 내용(<b>{업체명}</b> 이 그 업체 이름으로 바뀐 것)까지 채워져 열림 → 보내기. PC 에서 누르면 내용이 복사됩니다. 보낸 뒤 <b>[연락함]</b> 표시.</li>
             <li><b>하루 몇 통:</b> 하루 <b>20~30통 안쪽</b>을 권합니다. 같은 내용을 한꺼번에 많이 보내면 통신사가 스팸으로 보고 막거나, 받은 사람의 스팸 신고가 쌓이면 <b>내 휴대폰 번호 문자 발송이 정지</b>될 수 있습니다(통신사 기준은 공개돼 있지 않음 — 넉넉히 적게).</li>
@@ -353,7 +360,7 @@ function bindDetail(li, it) {
       if (!body) { e.preventDefault(); $('#ld-sms').closest('details').open = true; toast('위 "보낼 문자" 에 내용을 먼저 써 주세요.'); return; }
       const touch = matchMedia('(pointer: coarse)').matches;
       navigator.clipboard?.writeText(body).catch(() => {});
-      if (!touch) { e.preventDefault(); toast(`${it.name} 에 보낼 문자를 복사했습니다 — 폰 문자에 붙여 넣으세요.`); }
+      if (!touch) { e.preventDefault(); toast(`${it.name} 에 보낼 문자를 복사했습니다 — 홍보 내용이면 보내지 마세요(동의 · (광고) · 080 필요).`); }
     };
   }
   const copy = li.querySelector('[data-copy]');
