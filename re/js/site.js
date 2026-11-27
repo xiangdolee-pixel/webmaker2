@@ -67,7 +67,7 @@
       place();
       if (name === 'resume') fit();
     };
-    var fromHash = function () { show(location.hash === '#project' ? 'project' : 'resume'); };
+    var fromHash = function () { show(/^#(project|dev-d+)$/.test(location.hash) ? 'project' : 'resume'); };
     tabs.addEventListener('click', function (e) {
       var a = e.target.closest ? e.target.closest('a[data-tab]') : null;
       if (!a) return;
@@ -131,6 +131,17 @@
     }
     names();
     dev.addEventListener('input', names);
+    // 표의 줄을 누르면 아래 그 프로젝트 설명으로 부드럽게 내려가 잠깐 밝힌다(주소의 #dev-N 은 바꾸지 않음 — 바꾸면 탭이 기본 이력으로 돌아간다)
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    dev.querySelector('.roles-t tbody').addEventListener('click', function (e) {
+      if (d.body.classList.contains('xe-on') || !e.target.closest) return;
+      var tr = e.target.closest('tr'), a = tr && tr.querySelector('a[href^="#dev-"]'), li = a && d.getElementById(a.getAttribute('href').slice(1));
+      if (!li) return;
+      e.preventDefault();
+      li.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+      li.classList.remove('is-hit'); void li.offsetWidth; li.classList.add('is-hit');
+      setTimeout(function () { li.classList.remove('is-hit'); }, 2200);
+    });
     var tip = d.createElement('p');
     tip.className = 'roles-tip'; tip.setAttribute('data-xe-off', '');
     tip.textContent = '수정 모드: 색 점이나 알약(PM · 기획 · 디자인 · 퍼블리싱 · 개발)을 누르면 켜지고 꺼지며 바로 저장됩니다. 글자는 눌러서 고친 뒤 저장을 누르세요.';

@@ -132,7 +132,13 @@ a { color: inherit; text-decoration: none; }
 .roles-t th:last-child, .roles-t td:last-child { padding-right: clamp(10px, 2vw, 22px); }
 .roles-t tbody td:first-child { color: var(--sub); font-variant-numeric: tabular-nums; white-space: nowrap; width: 1%; padding-right: 18px; }
 .roles-t tbody th { font-weight: 600; line-height: 1.4; }
-.roles-t tbody th a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.roles-t tbody tr { cursor: pointer; transition: background-color .2s; }
+.roles-t tbody tr:hover { background: rgba(0, 0, 0, .035); }
+.roles-t tbody tr:hover th a { text-decoration: underline; text-underline-offset: 4px; }
+.xe-on .roles-t tbody tr { cursor: auto; }
+/* 표에서 눌러 내려온 프로젝트: 머리(60px)에 가리지 않게, 잠깐 밝힌다 */
+.row[id^="dev-"] { scroll-margin-top: 76px; transition: background-color .6s, box-shadow .6s; border-radius: 6px; }
+.row.is-hit { background: rgba(214, 196, 150, .28); box-shadow: 0 0 0 14px rgba(214, 196, 150, .28); }
 .roles-t tbody th em { display: inline-block; margin-left: 8px; padding: 1px 8px; border: 1px solid var(--ink); border-radius: 999px; color: var(--ink); font-style: normal; font-size: 13px; font-weight: 600; vertical-align: 2px; white-space: nowrap; }
 .roles-t tbody td:nth-child(n+3), .roles-t thead th:nth-child(n+3) { width: 68px; }
 .rd { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line); vertical-align: middle; }
