@@ -6,7 +6,8 @@ import { $, esc, toast, busy, fmtDate, pillTabs } from './common.js';
 let deps = null;   // { view, api }
 let filter = '';   // '' 전체 · 'has' 번호 있음 · 'none' 번호 없음 · 'done' 연락함
 let q = '';
-let region = '';   // '' 모든 지역 · '서울 노원구' 처럼 주소 앞 두 마디(시도 + 시군구)
+let sido = '';     // '' 모든 시 · 도 · '서울시'
+let gu = '';       // '' 모든 구 · '노원구'
 let items = [];
 let scopes = [];
 let sms = '';      // 복사해 쓰는 문자 내용(xim settings.lead_sms — 리포에는 두지 않는다)
@@ -14,31 +15,32 @@ let lastScan = null;
 const open = new Set();   // 펼쳐 둔 줄(id)
 
 const SRC = { map: '지도 업체 정보', place: '네이버 플레이스', homepage: '홈페이지', blog: '블로그', instagram: '인스타그램', manual: '직접 넣음' };
-// 지역 = 주소의 시도 + 시군구(예: "서울 노원구"). 모을 때 따로 적지 않아도 주소만 있으면 지역별로 묶인다
-const regionOf = (it) => (it.address || '').split(/\s+/).slice(0, 2).join(' ') || '지역 모름';
-const inRegion = (it) => !region || regionOf(it) === region;
-// 어디까지 알아봤나(lead_scopes.area 예: "노원구")는 고른 지역 이름에 그 말이 들어 있으면 보인다
-const scopeIn = (sc) => !region || region.includes(sc.area) || sc.area.includes(region.split(' ').pop());
+// 지역 = 주소의 첫 두 마디(시 · 도 + 구 · 시 · 군). 모을 때 따로 적지 않아도 주소만 있으면 "서울시 › 노원구" 로 나뉜다
+const SIDO = { 서울: '서울시', 부산: '부산시', 대구: '대구시', 인천: '인천시', 광주: '광주시', 대전: '대전시', 울산: '울산시', 세종: '세종시', 경기: '경기도', 강원: '강원도', 충북: '충청북도', 충남: '충청남도', 전북: '전북', 전남: '전라남도', 경북: '경상북도', 경남: '경상남도', 제주: '제주도' };
+const words = (it) => (it.address || '').trim().split(/\s+/);
+const sidoOf = (it) => { const w = words(it)[0]; return w ? (SIDO[w] || w) : '지역 모름'; };
+const guOf = (it) => words(it)[1] || '';
+const regionOf = (it) => `${sidoOf(it)} ${guOf(it)}`.trim();
+const inRegion = (it) => (!sido || sidoOf(it) === sido) && (!gu || guOf(it) === gu);
+// 어디까지 알아봤나(lead_scopes.area 예: "노원구")는 구를 고르면 그 구 것만
+const scopeIn = (sc) => !gu || sc.area.includes(gu) || gu.includes(sc.area);
+const uniq = (arr) => [...new Set(arr)].sort((a, b) => a.localeCompare(b, 'ko'));
+const count = (fn) => items.filter(fn).length;
+// pillTabs 는 상자에 click 을 붙이므로, 다시 그릴 때는 빈 새 상자로 바꿔 끼운다
+const fresh = (sel) => { const o = $(sel); const n = o.cloneNode(false); o.replaceWith(n); return n; };
 const ext = (url, label, cls = '') => `<a class="${cls}" href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a>`;
 
 export async function renderLeads(d) {
   deps = d;
   const { view, api } = deps;
   ({ items, scopes = [], sms = '' } = await api('/leads'));
-  const regions = [...new Set(items.map(regionOf))].sort((a, b) => a.localeCompare(b, 'ko'));
-  if (region && !regions.includes(region)) region = '';
-  const mineAll = items.filter(inRegion);
-  const has = mineAll.filter((i) => i.phone).length;
-  const scs = scopes.filter(scopeIn);
+  if (sido && !items.some((i) => sidoOf(i) === sido)) { sido = ''; gu = ''; }
+  if (gu && !items.some(inRegion)) gu = '';
   view.innerHTML = `
-    <div class="bar"><h2>상담연락 ${mineAll.length}</h2>
-      <select class="input ld-region" id="ld-region" aria-label="지역"><option value="">모든 지역 ${items.length}</option>${regions.map((r) => `<option value="${esc(r)}"${r === region ? ' selected' : ''}>${esc(r)} ${items.filter((i) => regionOf(i) === r).length}</option>`).join('')}</select>
+    <div class="bar"><h2>상담연락 <span id="ld-count"></span></h2>
       <input class="input search-q ld-q" id="ld-q" type="search" placeholder="이름 · 번호 · 주소 찾기" value="${esc(q)}" aria-label="찾기">
       <button type="button" class="btn sm" id="ld-csv">엑셀(CSV) 받기</button></div>
-    ${scs.length ? `<details class="card ld-scope"><summary>어디까지 알아봤나 <small>${scs.map((s) => `${esc(s.area)} ${items.filter((i) => i.area === s.area && inRegion(i)).length}곳`).join(' · ')}</small></summary>
-      ${scs.map((s) => { const mine = items.filter((i) => i.area === s.area && inRegion(i)); return `<div class="ld-scope-item"><b>${esc(s.area)}</b> <span class="badge idle">${esc(s.source)}</span>
-        <span class="badge done">휴대폰 있음 ${mine.filter((i) => i.phone).length}</span> <span class="badge idle">없음 ${mine.filter((i) => !i.phone).length}</span>
-        <p>${esc(s.note)}</p><small>${fmtDate(s.checked_at)} 확인</small></div>`; }).join('')}</details>` : ''}
+    <div id="ld-scopes"></div>
     <details class="card ld-scope ld-sms"><summary>보낼 문자 <small>눌러서 내용 보기 · 고치기</small><button type="button" class="btn sm primary" id="ld-sms-copy">문자 복사</button></summary>
       <div class="ld-form"><textarea class="input" id="ld-sms" rows="14" maxlength="4000" placeholder="업체에 보낼 문자 내용" aria-label="보낼 문자">${esc(sms)}</textarea>
         <div class="ld-form-foot ld-sms-foot"><button type="button" class="btn sm" id="ld-sms-save">저장</button></div></div></details>
@@ -53,10 +55,13 @@ export async function renderLeads(d) {
         <p class="ld-err" id="ld-err" role="alert"></p>
         <div id="ld-scan"></div>
       </form></details>
+    <div class="ld-region"><span class="ld-region-label">지역</span>
+      <nav class="tabs iq-tabs" id="ld-sido" aria-label="시 · 도"></nav><span class="ld-region-sep" aria-hidden="true">›</span><nav class="tabs iq-tabs" id="ld-gu" aria-label="구"></nav></div>
     <nav class="tabs iq-tabs ld-tabs" id="ld-tabs" aria-label="보기"></nav>
     <div id="ld-body"></div>`;
-  pillTabs($('#ld-tabs'), [['', `전체 ${mineAll.length}`], ['has', `번호 있음 ${has}`], ['none', `번호 없음 ${mineAll.length - has}`], ['done', `연락함 ${mineAll.filter((i) => i.done).length}`]], filter, (v) => { filter = v; renderList(); });
-  $('#ld-region').onchange = (e) => { region = e.target.value; renderLeads(deps); };
+  pillTabs($('#ld-sido'), [['', `전체 ${items.length}`], ...uniq(items.map(sidoOf)).map((v) => [v, `${v} ${count((i) => sidoOf(i) === v)}`])], sido, (v) => { sido = v; gu = ''; paintGu(); paintCounts(); renderList(); });
+  paintGu();
+  paintCounts();
   $('#ld-q').oninput = (e) => { q = e.target.value; renderList(); };
   $('#ld-csv').onclick = downloadCsv;
   // 보낼 문자: 접혀 있어도 "문자 복사"는 바로 된다(입력칸에 있는 지금 내용 그대로)
@@ -76,6 +81,26 @@ export async function renderLeads(d) {
   renderList();
 }
 
+// 구 칸: 고른 시 · 도 안의 구만(시 · 도가 "전체"면 모든 구)
+function paintGu() {
+  const inSido = (i) => !sido || sidoOf(i) === sido;
+  const gus = uniq(items.filter(inSido).map(guOf).filter(Boolean));
+  pillTabs(fresh('#ld-gu'), [['', `전체 ${count(inSido)}`], ...gus.map((v) => [v, `${v} ${count((i) => inSido(i) && guOf(i) === v)}`])], gu, (v) => { gu = v; paintCounts(); renderList(); });
+}
+
+// 고른 지역에 맞춰 제목 숫자 · 어디까지 알아봤나 · 보기 탭 숫자
+function paintCounts() {
+  const mine = items.filter(inRegion);
+  const has = mine.filter((i) => i.phone).length;
+  $('#ld-count').textContent = mine.length;
+  const scs = scopes.filter(scopeIn);
+  $('#ld-scopes').innerHTML = scs.length ? `<details class="card ld-scope"><summary>어디까지 알아봤나 <small>${scs.map((s) => `${esc(s.area)} ${count((i) => i.area === s.area && inRegion(i))}곳`).join(' · ')}</small></summary>
+      ${scs.map((s) => { const m = items.filter((i) => i.area === s.area && inRegion(i)); return `<div class="ld-scope-item"><b>${esc(s.area)}</b> <span class="badge idle">${esc(s.source)}</span>
+        <span class="badge done">휴대폰 있음 ${m.filter((i) => i.phone).length}</span> <span class="badge idle">없음 ${m.filter((i) => !i.phone).length}</span>
+        <p>${esc(s.note)}</p><small>${fmtDate(s.checked_at)} 확인</small></div>`; }).join('')}</details>` : '';
+  pillTabs(fresh('#ld-tabs'), [['', `전체 ${mine.length}`], ['has', `번호 있음 ${has}`], ['none', `번호 없음 ${mine.length - has}`], ['done', `연락함 ${mine.filter((i) => i.done).length}`]], filter, (v) => { filter = v; renderList(); });
+}
+
 function renderScan() {
   const box = $('#ld-scan'); if (!box || !lastScan) return;
   box.innerHTML = `<ul class="ld-scan">${lastScan.results.map((r) => `
@@ -93,7 +118,8 @@ const shown = () => {
 function renderList() {
   const box = $('#ld-body'); if (!box) return;
   const list = shown();
-  box.innerHTML = list.length ? `<ul class="ld-list card">${list.map((it) => `
+  const groups = uniq(list.map(regionOf)).map((r) => [r, list.filter((it) => regionOf(it) === r)]);
+  box.innerHTML = list.length ? groups.map(([r, rows]) => `<h3 class="ld-group">${esc(r)} <small>${rows.length}곳</small></h3><ul class="ld-list card">${rows.map((it) => `
       <li class="ld-item${it.done ? ' is-done' : ''}${open.has(it.id) ? ' is-open' : ''}" data-id="${it.id}">
         <div class="ld-row">
           <button type="button" class="ld-name" data-toggle aria-expanded="${open.has(it.id)}"><b>${esc(it.name)}</b>${it.done ? '<span class="badge done">연락함</span>' : ''}</button>
@@ -102,7 +128,7 @@ function renderList() {
           <button type="button" class="ld-more" data-toggle aria-label="자세히"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         </div>
         ${open.has(it.id) ? detail(it) : ''}
-      </li>`).join('')}</ul>`
+      </li>`).join('')}</ul>`).join('')
     : `<section class="card item"><p class="meta">${items.length ? '이 보기에는 없습니다.' : '아직 모은 곳이 없습니다.'}</p></section>`;
   box.querySelectorAll('.ld-item').forEach((li) => {
     const it = items.find((x) => x.id === +li.dataset.id);
@@ -154,7 +180,7 @@ function downloadCsv() {
     ...list.map((it) => [it.name, it.category, it.phone, it.tel, it.address, it.homepage, it.blog, it.instagram, it.place_url, it.source_url, it.checked, it.memo, it.done ? '예' : '', regionOf(it), it.area])];
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([`﻿${rows.map((r) => r.map(cell).join(',')).join('\r\n')}`], { type: 'text/csv;charset=utf-8' }));
-  a.download = `상담연락${region ? `-${region.split(' ').pop()}` : ''}.csv`;
+  a.download = `상담연락${gu ? `-${gu}` : sido ? `-${sido}` : ''}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
