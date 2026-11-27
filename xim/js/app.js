@@ -229,6 +229,7 @@ function render() {
     if (tab === 'studio') tasks.push(renderStudio({ view, api, shrinkImage })); else stopStudio();
     if (tab === 'voice') tasks.push(renderVoice({ view, api })); else stopVoice();
     if (tab === 'pc') tasks.push(renderPc({ view, api }));
+    document.querySelector('main.wrap')?.classList.toggle('is-wide', tab === 'leads');   // 상담연락은 좌우 꽉 채움(사용자 지시 2026-11-27 — 지도 · 문자 화면이 넓어야)
     if (tab === 'leads') tasks.push(renderLeads({ view, api }));
     if (tab === 'domains') tasks.push(renderDomains({ view, api })); else stopDomains();
     await Promise.all(tasks);

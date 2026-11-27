@@ -130,6 +130,7 @@ textarea.input { min-height: 120px; resize: vertical; }
 
 /* ── 본문 ── */
 .wrap { width: 100%; max-width: 1600px; margin: 0 auto; padding: 20px clamp(10px, 1.6vw, 24px) 64px; }
+.wrap.is-wide { max-width: none; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 22px; }
 .tile { padding: 14px 16px; }
@@ -1344,7 +1345,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-map-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 12px; }
 .ld-map-head small { color: var(--mute); font-size: 13px; }
 .ld-map-total { margin-left: auto; color: var(--sub); font-size: 14px; font-weight: 700; }
-.ld-map-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: repeat(6, auto); gap: 6px; max-width: 720px; margin: 0 auto; }
+.ld-map-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: repeat(6, auto); gap: 6px; max-width: 880px; margin: 0 auto; }
 .ld-tile { display: grid; justify-items: center; align-content: center; gap: 1px; min-height: 64px; padding: 6px 2px; border: 2px solid transparent; border-radius: 12px; background: var(--bg); color: var(--sub); font: inherit; cursor: pointer; transition: background .2s, color .2s, border-color .2s, transform .2s var(--ease); }
 .ld-tile:hover { transform: translateY(-2px); border-color: var(--brand); }
 .ld-tile-name { font-size: 13px; font-weight: 600; white-space: nowrap; }
