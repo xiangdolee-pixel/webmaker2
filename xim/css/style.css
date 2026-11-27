@@ -1266,9 +1266,6 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-region .iq-tabs { margin-bottom: 0; }
 .ld-region-label { font-size: 14px; font-weight: 700; color: var(--sub); }
 .ld-region-sep { color: var(--mute); font-size: 18px; line-height: 1; }
-.ld-group { display: flex; align-items: baseline; gap: 8px; margin: 18px 0 8px; font-size: 16px; }
-.ld-group:first-child { margin-top: 4px; }
-.ld-group small { color: var(--mute); font-size: 13px; font-weight: 500; }
 .ld-scope { margin-bottom: 10px; padding: 0 16px; }
 .ld-scope > summary { padding: 12px 0; font-weight: 700; cursor: pointer; }
 .ld-scope > summary small { margin-left: 8px; color: var(--mute); font-size: 13px; font-weight: 400; }
@@ -1294,6 +1291,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-item.is-open { background: #fbfbfd; }
 .ld-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px 132px 36px; align-items: center; gap: 12px; min-height: 48px; padding: 4px 8px 4px 16px; }
 .ld-name { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 40px; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.ld-area { flex: none; min-width: 96px; padding: 3px 8px; border-radius: 6px; background: var(--bg); color: var(--sub); font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; }
 .ld-name b { overflow: hidden; font-size: 15.5px; text-overflow: ellipsis; white-space: nowrap; }
 .ld-phone { color: var(--brand); font-size: 16px; font-weight: 700; text-decoration: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ld-phone.none { color: var(--mute); font-size: 14px; font-weight: 400; }
@@ -1320,6 +1318,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
   .ld-scope > summary small { display: block; margin: 2px 0 0; }
   .ld-row { grid-template-columns: auto minmax(0, 1fr) 32px; grid-template-areas: "name name more" "phone links more"; gap: 0 10px; padding: 6px 4px 8px 14px; }
   .ld-name { grid-area: name; min-height: 30px; }
+  .ld-area { min-width: 0; padding: 2px 6px; font-size: 12px; }
   .ld-phone { grid-area: phone; }
   .ld-links { grid-area: links; justify-content: flex-end; flex-wrap: wrap; min-width: 0; }
   .ld-links a { padding: 2px 8px; font-size: 12.5px; }

@@ -118,17 +118,18 @@ const shown = () => {
 function renderList() {
   const box = $('#ld-body'); if (!box) return;
   const list = shown();
-  const groups = uniq(list.map(regionOf)).map((r) => [r, list.filter((it) => regionOf(it) === r)]);
-  box.innerHTML = list.length ? groups.map(([r, rows]) => `<h3 class="ld-group">${esc(r)} <small>${rows.length}곳</small></h3><ul class="ld-list card">${rows.map((it) => `
+  // 같은 지역끼리 붙어 나오게(지역 안에서는 원래 순서 그대로) — 줄마다 업체명 앞에 지역(서울시 노원구)
+  list.sort((a, b) => regionOf(a).localeCompare(regionOf(b), 'ko'));
+  box.innerHTML = list.length ? `<ul class="ld-list card">${list.map((it) => `
       <li class="ld-item${it.done ? ' is-done' : ''}${open.has(it.id) ? ' is-open' : ''}" data-id="${it.id}">
         <div class="ld-row">
-          <button type="button" class="ld-name" data-toggle aria-expanded="${open.has(it.id)}"><b>${esc(it.name)}</b>${it.done ? '<span class="badge done">연락함</span>' : ''}</button>
+          <button type="button" class="ld-name" data-toggle aria-expanded="${open.has(it.id)}"><span class="ld-area">${esc(regionOf(it))}</span><b>${esc(it.name)}</b>${it.done ? '<span class="badge done">연락함</span>' : ''}</button>
           ${it.phone ? `<a class="ld-phone" href="tel:${esc(it.phone)}">${esc(it.phone)}</a>` : '<span class="ld-phone none">번호 없음</span>'}
           <span class="ld-links">${it.homepage ? ext(it.homepage, '홈') : ''}${it.blog ? ext(it.blog, '블') : ''}${it.instagram ? ext(it.instagram, '인스타') : ''}</span>
           <button type="button" class="ld-more" data-toggle aria-label="자세히"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         </div>
         ${open.has(it.id) ? detail(it) : ''}
-      </li>`).join('')}</ul>`).join('')
+      </li>`).join('')}</ul>`
     : `<section class="card item"><p class="meta">${items.length ? '이 보기에는 없습니다.' : '아직 모은 곳이 없습니다.'}</p></section>`;
   box.querySelectorAll('.ld-item').forEach((li) => {
     const it = items.find((x) => x.id === +li.dataset.id);
