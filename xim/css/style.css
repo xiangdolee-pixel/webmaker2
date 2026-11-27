@@ -1277,6 +1277,12 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-sms > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; list-style: none; }
 .ld-sms > summary::-webkit-details-marker { display: none; }
 .ld-sms > summary .btn { margin-left: auto; }
+.ld-rule { margin: 0 0 14px; padding: 18px 20px; border: 3px solid var(--danger); border-radius: var(--radius); background: #fff6f6; }
+.ld-rule h3 { margin: 0 0 10px; color: var(--danger); font-size: clamp(19px, 2vw, 24px); line-height: 1.35; }
+.ld-rule ol { margin: 0; padding-left: 22px; font-size: 15.5px; line-height: 1.7; color: var(--ink); }
+.ld-rule li + li { margin-top: 4px; }
+.ld-script { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--brand-soft); font-size: 14.5px; line-height: 1.6; }
+.ld-script > b:first-child { display: block; margin-bottom: 2px; color: var(--brand); }
 .ld-warnbox { margin: 0 0 12px; padding: 12px 14px; border: 2px solid var(--danger); border-radius: var(--radius-sm); background: var(--danger-soft); font-size: 14px; line-height: 1.65; }
 .ld-warnbox > b { color: var(--danger); font-size: 15.5px; }
 .ld-warnbox ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink); }

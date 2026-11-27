@@ -64,13 +64,22 @@ export async function renderLeads(d) {
     <div class="bar"><h2>상담연락 <span id="ld-count"></span></h2>
       <input class="input search-q ld-q" id="ld-q" type="search" placeholder="이름 · 번호 · 주소 찾기" value="${esc(q)}" aria-label="찾기">
       <button type="button" class="btn sm" id="ld-csv">엑셀(CSV) 받기</button></div>
+    <section class="ld-rule" aria-label="연락 규칙">
+      <h3>📞 먼저 전화 → ✅ 동의 → 그다음에만 ✉ 문자</h3>
+      <ol>
+        <li><b>문자는 통화로 동의를 받은 곳에만</b> 보냅니다. 동의 없이 보내면 하루 한 통이어도 <b>과태료(최대 3천만 원)</b>, 신고가 쌓이면 <b>내 휴대폰 문자 차단</b>.</li>
+        <li><b>전화 첫마디에 연락처를 어디서 알았는지 꼭 밝힙니다.</b> "○○ 보고 연락드렸습니다" — 업체를 펼치면 <b>"전화할 때"</b> 에 그 업체 번호가 나온 곳이 적혀 있습니다.</li>
+        <li>동의를 받으면 업체를 펼쳐 <b>[동의 받음]</b> 에 날짜 · 방법을 남기고, 거절하면 다시 연락하지 않습니다(메모에 "거절").</li>
+        <li>홍보 전화도 정보통신망법이 적용될 수 있습니다 — 확실한 기준은 <b>118</b>(KISA, 무료)에 물어보기.</li>
+      </ol>
+    </section>
     <div id="ld-scopes"></div>
     <details class="card ld-scope ld-sms"><summary>보낼 문자 <small>눌러서 내용 보기 · 고치기 · <b>{업체명}</b> 은 업체마다 그 이름으로 바뀝니다</small><button type="button" class="btn sm primary" id="ld-sms-copy">문자 복사</button></summary>
       <div class="ld-form"><div class="ld-warnbox"><b>⚠ 절대 그냥 홍보 문자를 보내지 마세요</b>
           <ul>
             <li><b>하루 몇 통이어도, 내 폰이어도 똑같이 위반</b>입니다. 홍보(광고) 문자는 ① 받는 사람의 미리 받은 수신 동의 ② 맨 앞 (광고) · 보내는 사람 이름 ③ 무료 수신거부 방법(080)이 모두 있어야 합니다(정보통신망법 제50조).</li>
             <li><b>신고 한 건이면</b> 받은 사람이 휴대폰 스팸 신고나 118(KISA 불법스팸대응센터)로 신고 → KISA 가 번호 주인 확인 · 자료 제출 요구 → 방송통신위원회 <b>과태료</b>(상한 3천만 원, 첫 위반도 수백만 원대 가능) → 신고가 쌓이면 통신사가 <b>내 휴대폰 문자 발송 차단</b>.</li>
-            <li><b>문자로 보내도 되는 것:</b> 상대가 요청한 자료 · 문의 답변 · 계약 고객 안내(광고 아님). <b>처음 홍보는 전화로</b> 합니다.</li>
+            <li><b>문자로 보내도 되는 것:</b> 상대가 요청한 자료 · 문의 답변 · 계약 고객 안내(광고 아님). 처음 연락은 전화로 — 첫마디에 연락처를 어디서 알았는지 밝히기(홍보 전화도 법이 적용될 수 있어 118 확인 권장).</li>
             <li>홍보 문자를 꼭 보내야 하면: 동의 받은 곳에만 + 네이버 080 을 한 달 켜고(문자 설정 안내) + (광고) · 자두랩스 · 무료수신거부 080 넣기. 헷갈리면 118 에 무료로 물어보기.</li>
           </ul></div>
         <div class="ld-note ld-phone-note"><b>내 폰으로 보낼 때 (지금 쓰는 방법 — 2026-11-27)</b>
@@ -314,6 +323,12 @@ function renderList() {
   });
 }
 
+// 번호를 어디서 알았는지(전화 첫마디용)
+function srcLabel(it) {
+  const src = it.source === 'map' || it.source === 'place' ? '지도(카카오맵)' : it.source === 'homepage' ? '홈페이지' : it.source === 'blog' ? '네이버 블로그' : it.source === 'instagram' ? '인스타그램' : '';
+  return src ? `${it.name} ${src}` : `${it.name} 지도(카카오맵)`;
+}
+
 function detail(it) {
   it = { ...it, ...(full.get(it.id) || {}) };   // 펼칠 때 받은 긴 칸
   const more = it.links ? it.links.split(' ').filter(Boolean) : [];
@@ -327,6 +342,7 @@ function detail(it) {
         ${it.checked ? `<div><dt>확인한 것</dt><dd>${esc(it.checked)}</dd></div>` : ''}
         <div><dt>모은 때</dt><dd>${fmtDate(it.created_at)}${it.area ? ` · ${esc(it.area)}` : ''}</dd></div>
       </dl>
+      ${it.phone || it.tel ? `<div class="ld-script"><b>전화할 때 첫마디</b> "안녕하세요, ${esc(it.name)} 맞으시죠? <b>${esc(srcLabel(it))}</b>에 나온 번호를 보고 연락드렸습니다. 홈페이지 제작 관련해서 잠깐 여쭤봐도 될까요?"</div>` : ''}
       ${it.phone ? `<div class="ld-consent${it.consent ? ' on' : ''}"><b>${it.consent ? '수신 동의 받음' : '수신 동의 없음'}</b>
         ${it.consent ? `<small>${esc(it.consent_note)} · ${fmtDate(it.consent_at)}</small><button type="button" class="btn sm" data-consent>동의 취소</button>`
           : '<input class="input" data-consent-note placeholder="어떻게 받았나 (예: 전화 통화)" maxlength="200" aria-label="동의 받은 방법"><button type="button" class="btn sm primary" data-consent>동의 받음</button>'}
