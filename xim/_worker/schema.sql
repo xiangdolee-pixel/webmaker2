@@ -381,6 +381,9 @@ CREATE TABLE IF NOT EXISTS leads (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS leads_phone ON leads (phone) WHERE phone != '';
 -- 어디까지 알아봤나: 영역마다 한 줄(어느 목록 · 몇 곳 · 무엇을 확인했는지)
+-- 상담연락 통화 표시를 바꾼 기록(통화 · 동의받음 / 거절 / 부재중 — 날짜 · 시간)
+CREATE TABLE IF NOT EXISTS lead_call_log (id INTEGER PRIMARY KEY AUTOINCREMENT, lead_id INTEGER NOT NULL, call TEXT NOT NULL, created_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS lead_call_log_lead ON lead_call_log (lead_id);
 -- 상담연락 문자 보낸 기록(네이버 클라우드 SENS)
 CREATE TABLE IF NOT EXISTS lead_sms_log (id INTEGER PRIMARY KEY AUTOINCREMENT, lead_id INTEGER NOT NULL, phone TEXT NOT NULL, type TEXT NOT NULL, ad INTEGER NOT NULL DEFAULT 1, content TEXT NOT NULL, ok INTEGER NOT NULL DEFAULT 0, request_id TEXT NOT NULL DEFAULT '', error TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS lead_sms_log_lead ON lead_sms_log (lead_id);

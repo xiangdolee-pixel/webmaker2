@@ -563,13 +563,14 @@ async function ximApi(request, env, url, ctx) {
   }
   {
     const lm = path.match(/^\/api\/leads\/(\d+)$/);
-    if (lm && method === 'GET') return json({ item: await db.prepare('SELECT * FROM leads WHERE id = ?').bind(+lm[1]).first() });
+    if (lm && method === 'GET') return json({ item: await db.prepare('SELECT * FROM leads WHERE id = ?').bind(+lm[1]).first(), calls: (await db.prepare('SELECT call, created_at FROM lead_call_log WHERE lead_id = ? ORDER BY id DESC LIMIT 50').bind(+lm[1]).all()).results });
     // 전화 통화 표시(사용자 지시 2026-11-28): '' 통화 전 · yes 통화함-동의받음 · no 통화함-거절 · miss 부재중
     //   동의받음 / 거절은 문자 받기 동의(consent 1 / -1)도 같이 — 그때 날짜 · 시간이 찍힌다
     if (lm && method === 'PUT' && url.searchParams.get('call') !== null) {
       const c = ['yes', 'no', 'miss', 'ok'].includes(url.searchParams.get('call')) ? url.searchParams.get('call') : '';
       const t = now();
       await db.prepare('UPDATE leads SET call = ?, call_at = ? WHERE id = ?').bind(c, c ? t : 0, +lm[1]).run();
+      if (c) await db.prepare('INSERT INTO lead_call_log (lead_id, call, created_at) VALUES (?, ?, ?)').bind(+lm[1], c, t).run();   // 바꿀 때마다 기록(통화 전은 남기지 않음)
       if (c === 'yes' || c === 'no') await db.prepare("UPDATE leads SET consent = ?, consent_note = '전화 통화', consent_at = ? WHERE id = ?").bind(c === 'yes' ? 1 : -1, t, +lm[1]).run();
       if (c === 'yes' || c === 'no') await audit(db, request, 'LEAD_CONSENT', `상담연락 #${lm[1]}`, c === 'yes' ? '통화 · 문자 수신 동의' : '통화 · 거절');
       const r = await db.prepare('SELECT call, call_at, consent, consent_at FROM leads WHERE id = ?').bind(+lm[1]).first();

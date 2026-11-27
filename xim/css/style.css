@@ -1322,6 +1322,16 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-call.c-ok, .ld-call.c-yes { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); }
 .ld-call.c-miss { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
 .ld-call.c-no { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
+.ld-callcell { display: grid; gap: 1px; justify-items: start; }
+.ld-callat { color: var(--mute); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ld-calllog { font-size: 14px; }
+.ld-calllog ul { display: grid; gap: 3px; margin: 4px 0 0; padding: 0; list-style: none; }
+.ld-calllog li { display: flex; align-items: center; gap: 6px; }
+.ld-calllog small { color: var(--mute); font-variant-numeric: tabular-nums; }
+.ld-call-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mute); }
+.ld-call-dot.c-yes, .ld-call-dot.c-ok { background: var(--ok); }
+.ld-call-dot.c-no { background: var(--danger); }
+.ld-call-dot.c-miss { background: var(--warn); }
 .ld-pcell { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ld-src { flex: none; padding: 2px 7px; border-radius: 6px; background: var(--bg); color: var(--sub); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .ld-src.s-homepage { background: #e8f1ff; color: #1d4f9c; }
@@ -1355,7 +1365,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
   .ld-f .iq-tabs > button { flex: 1; min-width: 0; padding: 0 4px; font-size: 13px; }
   .ld-scope > summary small { display: block; margin: 2px 0 0; }
   .ld-row { grid-template-columns: 22px auto minmax(0, 1fr) 32px; grid-template-areas: "chk name name more" "chk phone links more" "chk call call more"; gap: 0 10px; padding: 6px 4px 8px 8px; }
-  .ld-call { grid-area: call; justify-self: start; margin-top: 4px; }
+  .ld-callcell { grid-area: call; margin-top: 4px; grid-auto-flow: column; align-items: center; gap: 6px; }
   .ld-chk { grid-area: chk; width: 22px; }
   .ld-name { grid-area: name; min-height: 30px; }
   .ld-area { min-width: 0; padding: 2px 6px; font-size: 12px; }

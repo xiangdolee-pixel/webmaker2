@@ -309,7 +309,7 @@ function renderList() {
           ${it.phone ? `<label class="ld-chk"><input type="checkbox" data-pick${picked.has(it.id) ? ' checked' : ''} aria-label="${esc(it.name)} 고르기"></label>` : '<span class="ld-chk"></span>'}
           <button type="button" class="ld-name" data-toggle aria-expanded="${open.has(it.id)}"><span class="ld-area">${esc(regionOf(it))}</span><b>${esc(it.name)}</b>${it.consent > 0 ? '<span class="badge done">문자 동의</span>' : it.consent < 0 ? '<span class="badge ld-no">문자 거절</span>' : ''}${it.sent_n ? `<span class="badge idle">문자 ${it.sent_n}</span>` : ''}${it.done ? '<span class="badge done">연락함</span>' : ''}</button>
           ${it.phone ? `<span class="ld-pcell"><a class="ld-phone" href="tel:${esc(it.phone)}">${esc(it.phone)}</a><small class="ld-src s-${esc(it.source)}" title="이 번호를 찾은 곳">${esc(SRC_SHORT[it.source] || it.source || '?')}</small></span>` : '<span class="ld-phone none">번호 없음</span>'}
-          ${it.phone || it.tel ? `<select class="ld-call c-${it.call || 'none'}" data-call aria-label="${esc(it.name)} 통화 표시">${Object.entries(it.call === 'ok' ? { ...CALL, ok: '통화함' } : CALL).map(([v, l]) => `<option value="${v}"${(it.call || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select>` : '<span></span>'}
+          ${it.phone || it.tel ? `<span class="ld-callcell"><select class="ld-call c-${it.call || 'none'}" data-call aria-label="${esc(it.name)} 통화 표시">${Object.entries(it.call === 'ok' ? { ...CALL, ok: '통화함' } : CALL).map(([v, l]) => `<option value="${v}"${(it.call || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select>${it.call && it.call_at ? `<small class="ld-callat">${fmtDate(it.call_at).slice(5)}</small>` : ''}</span>` : '<span></span>'}
           <span class="ld-links">${it.homepage ? ext(it.homepage, '홈') : ''}${it.blog ? ext(it.blog, '블') : ''}${it.instagram ? ext(it.instagram, '인스타') : ''}</span>
           <button type="button" class="ld-more" data-toggle aria-label="자세히"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         </div>
@@ -322,12 +322,12 @@ function renderList() {
     li.querySelectorAll('[data-toggle]').forEach((b) => { b.onclick = async () => {
       if (open.has(it.id)) { open.delete(it.id); renderList(); return; }
       open.add(it.id);
-      if (!full.has(it.id)) { try { const r = await deps.api(`/leads/${it.id}`); full.set(it.id, r.item || {}); } catch { full.set(it.id, {}); } }
+      if (!full.has(it.id)) { try { const r = await deps.api(`/leads/${it.id}`); full.set(it.id, { ...(r.item || {}), calls: r.calls || [] }); } catch { full.set(it.id, {}); } }
       renderList();
     }; });
     const cs = li.querySelector('[data-call]');
     if (cs) cs.onchange = async () => {
-      try { const r = await deps.api(`/leads/${it.id}?call=${encodeURIComponent(cs.value)}`, { method: 'PUT', data: {} }); Object.assign(it, r); toast(`${it.name} — ${CALL[it.call || ''] || '통화함'}`); renderList(); paintCounts(); paintPick(); }
+      try { const r = await deps.api(`/leads/${it.id}?call=${encodeURIComponent(cs.value)}`, { method: 'PUT', data: {} }); Object.assign(it, r); const f = full.get(it.id); if (f && r.call) f.calls = [{ call: r.call, created_at: r.call_at }, ...(f.calls || [])]; if (f) Object.assign(f, r); toast(`${it.name} — ${CALL[it.call || ''] || '통화함'}`); renderList(); paintCounts(); paintPick(); }
       catch (e) { toast(e.message); cs.value = it.call || ''; }
     };
     const pk = li.querySelector('[data-pick]'); if (pk) pk.onchange = () => { if (pk.checked) picked.add(it.id); else picked.delete(it.id); paintPick(); };
@@ -379,6 +379,7 @@ function detail(it) {
         ${it.checked ? `<div><dt>확인한 것</dt><dd>${esc(it.checked)}</dd></div>` : ''}
         <div><dt>모은 때</dt><dd>${fmtDate(it.created_at)}${it.area ? ` · ${esc(it.area)}` : ''}</dd></div>
       </dl>
+      ${it.calls?.length ? `<div class="ld-calllog"><b>통화 기록</b><ul>${it.calls.map((c) => `<li><span class="ld-call-dot c-${esc(c.call)}"></span>${esc(CALL[c.call] || '통화함')} <small>${fmtDate(c.created_at)}</small></li>`).join('')}</ul></div>` : ''}
       ${it.phone || it.tel ? callScript(it) : ''}
       ${it.phone ? `<div class="ld-consent${it.consent > 0 ? ' on' : it.consent < 0 ? ' no' : ''}"><b>문자 받기</b>
         <label class="ld-ck"><input type="checkbox" data-consent="1"${it.consent > 0 ? ' checked' : ''}> 동의함${it.consent > 0 ? ` <small>${fmtDate(it.consent_at)}</small>` : ''}</label>
