@@ -171,13 +171,37 @@ export async function serveRobots(env, site, origin) {
   return new Response(robotsTxt(await getSeo(env.DB, site), origin), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=300' } });
 }
 
+// robots.txt 의 'User-agent: *' 묶음 규칙으로 주소 하나를 가져가도 되는지 (구글 방식: 가장 긴 규칙이 이기고, 길이가 같으면 Allow)
+export function robotsAllow(txt) {
+  const rules = [];
+  let mine = false, inAgents = false;
+  for (const raw of String(txt).split(/\r?\n/)) {
+    const m = raw.replace(/#.*/, '').trim().match(/^([a-z-]+)\s*:\s*(.*)$/i);
+    if (!m) continue;
+    const k = m[1].toLowerCase(), v = m[2].trim();
+    if (k === 'user-agent') { if (!inAgents) mine = false; inAgents = true; if (v === '*') mine = true; continue; }
+    inAgents = false;
+    if (!mine || (k !== 'allow' && k !== 'disallow') || !v) continue;
+    const end = v.endsWith('$');
+    const body = (end ? v.slice(0, -1) : v).replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+    rules.push({ allow: k === 'allow', len: v.length, re: new RegExp('^' + body + (end ? '$' : '')) });
+  }
+  return (p) => {
+    let best = null;
+    for (const r of rules) if (r.re.test(p) && (!best || r.len > best.len || (r.len === best.len && r.allow))) best = r;
+    return !best || best.allow;
+  };
+}
+
 // 검색엔진에 알릴 화면 주소: 첫 화면 · 메뉴 · 공개 게시판 · 공개 글 [[경로, 고친 때]]
 async function publicPages(env, site) {
   const db = env.DB;
   const guest = { kind: 'guest', level: 0 };
   const urls = new Map();
-  // robots.txt 기본값이 막는 곳(/member/ · /xms · /admin · /xms-api)은 넣지 않는다 — 넣으면 구글이 '사이트맵 페이지가 robots.txt 에 막힘'으로 알린다
-  const add = (p, t) => { if (!urls.has(p) && !/^\/(member|xms|xms-api|admin)(\/|$)/.test(p)) urls.set(p, t); };
+  // 실제로 나가는 robots.txt(업체가 xms 에서 고친 것 포함)가 막는 주소는 넣지 않는다
+  //   — 넣으면 구글이 '사이트맵의 페이지가 robots.txt 에 의해 차단됨' 메일을 보낸다
+  const ok = robotsAllow((await getSeo(db, site)).robots || defaultRobots());
+  const add = (p, t) => { if (!urls.has(p) && ok(p)) urls.set(p, t); };
   add('/', 0);
   const walk = (items) => items.forEach((m) => {
     if (m.href && !m.external) { const p = m.href.split('#')[0] || '/'; if (p.startsWith('/') && !p.startsWith('//')) add(p, 0); }
