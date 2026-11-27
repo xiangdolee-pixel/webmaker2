@@ -1277,6 +1277,8 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-sms > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; list-style: none; }
 .ld-sms > summary::-webkit-details-marker { display: none; }
 .ld-sms > summary .btn { margin-left: auto; }
+.ld-phone-note { margin: 0 0 12px; background: var(--brand-soft); }
+.ld-phone-note > b { color: var(--brand); }
 .ld-sms textarea { min-height: 300px; font-size: 14.5px; line-height: 1.6; }
 .ld-sms-foot { justify-content: flex-end; margin-top: 8px; }
 .ld-scope-item { padding: 12px 0; border-top: 1px solid var(--line); font-size: 14px; }

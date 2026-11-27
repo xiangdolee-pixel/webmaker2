@@ -66,7 +66,17 @@ export async function renderLeads(d) {
       <button type="button" class="btn sm" id="ld-csv">엑셀(CSV) 받기</button></div>
     <div id="ld-scopes"></div>
     <details class="card ld-scope ld-sms"><summary>보낼 문자 <small>눌러서 내용 보기 · 고치기 · <b>{업체명}</b> 은 업체마다 그 이름으로 바뀝니다</small><button type="button" class="btn sm primary" id="ld-sms-copy">문자 복사</button></summary>
-      <div class="ld-form"><textarea class="input" id="ld-sms" rows="14" maxlength="4000" placeholder="[{업체명}] 원장님 안녕하세요…" aria-label="보낼 문자">${esc(sms)}</textarea>
+      <div class="ld-form"><div class="ld-note ld-phone-note"><b>내 폰으로 보낼 때 (지금 쓰는 방법 — 2026-11-27)</b>
+          <ul>
+            <li><b>보내는 법:</b> 폰에서 xim 을 열고 업체를 펼쳐 <b>[내 폰으로 문자]</b> → 문자 앱이 번호 · 내용(<b>{업체명}</b> 이 그 업체 이름으로 바뀐 것)까지 채워져 열림 → 보내기. PC 에서 누르면 내용이 복사됩니다. 보낸 뒤 <b>[연락함]</b> 표시.</li>
+            <li><b>하루 몇 통:</b> 하루 <b>20~30통 안쪽</b>을 권합니다. 같은 내용을 한꺼번에 많이 보내면 통신사가 스팸으로 보고 막거나, 받은 사람의 스팸 신고가 쌓이면 <b>내 휴대폰 번호 문자 발송이 정지</b>될 수 있습니다(통신사 기준은 공개돼 있지 않음 — 넉넉히 적게).</li>
+            <li><b>먼저 전화:</b> 처음 연락은 전화로. 통화에서 "자료 보내 드려도 될까요?" 동의를 받은 곳에만 보내고, 업체를 펼쳐 <b>[동의 받음]</b> 에 날짜 · 방법을 남깁니다. 말로만 받은 동의는 증거로 약하니 상대가 문자로 "네" 라고 답해 주면 더 좋습니다.</li>
+            <li><b>광고인지 아닌지:</b> 상대가 요청한 자료 · 답변이면 그냥 보내도 됩니다. 홍보 내용(처음 소개 · 할인 안내 등)이면 내 폰이어도 <b>광고 문자</b>라서 맨 앞 <b>(광고)</b>, 보내는 사람 이름, 수신거부 방법을 넣어야 합니다(정보통신망법 제50조).</li>
+            <li><b>시간:</b> 광고 문자는 <b>밤 9시 ~ 아침 8시 금지</b>. 안내 문자도 근무 시간(평일 9~18시)에 보내는 게 좋습니다.</li>
+            <li><b>거절하면 끝:</b> "보내지 마세요" 라고 하면 바로 멈추고, 업체를 펼쳐 동의 취소 + 메모에 "수신거부" 를 적어 둡니다. 다시 보내면 신고 대상입니다.</li>
+            <li><b>내용:</b> 업체 이름이 맞게 들어갔는지 보내기 전에 한 번 확인. 같은 글을 복사해 수십 곳에 보내기보다 업체마다 한 줄이라도 다르게 쓰면 스팸으로 덜 걸립니다.</li>
+          </ul></div>
+        <textarea class="input" id="ld-sms" rows="14" maxlength="4000" placeholder="[{업체명}] 원장님 안녕하세요…" aria-label="보낼 문자">${esc(sms)}</textarea>
         <div class="ld-form-foot ld-sms-foot"><small class="ld-bytes" id="ld-bytes"></small><button type="button" class="btn sm" id="ld-sms-ins">{업체명} 넣기</button><button type="button" class="btn sm" id="ld-sms-save">저장</button></div></div></details>
     <details class="card ld-scope"><summary>문자 설정 <small>${smsReady() ? '<span class="badge done">보낼 준비 됨</span>' : '<span class="badge idle">아직 준비 안 됨</span>'} ${{ solapi: '솔라피', sens: '네이버 클라우드 SENS', hackle: '핵클 메시지' }[smsCfg.provider] || '네이버 클라우드 SENS'}</small></summary>
       <form class="ld-form ld-cfg" id="ld-cfg">
@@ -321,7 +331,7 @@ function detail(it) {
         ${it.sent_at ? `<small class="ld-sent">마지막 문자 ${fmtDate(it.sent_at)} · 모두 ${it.sent_n}번</small>` : ''}</div>` : ''}
       <input class="input ld-memo" type="text" value="${esc(it.memo)}" placeholder="메모" maxlength="500" aria-label="메모">
       <div class="ld-act">
-        ${it.phone ? '<button type="button" class="btn sm" data-copy>번호 복사</button>' : ''}
+        ${it.phone ? '<a class="btn sm primary" data-myphone href="#">내 폰으로 문자</a><button type="button" class="btn sm" data-copy>번호 복사</button>' : ''}
         <button type="button" class="btn sm${it.done ? '' : ' primary'}" data-done>${it.done ? '연락 전으로' : '연락함'}</button>
         <button type="button" class="btn sm danger" data-del>삭제</button>
       </div>
@@ -338,6 +348,19 @@ function bindDetail(li, it) {
     await save({ consent: !it.consent, consent_note: note });
     await renderLeads(deps);
   });
+  // 내 폰으로 문자: 폰이면 문자 앱(번호 · 내용 채움), PC 면 내용 복사 — {업체명} 은 이 업체 이름으로
+  const mp = li.querySelector('[data-myphone]');
+  if (mp) {
+    const body = (($('#ld-sms')?.value || sms) || '').replace(/\{업체명\}/g, it.name).trim();
+    const num = it.phone.replace(/\D/g, '');
+    mp.href = `sms:${num}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+    mp.onclick = (e) => {
+      if (!body) { e.preventDefault(); $('#ld-sms').closest('details').open = true; toast('위 "보낼 문자" 에 내용을 먼저 써 주세요.'); return; }
+      const touch = matchMedia('(pointer: coarse)').matches;
+      navigator.clipboard?.writeText(body).catch(() => {});
+      if (!touch) { e.preventDefault(); toast(`${it.name} 에 보낼 문자를 복사했습니다 — 폰 문자에 붙여 넣으세요.`); }
+    };
+  }
   const copy = li.querySelector('[data-copy]');
   if (copy) copy.onclick = () => navigator.clipboard.writeText(it.phone).then(() => toast('번호를 복사했습니다.'));
   li.querySelector('[data-done]').onclick = (e) => busy(e.currentTarget, null, async () => { await save({ done: !it.done }); await renderLeads(deps); });
