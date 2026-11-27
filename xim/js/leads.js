@@ -1,13 +1,16 @@
 // xim 상담연락 — 지도에 나온 업체와, 그 업체의 홈페이지 · 블로그 · 인스타그램에 공개된 휴대폰 번호 (사용자 지시 2026-11-26)
 //   한 줄 = 업체 하나(이름 · 휴대폰 · 홈 / 블 / 인스타). 누르면 나머지(주소 · 어디까지 확인했는지 · 메모 · 단추)가 펼쳐진다.
 //   주소를 붙여 넣으면 xim 이 그 페이지를 열어 010 번호를 찾아 쌓는다. 같은 번호는 한 번만.
-import { $, esc, toast, busy, fmtDate, pillTabs } from './common.js';
+import { $, esc, toast, busy, fmtDate, pillTabs, slideTabs } from './common.js';
 
 let deps = null;   // { view, api }
 let filter = '';   // '' 전체 · 'has' 번호 있음 · 'none' 번호 없음 · 'done' 연락함
 let q = '';
 let sido = '';     // '' 모든 시 · 도 · '서울시'
 let gu = '';       // '' 모든 구 · '노원구'
+// 홈페이지 · 블로그 · 인스타그램이 있는 곳 / 없는 곳 (사용자 지시 2026-11-27) — 칸마다 '' 상관없음 · 'y' 있음 · 'n' 없음, 여러 칸을 함께 고르면 모두 맞는 곳만
+const LINKS = [['homepage', '홈페이지'], ['blog', '블로그'], ['instagram', '인스타그램']];
+const link = { homepage: '', blog: '', instagram: '' };
 let items = [];
 let scopes = [];
 let sms = '';      // 복사해 쓰는 문자 내용(xim settings.lead_sms — 리포에는 두지 않는다)
@@ -22,6 +25,14 @@ const sidoOf = (it) => { const w = words(it)[0]; return w ? (SIDO[w] || w) : '�
 const guOf = (it) => words(it)[1] || '';
 const regionOf = (it) => `${sidoOf(it)} ${guOf(it)}`.trim();
 const inRegion = (it) => (!sido || sidoOf(it) === sido) && (!gu || guOf(it) === gu);
+const phoneOk = (it) => (filter === 'has' ? !!it.phone : filter === 'none' ? !it.phone : filter === 'done' ? !!it.done : true);
+const linkOk = (it, skip) => LINKS.every(([k]) => k === skip || !link[k] || (link[k] === 'y') === !!it[k]);
+const textOk = (it) => {
+  const k = q.trim().toLowerCase().replace(/-/g, '');
+  return !k || `${it.name} ${it.phone.replace(/-/g, '')} ${it.tel.replace(/-/g, '')} ${it.address} ${it.category} ${it.memo}`.toLowerCase().includes(k);
+};
+// 탭을 다시 그리지 않고 숫자만 바꾼다(고른 칸 배경이 미끄러지는 게 끊기지 않게)
+const relabel = (box, labels) => { if (!box) return; box.querySelectorAll('button[data-v]').forEach((b) => { b.textContent = labels[b.dataset.v]; }); slideTabs(box); };
 // 어디까지 알아봤나(lead_scopes.area 예: "노원구")는 구를 고르면 그 구 것만
 const scopeIn = (sc) => !gu || sc.area.includes(gu) || gu.includes(sc.area);
 const uniq = (arr) => [...new Set(arr)].sort((a, b) => a.localeCompare(b, 'ko'));
@@ -57,12 +68,15 @@ export async function renderLeads(d) {
       </form></details>
     <div class="ld-region"><span class="ld-region-label">지역</span>
       <nav class="tabs iq-tabs" id="ld-sido" aria-label="시 · 도"></nav><span class="ld-region-sep" aria-hidden="true">›</span><nav class="tabs iq-tabs" id="ld-gu" aria-label="구"></nav></div>
+    <div class="ld-filters">${LINKS.map(([k, label]) => `<div class="ld-f"><span class="ld-region-label">${label}</span><nav class="tabs iq-tabs" id="ld-f-${k}" aria-label="${label}"></nav></div>`).join('')}</div>
     <nav class="tabs iq-tabs ld-tabs" id="ld-tabs" aria-label="보기"></nav>
     <div id="ld-body"></div>`;
-  pillTabs($('#ld-sido'), [['', `전체 ${items.length}`], ...uniq(items.map(sidoOf)).map((v) => [v, `${v} ${count((i) => sidoOf(i) === v)}`])], sido, (v) => { sido = v; gu = ''; paintGu(); paintCounts(); renderList(); });
+  pillTabs($('#ld-sido'), [['', `전체 ${items.length}`], ...uniq(items.map(sidoOf)).map((v) => [v, `${v} ${count((i) => sidoOf(i) === v)}`])], sido, (v) => { sido = v; gu = ''; paintGu(); update(); });
   paintGu();
-  paintCounts();
-  $('#ld-q').oninput = (e) => { q = e.target.value; renderList(); };
+  for (const [k] of LINKS) pillTabs($(`#ld-f-${k}`), [['', '전체'], ['y', '있음'], ['n', '없음']], link[k], (v) => { link[k] = v; update(); });
+  pillTabs($('#ld-tabs'), [['', '전체'], ['has', '번호 있음'], ['none', '번호 없음'], ['done', '연락함']], filter, (v) => { filter = v; update(); });
+  update();
+  $('#ld-q').oninput = (e) => { q = e.target.value; update(); };
   $('#ld-csv').onclick = downloadCsv;
   // 보낼 문자: 접혀 있어도 "문자 복사"는 바로 된다(입력칸에 있는 지금 내용 그대로)
   $('#ld-sms-copy').onclick = (e) => { e.preventDefault(); const t = $('#ld-sms').value; if (!t.trim()) return toast('문자 내용이 비어 있습니다.'); navigator.clipboard.writeText(t).then(() => toast('문자를 복사했습니다.')); };
@@ -85,20 +99,29 @@ export async function renderLeads(d) {
 function paintGu() {
   const inSido = (i) => !sido || sidoOf(i) === sido;
   const gus = uniq(items.filter(inSido).map(guOf).filter(Boolean));
-  pillTabs(fresh('#ld-gu'), [['', `전체 ${count(inSido)}`], ...gus.map((v) => [v, `${v} ${count((i) => inSido(i) && guOf(i) === v)}`])], gu, (v) => { gu = v; paintCounts(); renderList(); });
+  pillTabs(fresh('#ld-gu'), [['', `전체 ${count(inSido)}`], ...gus.map((v) => [v, `${v} ${count((i) => inSido(i) && guOf(i) === v)}`])], gu, (v) => { gu = v; update(); });
 }
 
-// 고른 지역에 맞춰 제목 숫자 · 어디까지 알아봤나 · 보기 탭 숫자
+const update = () => { paintCounts(); renderList(); };
+
+// 고른 지역 · 필터에 맞춰 제목 숫자 · 어디까지 알아봤나 · 탭 숫자
 function paintCounts() {
-  const mine = items.filter(inRegion);
+  const area = items.filter(inRegion);
+  // 각 탭의 숫자 = 그 탭만 빼고 나머지 고른 것을 모두 맞춘 곳 중에서
+  const mine = area.filter((i) => linkOk(i) && textOk(i));
   const has = mine.filter((i) => i.phone).length;
-  $('#ld-count').textContent = mine.length;
+  relabel($('#ld-tabs'), { '': `전체 ${mine.length}`, has: `번호 있음 ${has}`, none: `번호 없음 ${mine.length - has}`, done: `연락함 ${mine.filter((i) => i.done).length}` });
+  for (const [k] of LINKS) {
+    const base = area.filter((i) => phoneOk(i) && linkOk(i, k) && textOk(i));
+    const y = base.filter((i) => i[k]).length;
+    relabel($(`#ld-f-${k}`), { '': `전체 ${base.length}`, y: `있음 ${y}`, n: `없음 ${base.length - y}` });
+  }
+  $('#ld-count').textContent = shown().length;
   const scs = scopes.filter(scopeIn);
   $('#ld-scopes').innerHTML = scs.length ? `<details class="card ld-scope"><summary>어디까지 알아봤나 <small>${scs.map((s) => `${esc(s.area)} ${count((i) => i.area === s.area && inRegion(i))}곳`).join(' · ')}</small></summary>
       ${scs.map((s) => { const m = items.filter((i) => i.area === s.area && inRegion(i)); return `<div class="ld-scope-item"><b>${esc(s.area)}</b> <span class="badge idle">${esc(s.source)}</span>
         <span class="badge done">휴대폰 있음 ${m.filter((i) => i.phone).length}</span> <span class="badge idle">없음 ${m.filter((i) => !i.phone).length}</span>
         <p>${esc(s.note)}</p><small>${fmtDate(s.checked_at)} 확인</small></div>`; }).join('')}</details>` : '';
-  pillTabs(fresh('#ld-tabs'), [['', `전체 ${mine.length}`], ['has', `번호 있음 ${has}`], ['none', `번호 없음 ${mine.length - has}`], ['done', `연락함 ${mine.filter((i) => i.done).length}`]], filter, (v) => { filter = v; renderList(); });
 }
 
 function renderScan() {
@@ -109,11 +132,7 @@ function renderScan() {
       ${r.errors.length ? `<small>${esc(r.errors.join(' · '))}</small>` : ''}</li>`).join('')}</ul>`;
 }
 
-const shown = () => {
-  const k = q.trim().toLowerCase().replace(/-/g, '');
-  return items.filter((it) => inRegion(it) && (filter === 'has' ? it.phone : filter === 'none' ? !it.phone : filter === 'done' ? it.done : true)
-    && (!k || `${it.name} ${it.phone.replace(/-/g, '')} ${it.tel.replace(/-/g, '')} ${it.address} ${it.category} ${it.memo}`.toLowerCase().includes(k)));
-};
+const shown = () => items.filter((it) => inRegion(it) && phoneOk(it) && linkOk(it) && textOk(it));
 
 function renderList() {
   const box = $('#ld-body'); if (!box) return;

@@ -1266,6 +1266,10 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-region .iq-tabs { margin-bottom: 0; }
 .ld-region-label { font-size: 14px; font-weight: 700; color: var(--sub); }
 .ld-region-sep { color: var(--mute); font-size: 18px; line-height: 1; }
+.ld-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin-bottom: 12px; }
+.ld-f { display: flex; align-items: center; gap: 8px; }
+.ld-f .iq-tabs { margin-bottom: 0; }
+.ld-f .iq-tabs > button { min-height: 32px; padding: 0 12px; font-size: 13.5px; white-space: nowrap; }
 .ld-scope { margin-bottom: 10px; padding: 0 16px; }
 .ld-scope > summary { padding: 12px 0; font-weight: 700; cursor: pointer; }
 .ld-scope > summary small { margin-left: 8px; color: var(--mute); font-size: 13px; font-weight: 400; }
@@ -1315,6 +1319,10 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
   .ld-q { flex-basis: 100%; max-width: none; }
   .ld-region .iq-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
   .ld-region-label { flex-basis: 100%; }
+  .ld-f { flex-basis: 100%; }
+  .ld-f .ld-region-label { flex: 0 0 72px; }
+  .ld-f .iq-tabs { display: flex; flex: 1; min-width: 0; }
+  .ld-f .iq-tabs > button { flex: 1; min-width: 0; padding: 0 4px; font-size: 13px; }
   .ld-scope > summary small { display: block; margin: 2px 0 0; }
   .ld-row { grid-template-columns: auto minmax(0, 1fr) 32px; grid-template-areas: "name name more" "phone links more"; gap: 0 10px; padding: 6px 4px 8px 14px; }
   .ld-name { grid-area: name; min-height: 30px; }
