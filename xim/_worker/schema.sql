@@ -139,6 +139,11 @@ CREATE TABLE IF NOT EXISTS otp_trust (
 --   ALTER TABLE requests ADD COLUMN site_seen_at INTEGER NOT NULL DEFAULT 0;  -- 업체 관리자가 마지막으로 본 때 (운영자 새 글 표시)
 --   ALTER TABLE sites ADD COLUMN portfolio INTEGER NOT NULL DEFAULT 0;  -- 1 이면 포트폴리오(portfolio.plators.com)에 나온다 (xim 사이트 줄의 스위치)
 --   ALTER TABLE requests ADD COLUMN op_seen_at INTEGER NOT NULL DEFAULT 0;    -- 운영자가 마지막으로 본 때 (업체 새 글 표시)
+--   ALTER TABLE leads ADD COLUMN consent INTEGER NOT NULL DEFAULT 0;     -- 상담연락 문자 (2026-11-27)
+--   ALTER TABLE leads ADD COLUMN consent_note TEXT NOT NULL DEFAULT '';
+--   ALTER TABLE leads ADD COLUMN consent_at INTEGER NOT NULL DEFAULT 0;
+--   ALTER TABLE leads ADD COLUMN sent_at INTEGER NOT NULL DEFAULT 0;
+--   ALTER TABLE leads ADD COLUMN sent_n INTEGER NOT NULL DEFAULT 0;
 
 -- 관리 로그: 운영자가 xim 에서 한 일 (2026-11-04, 1개월 보관 — xms audit_log 와 같은 방식)
 CREATE TABLE IF NOT EXISTS audit_log (
@@ -363,8 +368,16 @@ CREATE TABLE IF NOT EXISTS leads (
   checked TEXT NOT NULL DEFAULT '',
   memo TEXT NOT NULL DEFAULT '',
   done INTEGER NOT NULL DEFAULT 0,
+  consent INTEGER NOT NULL DEFAULT 0,     -- 문자 수신 동의(정보통신망법 제50조) — 동의한 곳에만 문자가 나간다
+  consent_note TEXT NOT NULL DEFAULT '',  -- 어떻게 받았나(예: 11/28 통화)
+  consent_at INTEGER NOT NULL DEFAULT 0,
+  sent_at INTEGER NOT NULL DEFAULT 0,     -- 마지막으로 문자 보낸 때
+  sent_n INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS leads_phone ON leads (phone) WHERE phone != '';
 -- 어디까지 알아봤나: 영역마다 한 줄(어느 목록 · 몇 곳 · 무엇을 확인했는지)
+-- 상담연락 문자 보낸 기록(네이버 클라우드 SENS)
+CREATE TABLE IF NOT EXISTS lead_sms_log (id INTEGER PRIMARY KEY AUTOINCREMENT, lead_id INTEGER NOT NULL, phone TEXT NOT NULL, type TEXT NOT NULL, ad INTEGER NOT NULL DEFAULT 1, content TEXT NOT NULL, ok INTEGER NOT NULL DEFAULT 0, request_id TEXT NOT NULL DEFAULT '', error TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS lead_sms_log_lead ON lead_sms_log (lead_id);
 CREATE TABLE IF NOT EXISTS lead_scopes (area TEXT PRIMARY KEY, keyword TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', total INTEGER NOT NULL DEFAULT 0, checked_at INTEGER NOT NULL);

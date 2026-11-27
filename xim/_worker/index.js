@@ -12,6 +12,7 @@ import { ensureMailDomain, ensureTurnstile } from './mail-domain.js';
 import { deleteRequest } from './request-files.js';
 import { linkUrl as cleanUrl, scrapeMeta } from './scrape.js';
 import { scanUrl, normPhone } from './leads.js';
+import { sendLeads, cfgReady, compose, kindOf, bytes as smsBytes, nightBlocked, PRICE as SMS_PRICE } from './lead-sms.js';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 // 스튜디오(유튜브 발표자료 제작) — /api/studio/* · /studio/* · Workflow StudioMain (xim/_worker/studio.js)
 import { studioApi, studioHelper, studioPublic, studioScheduled, StudioMain } from './studio.js';
@@ -471,8 +472,55 @@ async function ximApi(request, env, url, ctx) {
 
   // 상담연락 (2026-11-26): 주소를 넣으면 그 페이지(플레이스 · 홈페이지 · 블로그 · 인스타그램)에서 휴대폰 번호를 찾아 쌓는다. 같은 번호는 한 번만
   if (path === '/api/leads' && method === 'GET') {
-    const [a, s] = await db.batch([db.prepare("SELECT * FROM leads ORDER BY (phone = ''), id LIMIT 3000"), db.prepare('SELECT * FROM lead_scopes ORDER BY checked_at DESC')]);
-    return json({ items: a.results, scopes: s.results, sms: (await getSetting(db, 'lead_sms')) || '' });   // scopes = 어디까지 알아봤는지(영역마다 한 줄), sms = 복사해 쓰는 문자 내용
+    const [a, s] = await db.batch([db.prepare("SELECT * FROM leads ORDER BY (phone = ''), id LIMIT 8000"), db.prepare('SELECT * FROM lead_scopes ORDER BY checked_at DESC')]);
+    const cfg = JSON.parse((await getSetting(db, 'lead_sms_cfg')) || '{}');
+    return json({ items: a.results, scopes: s.results, sms: (await getSetting(db, 'lead_sms')) || '',   // scopes = 어디까지 알아봤는지(영역마다 한 줄), sms = 보낼 문자 내용({업체명} 은 업체마다 바뀜)
+      smsCfg: { from: cfg.from || '', optout: cfg.optout || '', serviceId: cfg.serviceId || '', subject: cfg.subject || '', ready: cfgReady(env, cfg), night: nightBlocked(), price: SMS_PRICE } });
+  }
+  // 문자 설정: 서비스 ID · 발신번호 · 080 수신거부 번호 · LMS 제목 (키 두 개는 Worker 비밀값)
+  if (path === '/api/leads/sms-cfg' && method === 'PUT') {
+    const b = await body(request);
+    const cfg = { serviceId: str(b.serviceId, 80), from: str(b.from, 20), optout: str(b.optout, 20), subject: str(b.subject, 40) };
+    await setSetting(db, 'lead_sms_cfg', JSON.stringify(cfg));
+    await audit(db, request, 'LEAD_SMS_CFG', '상담연락 문자 설정');
+    return json({ ok: true, ready: cfgReady(env, cfg) });
+  }
+  // 문자 보내기: ids 의 업체마다 {업체명} 을 바꿔 넣고, 수신 동의한 곳에만. preview: true 면 보내지 않고 무엇이 어떻게 갈지만
+  if (path === '/api/leads/send' && method === 'POST') {
+    const b = await body(request);
+    const ids = [...new Set((Array.isArray(b.ids) ? b.ids : []).map(Number).filter((n) => n > 0))].slice(0, 1000);
+    if (!ids.length) throw bad('보낼 곳을 골라 주세요.');
+    const cfg = JSON.parse((await getSetting(db, 'lead_sms_cfg')) || '{}');
+    const rows = [];
+    for (let i = 0; i < ids.length; i += 90) rows.push(...(await db.prepare(`SELECT id, name, phone, consent FROM leads WHERE id IN (${ids.slice(i, i + 90).map(() => '?').join(',')})`).bind(...ids.slice(i, i + 90)).all()).results);
+    const text = str(b.text, 4000), ad = b.ad !== false;
+    if (b.preview) {
+      const ok = rows.filter((r) => r.phone && r.consent);
+      const sample = ok[0] || rows[0];
+      const each = ok.map((r) => compose(text, r, { ad, optout: cfg.optout || '080-000-0000' }));
+      const lms = each.filter((t) => kindOf(t) === 'LMS').length;
+      return json({ total: rows.length, sendable: ok.length, noPhone: rows.filter((r) => !r.phone).length, noConsent: rows.filter((r) => r.phone && !r.consent).length,
+        sample: sample ? { name: sample.name, text: compose(text, sample, { ad, optout: cfg.optout || '080-000-0000' }) } : null,
+        bytes: sample ? smsBytes(compose(text, sample, { ad, optout: cfg.optout || '080-000-0000' })) : 0, sms: ok.length - lms, lms,
+        cost: (ok.length - lms) * SMS_PRICE.SMS + lms * SMS_PRICE.LMS, night: ad && nightBlocked(), ready: cfgReady(env, cfg) });
+    }
+    let out;
+    try { out = await sendLeads(env, cfg, rows, { text, ad }); } catch (e) { throw bad(e.message); }
+    const t = now();
+    for (const r of out.results) {
+      await db.prepare('INSERT INTO lead_sms_log (lead_id, phone, type, ad, content, ok, request_id, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(r.id, r.phone, r.type, ad ? 1 : 0, r.content, r.ok ? 1 : 0, r.requestId, r.error, t).run();
+      if (r.ok) await db.prepare('UPDATE leads SET sent_at = ?, sent_n = sent_n + 1 WHERE id = ?').bind(t, r.id).run();
+    }
+    const okN = out.results.filter((r) => r.ok).length;
+    await audit(db, request, 'LEAD_SMS_SEND', `상담연락 문자 ${okN}건`, `실패 ${out.results.length - okN} · 뺌 ${out.skipped.length}`);
+    return json({ sent: okN, failed: out.results.filter((r) => !r.ok).map((r) => ({ id: r.id, name: r.name, error: r.error })), skipped: out.skipped });
+  }
+  // 한 업체에게 보낸 문자 기록
+  {
+    const sm = path.match(/^\/api\/leads\/(\d+)\/sms$/);
+    if (sm && method === 'GET') {
+      return json({ items: (await db.prepare('SELECT type, ad, content, ok, error, created_at FROM lead_sms_log WHERE lead_id = ? ORDER BY id DESC LIMIT 20').bind(+sm[1]).all()).results });
+    }
   }
   if (path === '/api/leads/sms' && method === 'PUT') {
     await setSetting(db, 'lead_sms', str((await body(request)).text, 4000));
@@ -514,6 +562,11 @@ async function ximApi(request, env, url, ctx) {
     if (lm && method === 'PATCH') {
       const b = await body(request);
       await db.prepare('UPDATE leads SET done = ?, memo = ? WHERE id = ?').bind(b.done ? 1 : 0, str(b.memo, 500), +lm[1]).run();
+      // 수신 동의(문자 보내기 조건): 언제 · 어떻게 받았는지 함께 남긴다
+      if ('consent' in b) {
+        await db.prepare('UPDATE leads SET consent = ?, consent_note = ?, consent_at = ? WHERE id = ?').bind(b.consent ? 1 : 0, str(b.consent_note, 200), b.consent ? now() : 0, +lm[1]).run();
+        await audit(db, request, 'LEAD_CONSENT', `상담연락 #${lm[1]}`, b.consent ? `수신 동의 · ${str(b.consent_note, 200)}` : '수신 동의 취소');
+      }
       return json({ ok: true });
     }
     if (lm && method === 'DELETE') {

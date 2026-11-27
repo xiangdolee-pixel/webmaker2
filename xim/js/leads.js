@@ -1,7 +1,7 @@
 // xim 상담연락 — 지도에 나온 업체와, 그 업체의 홈페이지 · 블로그 · 인스타그램에 공개된 휴대폰 번호 (사용자 지시 2026-11-26)
 //   한 줄 = 업체 하나(이름 · 휴대폰 · 홈 / 블 / 인스타). 누르면 나머지(주소 · 어디까지 확인했는지 · 메모 · 단추)가 펼쳐진다.
 //   주소를 붙여 넣으면 xim 이 그 페이지를 열어 010 번호를 찾아 쌓는다. 같은 번호는 한 번만.
-import { $, esc, toast, busy, fmtDate, pillTabs, slideTabs } from './common.js';
+import { $, esc, toast, busy, fmtDate, pillTabs, slideTabs, openDialog } from './common.js';
 
 let deps = null;   // { view, api }
 let filter = '';   // '' 전체 · 'has' 번호 있음 · 'none' 번호 없음 · 'done' 연락함
@@ -16,6 +16,15 @@ let scopes = [];
 let sms = '';      // 복사해 쓰는 문자 내용(xim settings.lead_sms — 리포에는 두지 않는다)
 let lastScan = null;
 const open = new Set();   // 펼쳐 둔 줄(id)
+const picked = new Set(); // 문자 보낼 곳으로 고른 줄(id) — 휴대폰 있는 곳만
+let smsCfg = {};          // 문자 설정(네이버 클라우드 SENS) + 준비 상태
+// 서울 25개 구 — 칸 지도(대략 실제 위치대로 7칸 × 6줄). 구 이름은 주소 둘째 마디와 같다
+const SEOUL = [['강북구', 4, 0], ['도봉구', 5, 0], ['노원구', 6, 0],
+  ['은평구', 1, 1], ['서대문구', 2, 1], ['종로구', 3, 1], ['성북구', 4, 1], ['동대문구', 5, 1], ['중랑구', 6, 1],
+  ['마포구', 2, 2], ['중구', 3, 2], ['성동구', 4, 2], ['광진구', 5, 2],
+  ['강서구', 0, 3], ['양천구', 1, 3], ['영등포구', 2, 3], ['용산구', 3, 3], ['강동구', 6, 3],
+  ['구로구', 1, 4], ['동작구', 2, 4], ['서초구', 3, 4], ['강남구', 4, 4], ['송파구', 5, 4],
+  ['금천구', 1, 5], ['관악구', 2, 5]];
 
 const SRC = { map: '지도 업체 정보', place: '네이버 플레이스', homepage: '홈페이지', blog: '블로그', instagram: '인스타그램', manual: '직접 넣음' };
 // 지역 = 주소의 첫 두 마디(시 · 도 + 구 · 시 · 군). 모을 때 따로 적지 않아도 주소만 있으면 "서울시 › 노원구" 로 나뉜다
@@ -44,7 +53,8 @@ const ext = (url, label, cls = '') => `<a class="${cls}" href="${esc(url)}" targ
 export async function renderLeads(d) {
   deps = d;
   const { view, api } = deps;
-  ({ items, scopes = [], sms = '' } = await api('/leads'));
+  ({ items, scopes = [], sms = '', smsCfg = {} } = await api('/leads'));
+  for (const id of [...picked]) if (!items.some((i) => i.id === id && i.phone)) picked.delete(id);
   if (sido && !items.some((i) => sidoOf(i) === sido)) { sido = ''; gu = ''; }
   if (gu && !items.some(inRegion)) gu = '';
   view.innerHTML = `
@@ -52,9 +62,20 @@ export async function renderLeads(d) {
       <input class="input search-q ld-q" id="ld-q" type="search" placeholder="이름 · 번호 · 주소 찾기" value="${esc(q)}" aria-label="찾기">
       <button type="button" class="btn sm" id="ld-csv">엑셀(CSV) 받기</button></div>
     <div id="ld-scopes"></div>
-    <details class="card ld-scope ld-sms"><summary>보낼 문자 <small>눌러서 내용 보기 · 고치기</small><button type="button" class="btn sm primary" id="ld-sms-copy">문자 복사</button></summary>
-      <div class="ld-form"><textarea class="input" id="ld-sms" rows="14" maxlength="4000" placeholder="업체에 보낼 문자 내용" aria-label="보낼 문자">${esc(sms)}</textarea>
-        <div class="ld-form-foot ld-sms-foot"><button type="button" class="btn sm" id="ld-sms-save">저장</button></div></div></details>
+    <details class="card ld-scope ld-sms"><summary>보낼 문자 <small>눌러서 내용 보기 · 고치기 · <b>{업체명}</b> 은 업체마다 그 이름으로 바뀝니다</small><button type="button" class="btn sm primary" id="ld-sms-copy">문자 복사</button></summary>
+      <div class="ld-form"><textarea class="input" id="ld-sms" rows="14" maxlength="4000" placeholder="[{업체명}] 원장님 안녕하세요…" aria-label="보낼 문자">${esc(sms)}</textarea>
+        <div class="ld-form-foot ld-sms-foot"><small class="ld-bytes" id="ld-bytes"></small><button type="button" class="btn sm" id="ld-sms-ins">{업체명} 넣기</button><button type="button" class="btn sm" id="ld-sms-save">저장</button></div></div></details>
+    <details class="card ld-scope"><summary>문자 설정 <small>${smsReady() ? '<span class="badge done">보낼 준비 됨</span>' : '<span class="badge idle">아직 준비 안 됨</span>'} 네이버 클라우드 SENS</small></summary>
+      <form class="ld-form ld-cfg" id="ld-cfg">
+        <div class="ld-cfg-grid">
+          <label class="field"><span>서비스 ID <small>SENS › Project 의 SMS 서비스 ID</small></span><input class="input" name="serviceId" value="${esc(smsCfg.serviceId)}" placeholder="ncp:sms:kr:000000000000:xim" autocomplete="off"></label>
+          <label class="field"><span>발신번호 <small>SENS 에 등록 · 승인된 번호</small></span><input class="input" name="from" value="${esc(smsCfg.from)}" placeholder="010-0000-0000" inputmode="tel"></label>
+          <label class="field"><span>무료 수신거부 번호 <small>광고 문자 끝에 붙음 — 080</small></span><input class="input" name="optout" value="${esc(smsCfg.optout)}" placeholder="080-000-0000" inputmode="tel"></label>
+          <label class="field"><span>장문(LMS) 제목</span><input class="input" name="subject" value="${esc(smsCfg.subject)}" placeholder="안내" maxlength="40"></label>
+        </div>
+        <ul class="ld-ready">${[['keys', 'API 키(비밀값)'], ['service', '서비스 ID'], ['from', '발신번호'], ['optout', '080 수신거부 번호']].map(([k, l]) => `<li class="${smsCfg.ready?.[k] ? 'ok' : ''}">${l}</li>`).join('')}</ul>
+        <div class="ld-form-foot ld-sms-foot"><button type="submit" class="btn sm primary">설정 저장</button></div>
+      </form></details>
     <details class="card ld-scope"><summary>주소를 넣어 더 모으기 <small>홈페이지 · 블로그 · 인스타그램 · 네이버 지도(플레이스) 주소</small></summary>
       <form class="ld-form" id="ld-form">
         <label class="field"><span>주소 붙여 넣기 <small>한 줄에 하나 · 한 번에 15개까지</small></span>
@@ -66,11 +87,13 @@ export async function renderLeads(d) {
         <p class="ld-err" id="ld-err" role="alert"></p>
         <div id="ld-scan"></div>
       </form></details>
+    <div id="ld-map"></div>
     <div class="ld-region"><span class="ld-region-label">지역</span>
       <nav class="tabs iq-tabs" id="ld-sido" aria-label="시 · 도"></nav><span class="ld-region-sep" aria-hidden="true">›</span><nav class="tabs iq-tabs" id="ld-gu" aria-label="구"></nav></div>
     <div class="ld-filters">${LINKS.map(([k, label]) => `<div class="ld-f"><span class="ld-region-label">${label}</span><nav class="tabs iq-tabs" id="ld-f-${k}" aria-label="${label}"></nav></div>`).join('')}</div>
     <nav class="tabs iq-tabs ld-tabs" id="ld-tabs" aria-label="보기"></nav>
-    <div id="ld-body"></div>`;
+    <div id="ld-body"></div>
+    <div class="ld-pick" id="ld-pick" hidden></div>`;
   pillTabs($('#ld-sido'), [['', `전체 ${items.length}`], ...uniq(items.map(sidoOf)).map((v) => [v, `${v} ${count((i) => sidoOf(i) === v)}`])], sido, (v) => { sido = v; gu = ''; paintGu(); update(); });
   paintGu();
   for (const [k] of LINKS) pillTabs($(`#ld-f-${k}`), [['', '전체'], ['y', '있음'], ['n', '없음']], link[k], (v) => { link[k] = v; update(); });
@@ -81,6 +104,19 @@ export async function renderLeads(d) {
   // 보낼 문자: 접혀 있어도 "문자 복사"는 바로 된다(입력칸에 있는 지금 내용 그대로)
   $('#ld-sms-copy').onclick = (e) => { e.preventDefault(); const t = $('#ld-sms').value; if (!t.trim()) return toast('문자 내용이 비어 있습니다.'); navigator.clipboard.writeText(t).then(() => toast('문자를 복사했습니다.')); };
   $('#ld-sms-save').onclick = (e) => busy(e.currentTarget, null, async () => { sms = $('#ld-sms').value; await api('/leads/sms', { method: 'PUT', data: { text: sms } }); toast('문자를 저장했습니다.'); });
+  const ta = $('#ld-sms');
+  const paintBytes = () => { const b = byteLen(ta.value.replace(/\{업체명\}/g, '가나다라마바사심리상담센터')); $('#ld-bytes').textContent = `${b}바이트 · ${b <= 80 ? '단문(SMS)' : b <= 2000 ? '장문(LMS)' : '너무 깁니다'} — 광고 표시 · 수신거부 문구는 보낼 때 붙습니다`; };
+  ta.oninput = paintBytes; paintBytes();
+  $('#ld-sms-ins').onclick = () => { const a = ta.selectionStart ?? ta.value.length; ta.setRangeText('{업체명}', a, ta.selectionEnd ?? a, 'end'); ta.focus(); paintBytes(); };
+  $('#ld-cfg').onsubmit = (e) => {
+    e.preventDefault();
+    const f = e.currentTarget;
+    busy(f.querySelector('[type=submit]'), null, async () => {
+      await api('/leads/sms-cfg', { method: 'PUT', data: { serviceId: f.serviceId.value, from: f.from.value, optout: f.optout.value, subject: f.subject.value } });
+      toast('문자 설정을 저장했습니다.');
+      await renderLeads(deps);
+    });
+  };
   $('#ld-form').onsubmit = (e) => {
     e.preventDefault();
     const f = e.currentTarget;
@@ -102,7 +138,86 @@ function paintGu() {
   pillTabs(fresh('#ld-gu'), [['', `전체 ${count(inSido)}`], ...gus.map((v) => [v, `${v} ${count((i) => inSido(i) && guOf(i) === v)}`])], gu, (v) => { gu = v; update(); });
 }
 
-const update = () => { paintCounts(); renderList(); };
+const update = () => { paintCounts(); paintMap(); renderList(); paintPick(); };
+const smsReady = () => { const r = smsCfg.ready || {}; return r.keys && r.service && r.from; };
+const byteLen = (t) => { let n = 0; for (const ch of String(t)) n += ch.charCodeAt(0) > 127 ? 2 : 1; return n; };
+
+// 서울 구별 업체 수 — 칸 지도. 진할수록 많다. 누르면 그 구만(다시 누르면 서울 전체)
+function paintMap() {
+  const box = $('#ld-map'); if (!box) return;
+  if (!items.some((i) => sidoOf(i) === '서울시')) { box.innerHTML = ''; return; }
+  const seoul = items.filter((i) => sidoOf(i) === '서울시' && linkOk(i) && textOk(i) && phoneOk(i));
+  const n = {}; const p = {};
+  for (const i of seoul) { const g = guOf(i); n[g] = (n[g] || 0) + 1; if (i.phone) p[g] = (p[g] || 0) + 1; }
+  const max = Math.max(1, ...Object.values(n));
+  box.innerHTML = `<section class="card ld-map"><div class="ld-map-head"><b>서울 구별 업체 수</b><small>진할수록 많음 · 누르면 그 구만 보기 · 작은 숫자 = 휴대폰 있는 곳</small><span class="ld-map-total">서울 ${seoul.length}곳</span></div>
+    <div class="ld-map-grid">${SEOUL.map(([g, x, y]) => {
+      const v = n[g] || 0; const lv = v ? Math.min(5, 1 + Math.floor((v / max) * 4.999)) : 0;
+      return `<button type="button" class="ld-tile lv${lv}${sido === '서울시' && gu === g ? ' on' : ''}" style="grid-column:${x + 1};grid-row:${y + 1}" data-gu="${g}" aria-pressed="${sido === '서울시' && gu === g}" aria-label="${g} ${v}곳, 휴대폰 ${p[g] || 0}곳">
+        <span class="ld-tile-name">${g.replace(/(.)구$/, '$1')}</span><b>${v}</b><small>${p[g] || 0}</small></button>`; }).join('')}</div></section>`;
+  box.querySelectorAll('.ld-tile').forEach((b) => { b.onclick = () => {
+    const g = b.dataset.gu; const same = sido === '서울시' && gu === g;
+    sido = '서울시'; gu = same ? '' : g;
+    renderLeads(deps);   // 시 · 도 탭과 구 탭도 같이 맞춘다
+  }; });
+}
+
+// 고른 곳 막대(화면 아래에 붙음): 몇 곳 · 그중 수신 동의 · 보이는 곳 모두 고르기 · 문자 보내기
+function paintPick() {
+  const bar = $('#ld-pick'); if (!bar) return;
+  const vis = shown().filter((i) => i.phone);
+  const sel = items.filter((i) => picked.has(i.id));
+  const ok = sel.filter((i) => i.consent).length;
+  const allOn = vis.length && vis.every((i) => picked.has(i.id));
+  bar.hidden = false;
+  bar.innerHTML = `<span class="ld-pick-n">${sel.length ? `<b>${sel.length}곳</b> 고름 · 수신 동의 <b>${ok}</b>` : '문자 보낼 곳을 왼쪽 네모로 고르세요'}</span>
+    <button type="button" class="btn sm" data-all>${allOn ? '보이는 곳 풀기' : `보이는 번호 ${vis.length}곳 고르기`}</button>
+    ${sel.length ? '<button type="button" class="btn sm" data-clear>모두 풀기</button>' : ''}
+    <button type="button" class="btn sm primary" data-send${sel.length ? '' : ' disabled'}>문자 보내기</button>`;
+  bar.querySelector('[data-all]').onclick = () => { for (const i of vis) { if (allOn) picked.delete(i.id); else picked.add(i.id); } renderList(); paintPick(); };
+  const c = bar.querySelector('[data-clear]'); if (c) c.onclick = () => { picked.clear(); renderList(); paintPick(); };
+  bar.querySelector('[data-send]').onclick = sendDialog;
+}
+
+// 보내기 전 확인: 서버가 업체마다 만든 문장 중 하나를 보여 주고, 동의 없는 곳 · 비용 · 단문/장문을 알려 준다
+async function sendDialog() {
+  const { api } = deps;
+  const text = $('#ld-sms').value;
+  if (!text.trim()) { $('#ld-sms').closest('details').open = true; return toast('보낼 문자 내용을 먼저 써 주세요.'); }
+  const ids = [...picked];
+  let ad = true;
+  const dlg = openDialog(`<h2>문자 보내기</h2><div data-body><p class="meta">확인하는 중…</p></div>
+    <label class="ld-ad"><input type="checkbox" data-ad checked> 광고 문자입니다 <small>맨 앞에 (광고), 끝에 무료 수신거부 번호가 붙고, 밤 9시 ~ 아침 8시에는 못 보냅니다</small></label>
+    <p class="err" role="alert"></p>
+    <div class="dlg-foot"><button class="btn" type="button" data-close>닫기</button><button class="btn primary" type="button" data-go disabled>보내기</button></div>`);
+  const body = dlg.querySelector('[data-body]'); const go = dlg.querySelector('[data-go]'); const err = dlg.querySelector('.err');
+  const load = async () => {
+    err.textContent = '';
+    try {
+      const v = await api('/leads/send', { method: 'POST', data: { ids, text, ad, preview: true } });
+      const r = v.ready || {};
+      const miss = [!r.keys && 'API 키', !r.service && '서비스 ID', !r.from && '발신번호', ad && !r.optout && '080 수신거부 번호'].filter(Boolean);
+      body.innerHTML = `<ul class="ld-send-sum">
+          <li>고른 곳 <b>${v.total}</b></li><li>보낼 곳 <b>${v.sendable}</b> <small>단문 ${v.sms} · 장문 ${v.lms}</small></li>
+          ${v.noConsent ? `<li class="warn">수신 동의 없음 <b>${v.noConsent}</b> <small>빼고 보냅니다</small></li>` : ''}${v.noPhone ? `<li>휴대폰 없음 <b>${v.noPhone}</b></li>` : ''}
+          <li>예상 비용 <b>${v.cost.toLocaleString()}원</b> <small>부가세 별도</small></li></ul>
+        ${v.sample ? `<p class="meta">미리보기 — ${esc(v.sample.name)} (${v.bytes}바이트)</p><pre class="ld-preview">${esc(v.sample.text)}</pre>` : ''}
+        ${miss.length ? `<p class="ld-warn">문자 설정에 ${miss.join(' · ')}이(가) 없어 아직 보낼 수 없습니다.</p>` : ''}
+        ${v.night ? '<p class="ld-warn">지금은 밤 9시 ~ 아침 8시라 광고 문자를 보낼 수 없습니다.</p>' : ''}
+        ${!v.sendable ? '<p class="ld-warn">보낼 수 있는 곳이 없습니다. 업체를 펼쳐 <b>수신 동의</b>를 먼저 표시해 주세요(전화로 동의를 받은 곳만).</p>' : ''}`;
+      go.disabled = !v.sendable || miss.length > 0 || v.night;
+      go.textContent = v.sendable ? `${v.sendable}곳에 보내기` : '보내기';
+    } catch (e) { body.innerHTML = ''; err.textContent = e.message; }
+  };
+  dlg.querySelector('[data-ad]').onchange = (e) => { ad = e.target.checked; load(); };
+  go.onclick = () => busy(go, err, async () => {
+    const r = await api('/leads/send', { method: 'POST', data: { ids, text, ad } });
+    toast(`${r.sent}곳에 보냈습니다.${r.failed.length ? ` 실패 ${r.failed.length}곳` : ''}${r.skipped.length ? ` · 뺌 ${r.skipped.length}곳` : ''}`);
+    if (!r.failed.length) { picked.clear(); dlg.close(); } else err.textContent = r.failed.slice(0, 5).map((f) => `${f.name}: ${f.error}`).join(' / ');
+    await renderLeads(deps);
+  }, '보내는 중…');
+  load();
+}
 
 // 고른 지역 · 필터에 맞춰 제목 숫자 · 어디까지 알아봤나 · 탭 숫자
 function paintCounts() {
@@ -142,7 +257,8 @@ function renderList() {
   box.innerHTML = list.length ? `<ul class="ld-list card">${list.map((it) => `
       <li class="ld-item${it.done ? ' is-done' : ''}${open.has(it.id) ? ' is-open' : ''}" data-id="${it.id}">
         <div class="ld-row">
-          <button type="button" class="ld-name" data-toggle aria-expanded="${open.has(it.id)}"><span class="ld-area">${esc(regionOf(it))}</span><b>${esc(it.name)}</b>${it.done ? '<span class="badge done">연락함</span>' : ''}</button>
+          ${it.phone ? `<label class="ld-chk"><input type="checkbox" data-pick${picked.has(it.id) ? ' checked' : ''} aria-label="${esc(it.name)} 고르기"></label>` : '<span class="ld-chk"></span>'}
+          <button type="button" class="ld-name" data-toggle aria-expanded="${open.has(it.id)}"><span class="ld-area">${esc(regionOf(it))}</span><b>${esc(it.name)}</b>${it.consent ? '<span class="badge done">동의</span>' : ''}${it.sent_n ? `<span class="badge idle">문자 ${it.sent_n}</span>` : ''}${it.done ? '<span class="badge done">연락함</span>' : ''}</button>
           ${it.phone ? `<a class="ld-phone" href="tel:${esc(it.phone)}">${esc(it.phone)}</a>` : '<span class="ld-phone none">번호 없음</span>'}
           <span class="ld-links">${it.homepage ? ext(it.homepage, '홈') : ''}${it.blog ? ext(it.blog, '블') : ''}${it.instagram ? ext(it.instagram, '인스타') : ''}</span>
           <button type="button" class="ld-more" data-toggle aria-label="자세히"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -153,6 +269,7 @@ function renderList() {
   box.querySelectorAll('.ld-item').forEach((li) => {
     const it = items.find((x) => x.id === +li.dataset.id);
     li.querySelectorAll('[data-toggle]').forEach((b) => { b.onclick = () => { if (open.has(it.id)) open.delete(it.id); else open.add(it.id); renderList(); }; });
+    const pk = li.querySelector('[data-pick]'); if (pk) pk.onchange = () => { if (pk.checked) picked.add(it.id); else picked.delete(it.id); paintPick(); };
     if (open.has(it.id)) bindDetail(li, it);
   });
 }
@@ -169,6 +286,10 @@ function detail(it) {
         ${it.checked ? `<div><dt>확인한 것</dt><dd>${esc(it.checked)}</dd></div>` : ''}
         <div><dt>모은 때</dt><dd>${fmtDate(it.created_at)}${it.area ? ` · ${esc(it.area)}` : ''}</dd></div>
       </dl>
+      ${it.phone ? `<div class="ld-consent${it.consent ? ' on' : ''}"><b>${it.consent ? '수신 동의 받음' : '수신 동의 없음'}</b>
+        ${it.consent ? `<small>${esc(it.consent_note)} · ${fmtDate(it.consent_at)}</small><button type="button" class="btn sm" data-consent>동의 취소</button>`
+          : '<input class="input" data-consent-note placeholder="어떻게 받았나 (예: 전화 통화)" maxlength="200" aria-label="동의 받은 방법"><button type="button" class="btn sm primary" data-consent>동의 받음</button>'}
+        ${it.sent_at ? `<small class="ld-sent">마지막 문자 ${fmtDate(it.sent_at)} · 모두 ${it.sent_n}번</small>` : ''}</div>` : ''}
       <input class="input ld-memo" type="text" value="${esc(it.memo)}" placeholder="메모" maxlength="500" aria-label="메모">
       <div class="ld-act">
         ${it.phone ? '<button type="button" class="btn sm" data-copy>번호 복사</button>' : ''}
@@ -181,6 +302,13 @@ function detail(it) {
 function bindDetail(li, it) {
   const { api } = deps;
   const save = (data) => api(`/leads/${it.id}`, { method: 'PATCH', data: { done: !!it.done, memo: it.memo, ...data } });
+  const cs = li.querySelector('[data-consent]');
+  if (cs) cs.onclick = (e) => busy(e.currentTarget, null, async () => {
+    const note = li.querySelector('[data-consent-note]')?.value.trim() || '';
+    if (!it.consent && !note) { li.querySelector('[data-consent-note]').focus(); throw new Error('어떻게 동의를 받았는지 적어 주세요(예: 전화 통화).'); }
+    await save({ consent: !it.consent, consent_note: note });
+    await renderLeads(deps);
+  });
   const copy = li.querySelector('[data-copy]');
   if (copy) copy.onclick = () => navigator.clipboard.writeText(it.phone).then(() => toast('번호를 복사했습니다.'));
   li.querySelector('[data-done]').onclick = (e) => busy(e.currentTarget, null, async () => { await save({ done: !it.done }); await renderLeads(deps); });
