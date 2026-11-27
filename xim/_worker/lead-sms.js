@@ -8,8 +8,8 @@ export const SMS_MAX = 80;      // SENS SMS 최대 바이트(EUC-KR 기준 — �
 export const LMS_MAX = 2000;
 // 원(부가세 별도). sens = 네이버 클라우드 요금표(2026-11-27), hackle = 핵클 문서 프로모션가(첫 충전 한 달은 SMS 7.3 · LMS 23.7)
 export const PRICES = { solapi: { SMS: 18, LMS: 45 }, sens: { SMS: 9, LMS: 30 }, hackle: { SMS: 10, LMS: 33 } };
-// 기본 = 솔라피(고정 IP 없이 · 080 무료 공용 · 1,000원부터 충전 — 사용자 결정 2026-11-27). 핵클은 허용 IP 필수라 xim(Cloudflare)에서 못 씀
-export const providerOf = (cfg) => (['sens', 'hackle'].includes(cfg.provider) ? cfg.provider : 'solapi');
+// 기본 = 네이버 클라우드 SENS — 고정 IP 없이 xim(Cloudflare)에서 되는 곳. 핵클 · 솔라피는 문자 API 허용 IP 필수라 중계 서버 없이는 못 씀(2026-11-27 확인)
+export const providerOf = (cfg) => (['solapi', 'hackle'].includes(cfg.provider) ? cfg.provider : 'sens');
 export const SOLAPI_080 = '080-500-4233';   // 솔라피 공용 무료 수신거부 번호
 export const optoutOf = (cfg) => cfg.optout || (providerOf(cfg) === 'solapi' ? SOLAPI_080 : '');
 export const PRICE = PRICES.sens;

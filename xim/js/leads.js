@@ -68,10 +68,10 @@ export async function renderLeads(d) {
     <details class="card ld-scope ld-sms"><summary>보낼 문자 <small>눌러서 내용 보기 · 고치기 · <b>{업체명}</b> 은 업체마다 그 이름으로 바뀝니다</small><button type="button" class="btn sm primary" id="ld-sms-copy">문자 복사</button></summary>
       <div class="ld-form"><textarea class="input" id="ld-sms" rows="14" maxlength="4000" placeholder="[{업체명}] 원장님 안녕하세요…" aria-label="보낼 문자">${esc(sms)}</textarea>
         <div class="ld-form-foot ld-sms-foot"><small class="ld-bytes" id="ld-bytes"></small><button type="button" class="btn sm" id="ld-sms-ins">{업체명} 넣기</button><button type="button" class="btn sm" id="ld-sms-save">저장</button></div></div></details>
-    <details class="card ld-scope"><summary>문자 설정 <small>${smsReady() ? '<span class="badge done">보낼 준비 됨</span>' : '<span class="badge idle">아직 준비 안 됨</span>'} ${{ solapi: '솔라피', sens: '네이버 클라우드 SENS', hackle: '핵클 메시지' }[smsCfg.provider] || '솔라피'}</small></summary>
+    <details class="card ld-scope"><summary>문자 설정 <small>${smsReady() ? '<span class="badge done">보낼 준비 됨</span>' : '<span class="badge idle">아직 준비 안 됨</span>'} ${{ solapi: '솔라피', sens: '네이버 클라우드 SENS', hackle: '핵클 메시지' }[smsCfg.provider] || '네이버 클라우드 SENS'}</small></summary>
       <form class="ld-form ld-cfg" id="ld-cfg">
         <div class="ld-cfg-grid">
-          <label class="field"><span>보내는 곳</span><select class="input" name="provider">${[['solapi', '솔라피 (080 무료 · 고정 IP 필요 없음)'], ['sens', '네이버 클라우드 SENS (080 월 29,000원)'], ['hackle', '핵클 메시지 (허용 IP 필수 — xim 에서는 안 됨)']].map(([v, l]) => `<option value="${v}"${smsCfg.provider === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+          <label class="field"><span>보내는 곳</span><select class="input" name="provider">${[['sens', '네이버 클라우드 SENS (지금 쓰는 곳)'], ['solapi', '솔라피 (허용 IP 필수 — xim 에서는 안 됨)'], ['hackle', '핵클 메시지 (허용 IP 필수 — xim 에서는 안 됨)']].map(([v, l]) => `<option value="${v}"${smsCfg.provider === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
           <label class="field" data-p="solapi"><span>솔라피 API Key <small>솔라피 › 개발/연동 › API Key 관리</small></span><input class="input" name="sak" placeholder="${smsCfg.provider === 'solapi' && smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : 'NCS…'}" autocomplete="off" spellcheck="false"></label>
           <label class="field" data-p="solapi"><span>솔라피 API Secret</span><input class="input" type="password" name="sas" placeholder="${smsCfg.provider === 'solapi' && smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : 'API Secret'}" autocomplete="new-password" spellcheck="false"></label>
           <label class="field" data-p="hackle"><span>핵클 API 키 <small>핵클 › API 발송</small></span><input class="input" type="password" name="hk" placeholder="${smsCfg.provider !== 'sens' && smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : '핵클 API 키'}" autocomplete="new-password" spellcheck="false"></label>
@@ -82,12 +82,15 @@ export async function renderLeads(d) {
           <label class="field" data-p="sens"><span>Access Key ID <small>네이버 클라우드 › Sub Account › xim-sms › Access Key</small></span><input class="input" name="ak" placeholder="${smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : 'ncp_iam_BPA…'}" autocomplete="off" spellcheck="false"></label>
           <label class="field" data-p="sens"><span>Secret Key <small>같은 줄의 [보기]</small></span><input class="input" type="password" name="sk" placeholder="${smsCfg.ready?.keys ? '넣어 둠 — 바꿀 때만 새로 넣기' : 'ncp_iam_BPK…'}" autocomplete="new-password" spellcheck="false"></label>
         </div>
-        <div class="ld-note"><b>홍보(광고) 문자는 080 수신거부 번호가 있어야 보낼 수 있습니다</b>
+        <div class="ld-note"><b>문자 업체를 고른 이유 (2026-11-27 알아본 것)</b>
           <ul>
-            <li>정보통신망법 제50조: 광고 문자는 수신 동의를 받았어도 맨 앞 <b>(광고)</b> + <b>무료 수신거부 번호</b>(080)를 넣어야 합니다. 080 없이 보내면 과태료(최대 3천만 원) · 발신번호 차단 위험.</li>
-            <li><b>네이버 클라우드 080</b>: 회선당 <b>월 29,000원</b>(부가세 별도, 수신거부 전화 월 1,000통 포함 · 넘으면 통당 25원). 개통 영업일 3~4일, 중간 해지는 쓴 날만큼만 — 홍보 문자 보낼 때만 며칠 켰다 끄는 방법도 됩니다.</li>
-            <li><b>핵클 메시지</b>: 080 번호를 <b>무료</b>로 줍니다. 대신 한 번 충전할 때 <b>최소 10만 원</b> 이상(SMS 7.3 · LMS 23.7원은 첫 충전 뒤 한 달만).</li>
-            <li>광고가 아닌 문자(문의해 온 곳에 답변 · 요청받은 자료 · 계약 고객 안내)는 080 없이 보낼 수 있습니다 — 보내기 창에서 "광고 문자입니다" 를 끄고 보내기.</li>
+            <li><b>핵심 조건 — 고정 IP:</b> xim 은 Cloudflare 에서 돌아가 문자를 보낼 때마다 나가는 IP 가 바뀝니다. 업체가 "허용 IP 등록 필수"면 xim 에서 바로 보낼 수 없습니다(고정 IP 중계 서버를 따로 두어야 함).</li>
+            <li><b>네이버 클라우드 SENS — 지금 쓰는 곳:</b> IP 대신 키 서명으로 확인해서 xim 에서 바로 됩니다. SMS 9 · LMS 30원(부가세 별도), 충전 없이 쓴 만큼 다음 달 청구. 발신번호 010-8381-5303 등록 신청(영업일 3일 안 승인).</li>
+            <li><b>네이버의 단점 — 080:</b> 홍보(광고) 문자에는 법으로 (광고) 표시 + 무료 수신거부 번호(080)가 필요한데, 네이버 080 은 회선당 <b>월 29,000원</b>(부가세 별도). 그래서 080 은 신청하지 않음 → 지금은 <b>광고가 아닌 문자</b>(문의 답변 · 요청받은 자료 · 계약 고객 안내)만 보냅니다. 홍보 문자를 보낼 때만 며칠 켰다 끄는 방법도 됨(쓴 날만큼 계산, 개통 영업일 3~4일).</li>
+            <li><b>핵클 메시지 — 안 되는 이유:</b> 080 무료 · 단가가 싸지만 <b>API 허용 IP 등록 필수</b>(등록 안 하면 API 발송 차단), 한 번 충전 최소 10만 원. 발신번호(010-8381-5303)는 등록해 둠 — 웹 화면에서 직접 보내는 데는 쓸 수 있습니다.</li>
+            <li><b>솔라피 — 안 되는 이유:</b> 공용 080 무료 · 1,000원부터 충전이라 골랐으나, API 키를 만들어 보니 <b>문자 발송은 허용 IP 필수</b>("클라우드 공급사 대역은 고정 출구 IP 로 인정되지 않음"). 발신번호만 등록돼 있고 API 키는 만들지 않음.</li>
+            <li><b>알리고 · 다이렉트센드 · 뿌리오 · 문자나라 · 쏘다:</b> 모두 API 허용 IP 등록 필수.</li>
+            <li><b>나중에 싼 곳(핵클 · 솔라피)을 쓰려면:</b> IP 가 고정된 작은 중계 서버를 두고 xim → 그 서버 → 업체로 보내면 됩니다(서버 관리 필요). 문자가 많아지면 검토.</li>
           </ul></div>
         <ul class="ld-ready">${[['keys', 'API 키'], ...(smsCfg.provider === 'sens' ? [['service', '서비스 ID']] : []), ['from', '발신번호'], ['optout', '080 수신거부 번호']].map(([k, l]) => `<li class="${smsCfg.ready?.[k] ? 'ok' : ''}">${l}</li>`).join('')}</ul>
         <div class="ld-form-foot ld-sms-foot"><button type="submit" class="btn sm primary">설정 저장</button></div>

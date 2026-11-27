@@ -484,7 +484,7 @@ async function ximApi(request, env, url, ctx) {
     const b = await body(request);
     const old = JSON.parse((await getSetting(db, 'lead_sms_cfg')) || '{}');
     // API 키는 새로 넣었을 때만 바꾼다(빈칸이면 그대로 — 화면에 다시 내려보내지 않으니까)
-    const cfg = { serviceId: str(b.serviceId, 80), from: str(b.from, 20), optout: str(b.optout, 20), subject: str(b.subject, 40), ak: str(b.ak, 100) || old.ak || '', sk: str(b.sk, 200) || old.sk || '', hk: str(b.hk, 200) || old.hk || '', sak: str(b.sak, 100) || old.sak || '', sas: str(b.sas, 200) || old.sas || '', provider: ['sens', 'hackle'].includes(b.provider) ? b.provider : 'solapi' };
+    const cfg = { serviceId: str(b.serviceId, 80), from: str(b.from, 20), optout: str(b.optout, 20), subject: str(b.subject, 40), ak: str(b.ak, 100) || old.ak || '', sk: str(b.sk, 200) || old.sk || '', hk: str(b.hk, 200) || old.hk || '', sak: str(b.sak, 100) || old.sak || '', sas: str(b.sas, 200) || old.sas || '', provider: ['solapi', 'hackle'].includes(b.provider) ? b.provider : 'sens' };
     await setSetting(db, 'lead_sms_cfg', JSON.stringify(cfg));
     await audit(db, request, 'LEAD_SMS_CFG', '상담연락 문자 설정');
     return json({ ok: true, ready: cfgReady(env, cfg) });
