@@ -176,7 +176,8 @@ async function publicPages(env, site) {
   const db = env.DB;
   const guest = { kind: 'guest', level: 0 };
   const urls = new Map();
-  const add = (p, t) => { if (!urls.has(p)) urls.set(p, t); };
+  // robots.txt 기본값이 막는 곳(/member/ · /xms · /admin · /xms-api)은 넣지 않는다 — 넣으면 구글이 '사이트맵 페이지가 robots.txt 에 막힘'으로 알린다
+  const add = (p, t) => { if (!urls.has(p) && !/^\/(member|xms|xms-api|admin)(\/|$)/.test(p)) urls.set(p, t); };
   add('/', 0);
   const walk = (items) => items.forEach((m) => {
     if (m.href && !m.external) { const p = m.href.split('#')[0] || '/'; if (p.startsWith('/') && !p.startsWith('//')) add(p, 0); }
