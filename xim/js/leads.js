@@ -444,8 +444,9 @@ function bindDetail(li, it) {
   li.querySelectorAll('[data-consent]').forEach((ck) => { ck.onchange = async () => {
     const v = ck.checked ? +ck.dataset.consent : 0;
     try {
-      await save({ consent: v, consent_note: v ? '전화 통화' : '' });
+      const r = await save({ consent: v, consent_note: v ? '전화 통화' : '' });
       it.consent = v; it.consent_at = v ? Date.now() : 0;
+      if (r?.call !== undefined) { const f = full.get(it.id); if (f && r.call && r.call !== it.call) f.calls = [{ call: r.call, created_at: r.call_at }, ...(f.calls || [])]; Object.assign(it, r); if (f) Object.assign(f, r); paintCounts(); }   // 통화 표시도 동의받음 / 거절로
       toast(`${it.name} — ${v > 0 ? '문자 동의' : v < 0 ? '문자 거절' : '동의 표시 지움'}`);
       renderList(); paintPick();
     } catch (e) { toast(e.message); ck.checked = !ck.checked; }

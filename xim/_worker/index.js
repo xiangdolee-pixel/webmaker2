@@ -593,6 +593,15 @@ async function ximApi(request, env, url, ctx) {
         const cv = b.consent === -1 ? -1 : b.consent ? 1 : 0;   // 1 동의 · -1 거절 · 0 아직 — 체크한 때(날짜 · 시간)를 찍는다
         await db.prepare('UPDATE leads SET consent = ?, consent_note = ?, consent_at = ? WHERE id = ?').bind(cv, str(b.consent_note, 200), cv ? now() : 0, +lm[1]).run();
         await audit(db, request, 'LEAD_CONSENT', `상담연락 #${lm[1]}`, cv === 1 ? '문자 수신 동의' : cv === -1 ? '문자 수신 거절' : '동의 표시 지움');
+        // 동의 · 거절 체크 = 통화 표시도 '통화 · 동의받음' / '통화 · 거절' 로(사용자 지시 2026-11-28) — 이미 같으면 그대로
+        const c = cv === 1 ? 'yes' : cv === -1 ? 'no' : '';
+        const cur = await db.prepare('SELECT call FROM leads WHERE id = ?').bind(+lm[1]).first();
+        if (c && cur && cur.call !== c) {
+          const t = now();
+          await db.prepare('UPDATE leads SET call = ?, call_at = ? WHERE id = ?').bind(c, t, +lm[1]).run();
+          await db.prepare('INSERT INTO lead_call_log (lead_id, call, created_at) VALUES (?, ?, ?)').bind(+lm[1], c, t).run();
+        }
+        return json({ ok: true, ...(await db.prepare('SELECT call, call_at, consent, consent_at FROM leads WHERE id = ?').bind(+lm[1]).first()) });
       }
       return json({ ok: true });
     }
