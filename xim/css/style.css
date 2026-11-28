@@ -1394,6 +1394,11 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
   .ld-more { grid-area: more; width: 32px; }
   .ld-form-foot .btn { flex: 1; }
   .ld-tabs { display: flex; }
+  .ld-viewrow > * { flex-basis: 100%; min-width: 0; }
+  .ld-viewrow .ld-f .iq-tabs { overflow-x: auto; scrollbar-width: none; }
+  .ld-viewrow .ld-f .iq-tabs::-webkit-scrollbar { display: none; }
+  .ld-viewrow .ld-f .iq-tabs > button { flex: none; padding: 0 10px; }
+  .ld-pick.is-empty { display: none; }
   .ld-tabs > button { flex: 1; min-width: 0; padding: 0 4px; font-size: 13px; white-space: nowrap; }
   .ld-dl > div { grid-template-columns: 1fr; gap: 0; }
 }

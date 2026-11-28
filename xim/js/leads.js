@@ -233,6 +233,7 @@ function paintPick() {
   const ok = sel.filter((i) => i.consent > 0).length;
   const allOn = vis.length && vis.every((i) => picked.has(i.id));
   bar.hidden = false;
+  bar.classList.toggle('is-empty', !sel.length);   // 폰에서는 고른 곳이 있을 때만(목록을 가리지 않게)
   bar.innerHTML = `<span class="ld-pick-n">${sel.length ? `<b>${sel.length}곳</b> 고름 · 수신 동의 <b>${ok}</b>` : '문자 보낼 곳을 왼쪽 네모로 고르세요'}</span>
     <button type="button" class="btn sm" data-all>${allOn ? '보이는 곳 풀기' : `보이는 번호 ${vis.length}곳 고르기`}</button>
     ${sel.length ? '<button type="button" class="btn sm" data-clear>모두 풀기</button>' : ''}
