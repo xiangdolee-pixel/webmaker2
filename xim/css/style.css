@@ -1271,6 +1271,13 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-f { display: flex; align-items: center; gap: 8px; }
 .ld-f .iq-tabs { margin-bottom: 0; }
 .ld-f .iq-tabs > button { min-height: 32px; padding: 0 12px; font-size: 13.5px; white-space: nowrap; }
+.ld-tools { margin-bottom: 10px; }
+.ld-tools > summary { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; color: var(--mute); font-size: 12.5px; cursor: pointer; list-style: none; }
+.ld-tools > summary::-webkit-details-marker { display: none; }
+.ld-tools > summary::before { content: '▸'; transition: transform .2s; }
+.ld-tools[open] > summary::before { transform: rotate(90deg); }
+.ld-tools > summary:hover { color: var(--sub); }
+.ld-tools[open] > summary { margin-bottom: 8px; }
 .ld-scope { margin-bottom: 10px; padding: 0 16px; }
 .ld-scope > summary { padding: 12px 0; font-weight: 700; cursor: pointer; }
 .ld-scope > summary small { margin-left: 8px; color: var(--mute); font-size: 13px; font-weight: 400; }

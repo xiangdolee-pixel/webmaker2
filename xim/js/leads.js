@@ -72,6 +72,7 @@ export async function renderLeads(d) {
     <div class="bar"><h2>상담연락 <span id="ld-count"></span></h2>
       <input class="input search-q ld-q" id="ld-q" type="search" placeholder="이름 · 번호 · 주소 찾기" value="${esc(q)}" aria-label="찾기">
       <button type="button" class="btn sm" id="ld-csv">엑셀(CSV) 받기</button></div>
+    <details class="ld-tools" id="ld-tools"${localStorage.getItem('xim.leads.tools') === '1' ? ' open' : ''}><summary>연락 규칙 · 보낼 문자 · 문자 설정 · 더 모으기 · 서울 지도</summary>
     <section class="ld-rule" aria-label="연락 규칙">
       <h3>📞 먼저 전화 → ✅ 동의 → 그다음에만 ✉ 문자</h3>
       <ol>
@@ -136,6 +137,7 @@ export async function renderLeads(d) {
         <div id="ld-scan"></div>
       </form></details>
     <div id="ld-map"></div>
+    </details>
     <div class="ld-region"><span class="ld-region-label">지역</span>
       <nav class="tabs iq-tabs" id="ld-sido" aria-label="시 · 도"></nav><span class="ld-region-sep" aria-hidden="true">›</span><nav class="tabs iq-tabs" id="ld-gu" aria-label="구"></nav></div>
     <div class="ld-filters"><div class="ld-f"><span class="ld-region-label">통화</span><nav class="tabs iq-tabs" id="ld-f-call" aria-label="통화"></nav></div>${LINKS.map(([k, label]) => `<div class="ld-f"><span class="ld-region-label">${label}</span><nav class="tabs iq-tabs" id="ld-f-${k}" aria-label="${label}"></nav></div>`).join('')}</div>
@@ -148,6 +150,7 @@ export async function renderLeads(d) {
   pillTabs($('#ld-f-call'), [['', '전체'], ['-', '통화 전'], ['yes', '동의받음'], ['no', '거절'], ['miss', '부재중']], callF, (v) => { callF = v; update(); });
   pillTabs($('#ld-tabs'), [['', '전체'], ['has', '번호 있음'], ['none', '번호 없음'], ['done', '연락함']], filter, (v) => { filter = v; update(); });
   update();
+  $('#ld-tools').ontoggle = (e) => { try { localStorage.setItem('xim.leads.tools', e.target.open ? '1' : '0'); } catch {} };   // 접어 둔 위쪽 칸 — 열고 닫은 상태 기억
   $('#ld-q').oninput = (e) => { q = e.target.value; update(); };
   $('#ld-csv').onclick = downloadCsv;
   // 보낼 문자: 접혀 있어도 "문자 복사"는 바로 된다(입력칸에 있는 지금 내용 그대로)
