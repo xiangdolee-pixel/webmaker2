@@ -407,7 +407,7 @@ function detail(it) {
         <div><dt>모은 때</dt><dd>${fmtDate(it.created_at)}${it.area ? ` · ${esc(it.area)}` : ''}</dd></div>
       </dl>
       ${it.calls?.length ? `<div class="ld-calllog"><b>통화 기록</b><ul>${it.calls.map((c) => `<li><span class="ld-call-dot c-${esc(c.call)}"></span>${esc(CALL[c.call] || '통화함')} <small>${fmtDate(c.created_at)}</small></li>`).join('')}</ul></div>` : ''}
-      ${it.sms?.length ? `<div class="ld-calllog"><b>문자 기록</b><ul>${it.sms.map((m) => `<li class="ld-smslog"><details><summary><span class="ld-call-dot${m.ok ? ' c-yes' : ' c-no'}"></span>${m.type === 'PHONE' ? '내 폰으로 보냄' : `자동 발송(${esc(m.type)})${m.ok ? '' : ' 실패'}`} <small>${fmtDate(m.created_at)} · 눌러서 내용 보기</small></summary><p class="ld-smsbody">${esc(m.content || '')}</p></details></li>`).join('')}</ul></div>` : ''}
+      ${it.sms?.length ? `<div class="ld-calllog"><b>문자 기록</b><ul>${it.sms.map((m) => `<li class="ld-smslog"><details><summary><span class="ld-call-dot${m.ok ? ' c-yes' : ' c-no'}"></span>${m.type === 'PHONE' ? '내 폰으로 보냄' : `자동 발송(${esc(m.type)})${m.ok ? '' : ' 실패'}`} <small>${fmtDate(m.created_at)}</small><span class="ld-smsview">내용 보기</span></summary><p class="ld-smsbody">${esc(m.content || '')}</p></details></li>`).join('')}</ul></div>` : ''}
       ${it.phone || it.tel ? callScript(it) : ''}
       ${it.phone && it.consent > 0 ? proofBox(it) : ''}
       ${it.phone ? `<div class="ld-consent${it.consent > 0 ? ' on' : it.consent < 0 ? ' no' : ''}"><b>문자 받기</b>

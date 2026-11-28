@@ -1338,6 +1338,10 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-smslog { display: block !important; }
 .ld-smslog summary { display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; }
 .ld-smslog summary::-webkit-details-marker { display: none; }
+.ld-smsview { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border: 1px solid var(--brand); border-radius: 999px; background: #fff; color: var(--brand); font-size: 12.5px; font-weight: 700; white-space: nowrap; transition: background .2s, color .2s; }
+.ld-smsview::after { content: '▾'; margin-left: 4px; transition: transform .2s; }
+.ld-smslog summary:hover .ld-smsview, .ld-smslog details[open] .ld-smsview { background: var(--brand); color: #fff; }
+.ld-smslog details[open] .ld-smsview::after { transform: rotate(180deg); }
 .ld-smsbody { margin: 6px 0 4px 14px; padding: 10px 12px; border-radius: 8px; background: var(--bg); color: var(--sub); font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
 .ld-call-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mute); }
 .ld-call-dot.c-yes, .ld-call-dot.c-ok { background: var(--ok); }
