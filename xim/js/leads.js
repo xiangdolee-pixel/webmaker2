@@ -144,8 +144,8 @@ export async function renderLeads(d) {
     </details>
     <div class="ld-region"><span class="ld-region-label">지역</span>
       <nav class="tabs iq-tabs" id="ld-sido" aria-label="시 · 도"></nav><span class="ld-region-sep" aria-hidden="true">›</span><nav class="tabs iq-tabs" id="ld-gu" aria-label="구"></nav></div>
-    <div class="ld-filters"><div class="ld-f"><span class="ld-region-label">통화</span><nav class="tabs iq-tabs" id="ld-f-call" aria-label="통화"></nav></div><div class="ld-f"><span class="ld-region-label">통화한 날</span><nav class="tabs iq-tabs" id="ld-f-day" aria-label="통화한 날"></nav></div>${LINKS.map(([k, label]) => `<div class="ld-f"><span class="ld-region-label">${label}</span><nav class="tabs iq-tabs" id="ld-f-${k}" aria-label="${label}"></nav></div>`).join('')}</div>
-    <nav class="tabs iq-tabs ld-tabs" id="ld-tabs" aria-label="보기"></nav>
+    <div class="ld-filters"><div class="ld-f"><span class="ld-region-label">통화한 날</span><nav class="tabs iq-tabs" id="ld-f-day" aria-label="통화한 날"></nav></div>${LINKS.map(([k, label]) => `<div class="ld-f"><span class="ld-region-label">${label}</span><nav class="tabs iq-tabs" id="ld-f-${k}" aria-label="${label}"></nav></div>`).join('')}</div>
+    <div class="ld-viewrow"><nav class="tabs iq-tabs ld-tabs" id="ld-tabs" aria-label="보기"></nav><div class="ld-f"><span class="ld-region-label">통화</span><nav class="tabs iq-tabs" id="ld-f-call" aria-label="통화"></nav></div></div>
     <div id="ld-body"></div>
     <div class="ld-pick" id="ld-pick" hidden></div>`;
   pillTabs($('#ld-sido'), [['', `전체 ${items.length}`], ...uniq(items.map(sidoOf)).map((v) => [v, `${v} ${count((i) => sidoOf(i) === v)}`])], sido, (v) => { sido = v; gu = ''; paintGu(); update(); });
