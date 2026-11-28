@@ -371,7 +371,7 @@ function callScript(it) {
   }[has];
   return `<details class="ld-script" open><summary><b>전화 멘트</b> <small>이 업체 상황: ${has === 'home' ? '홈페이지 있음' : has === 'sns' ? (it.blog ? '블로그' : '인스타그램') + '만 있음' : '홈페이지 · 블로그 없음'}</small></summary>
     <ol>
-      <li><span class="ld-step">① 인사 · 출처</span>"안녕하세요, ${n} 맞으시죠? <b>${esc(srcLabel(it))}</b>에 나온 번호를 보고 연락드렸어요. 저는 상담센터 홈페이지를 만드는 <b>자두랩스</b> 박민진입니다. (1분만 여쭤봐도 될까요?)"<small>→ "바빠요 · 괜찮아요" 하면: "네, 알겠습니다. 바쁘신데 죄송합니다." 하고 바로 끊고 <b>거절</b> 표시.</small></li>
+      <li><span class="ld-step">① 인사 · 출처</span>"안녕하세요, ${n} 맞으시죠? <b>${esc(srcLabel(it))}</b>에 나온 번호를 보고 연락드렸어요. 저는 상담센터 홈페이지를 전문으로 만드는 <b>자두랩스</b> 박민진입니다. (1분만 여쭤봐도 될까요?)"<small>→ "바빠요 · 괜찮아요" 하면: "네, 알겠습니다. 바쁘신데 죄송합니다." 하고 바로 끊고 <b>거절</b> 표시.</small></li>
       <li><span class="ld-step">② 묻기 (팔지 말고 듣기)</span>${ask.map((q) => `"${esc(q)}"`).join('<br>')}<small>→ 원장님이 "그게 좀 불편해요 · 없어요 · 생각은 있었어요" 라고 <b>스스로 말하게</b> 하는 게 목표. 말이 나오면 "아 그러시군요, 많이들 그러세요" 하고 맞장구.</small></li>
       <li><span class="ld-step">③ 짧게 제안</span>"${esc(offer)}"</li>
       <li><span class="ld-step">④ 문자 동의 받기</span>"제가 비슷한 상담센터 홈페이지 예시를 <b>문자로 하나 보내 드려도 될까요?</b> 보시고 아니다 싶으시면 답 안 주셔도 괜찮습니다."<small>→ "네" 하면 <b>☑ 동의함</b> 체크하고 그다음에 문자. "아니요" 하면 <b>☑ 거절함</b> 체크 · 다시 연락 안 함.</small></li>
