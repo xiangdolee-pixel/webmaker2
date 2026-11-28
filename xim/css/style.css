@@ -1311,7 +1311,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-item + .ld-item { border-top: 1px solid var(--line); }
 .ld-item.is-done .ld-row { opacity: .6; }
 .ld-item.is-open { background: #fbfbfd; }
-.ld-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) 230px 128px 132px 36px; align-items: center; gap: 12px; min-height: 48px; padding: 4px 8px 4px 12px; }
+.ld-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) 280px 128px 132px 36px; align-items: center; gap: 12px; min-height: 48px; padding: 4px 8px 4px 12px; }
 .ld-chk { display: grid; place-items: center; width: 24px; height: 40px; cursor: pointer; }
 .ld-chk input { width: 18px; height: 18px; margin: 0; accent-color: var(--brand); cursor: pointer; }
 .ld-name { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 40px; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
@@ -1333,6 +1333,8 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-call-dot.c-no { background: var(--danger); }
 .ld-call-dot.c-miss { background: var(--warn); }
 .ld-pcell { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ld-smsbtn { flex: none; display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.ld-smsbtn:hover { filter: brightness(1.1); }
 .ld-src { flex: none; padding: 2px 7px; border-radius: 6px; background: var(--bg); color: var(--sub); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .ld-src.s-homepage { background: #e8f1ff; color: #1d4f9c; }
 .ld-src.s-blog { background: #e6f6ea; color: #1b6b35; }

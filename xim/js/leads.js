@@ -308,7 +308,7 @@ function renderList() {
         <div class="ld-row">
           ${it.phone ? `<label class="ld-chk"><input type="checkbox" data-pick${picked.has(it.id) ? ' checked' : ''} aria-label="${esc(it.name)} 고르기"></label>` : '<span class="ld-chk"></span>'}
           <button type="button" class="ld-name" data-toggle aria-expanded="${open.has(it.id)}"><span class="ld-area">${esc(regionOf(it))}</span><b>${esc(it.name)}</b>${it.consent > 0 ? '<span class="badge done">문자 동의</span>' : it.consent < 0 ? '<span class="badge ld-no">문자 거절</span>' : ''}${it.sent_n ? `<span class="badge idle">문자 ${it.sent_n}</span>` : ''}${it.done ? '<span class="badge done">연락함</span>' : ''}</button>
-          ${it.phone ? `<span class="ld-pcell"><a class="ld-phone" href="tel:${esc(it.phone)}">${esc(it.phone)}</a><small class="ld-src s-${esc(it.source)}" title="이 번호를 찾은 곳">${esc(SRC_SHORT[it.source] || it.source || '?')}</small></span>` : '<span class="ld-phone none">번호 없음</span>'}
+          ${it.phone ? `<span class="ld-pcell"><a class="ld-phone" href="tel:${esc(it.phone)}">${esc(it.phone)}</a><small class="ld-src s-${esc(it.source)}" title="이 번호를 찾은 곳">${esc(SRC_SHORT[it.source] || it.source || '?')}</small>${it.consent > 0 ? `<a class="ld-smsbtn" data-myphone href="#" title="${esc(it.name)} 에 보낼 문자 — 폰에서 누르면 문자 앱이 열립니다">문자</a>` : ''}</span>` : '<span class="ld-phone none">번호 없음</span>'}
           ${it.phone || it.tel ? `<span class="ld-callcell"><select class="ld-call c-${it.call || 'none'}" data-call aria-label="${esc(it.name)} 통화 표시">${Object.entries(it.call === 'ok' ? { ...CALL, ok: '통화함' } : CALL).map(([v, l]) => `<option value="${v}"${(it.call || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select>${it.call && it.call_at ? `<small class="ld-callat">${fmtDate(it.call_at).slice(5)}</small>` : ''}</span>` : '<span></span>'}
           <span class="ld-links">${it.homepage ? ext(it.homepage, '홈') : ''}${it.blog ? ext(it.blog, '블') : ''}${it.instagram ? ext(it.instagram, '인스타') : ''}</span>
           <button type="button" class="ld-more" data-toggle aria-label="자세히"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -330,6 +330,7 @@ function renderList() {
       try { const r = await deps.api(`/leads/${it.id}?call=${encodeURIComponent(cs.value)}`, { method: 'PUT', data: {} }); Object.assign(it, r); const f = full.get(it.id); if (f && r.call) f.calls = [{ call: r.call, created_at: r.call_at }, ...(f.calls || [])]; if (f) Object.assign(f, r); toast(`${it.name} — ${CALL[it.call || ''] || '통화함'}`); renderList(); paintCounts(); paintPick(); }
       catch (e) { toast(e.message); cs.value = it.call || ''; }
     };
+    const rs = li.querySelector('.ld-row [data-myphone]'); if (rs) rs.onclick = (e) => smsToPhone(e, rs, it);
     const pk = li.querySelector('[data-pick]'); if (pk) pk.onchange = () => { if (pk.checked) picked.add(it.id); else picked.delete(it.id); paintPick(); };
     if (open.has(it.id)) bindDetail(li, it);
   });
@@ -359,7 +360,7 @@ function callScript(it) {
   }[has];
   return `<details class="ld-script" open><summary><b>전화 멘트</b> <small>이 업체 상황: ${has === 'home' ? '홈페이지 있음' : has === 'sns' ? (it.blog ? '블로그' : '인스타그램') + '만 있음' : '홈페이지 · 블로그 없음'}</small></summary>
     <ol>
-      <li><span class="ld-step">① 인사 · 출처</span>"안녕하세요, ${n} 맞으시죠? 저는 상담센터 홈페이지를 만드는 <b>자두랩스</b> 박민진입니다. <b>${esc(srcLabel(it))}</b>에 나온 번호를 보고 연락드렸어요. (1분만 여쭤봐도 될까요?)"<small>→ "바빠요 · 괜찮아요" 하면: "네, 알겠습니다. 바쁘신데 죄송합니다." 하고 바로 끊고 <b>거절</b> 표시.</small></li>
+      <li><span class="ld-step">① 인사 · 출처</span>"안녕하세요, ${n} 맞으시죠? <b>${esc(srcLabel(it))}</b>에 나온 번호를 보고 연락드렸어요. 저는 상담센터 홈페이지를 만드는 <b>자두랩스</b> 박민진입니다. (1분만 여쭤봐도 될까요?)"<small>→ "바빠요 · 괜찮아요" 하면: "네, 알겠습니다. 바쁘신데 죄송합니다." 하고 바로 끊고 <b>거절</b> 표시.</small></li>
       <li><span class="ld-step">② 묻기 (팔지 말고 듣기)</span>${ask.map((q) => `"${esc(q)}"`).join('<br>')}<small>→ 원장님이 "그게 좀 불편해요 · 없어요 · 생각은 있었어요" 라고 <b>스스로 말하게</b> 하는 게 목표. 말이 나오면 "아 그러시군요, 많이들 그러세요" 하고 맞장구.</small></li>
       <li><span class="ld-step">③ 짧게 제안</span>"${esc(offer)}"</li>
       <li><span class="ld-step">④ 문자 동의 받기</span>"제가 비슷한 상담센터 홈페이지 예시를 <b>문자로 하나 보내 드려도 될까요?</b> 보시고 아니다 싶으시면 답 안 주셔도 괜찮습니다."<small>→ "네" 하면 <b>☑ 동의함</b> 체크하고 그다음에 문자. "아니요" 하면 <b>☑ 거절함</b> 체크 · 다시 연락 안 함.</small></li>
@@ -410,6 +411,15 @@ function detail(it) {
     </div>`;
 }
 
+// 내 폰으로 문자: 폰이면 문자 앱(번호 · 내용 채움), PC 면 내용 복사 — {업체명} 은 이 업체 이름으로(줄의 [문자] · 펼친 곳 [내 폰으로 문자] 같이 씀)
+function smsToPhone(e, a, it) {
+  const body = (($('#ld-sms')?.value || sms) || '').replace(/\{업체명\}/g, it.name).trim();   // 누를 때의 내용으로(고친 뒤에도 맞게)
+  a.href = `sms:${it.phone.replace(/\D/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+  if (!body) { e.preventDefault(); $('#ld-sms').closest('details').open = true; toast('위 "보낼 문자" 에 내용을 먼저 써 주세요.'); return; }
+  navigator.clipboard?.writeText(body).catch(() => {});
+  if (!matchMedia('(pointer: coarse)').matches) { e.preventDefault(); toast(`${it.name} 에 보낼 문자를 복사했습니다 — 폰에서 누르면 문자 앱이 바로 열립니다.`); }
+}
+
 function bindDetail(li, it) {
   const { api } = deps;
   const save = (data) => api(`/leads/${it.id}`, { method: 'PATCH', data: { done: !!it.done, memo: it.memo, ...data } });
@@ -430,19 +440,8 @@ function bindDetail(li, it) {
     navigator.clipboard?.writeText(body).catch(() => {});
     if (!matchMedia('(pointer: coarse)').matches) { e.preventDefault(); toast('동의 확인 문자를 복사했습니다 — 폰 문자에 붙여 넣어 보내세요.'); }
   };
-  // 내 폰으로 문자: 폰이면 문자 앱(번호 · 내용 채움), PC 면 내용 복사 — {업체명} 은 이 업체 이름으로
-  const mp = li.querySelector('[data-myphone]');
-  if (mp) {
-    const num = it.phone.replace(/\D/g, '');
-    mp.onclick = (e) => {
-      const body = (($('#ld-sms')?.value || sms) || '').replace(/\{업체명\}/g, it.name).trim();   // 누를 때의 내용으로(고친 뒤에도 맞게)
-      mp.href = `sms:${num}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
-      if (!body) { e.preventDefault(); $('#ld-sms').closest('details').open = true; toast('위 "보낼 문자" 에 내용을 먼저 써 주세요.'); return; }
-      const touch = matchMedia('(pointer: coarse)').matches;
-      navigator.clipboard?.writeText(body).catch(() => {});
-      if (!touch) { e.preventDefault(); toast(`${it.name} 에 보낼 문자를 복사했습니다 — 홍보 내용이면 보내지 마세요(동의 · (광고) · 080 필요).`); }
-    };
-  }
+  const mp = li.querySelector('.ld-act [data-myphone]');
+  if (mp) mp.onclick = (e) => smsToPhone(e, mp, it);
   const copy = li.querySelector('[data-copy]');
   if (copy) copy.onclick = () => navigator.clipboard.writeText(it.phone).then(() => toast('번호를 복사했습니다.'));
   li.querySelector('[data-done]').onclick = (e) => busy(e.currentTarget, null, async () => { await save({ done: !it.done }); await renderLeads(deps); });
