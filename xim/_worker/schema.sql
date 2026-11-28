@@ -375,7 +375,7 @@ CREATE TABLE IF NOT EXISTS leads (
   consent_at INTEGER NOT NULL DEFAULT 0,
   sent_at INTEGER NOT NULL DEFAULT 0,     -- 마지막으로 문자 보낸 때
   sent_n INTEGER NOT NULL DEFAULT 0,
-  call TEXT NOT NULL DEFAULT '',         -- 전화 통화: '' 안 함 · ok 통화함 · miss 부재중 · no 거절
+  call TEXT NOT NULL DEFAULT '',         -- 전화 통화: '' 안 함 · ok 통화함 · miss 부재중 · nope 안 받음 · no 거절 · yes 동의받음
   call_at INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );

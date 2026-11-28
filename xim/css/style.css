@@ -1327,7 +1327,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-phone { color: var(--brand); font-size: 16px; font-weight: 700; text-decoration: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ld-call { min-height: 32px; padding: 0 6px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--sub); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .ld-call.c-ok, .ld-call.c-yes { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); }
-.ld-call.c-miss { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.ld-call.c-miss, .ld-call.c-nope { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
 .ld-call.c-no { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
 .ld-callcell { display: grid; gap: 1px; justify-items: start; }
 .ld-callat { color: var(--mute); font-size: 11.5px; font-variant-numeric: tabular-nums; }
@@ -1346,7 +1346,7 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-call-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mute); }
 .ld-call-dot.c-yes, .ld-call-dot.c-ok { background: var(--ok); }
 .ld-call-dot.c-no { background: var(--danger); }
-.ld-call-dot.c-miss { background: var(--warn); }
+.ld-call-dot.c-miss, .ld-call-dot.c-nope { background: var(--warn); }
 .ld-pcell { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ld-smsbtn { flex: none; display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap; }
 .ld-smsbtn:hover { filter: brightness(1.1); }

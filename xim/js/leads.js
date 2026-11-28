@@ -5,8 +5,8 @@ import { $, esc, toast, busy, fmtDate, pillTabs, slideTabs, openDialog } from '.
 
 let deps = null;   // { view, api }
 let filter = '';   // '' 전체 · 'has' 번호 있음 · 'none' 번호 없음 · 'done' 연락함
-let callF = '';    // 통화: '' 전체 · '-' 통화 전 · yes 동의받음 · no 거절 · miss 부재중
-const CALL = { '': '통화 전', yes: '통화 · 동의받음', no: '통화 · 거절', miss: '부재중' };   // ok = 예전 '통화함'(남아 있으면 그대로 보임)
+let callF = '';    // 통화: '' 전체 · '-' 통화 전 · yes 동의받음 · no 거절 · miss 부재중 · nope 안 받음
+const CALL = { '': '통화 전', yes: '통화 · 동의받음', no: '통화 · 거절', miss: '부재중', nope: '안 받음' };   // ok = 예전 '통화함'(남아 있으면 그대로 보임)
 let q = '';
 let sido = '';     // '' 모든 시 · 도 · '서울시'
 let gu = '';       // '' 모든 구 · '노원구'
@@ -147,7 +147,7 @@ export async function renderLeads(d) {
   pillTabs($('#ld-sido'), [['', `전체 ${items.length}`], ...uniq(items.map(sidoOf)).map((v) => [v, `${v} ${count((i) => sidoOf(i) === v)}`])], sido, (v) => { sido = v; gu = ''; paintGu(); update(); });
   paintGu();
   for (const [k] of LINKS) pillTabs($(`#ld-f-${k}`), [['', '전체'], ['y', '있음'], ['n', '없음']], link[k], (v) => { link[k] = v; update(); });
-  pillTabs($('#ld-f-call'), [['', '전체'], ['-', '통화 전'], ['yes', '동의받음'], ['no', '거절'], ['miss', '부재중']], callF, (v) => { callF = v; update(); });
+  pillTabs($('#ld-f-call'), [['', '전체'], ['-', '통화 전'], ['yes', '동의받음'], ['no', '거절'], ['miss', '부재중'], ['nope', '안 받음']], callF, (v) => { callF = v; update(); });
   pillTabs($('#ld-tabs'), [['', '전체'], ['has', '번호 있음'], ['none', '번호 없음'], ['done', '연락함']], filter, (v) => { filter = v; update(); });
   update();
   $('#ld-tools').ontoggle = (e) => { try { localStorage.setItem('xim.leads.tools', e.target.open ? '1' : '0'); } catch {} };   // 접어 둔 위쪽 칸 — 열고 닫은 상태 기억
@@ -283,7 +283,7 @@ function paintCounts() {
   const mine = area.filter((i) => linkOk(i) && textOk(i));
   const has = mine.filter((i) => i.phone).length;
   { const base = area.filter((i) => phoneOk(i) && linkOk(i) && textOk(i)); const c = (v) => base.filter((i) => (v === '-' ? !i.call : i.call === v)).length;
-    relabel($('#ld-f-call'), { '': `전체 ${base.length}`, '-': `통화 전 ${c('-')}`, yes: `동의받음 ${c('yes')}`, no: `거절 ${c('no')}`, miss: `부재중 ${c('miss')}` }); }
+    relabel($('#ld-f-call'), { '': `전체 ${base.length}`, '-': `통화 전 ${c('-')}`, yes: `동의받음 ${c('yes')}`, no: `거절 ${c('no')}`, miss: `부재중 ${c('miss')}`, nope: `안 받음 ${c('nope')}` }); }
   relabel($('#ld-tabs'), { '': `전체 ${mine.length}`, has: `번호 있음 ${has}`, none: `번호 없음 ${mine.length - has}`, done: `연락함 ${mine.filter((i) => i.done).length}` });
   for (const [k] of LINKS) {
     const base = area.filter((i) => phoneOk(i) && linkOk(i, k) && textOk(i));
