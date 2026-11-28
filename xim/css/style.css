@@ -1335,6 +1335,10 @@ textarea.ct-text { min-height: 240px; overflow: hidden; resize: none; font-size:
 .ld-calllog ul { display: grid; gap: 3px; margin: 4px 0 0; padding: 0; list-style: none; }
 .ld-calllog li { display: flex; align-items: center; gap: 6px; }
 .ld-calllog small { color: var(--mute); font-variant-numeric: tabular-nums; }
+.ld-smslog { display: block !important; }
+.ld-smslog summary { display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; }
+.ld-smslog summary::-webkit-details-marker { display: none; }
+.ld-smsbody { margin: 6px 0 4px 14px; padding: 10px 12px; border-radius: 8px; background: var(--bg); color: var(--sub); font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
 .ld-call-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mute); }
 .ld-call-dot.c-yes, .ld-call-dot.c-ok { background: var(--ok); }
 .ld-call-dot.c-no { background: var(--danger); }

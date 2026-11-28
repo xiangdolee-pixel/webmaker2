@@ -407,7 +407,7 @@ function detail(it) {
         <div><dt>모은 때</dt><dd>${fmtDate(it.created_at)}${it.area ? ` · ${esc(it.area)}` : ''}</dd></div>
       </dl>
       ${it.calls?.length ? `<div class="ld-calllog"><b>통화 기록</b><ul>${it.calls.map((c) => `<li><span class="ld-call-dot c-${esc(c.call)}"></span>${esc(CALL[c.call] || '통화함')} <small>${fmtDate(c.created_at)}</small></li>`).join('')}</ul></div>` : ''}
-      ${it.sms?.length ? `<div class="ld-calllog"><b>문자 기록</b><ul>${it.sms.map((m) => `<li><span class="ld-call-dot${m.ok ? ' c-yes' : ' c-no'}"></span>${m.type === 'PHONE' ? '내 폰으로 보냄' : `자동 발송(${esc(m.type)})${m.ok ? '' : ' 실패'}`} <small>${fmtDate(m.created_at)}</small></li>`).join('')}</ul></div>` : ''}
+      ${it.sms?.length ? `<div class="ld-calllog"><b>문자 기록</b><ul>${it.sms.map((m) => `<li class="ld-smslog"><details><summary><span class="ld-call-dot${m.ok ? ' c-yes' : ' c-no'}"></span>${m.type === 'PHONE' ? '내 폰으로 보냄' : `자동 발송(${esc(m.type)})${m.ok ? '' : ' 실패'}`} <small>${fmtDate(m.created_at)} · 눌러서 내용 보기</small></summary><p class="ld-smsbody">${esc(m.content || '')}</p></details></li>`).join('')}</ul></div>` : ''}
       ${it.phone || it.tel ? callScript(it) : ''}
       ${it.phone && it.consent > 0 ? proofBox(it) : ''}
       ${it.phone ? `<div class="ld-consent${it.consent > 0 ? ' on' : it.consent < 0 ? ' no' : ''}"><b>문자 받기</b>
@@ -416,7 +416,7 @@ function detail(it) {
         ${it.sent_at ? `<small class="ld-sent">마지막 문자 ${fmtDate(it.sent_at)} · 모두 ${it.sent_n}번</small>` : ''}</div>` : ''}
       <input class="input ld-memo" type="text" value="${esc(it.memo)}" placeholder="메모" maxlength="500" aria-label="메모">
       <div class="ld-act">
-        ${it.phone ? '<a class="btn sm primary" data-myphone href="#">내 폰으로 문자</a><button type="button" class="btn sm" data-copy>번호 복사</button>' : ''}
+        ${it.phone ? '<a class="btn sm primary" data-myphone href="#">내 폰으로 문자</a><button type="button" class="btn sm" data-sentlog title="PC 에서 복사해 보냈을 때 — 지금 날짜 · 보낼 문자 내용으로 기록">보냄 기록</button><button type="button" class="btn sm" data-copy>번호 복사</button>' : ''}
         <button type="button" class="btn sm${it.done ? '' : ' primary'}" data-done>${it.done ? '연락 전으로' : '연락함'}</button>
         <button type="button" class="btn sm danger" data-del>삭제</button>
       </div>
@@ -430,8 +430,11 @@ function smsToPhone(e, a, it) {
   if (!body) { e.preventDefault(); $('#ld-sms').closest('details').open = true; toast('위 "보낼 문자" 에 내용을 먼저 써 주세요.'); return; }
   navigator.clipboard?.writeText(body).catch(() => {});
   if (!matchMedia('(pointer: coarse)').matches) { e.preventDefault(); toast(`${it.name} 에 보낼 문자를 복사했습니다 — 폰에서 누르면 문자 앱이 바로 열리고 기록도 남습니다.`); return; }
-  // 폰: 문자 앱을 열면서 보낸 기록을 남긴다(날짜 · 내용 · 횟수)
-  deps.api(`/leads/${it.id}/sms`, { method: 'POST', data: { content: body } }).then((r) => {
+  recordSent(it, body);   // 폰: 문자 앱을 열면서 보낸 기록을 남긴다(날짜 · 내용 · 횟수)
+}
+// 보낸 문자 기록 — 폰 [문자] 를 누를 때, 또는 PC 에서 복사해 따로 보낸 뒤 [보냄 기록] 을 누를 때
+function recordSent(it, body) {
+  return deps.api(`/leads/${it.id}/sms`, { method: 'POST', data: { content: body } }).then((r) => {
     Object.assign(it, r); const f = full.get(it.id); if (f) { Object.assign(f, r); f.sms = [{ type: 'PHONE', content: body, ok: 1, created_at: r.sent_at }, ...(f.sms || [])]; }
     toast(`${it.name} — 문자 보낸 기록을 남겼습니다.`); setTimeout(renderList, 400);
   }).catch((err) => toast(`기록을 못 남겼습니다: ${err.message}`));
@@ -460,6 +463,8 @@ function bindDetail(li, it) {
   };
   const mp = li.querySelector('.ld-act [data-myphone]');
   if (mp) mp.onclick = (e) => smsToPhone(e, mp, it);
+  const sl = li.querySelector('[data-sentlog]');
+  if (sl) sl.onclick = () => { const body = (($('#ld-sms')?.value || sms) || '').replace(/\{업체명\}/g, it.name).trim(); if (!body) return toast('보낼 문자 내용이 비어 있습니다.'); recordSent(it, body); };
   const copy = li.querySelector('[data-copy]');
   if (copy) copy.onclick = () => navigator.clipboard.writeText(it.phone).then(() => toast('번호를 복사했습니다.'));
   li.querySelector('[data-done]').onclick = (e) => busy(e.currentTarget, null, async () => { await save({ done: !it.done }); await renderLeads(deps); });
