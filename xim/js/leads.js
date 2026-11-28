@@ -17,6 +17,7 @@ const link = { homepage: '', blog: '', instagram: '' };
 try {   // 저장해 둔 필터 불러오기(saveFilters)
   const f = JSON.parse(localStorage.getItem('xim.leads.filters') || '{}');
   ({ sido = '', gu = '', callF = '', dayF = '', filter = '' } = f);
+  if (filter === 'done') filter = '';   // '연락함' 탭은 뺐다(2026-11-28)
   for (const k of Object.keys(link)) if (typeof f.link?.[k] === 'string') link[k] = f.link[k];
 } catch {}
 let items = [];
@@ -153,7 +154,7 @@ export async function renderLeads(d) {
   for (const [k] of LINKS) pillTabs($(`#ld-f-${k}`), [['', '전체'], ['y', '있음'], ['n', '없음']], link[k], (v) => { link[k] = v; update(); });
   pillTabs($('#ld-f-call'), [['', '전체'], ['-', '통화 전'], ['yes', '동의받음'], ['no', '거절'], ['miss', '부재중'], ['nope', '안 받음']], callF, (v) => { callF = v; update(); });
   pillTabs($('#ld-f-day'), [['', '전체'], ['today', '오늘'], ['yday', '어제'], ['week', '최근 7일']], dayF, (v) => { dayF = v; update(); });
-  pillTabs($('#ld-tabs'), [['', '전체'], ['has', '번호 있음'], ['none', '번호 없음'], ['done', '연락함']], filter, (v) => { filter = v; update(); });
+  pillTabs($('#ld-tabs'), [['', '전체'], ['has', '번호 있음'], ['none', '번호 없음']], filter, (v) => { filter = v; update(); });
   update();
   $('#ld-tools').ontoggle = (e) => { try { localStorage.setItem('xim.leads.tools', e.target.open ? '1' : '0'); } catch {} };   // 접어 둔 위쪽 칸 — 열고 닫은 상태 기억
   $('#ld-q').oninput = (e) => { q = e.target.value; update(); };
@@ -291,7 +292,7 @@ function paintCounts() {
     relabel($('#ld-f-call'), { '': `전체 ${base.length}`, '-': `통화 전 ${c('-')}`, yes: `동의받음 ${c('yes')}`, no: `거절 ${c('no')}`, miss: `부재중 ${c('miss')}`, nope: `안 받음 ${c('nope')}` }); }
   { const base = area.filter((i) => phoneOk(i) && linkOk(i) && textOk(i) && callOk(i)); const c = (v) => base.filter((i) => dayOk(i, v)).length;
     relabel($('#ld-f-day'), { '': `전체 ${base.length}`, today: `오늘 ${c('today')}`, yday: `어제 ${c('yday')}`, week: `최근 7일 ${c('week')}` }); }
-  relabel($('#ld-tabs'), { '': `전체 ${mine.length}`, has: `번호 있음 ${has}`, none: `번호 없음 ${mine.length - has}`, done: `연락함 ${mine.filter((i) => i.done).length}` });
+  relabel($('#ld-tabs'), { '': `전체 ${mine.length}`, has: `번호 있음 ${has}`, none: `번호 없음 ${mine.length - has}` });
   for (const [k] of LINKS) {
     const base = area.filter((i) => phoneOk(i) && linkOk(i, k) && textOk(i));
     const y = base.filter((i) => i[k]).length;
