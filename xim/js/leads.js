@@ -13,6 +13,11 @@ let gu = '';       // '' 모든 구 · '노원구'
 // 홈페이지 · 블로그 · 인스타그램이 있는 곳 / 없는 곳 (사용자 지시 2026-11-27) — 칸마다 '' 상관없음 · 'y' 있음 · 'n' 없음, 여러 칸을 함께 고르면 모두 맞는 곳만
 const LINKS = [['homepage', '홈페이지'], ['blog', '블로그'], ['instagram', '인스타그램']];
 const link = { homepage: '', blog: '', instagram: '' };
+try {   // 저장해 둔 필터 불러오기(saveFilters)
+  const f = JSON.parse(localStorage.getItem('xim.leads.filters') || '{}');
+  ({ sido = '', gu = '', callF = '', filter = '' } = f);
+  for (const k of Object.keys(link)) if (typeof f.link?.[k] === 'string') link[k] = f.link[k];
+} catch {}
 let items = [];
 let scopes = [];
 let sms = '';      // 복사해 쓰는 문자 내용(xim settings.lead_sms — 리포에는 두지 않는다)
@@ -184,7 +189,10 @@ function paintGu() {
   pillTabs(fresh('#ld-gu'), [['', `전체 ${count(inSido)}`], ...gus.map((v) => [v, `${v} ${count((i) => inSido(i) && guOf(i) === v)}`])], gu, (v) => { gu = v; update(); });
 }
 
-const update = () => { limit = PAGE; paintCounts(); paintMap(); renderList(); paintPick(); };
+// 고른 필터(지역 · 통화 · 홈페이지 · 블로그 · 인스타 · 보기)는 이 브라우저에 저장 — 새로고침 · 다음에 들어와도 그대로(사용자 지시 2026-11-28)
+const FKEY = 'xim.leads.filters';
+const saveFilters = () => { try { localStorage.setItem(FKEY, JSON.stringify({ sido, gu, callF, filter, link })); } catch {} };
+const update = () => { limit = PAGE; saveFilters(); paintCounts(); paintMap(); renderList(); paintPick(); };
 const smsReady = () => { const r = smsCfg.ready || {}; return r.keys && r.service && r.from; };
 const byteLen = (t) => { let n = 0; for (const ch of String(t)) n += ch.charCodeAt(0) > 127 ? 2 : 1; return n; };
 
@@ -322,7 +330,7 @@ function renderList() {
     li.querySelectorAll('[data-toggle]').forEach((b) => { b.onclick = async () => {
       if (open.has(it.id)) { open.delete(it.id); renderList(); return; }
       open.add(it.id);
-      if (!full.has(it.id)) { try { const r = await deps.api(`/leads/${it.id}`); full.set(it.id, { ...(r.item || {}), calls: r.calls || [] }); } catch { full.set(it.id, {}); } }
+      if (!full.has(it.id)) { try { const r = await deps.api(`/leads/${it.id}`); let sm = []; try { sm = (await deps.api(`/leads/${it.id}/sms`)).items || []; } catch {} full.set(it.id, { ...(r.item || {}), calls: r.calls || [], sms: sm }); } catch { full.set(it.id, {}); } }
       renderList();
     }; });
     const cs = li.querySelector('[data-call]');
@@ -396,6 +404,7 @@ function detail(it) {
         <div><dt>모은 때</dt><dd>${fmtDate(it.created_at)}${it.area ? ` · ${esc(it.area)}` : ''}</dd></div>
       </dl>
       ${it.calls?.length ? `<div class="ld-calllog"><b>통화 기록</b><ul>${it.calls.map((c) => `<li><span class="ld-call-dot c-${esc(c.call)}"></span>${esc(CALL[c.call] || '통화함')} <small>${fmtDate(c.created_at)}</small></li>`).join('')}</ul></div>` : ''}
+      ${it.sms?.length ? `<div class="ld-calllog"><b>문자 기록</b><ul>${it.sms.map((m) => `<li><span class="ld-call-dot${m.ok ? ' c-yes' : ' c-no'}"></span>${m.type === 'PHONE' ? '내 폰으로 보냄' : `자동 발송(${esc(m.type)})${m.ok ? '' : ' 실패'}`} <small>${fmtDate(m.created_at)}</small></li>`).join('')}</ul></div>` : ''}
       ${it.phone || it.tel ? callScript(it) : ''}
       ${it.phone && it.consent > 0 ? proofBox(it) : ''}
       ${it.phone ? `<div class="ld-consent${it.consent > 0 ? ' on' : it.consent < 0 ? ' no' : ''}"><b>문자 받기</b>
@@ -417,7 +426,12 @@ function smsToPhone(e, a, it) {
   a.href = `sms:${it.phone.replace(/\D/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   if (!body) { e.preventDefault(); $('#ld-sms').closest('details').open = true; toast('위 "보낼 문자" 에 내용을 먼저 써 주세요.'); return; }
   navigator.clipboard?.writeText(body).catch(() => {});
-  if (!matchMedia('(pointer: coarse)').matches) { e.preventDefault(); toast(`${it.name} 에 보낼 문자를 복사했습니다 — 폰에서 누르면 문자 앱이 바로 열립니다.`); }
+  if (!matchMedia('(pointer: coarse)').matches) { e.preventDefault(); toast(`${it.name} 에 보낼 문자를 복사했습니다 — 폰에서 누르면 문자 앱이 바로 열리고 기록도 남습니다.`); return; }
+  // 폰: 문자 앱을 열면서 보낸 기록을 남긴다(날짜 · 내용 · 횟수)
+  deps.api(`/leads/${it.id}/sms`, { method: 'POST', data: { content: body } }).then((r) => {
+    Object.assign(it, r); const f = full.get(it.id); if (f) { Object.assign(f, r); f.sms = [{ type: 'PHONE', content: body, ok: 1, created_at: r.sent_at }, ...(f.sms || [])]; }
+    toast(`${it.name} — 문자 보낸 기록을 남겼습니다.`); setTimeout(renderList, 400);
+  }).catch((err) => toast(`기록을 못 남겼습니다: ${err.message}`));
 }
 
 function bindDetail(li, it) {

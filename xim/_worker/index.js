@@ -525,6 +525,15 @@ async function ximApi(request, env, url, ctx) {
     if (sm && method === 'GET') {
       return json({ items: (await db.prepare('SELECT type, ad, content, ok, error, created_at FROM lead_sms_log WHERE lead_id = ? ORDER BY id DESC LIMIT 20').bind(+sm[1]).all()).results });
     }
+    // 내 폰으로 보낸 문자 기록(사용자 지시 2026-11-28) — 폰에서 [문자] 를 눌러 문자 앱을 연 때. type = 'PHONE'
+    if (sm && method === 'POST') {
+      const b = await body(request), t = now();
+      const r = await db.prepare('SELECT phone FROM leads WHERE id = ?').bind(+sm[1]).first();
+      if (!r) throw bad('없는 업체입니다.');
+      await db.prepare("INSERT INTO lead_sms_log (lead_id, phone, type, ad, content, ok, request_id, error, created_at) VALUES (?, ?, 'PHONE', 0, ?, 1, '', '', ?)").bind(+sm[1], r.phone, str(b.content, 4000), t).run();
+      await db.prepare('UPDATE leads SET sent_at = ?, sent_n = sent_n + 1 WHERE id = ?').bind(t, +sm[1]).run();
+      return json(await db.prepare('SELECT sent_at, sent_n FROM leads WHERE id = ?').bind(+sm[1]).first());
+    }
   }
   if (path === '/api/leads/sms' && method === 'PUT') {
     await setSetting(db, 'lead_sms', str((await body(request)).text, 4000));
