@@ -5,6 +5,7 @@ import { $, esc, toast, busy, fmtDate, pillTabs, slideTabs, openDialog } from '.
 
 let deps = null;   // { view, api }
 let filter = '';   // '' 전체 · 'has' 번호 있음 · 'none' 번호 없음 · 'done' 연락함
+let dayF = '';     // 통화한 날: '' 전체 · today 오늘 · yday 어제 · week 최근 7일
 let callF = '';    // 통화: '' 전체 · '-' 통화 전 · yes 동의받음 · no 거절 · miss 부재중 · nope 안 받음
 const CALL = { '': '통화 전', yes: '통화 · 동의받음', no: '통화 · 거절', miss: '부재중', nope: '안 받음' };   // ok = 예전 '통화함'(남아 있으면 그대로 보임)
 let q = '';
@@ -15,7 +16,7 @@ const LINKS = [['homepage', '홈페이지'], ['blog', '블로그'], ['instagram'
 const link = { homepage: '', blog: '', instagram: '' };
 try {   // 저장해 둔 필터 불러오기(saveFilters)
   const f = JSON.parse(localStorage.getItem('xim.leads.filters') || '{}');
-  ({ sido = '', gu = '', callF = '', filter = '' } = f);
+  ({ sido = '', gu = '', callF = '', dayF = '', filter = '' } = f);
   for (const k of Object.keys(link)) if (typeof f.link?.[k] === 'string') link[k] = f.link[k];
 } catch {}
 let items = [];
@@ -45,6 +46,9 @@ const guOf = (it) => words(it)[1] || '';
 const regionOf = (it) => `${sidoOf(it)} ${guOf(it)}`.trim();
 const inRegion = (it) => (!sido || sidoOf(it) === sido) && (!gu || guOf(it) === gu);
 const callOk = (it) => !callF || (callF === '-' ? !it.call : it.call === callF);
+// 통화한 날(한국 날짜 기준, 마지막 통화 표시 시각 call_at)
+const kday = (t) => Math.floor((t + 9 * 3600000) / 86400000);
+const dayOk = (it, v = dayF) => { if (!v) return true; if (!it.call_at) return false; const d = kday(Date.now()) - kday(it.call_at); return v === 'today' ? d === 0 : v === 'yday' ? d === 1 : d < 7; };
 const phoneOk = (it) => (filter === 'has' ? !!it.phone : filter === 'none' ? !it.phone : filter === 'done' ? !!it.done : true);
 const linkOk = (it, skip) => LINKS.every(([k]) => k === skip || !link[k] || (link[k] === 'y') === !!it[k]);
 const textOk = (it) => {
@@ -140,7 +144,7 @@ export async function renderLeads(d) {
     </details>
     <div class="ld-region"><span class="ld-region-label">지역</span>
       <nav class="tabs iq-tabs" id="ld-sido" aria-label="시 · 도"></nav><span class="ld-region-sep" aria-hidden="true">›</span><nav class="tabs iq-tabs" id="ld-gu" aria-label="구"></nav></div>
-    <div class="ld-filters"><div class="ld-f"><span class="ld-region-label">통화</span><nav class="tabs iq-tabs" id="ld-f-call" aria-label="통화"></nav></div>${LINKS.map(([k, label]) => `<div class="ld-f"><span class="ld-region-label">${label}</span><nav class="tabs iq-tabs" id="ld-f-${k}" aria-label="${label}"></nav></div>`).join('')}</div>
+    <div class="ld-filters"><div class="ld-f"><span class="ld-region-label">통화</span><nav class="tabs iq-tabs" id="ld-f-call" aria-label="통화"></nav></div><div class="ld-f"><span class="ld-region-label">통화한 날</span><nav class="tabs iq-tabs" id="ld-f-day" aria-label="통화한 날"></nav></div>${LINKS.map(([k, label]) => `<div class="ld-f"><span class="ld-region-label">${label}</span><nav class="tabs iq-tabs" id="ld-f-${k}" aria-label="${label}"></nav></div>`).join('')}</div>
     <nav class="tabs iq-tabs ld-tabs" id="ld-tabs" aria-label="보기"></nav>
     <div id="ld-body"></div>
     <div class="ld-pick" id="ld-pick" hidden></div>`;
@@ -148,6 +152,7 @@ export async function renderLeads(d) {
   paintGu();
   for (const [k] of LINKS) pillTabs($(`#ld-f-${k}`), [['', '전체'], ['y', '있음'], ['n', '없음']], link[k], (v) => { link[k] = v; update(); });
   pillTabs($('#ld-f-call'), [['', '전체'], ['-', '통화 전'], ['yes', '동의받음'], ['no', '거절'], ['miss', '부재중'], ['nope', '안 받음']], callF, (v) => { callF = v; update(); });
+  pillTabs($('#ld-f-day'), [['', '전체'], ['today', '오늘'], ['yday', '어제'], ['week', '최근 7일']], dayF, (v) => { dayF = v; update(); });
   pillTabs($('#ld-tabs'), [['', '전체'], ['has', '번호 있음'], ['none', '번호 없음'], ['done', '연락함']], filter, (v) => { filter = v; update(); });
   update();
   $('#ld-tools').ontoggle = (e) => { try { localStorage.setItem('xim.leads.tools', e.target.open ? '1' : '0'); } catch {} };   // 접어 둔 위쪽 칸 — 열고 닫은 상태 기억
@@ -194,7 +199,7 @@ function paintGu() {
 
 // 고른 필터(지역 · 통화 · 홈페이지 · 블로그 · 인스타 · 보기)는 이 브라우저에 저장 — 새로고침 · 다음에 들어와도 그대로(사용자 지시 2026-11-28)
 const FKEY = 'xim.leads.filters';
-const saveFilters = () => { try { localStorage.setItem(FKEY, JSON.stringify({ sido, gu, callF, filter, link })); } catch {} };
+const saveFilters = () => { try { localStorage.setItem(FKEY, JSON.stringify({ sido, gu, callF, dayF, filter, link })); } catch {} };
 const update = () => { limit = PAGE; saveFilters(); paintCounts(); paintMap(); renderList(); paintPick(); };
 const smsReady = () => { const r = smsCfg.ready || {}; return r.keys && r.service && r.from; };
 const byteLen = (t) => { let n = 0; for (const ch of String(t)) n += ch.charCodeAt(0) > 127 ? 2 : 1; return n; };
@@ -282,8 +287,10 @@ function paintCounts() {
   // 각 탭의 숫자 = 그 탭만 빼고 나머지 고른 것을 모두 맞춘 곳 중에서
   const mine = area.filter((i) => linkOk(i) && textOk(i));
   const has = mine.filter((i) => i.phone).length;
-  { const base = area.filter((i) => phoneOk(i) && linkOk(i) && textOk(i)); const c = (v) => base.filter((i) => (v === '-' ? !i.call : i.call === v)).length;
+  { const base = area.filter((i) => phoneOk(i) && linkOk(i) && textOk(i) && dayOk(i)); const c = (v) => base.filter((i) => (v === '-' ? !i.call : i.call === v)).length;
     relabel($('#ld-f-call'), { '': `전체 ${base.length}`, '-': `통화 전 ${c('-')}`, yes: `동의받음 ${c('yes')}`, no: `거절 ${c('no')}`, miss: `부재중 ${c('miss')}`, nope: `안 받음 ${c('nope')}` }); }
+  { const base = area.filter((i) => phoneOk(i) && linkOk(i) && textOk(i) && callOk(i)); const c = (v) => base.filter((i) => dayOk(i, v)).length;
+    relabel($('#ld-f-day'), { '': `전체 ${base.length}`, today: `오늘 ${c('today')}`, yday: `어제 ${c('yday')}`, week: `최근 7일 ${c('week')}` }); }
   relabel($('#ld-tabs'), { '': `전체 ${mine.length}`, has: `번호 있음 ${has}`, none: `번호 없음 ${mine.length - has}`, done: `연락함 ${mine.filter((i) => i.done).length}` });
   for (const [k] of LINKS) {
     const base = area.filter((i) => phoneOk(i) && linkOk(i, k) && textOk(i));
@@ -306,7 +313,7 @@ function renderScan() {
       ${r.errors.length ? `<small>${esc(r.errors.join(' · '))}</small>` : ''}</li>`).join('')}</ul>`;
 }
 
-const shown = () => items.filter((it) => inRegion(it) && phoneOk(it) && linkOk(it) && textOk(it) && callOk(it));
+const shown = () => items.filter((it) => inRegion(it) && phoneOk(it) && linkOk(it) && textOk(it) && callOk(it) && dayOk(it));
 
 function renderList() {
   const box = $('#ld-body'); if (!box) return;
